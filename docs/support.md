@@ -795,6 +795,21 @@ answer.
   selected Node types can leave both DOM and Node targets possible for a shared
   global, type name or typed member. Two test frameworks supplying the same
   global can also produce a candidate set.
+- **Unbuilt checkout packages:** The configured compiler emit can identify
+  a unique source of a missing declaration entry. A plain `tsc` build can
+  prove that mapping, including through `tsc -b` for a referenced child.
+  An unproved build yields a link carrying
+  `ts-unbuilt-entry-is-compiler-emit` in `data.assumes` if the checkout has
+  no contrary evidence. Known declaration rollups, different command-line
+  entries, opaque or mismatched bundler configs, compiler mapping overrides,
+  entry rewrites, missing JavaScript-only emit and stripped internal
+  declarations leave the affected links unresolved. Normal compiler
+  lookup handles `paths`, export conditions and built entries first.
+  Followed links expose the manifest, config, output and source in
+  `data.unbuiltEntry`. An assumption-backed member link records the entry
+  that supplied its receiver type when the declaring file is also imported
+  directly.
+  [C-25](changes/C-25.md)
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   bare test globals with an overlapping unmodelled type request
@@ -806,7 +821,7 @@ answer.
   (`workspace-manifest-unreadable`);
   unavailable Deno import maps, unmapped Deno bare imports and remote URL
   imports (`deno-import-unverified`);
-  installed workspace bindings with no captured entry
+  workspace bindings with no usable entry or proven producer
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).
 - **`partial` files** have complete but qualified facts, never syntax errors: an

@@ -19,6 +19,8 @@ import type { ProjectGroup } from "./project.js";
 import type { Renamed } from "./rename.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
 import { neutralizeAssumed } from "./untrusted.js";
+import { entryProvenance } from "./workspace-entries.js";
+import { unbuiltEntryAssumption } from "./entry-build.js";
 
 /** Program rebuilds per file after checker stack overflows before giving up. */
 const MAX_LIMIT_RETRIES = 25;
@@ -109,7 +111,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `39+typescript-${ts.version}`;
+const MODULE_VERSION = `42+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -585,6 +587,57 @@ const failedDigest = (
       )
     : undefined;
 
+/** A projected source can change even unrelated compiler answers, through
+ * ambient declarations or receiver types. Keep existing answers and mark
+ * new answers, including ones whose target lies beyond the entry package. */
+function withWorkspaceAssumptions(
+  projected: ParseResult,
+  plain: ParseResult,
+): ParseResult {
+  if (plain.status === "failed" || projected.status === "failed") return plain;
+  const key = (link: LinkDraft) =>
+    JSON.stringify([link.sourceKey, siteOf(link), link.targetName]);
+  const existing = new Map(plain.links.map((link) => [key(link), link]));
+  return {
+    ...projected,
+    links: projected.links.map((link) => {
+      if (link.kind === "contains") return link;
+      const previous = existing.get(key(link));
+      const data = { ...((link.data ?? {}) as { [key: string]: Json }) };
+      const entry = data.unbuiltEntry as { assumed?: true } | undefined;
+      const changed = !previous || outcomeOf(previous) !== outcomeOf(link);
+      const before = previous?.data as
+        | {
+            reason?: string;
+            targets?: TargetFact[];
+            libraryFacts?: LibraryTarget[];
+          }
+        | undefined;
+      if (previous && before?.reason === "invalid-code") return previous;
+      if (
+        previous &&
+        before &&
+        !before.reason &&
+        (before.targets?.length || before.libraryFacts?.length) &&
+        (changed || entry?.assumed)
+      )
+        return previous;
+      if (changed || entry?.assumed) {
+        if (!entry?.assumed) {
+          if (previous) return previous;
+          delete data.targets;
+          delete data.libraryFacts;
+          data.reason = "workspace-build-output-missing";
+          return { ...link, data };
+        }
+        assume(data, unbuiltEntryAssumption);
+        return { ...link, data };
+      }
+      return link;
+    }),
+  };
+}
+
 /** A file that cannot be read: failed, with its syntax errors, no facts. */
 const invalidResult = (
   failure: { diagnostics: Diagnostic[] },
@@ -824,6 +877,32 @@ export function mergeTied(
         (data) => (Array.isArray(data.assumes) ? data.assumes : []) as string[],
       ),
     );
+    const assumptions = merged.assumes as string[] | undefined;
+    if (assumptions?.includes(unbuiltEntryAssumption)) {
+      const entries = new Map(
+        datas
+          .filter((data) =>
+            (data.assumes as string[] | undefined)?.includes(
+              unbuiltEntryAssumption,
+            ),
+          )
+          .map((data) => [
+            JSON.stringify(data.unbuiltEntry),
+            data.unbuiltEntry,
+          ]),
+      );
+      if (entries.size === 1)
+        merged.unbuiltEntry = entries.values().next().value!;
+      else {
+        delete merged.unbuiltEntry;
+        delete merged.targets;
+        delete merged.libraryFacts;
+        merged.reason = "ambiguous-project";
+        merged.assumes = assumptions.filter(
+          (name) => name !== unbuiltEntryAssumption,
+        );
+      }
+    }
     return { ...link, data: merged };
   });
   const diagnostics = [
@@ -1070,20 +1149,26 @@ export function typescriptModule(
             );
           continue;
         }
-        let baseHost = normal.host;
-        const hostOfNormal = () => normal?.host ?? baseHost;
-        const resolveModule = (specifier: string, from: string) => {
+        const provenance = new WeakMap<
+          ts.Program,
+          ReturnType<typeof entryProvenance>
+        >();
+        const resolveModule = (
+          host: ts.CompilerHost,
+          specifier: string,
+          from: string,
+        ) => {
           const selected = model.selectSpecifier(specifier, from);
           if (selected === undefined) return undefined;
           const resolved = ts.resolveModuleName(
             selected,
             toVirtual(from),
             group.options,
-            hostOfNormal(),
+            host,
           ).resolvedModule?.resolvedFileName;
           return resolved === undefined
             ? undefined
-            : fromVirtual(hostOfNormal().realpath?.(resolved) ?? resolved);
+            : fromVirtual(host.realpath?.(resolved) ?? resolved);
         };
         /**
          * What a captured target file is. `script` means only: analysed, no
@@ -1092,17 +1177,15 @@ export function typescriptModule(
          * found is `partial` (its exports cannot be ruled out).
          */
         const moduleKind = (
+          session: Session,
           path: string,
         ): "module" | "script" | "invalid" | "unavailable" => {
           if (model.syntaxFailures.has(path)) return "invalid";
           if (model.parseFailures.has(path) || model.failures.has(path))
             return "unavailable";
           const source =
-            normal?.program.getSourceFile(toVirtual(path)) ??
-            hostOfNormal().getSourceFile(
-              toVirtual(path),
-              ts.ScriptTarget.Latest,
-            );
+            session.program.getSourceFile(toVirtual(path)) ??
+            session.host.getSourceFile(toVirtual(path), ts.ScriptTarget.Latest);
           // Parsing it just now may have found a syntax error.
           if (model.syntaxFailures.has(path)) return "invalid";
           if (!source) return "unavailable";
@@ -1164,6 +1247,15 @@ export function typescriptModule(
               // Anything else the compiler threw is an internal error.
               throw Error(failure ?? "The compiler did not load this source");
             }
+            if (!provenance.has(session.program))
+              provenance.set(
+                session.program,
+                entryProvenance(
+                  session.program,
+                  model.unbuiltEntries(session.host),
+                  captured,
+                ),
+              );
             const result = extractFile(
               source,
               session.checker,
@@ -1177,13 +1269,15 @@ export function typescriptModule(
                 fresh: model.fresh,
                 explicitTypes: group.explicitTypes === true,
                 ...(renamed ? { renamed } : {}),
-                resolveModule,
+                resolveModule: (specifier, from) =>
+                  resolveModule(session.host, specifier, from),
                 hasDenoImports: model.hasDenoImports,
                 selectSpecifier: model.selectSpecifier,
                 workspaceReason: model.workspaceReason,
+                unbuilt: provenance.get(session.program),
                 workspaceBoundaryKnown: model.workspaceBoundaryKnown,
                 skip,
-                moduleKind,
+                moduleKind: (target) => moduleKind(session, target),
                 anyFailed: unseen.size > 0,
                 failedNames,
               },
@@ -1374,10 +1468,16 @@ export function typescriptModule(
         );
         // The differential pass shares the original parse cache. Its lookups
         // do not need the original program or checker.
-        baseHost = normal.host;
+        const baseHost = normal.host;
+        const projectedEntries = model.unbuiltEntries(baseHost);
+        const workspaceAssumed =
+          projectedEntries &&
+          [...projectedEntries.values()].some((entry) => entry.assumed);
         normal = undefined;
-        const assumed = new Map<string, Set<number>>();
-        if (assumedTexts.size) {
+        const differential = (
+          texts: ReadonlyMap<string, string>,
+          plainWorkspaceEntries: boolean,
+        ) => {
           statistics.neutralPrograms++;
           const failures = new Map(model.parseFailures);
           const neutral = openSession(
@@ -1385,9 +1485,10 @@ export function typescriptModule(
             group.options,
             () =>
               model.host(group, {
-                texts: assumedTexts,
+                texts,
                 base: baseHost,
                 failures,
+                plainWorkspaceEntries,
               }),
             failures,
             captured,
@@ -1396,26 +1497,55 @@ export function typescriptModule(
             undefined,
             hooks,
           );
-          for (const [path, result] of analysed) {
-            if (result.status === "failed") continue;
+          return (path: string) => {
             const renamed = model.renames.get(path);
             // The assumed loader becomes an undeclared name (see rename.ts).
-            const context: Renamed | undefined = renamed?.assumed.length
-              ? {
-                  ...renamed,
-                  uncertain: [...renamed.uncertain, ...renamed.assumed],
-                  assumed: [],
-                }
-              : renamed;
+            const context: Renamed | undefined =
+              texts.has(path) && renamed?.assumed.length
+                ? {
+                    ...renamed,
+                    uncertain: [...renamed.uncertain, ...renamed.assumed],
+                    assumed: [],
+                  }
+                : renamed;
             const other = extractWith(neutral, path, {}, [], context);
             statistics.neutralExtracted++;
-            assumed.set(path, differing(result, other));
+            return other;
+          };
+        };
+        if (assumedTexts.size) {
+          const withoutBundler = differential(assumedTexts, false);
+          analysed = analysed.map(([path, result]) => [
+            path,
+            result.status === "failed"
+              ? result
+              : labelled(result, differing(result, withoutBundler(path))),
+          ]);
+        }
+        if (workspaceAssumed) {
+          const withoutWorkspace = differential(new Map(), true);
+          let plain: [string, ParseResult][] = analysed.map(
+            ([path, result]) => [
+              path,
+              result.status === "failed" ? result : withoutWorkspace(path),
+            ],
+          );
+          if (assumedTexts.size) {
+            const withoutEither = differential(assumedTexts, true);
+            plain = plain.map(([path, result]) => [
+              path,
+              result.status === "failed"
+                ? result
+                : labelled(result, differing(result, withoutEither(path))),
+            ]);
           }
+          analysed = analysed.map(([path, result], index) => [
+            path,
+            withWorkspaceAssumptions(result, plain[index]![1]),
+          ]);
         }
         for (const [path, result] of analysed) {
           let final = result;
-          const marks = assumed.get(path);
-          if (marks?.size) final = labelled(final, marks);
           // One rule, one place: a program with a failed file among those it
           // would include flags every link it computed (failed links excepted).
           if (unseen.size && final.status !== "failed")

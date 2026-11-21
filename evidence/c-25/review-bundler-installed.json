@@ -1,0 +1,22 @@
+[
+  {
+    "pin": "honojs/hono",
+    "before": 72340,
+    "after": 72340,
+    "beforeL2": 46405,
+    "afterL2": 46975,
+    "shared": 72340,
+    "sharedBeforeL2": 46405,
+    "sharedAfterL2": 46975,
+    "lostSites": 0,
+    "newSites": 0,
+    "withdrawals": 0,
+    "definiteChanges": 0,
+    "checkoutSymbols": 5773,
+    "symbolKeysMatch": true,
+    "gainsByProof": {
+      "tsconfig-emit": 525,
+      "unmarked": 45
+    }
+  }
+]

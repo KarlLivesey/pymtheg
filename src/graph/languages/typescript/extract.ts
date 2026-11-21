@@ -23,7 +23,13 @@ import type {
   ParseResult,
   SymbolDraft,
 } from "../../types.js";
-import { fromVirtual, LIB_ROOT, toVirtual } from "./project.js";
+import {
+  fromVirtual,
+  LIB_ROOT,
+  matchesPathAlias,
+  toVirtual,
+} from "./project.js";
+import type { entryProvenance, UnbuiltEntry } from "./workspace-entries.js";
 import {
   bundledLibraryUnit,
   importedTarget,
@@ -70,6 +76,7 @@ export interface RenameContext {
     includeInstalled?: boolean,
   ) => string | undefined;
   workspaceBoundaryKnown: (from: string) => boolean;
+  unbuilt?: ReturnType<typeof entryProvenance>;
   /** Nodes (and warm-up steps) whose checker lookups overflowed before. */
   skip: ReadonlySet<string>;
   /**
@@ -143,6 +150,8 @@ export interface TargetFact {
 type Meaning = "call" | "value" | "type" | "any";
 interface Targets {
   targets: TargetFact[];
+  unbuiltEntry?: UnbuiltEntry;
+  viaSpecifier?: ts.StringLiteralLike;
   libraryFacts?: LibraryTarget[];
   /** Written outside identity independent of missing checker declarations. */
   lexicalLibrary?: boolean;
@@ -1233,14 +1242,23 @@ export function extractFile(
       new Set(libraries.map(libraryKey)).size !== libraries.length
     )
       return { targets: [], reason: "ambiguous-library-declaration", receiver };
-    if (!external && !local && !missingGlobalTypes)
+    if (!external && !local && !missingGlobalTypes) {
+      const specifier =
+        context.unbuilt && firstAlias && bindingSpecifier(firstAlias);
+      const viaSpecifier =
+        specifier && ts.isStringLiteralLike(specifier) ? specifier : undefined;
+      const unbuiltEntry =
+        viaSpecifier && context.unbuilt?.forSpecifier(viaSpecifier);
       return {
         targets,
         viaAlias,
         receiver,
         declarations,
         ...(libraries && { libraryFacts: libraries }),
+        ...(unbuiltEntry && { unbuiltEntry }),
+        ...(viaSpecifier && { viaSpecifier }),
       };
+    }
     // An alias whose module did not resolve keeps that module's reason.
     const moduleFailure =
       external &&
@@ -2067,6 +2085,48 @@ export function extractFile(
       )
     );
   }
+  /** Follow the receiver's own binding before considering file reachability.
+   * An independent import can load the member's declaring file without
+   * supplying the receiver type at this use. */
+  function receiverEntry(receiver: ts.Expression): UnbuiltEntry | undefined {
+    const seen = new Set<ts.Symbol>();
+    let value: ts.Node = receiver;
+    while (true) {
+      if (
+        ts.isPropertyAccessExpression(value) ||
+        ts.isElementAccessExpression(value) ||
+        ts.isCallExpression(value) ||
+        ts.isNewExpression(value) ||
+        ts.isParenthesizedExpression(value) ||
+        ts.isNonNullExpression(value) ||
+        ts.isAwaitExpression(value)
+      ) {
+        value = value.expression;
+        continue;
+      }
+      if (!ts.isIdentifier(value)) return;
+      const symbol = symbolOf(value);
+      if (!symbol || symbol === LIMIT || seen.has(symbol)) return;
+      seen.add(symbol);
+      for (const alias of aliasChain(checker, symbol)) {
+        const specifier = bindingSpecifier(alias);
+        if (specifier && ts.isStringLiteralLike(specifier)) {
+          const entry = context.unbuilt?.forSpecifier(specifier);
+          if (entry) return entry;
+        }
+      }
+      const declaration = symbol.valueDeclaration;
+      if (
+        !declaration ||
+        !ts.isVariableDeclaration(declaration) ||
+        declaration.type ||
+        !declaration.initializer ||
+        !(declaration.parent.flags & ts.NodeFlags.Const)
+      )
+        return;
+      value = declaration.initializer;
+    }
+  }
   function link(
     sourceKey: string,
     kind: string,
@@ -2075,6 +2135,13 @@ export function extractFile(
     found: Targets,
     extra: { [key: string]: Json } = {},
   ) {
+    if (
+      !found.reason &&
+      found.declarations?.some((declaration) =>
+        context.unbuilt?.isStripped(path, declaration, found.viaSpecifier),
+      )
+    )
+      found = { targets: [], reason: "workspace-build-output-missing" };
     // An unresolved bare name that a failed file of this program declares:
     // that file is why there is no answer (a global, a `declare global`,
     // a namespace). A member name through an untainted receiver never is.
@@ -2132,6 +2199,26 @@ export function extractFile(
         }));
     }
     if (reason) facts.reason = reason;
+    if (
+      !reason &&
+      context.unbuilt?.hasEntries &&
+      (found.targets.length || found.libraryFacts?.length)
+    ) {
+      const binding =
+        found.unbuiltEntry ?? (found.receiver && receiverEntry(found.receiver));
+      const first = found.targets[0];
+      const reachable = first && context.unbuilt.forTarget(path, first.file);
+      const entry =
+        binding ??
+        (reachable &&
+        found.targets.every(
+          (target) =>
+            context.unbuilt?.forTarget(path, target.file) === reachable,
+        )
+          ? reachable
+          : undefined);
+      if (entry) facts.unbuiltEntry = { ...entry };
+    }
     if (found.competingTypes) facts.competingTypes = [...found.competingTypes];
     links.push({
       sourceKey,
@@ -2239,15 +2326,7 @@ export function extractFile(
       return "missing-module";
     const aliased =
       text.startsWith("#") ||
-      (text === specifier.text &&
-        paths.some((pattern) => {
-          const star = pattern.indexOf("*");
-          return star < 0
-            ? pattern === text
-            : text.length >= pattern.length - 1 &&
-                text.startsWith(pattern.slice(0, star)) &&
-                text.endsWith(pattern.slice(star + 1));
-        }));
+      (text === specifier.text && matchesPathAlias(text, paths));
     const importer = fromVirtual(specifier.getSourceFile().fileName) ?? path;
     if (aliased) return "unresolved-alias";
     const workspace = context.workspaceReason(
@@ -2299,15 +2378,23 @@ export function extractFile(
       context.moduleKind(reached) === "unavailable"
         ? { ...found, reason: "target-unavailable" }
         : found;
-    link(owner, "imports", specifier.text, specifier, final, {
-      specifier: specifier.text,
-      ...(selection?.extensionFallback ? { extensionFallback: true } : {}),
-      // `notAModule` means one thing: the target file has no imports/exports.
-      ...(file && context.moduleKind(file) === "script"
-        ? { notAModule: true }
-        : {}),
-      ...extra,
-    });
+    const unbuiltEntry = context.unbuilt?.forSpecifier(specifier);
+    link(
+      owner,
+      "imports",
+      specifier.text,
+      specifier,
+      unbuiltEntry ? { ...final, unbuiltEntry } : final,
+      {
+        specifier: specifier.text,
+        ...(selection?.extensionFallback ? { extensionFallback: true } : {}),
+        // `notAModule` means one thing: the target file has no imports/exports.
+        ...(file && context.moduleKind(file) === "script"
+          ? { notAModule: true }
+          : {}),
+        ...extra,
+      },
+    );
   }
   const symbolOf = (node: ts.Node): ts.Symbol | undefined => {
     if (limited) {

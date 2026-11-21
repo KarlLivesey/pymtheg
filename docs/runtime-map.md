@@ -1730,6 +1730,22 @@ metadata. The physical package exposed to the importer supersedes an inferred
 workspace link. The checker supplies test-global owners when the competing
 type requests were captured. [C-20](changes/C-20.md)
 
+Module 41 can replay a failed checkout package lookup using the same
+TypeScript resolver and a scoped set of declared emit names. The package's
+plain `tsc` script selects the config, and the compiler gives the exact
+declaration path. A build-mode invocation can establish the config for a
+scriptless referenced package. The host serves the uniquely proved source in
+the existing program and records the entry provenance. When the package
+build is unproved, a second view of the same snapshot keeps existing
+answers and labels projected outcomes with
+`ts-unbuilt-entry-is-compiler-emit` when their entry is attributable.
+The receiver's binding can supply that entry even when another import
+reaches the member file. Visible bundler configs must give a matching
+literal entry, and build command-line flags must preserve the mapping.
+Installed registry packages and
+existing outputs stay on the ordinary route.
+[C-25](changes/C-25.md)
+
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
 lookup cache key for the outside search. `library.ts` supplies edition prelude
