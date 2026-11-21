@@ -2866,6 +2866,19 @@ facade and its implementation. Unverified implementations leave the
 expansion opaque without a supported output proof. Verified identities feed the C-12 effect rules and its existing
 external effect assumption. [C-18](changes/C-18.md)
 
+### C-34 Fixed impl items in Rust macro transcribers
+
+A resolved `macro_rules!` definition can bound its lexical output to no
+names when every arm consists of fixed `impl` items and the invocation
+passes only identifiers and commas. The written impl bodies delimit the
+associated items. Repetitions cannot supply an item boundary or join tokens
+with a separator other than a comma. Inside a body, `inline`, `allow` and
+`cfg` preserve or remove the annotated item. Other attributes and nested
+macro syntax leave the proof unavailable. A nested definition could export
+a macro to the crate root. The scope retry uses the proof as a lexical name
+bound. Generated impl contents are still opaque for member resolution.
+[C-34](changes/C-34.md)
+
 ### C-14 Go library targets
 
 Go records a library target where the source proves the package and, for a

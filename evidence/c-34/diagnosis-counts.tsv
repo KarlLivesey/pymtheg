@@ -1,0 +1,109 @@
+Dimension	Class	Other blockers	All pins	BurntSushi/ripgrep	actix/actix-web	cberner/redb	crossbeam-rs/crossbeam	fjall-rs/fjall	helix-editor/helix	rust-embedded/cortex-m	rustls/rustls	serde-rs/serde	tokio-rs/axum
+cohort	reason anywhere	any	119442	1355	25423	9227	1068	2350	27712	912	22519	15461	13415
+cohort	first reason	any	83981	764	18891	6506	768	1885	23420	758	12195	8617	10177
+classes	attribute identity open	several	1643	0	770	283	0	2	0	0	41	0	547
+classes	attribute identity open	sole	3380	0	864	850	0	24	0	4	130	0	1508
+classes	block statement macro identity open or external	several	469	19	37	7	136	0	3	3	205	21	38
+classes	block statement macro identity open or external	sole	758	11	38	36	122	6	5	6	353	72	109
+classes	block-local macro_rules expansion	several	110	0	0	0	51	0	39	0	0	0	20
+classes	block-local macro_rules expansion	sole	34	0	0	0	0	0	32	0	0	0	2
+classes	built-in derive spelling	several	3097	0	0	72	0	0	1912	0	1085	28	0
+classes	built-in derive spelling	sole	9352	0	0	196	0	0	8639	0	500	17	0
+classes	external derive identified	several	70	0	14	0	0	0	40	0	16	0	0
+classes	external derive identified	sole	344	0	68	0	0	0	206	0	45	0	25
+classes	external item macro	several	523	0	390	0	0	0	71	0	0	0	62
+classes	external item macro	sole	1771	0	1236	1	0	0	334	0	0	0	200
+classes	include or layout invocation	sole	1	0	0	0	0	0	0	0	0	1	0
+classes	module item macro identity open	several	992	0	520	177	65	0	200	16	12	2	0
+classes	module item macro identity open	sole	2342	0	770	552	229	0	575	98	82	5	31
+classes	module macro_rules expansion	several	2946	190	763	147	110	0	138	2	987	0	609
+classes	module macro_rules expansion	sole	8642	271	1409	1142	119	0	416	89	2968	0	2228
+classes	multiple origin classes	several	16955	0	2338	67	10	121	434	160	6326	6035	1464
+classes	multiple origin classes	sole	19172	66	2742	526	21	326	4793	127	3002	5201	2368
+classes	other derive identity open	several	1819	90	199	7	0	29	136	25	30	1288	15
+classes	other derive identity open	sole	7045	344	668	160	0	129	2878	144	128	2381	213
+classes	prelude or tool attribute spelling	several	3116	0	0	0	0	353	24	0	2739	0	0
+classes	prelude or tool attribute spelling	sole	2764	0	15	0	0	1182	13	0	1554	0	0
+classes	procedural attribute	several	3943	0	2524	0	0	63	292	89	62	1	912
+classes	procedural attribute	sole	8239	0	4848	0	0	115	1632	133	92	0	1419
+classes	traced guard already bounded by main	several	7689	357	1694	1982	115	0	2027	3	952	0	559
+classes	traced guard already bounded by main	sole	12226	7	3516	3022	90	0	2873	13	1210	409	1086
+origins	attribute identity open	several	3828	0	1589	292	0	55	0	48	193	0	1651
+origins	attribute identity open	sole	6082	0	1411	858	0	175	0	56	468	0	3114
+origins	block statement macro identity open or external	several	1088	19	88	7	136	47	29	23	391	259	89
+origins	block statement macro identity open or external	sole	1200	11	63	36	139	57	38	20	521	164	151
+origins	block-local macro_rules expansion	several	133	0	0	0	51	0	40	0	0	0	42
+origins	block-local macro_rules expansion	sole	301	0	0	0	0	0	36	0	0	259	6
+origins	built-in derive proved	several	61	0	0	0	0	0	0	0	0	61	0
+origins	built-in derive proved	sole	87	0	0	1	0	0	0	0	0	86	0
+origins	built-in derive spelling	several	15684	0	546	96	0	25	2341	0	6856	5719	101
+origins	built-in derive spelling	sole	22816	0	1176	578	0	86	12837	0	3258	4694	187
+origins	external derive identified	several	211	0	136	0	0	0	58	0	16	0	1
+origins	external derive identified	sole	471	0	174	0	0	0	224	0	47	0	26
+origins	external item macro	several	803	0	647	0	0	0	78	0	0	0	78
+origins	external item macro	sole	2144	0	1536	1	0	0	381	0	0	0	226
+origins	include or layout invocation	sole	1	0	0	0	0	0	0	0	0	1	0
+origins	module item macro identity open	several	8996	0	863	220	66	0	319	136	2294	4854	244
+origins	module item macro identity open	sole	10353	0	1389	695	233	0	2745	146	732	3621	792
+origins	module macro_rules expansion	several	6691	190	1788	172	120	0	295	3	2642	0	1481
+origins	module macro_rules expansion	sole	14743	337	1962	1217	140	0	3530	117	3457	0	3983
+origins	other derive identity open	several	6260	90	1282	49	0	138	508	25	1233	2620	315
+origins	other derive identity open	sole	16976	410	2299	619	0	433	7533	144	880	3969	689
+origins	prelude or tool attribute spelling	several	13484	0	47	0	0	365	61	37	8261	4713	0
+origins	prelude or tool attribute spelling	sole	8939	0	53	0	0	1204	69	19	3981	3613	0
+origins	procedural attribute	several	6358	0	3972	0	9	121	292	248	64	1	1651
+origins	procedural attribute	sole	10894	0	6572	0	0	218	1639	258	94	0	2113
+namespaces	any	several	858	0	63	4	0	0	103	0	186	300	202
+namespaces	any	sole	69	0	0	0	0	0	69	0	0	0	0
+namespaces	importType	several	1564	0	213	21	12	0	101	7	887	90	233
+namespaces	importType	sole	1255	6	199	17	5	6	447	46	422	4	103
+namespaces	macro	several	339	0	83	0	2	0	16	0	144	2	92
+namespaces	macro	sole	11930	179	3092	693	121	521	4063	186	759	872	1444
+namespaces	type	several	40600	599	9036	2600	282	563	5178	222	10976	7246	3898
+namespaces	type	sole	35524	224	7711	2624	250	672	9240	218	3649	5617	5319
+namespaces	value	several	5846	57	1068	161	194	5	348	193	2792	436	592
+namespaces	value	sole	34474	328	6519	3582	224	634	10084	240	6070	3656	3137
+positions	enclosing scope	several	37495	180	8372	2639	240	551	4813	237	9988	7042	3433
+positions	enclosing scope	sole	59026	536	12999	5461	420	1374	16106	327	7634	7345	6824
+positions	same scope	several	6096	458	1002	26	249	55	423	27	1622	1232	1002
+positions	same scope	sole	17576	150	3085	944	177	464	6575	258	1764	1579	2580
+positions	scope read along a path	several	7819	18	1537	311	3	0	1459	69	3345	296	781
+positions	scope read along a path	sole	12042	14	1020	678	5	1	6948	72	1513	9	1782
+causes	competing macro import	several	5751	209	1691	172	171	0	317	3	1921	273	994
+causes	competing macro import	sole	12686	348	1637	1217	140	0	3415	117	3301	343	2168
+causes	competing-library-import	several	1624	0	843	197	0	0	225	45	187	29	98
+causes	competing-library-import	sole	5533	0	1806	632	0	0	2349	245	338	7	156
+causes	conditional-name-may-be-absent	several	4802	0	92	0	117	0	0	4	3286	6	1297
+causes	conditional-name-may-be-absent	sole	3540	0	110	0	87	0	0	5	745	0	2593
+causes	dependency-presence-unverified	several	3139	90	309	0	0	0	0	13	0	2538	189
+causes	dependency-presence-unverified	sole	4785	344	312	0	18	0	0	33	0	3775	303
+causes	glob-import-unverified; conditional-name-may-be-absent	several	21	0	0	0	21	0	0	0	0	0	0
+causes	glob-import-unverified; conditional-name-may-be-absent	sole	26	0	0	0	26	0	0	0	0	0	0
+causes	glob-import-unverified	several	1416	0	563	0	0	31	185	0	20	432	185
+causes	glob-import-unverified	sole	3284	0	586	0	0	63	1640	0	4	712	279
+causes	item-under-opaque-attribute	several	133	0	133	0	0	0	0	0	0	0	0
+causes	item-under-opaque-attribute	sole	10	0	10	0	0	0	0	0	0	0	0
+causes	lexical glob guard	several	3100	0	2073	0	0	0	470	0	144	14	399
+causes	lexical glob guard	sole	9775	0	4721	0	0	0	4047	0	203	43	761
+causes	lookup found identity; effect or scope still blocked	several	5980	0	3024	47	9	140	348	158	112	770	1372
+causes	lookup found identity; effect or scope still blocked	sole	13187	66	4456	553	0	254	5151	101	252	572	1782
+causes	macro implementation source unverified	several	115	0	0	0	0	115	0	0	0	0	0
+causes	macro implementation source unverified	sole	354	0	0	0	0	354	0	0	0	0	0
+causes	macro-use-exports-unverified	several	2204	0	0	0	0	0	2196	0	8	0	0
+causes	macro-use-exports-unverified	sole	9825	0	0	0	0	0	9786	0	39	0	0
+causes	namespace-binding-unverified	several	466	0	296	72	0	0	0	0	98	0	0
+causes	namespace-binding-unverified	sole	644	0	340	196	0	0	0	0	108	0	0
+causes	no parsed macro link	several	13484	0	47	0	0	365	61	37	8261	4713	0
+causes	no parsed macro link	sole	8939	0	53	0	0	1204	69	19	3981	3613	0
+causes	no proven library binding	several	478	0	414	0	64	0	0	0	0	0	0
+causes	no proven library binding	sole	782	0	545	0	237	0	0	0	0	0	0
+causes	opaque-item-may-shadow-name; namespace-binding-unverified	several	23	0	23	0	0	0	0	0	0	0	0
+causes	opaque-item-may-shadow-name; namespace-binding-unverified	sole	26	0	26	0	0	0	0	0	0	0	0
+causes	opaque-item-may-shadow-name	several	1386	0	471	308	0	25	82	37	152	0	311
+causes	opaque-item-may-shadow-name	sole	3200	0	505	917	0	86	384	18	338	0	952
+causes	shared-core-prelude-binding-unavailable	several	5	0	0	5	0	0	0	0	0	0	0
+causes	shared-core-prelude-binding-unavailable	sole	32	0	0	32	0	0	0	0	0	0	0
+causes	site or placement unverified	several	11136	0	428	0	0	0	0	0	5954	4754	0
+causes	site or placement unverified	sole	6921	0	277	0	0	0	0	0	2948	3696	0
+causes	unverified path	several	2264	0	412	26	0	0	31	214	953	1	627
+causes	unverified path	sole	3970	0	534	450	0	0	213	211	429	16	2117
