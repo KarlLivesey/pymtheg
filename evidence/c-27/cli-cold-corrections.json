@@ -1,0 +1,62 @@
+[
+  {
+    "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalGood.go",
+    "line": 33,
+    "link": "opts.IO",
+    "before": {
+      "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalBad.go",
+      "line": 12,
+      "identity": "Options.IO"
+    },
+    "after": {
+      "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalGood.go",
+      "line": 13,
+      "identity": "Options.IO"
+    }
+  },
+  {
+    "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalGood.go",
+    "line": 36,
+    "link": "opts.HTTPClient",
+    "before": {
+      "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalBad.go",
+      "line": 13,
+      "identity": "Options.HTTPClient"
+    },
+    "after": {
+      "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalGood.go",
+      "line": 14,
+      "identity": "Options.HTTPClient"
+    }
+  },
+  {
+    "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalGood.go",
+    "line": 36,
+    "link": "opts.URL",
+    "before": {
+      "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalBad.go",
+      "line": 14,
+      "identity": "Options.URL"
+    },
+    "after": {
+      "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalGood.go",
+      "line": 15,
+      "identity": "Options.URL"
+    }
+  },
+  {
+    "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalGood.go",
+    "line": 50,
+    "link": "opts.IO",
+    "before": {
+      "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalBad.go",
+      "line": 12,
+      "identity": "Options.IO"
+    },
+    "after": {
+      "file": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalGood.go",
+      "line": 13,
+      "identity": "Options.IO"
+    }
+  }
+]

@@ -518,7 +518,21 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   `receiver-type-unverified`, …); no dot call has a closed candidate set.
   Trait methods (even of a checkout trait implemented for the type), `Box`,
   `Rc` and `Arc` receivers and `Deref` targets stay unresolved.
-- **Receiver types** come from written declarations only: a parameter or an
+- **Core inherent methods** use a small catalog checked against the pinned
+  Rust sources. A listed method is definite when the receiver is proved and
+  its exact form reaches that inherent declaration at the first probe.
+  The catalog covers selected primitive, `Option` and `Result` methods whose
+  impl applies to all type arguments. Each entry records the Rust version
+  that first supplied the declaration in `core`. The compiler floor is the
+  higher of the edition's minimum and the package's declared `rust-version`,
+  including workspace inheritance. A floor below the entry's version leaves
+  `core-method-owner-version-unverified`. Compiler verification for edition
+  2015 reaches Rust 1.31.
+  A competing type binding, opaque scope, or build that could omit `core`
+  withholds the proof. Trait selection, autoref and deref still require
+  separate probe proofs.
+- **Receiver types** come from a direct string, character or suffixed number
+  literal for cataloged methods, or from written declarations: a parameter or an
   annotated `let`; a `let` initialised by a struct literal naming exactly one
   struct or alias (not an imported struct-like variant), by a unit struct value,
   by a call with one definite checkout callee whose return type is written
@@ -529,7 +543,8 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   macros stay unresolved; the gap is recorded in `data.receiverGap` or
   `data.receiverTyping.gap`. A proven standard or dependency receiver type is
   recorded as `data.receiverTyping.outside` (never a generic parameter,
-  projection, `Self` path or variant); its method has no library target.
+  projection, `Self` path or variant). A method needs a separate declaring-owner
+  proof to receive a library target.
 - **Non-builtin attributes:** a link whose **target** is an item under a
   non-builtin attribute, or inside an item with one, is not definite (the
   attribute may replace the item; `item-under-opaque-attribute`, target kept as a
@@ -903,6 +918,16 @@ the project links whose target, or one of whose candidates, is library unit
 `candidateSet` counts (MCP: action `uses`, `query` the unit, optional `symbol`).
 It finds only stored library targets: unresolved links may hide more uses. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
+
+Source-only Go can reuse the stored link decisions outside an edit's affected
+files. An edit with the same declaration and import facts re-decides just the
+edited file. A change confined to ordinary function declarations can follow
+package imports back to their callers. Changes that may affect project-wide
+method sets, build configuration, package membership or unreadable files use
+a full Go pass. Reuse requires a recorded completed Go index in the store.
+An unfinished run or a direct graph write requires recovery. The opt-in
+toolchain route uses a full pass. The same file tree produces the same
+graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing

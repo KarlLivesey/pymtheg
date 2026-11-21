@@ -1,0 +1,86 @@
+{
+  "id": "cli/cli",
+  "seed": 27204,
+  "target": 12,
+  "completed": 7,
+  "allComparedEqual": true,
+  "steps": [
+    {
+      "step": 0,
+      "file": "internal/codespaces/rpc/codespace/codespace_host_service.v1_grpc.pb.go",
+      "kind": "add-export",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 16364,
+      "failed": 0,
+      "resolvedFiles": 73
+    },
+    {
+      "step": 1,
+      "file": "pkg/cmd/run/cancel/c27_random_1.go",
+      "kind": "file-add",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 33904,
+      "failed": 0,
+      "resolvedFiles": 1128
+    },
+    {
+      "step": 2,
+      "file": "git/errors.go",
+      "kind": "embed",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 36214,
+      "failed": 0,
+      "resolvedFiles": 1128
+    },
+    {
+      "step": 3,
+      "file": "context/remote_test.go",
+      "kind": "body",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 15108,
+      "failed": 0,
+      "resolvedFiles": 1
+    },
+    {
+      "step": 4,
+      "file": "internal/attachments/userasset_test.go",
+      "kind": "body",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 15630,
+      "failed": 0,
+      "resolvedFiles": 1
+    },
+    {
+      "step": 5,
+      "file": ".github/skills/cli-exercise/tool/main_test.go",
+      "kind": "interface",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 35651,
+      "failed": 0,
+      "resolvedFiles": 1128
+    },
+    {
+      "step": 6,
+      "file": "pkg/cmd/codespace/delete.go",
+      "kind": "signature",
+      "line": 1,
+      "equal": true,
+      "differences": [],
+      "wallMs": 16615,
+      "failed": 0,
+      "resolvedFiles": 63
+    }
+  ]
+}

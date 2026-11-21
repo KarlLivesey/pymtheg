@@ -6,7 +6,7 @@ import { lstat, mkdir, open, readdir, readFile, rename, rm, writeFile } from "no
 import { extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { installation } from "./install.mjs";
+import { installation, installerCommand } from "./install.mjs";
 
 const version = "0.1.0";
 const languageExtensions = {
@@ -371,12 +371,29 @@ async function runRepository(repo, release, scratch, limitSeconds, installed, go
         legacyPeerDeps: repo.id === "nestjs/nest" &&
           repo.commit === "085f83a168e9edbedfe9560428dcfd270073ae00",
       });
-      if (!setup.command) {
+      if (setup.status) {
         record.install = setup;
         return finalize("install-unavailable");
       }
-      const install = await run("install", setup.command, setup.args, setup.env);
-      record.install = { manager: setup.manager, status: install.process.code === 0 ? "installed" : "failed", exitCode: install.process.code };
+      const { manager, version: expected, prefix = [], args, env } = setup;
+      record.install = { manager, args: args.map(redact), status: "failed" };
+      let command;
+      try {
+        command = await installerCommand(setup, scratch);
+      } catch (error) {
+        record.install.reason = "installer-download-failed";
+        return finalize("install-unavailable", { stage, message: redact(error.message) });
+      }
+      const probe = await run("install-version", command, [...prefix, "--version"], env);
+      const version = (await readFile(`${probe.log}.out`, "utf8")).trim().replace(/^v(?=\d)/, "");
+      if (probe.process.code !== 0 || !/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version) || expected && version !== expected) {
+        record.install.reason = "installer-version-unavailable";
+        return finalize("install-unavailable", { stage, code: probe.process.code });
+      }
+      record.install.version = version;
+      const install = await run("install", command, [...prefix, ...args], env);
+      record.install.status = install.process.code === 0 ? "installed" : "failed";
+      record.install.exitCode = install.process.code;
       if (install.process.code !== 0) {
         const stderr = redact(await tail(`${install.log}.err`));
         const diagnostic = /\b(?:ERESOLVE|EUSAGE|ENOSPC|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ERR_PNPM_[A-Z_]+)\b/.exec(stderr)?.[0];
@@ -461,7 +478,8 @@ async function main() {
     !values.installed && !values["go-toolchain"] || repo.language === (values.installed ? "typescript" : "go"));
   const release = values["local-build"] ? await localBuild(scratch, values["local-build"]) : await installRelease(scratch);
   const recordsDirectory = values.installed
-    ? join(scratch, "installed-records", createHash("sha256").update(await readFile(new URL("./install.mjs", import.meta.url))).digest("hex"), release.sha256 ?? "release")
+    ? join(scratch, "installed-records", createHash("sha256").update(await readFile(new URL("./install.mjs", import.meta.url)))
+      .update(await readFile(new URL(import.meta.url))).digest("hex"), release.sha256 ?? "release")
     : values["go-toolchain"] ? join(scratch, "go-toolchain-records", release.sha256 ?? "release")
     : join(scratch, release.sha256 ? "build-records" : "records", release.sha256 ?? "");
   const outputPath = values.output ? resolve(values.output) : join(scratch, `results${mode === "source-only (default)" ? "" : `-${mode}`}${release.sha256 ? `-${release.sha256}` : ""}.json`);

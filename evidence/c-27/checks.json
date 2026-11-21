@@ -1,0 +1,57 @@
+{
+  "implementation": "ff90cf5",
+  "build": { "exit": 0 },
+  "typeCheck": { "exit": 0 },
+  "formatCheck": { "exit": 0 },
+  "npmTest": {
+    "exit": 0,
+    "tests": 3193,
+    "passed": 3193,
+    "failed": 0,
+    "skipped": 0
+  },
+  "standaloneExampleRegression": {
+    "mainTarget": "examples/first.go",
+    "expectedTarget": "examples/second.go",
+    "mainExit": 1,
+    "afterExit": 0
+  },
+  "mergedBranch": {
+    "head": "d94a36e",
+    "main": "0ccd239",
+    "buildExit": 0,
+    "typeCheckExit": 0,
+    "formatCheckExit": 0,
+    "npmTest": { "exit": 0, "passed": 3209, "failed": 0, "skipped": 0 }
+  },
+  "reviewFix": {
+    "testedTree": "754d23c",
+    "main": "e291a60",
+    "oldHead": "fc1b64a",
+    "oldHeadFailedRegressions": [
+      "clean project after replaceFile",
+      "clean project after resolveLinks",
+      "clean project after parsed link SQL delete",
+      "clean Go conformance fixture"
+    ],
+    "cliBodyEditResolvedFiles": 1,
+    "focusedTests": { "exit": 0, "passed": 33, "failed": 0, "skipped": 0 },
+    "buildExit": 0,
+    "typeCheckExit": 0,
+    "formatCheckExit": 0,
+    "randomEditScriptFormatExit": 0,
+    "firstFullRun": {
+      "passed": 3218,
+      "failed": 1,
+      "failure": "Recovery unnecessarily re-parsed an unchanged certified Go content failure after a JavaScript file replacement"
+    },
+    "npmTest": { "exit": 0, "passed": 3219, "failed": 0, "skipped": 0 },
+    "resticSeededReplay": {
+      "testedTree": "6035cf6",
+      "seed": 27301,
+      "equalToCold": 20,
+      "signatureRenames": 3,
+      "stepsWithFailedFiles": 0
+    }
+  }
+}

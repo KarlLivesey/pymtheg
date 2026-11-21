@@ -41,12 +41,23 @@ test("Go module passes the conformance kit on the sample project", async () => {
   await checkLanguageConformance(go, await fixtures(), { symbols, links });
 });
 
+test("Go module passes the conformance kit when every source parses cleanly", async () => {
+  const clean = (await fixtures()).filter(
+    (fixture) => fixture.status !== "failed",
+  );
+  await checkLanguageConformance(go, clean, { symbols, links });
+});
+
 test("Go module is discovered in production and claims only Go sources and context", async () => {
   const registry = await discoverLanguages();
   assert.ok(registry.modules.some((module) => module.id === "go"));
   assert.equal(registry.claim("pkg/a.go")?.id, "go");
   assert.equal(registry.claim("pkg/a_test.go")?.id, "go");
   assert.equal(registry.claim("go.mod"), undefined);
-  assert.deepEqual(go.contextFiles, ["go.mod", "go.work"]);
+  assert.deepEqual(go.contextFiles, [
+    "go.mod",
+    "go.work",
+    "**/vendor/modules.txt",
+  ]);
   assert.equal(go.testOnly, undefined);
 });

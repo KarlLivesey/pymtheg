@@ -171,15 +171,16 @@ These estimates prioritise work. They do not add definite score credit.
 
 ### Reproduce the coverage plan for 0.2.0
 
-The plan uses one fresh sweep's bare graphs, installed TypeScript graphs, and
-offline Go toolchain graphs. The input includes all pin outcomes, their
-exact link inventories and a source review of a new fixed-seed draw.
-The 0.1.0 archive supplies the comparison. Regenerate the whole plan from
-the repository root.
+The plan uses SW-4's bare and offline Go graphs, and a mix of SW-4 and
+SW-5 installed TypeScript graphs. The input includes all pin outcomes,
+exact link inventories, the original fixed-seed source review and build
+provenance for each replayed pin. The 0.1.0 archive supplies the comparison.
+Regenerate the whole plan from the repository root.
 
 ```sh
-node scripts/sweep/coverage.mjs --results evidence/sw-4/coverage-plan-input.json.gz \
+node scripts/sweep/coverage.mjs --results evidence/sw-5/coverage-plan-input.json.gz \
   --plan docs/coverage-plan.md
+node evidence/c-25/plan-refresh.mjs evidence/c-25/coverage-plan-input.json.gz docs/coverage-plan.md
 node --test scripts/sweep/*.test.mjs
 ```
 
@@ -191,8 +192,9 @@ default 60-minute budget per attempt and puts checkouts and stores on disk
 under `$PYM_SCRATCH`. `node scripts/sweep/refresh-evidence.mjs export` reads
 the finished graphs and verifies their totals against the warm CLI answers.
 The `draw` and `context` subcommands list the sampled links and their pinned
-source. See the [sweep evidence](../evidence/sw-4/README.md) for the review
-fields, intervals and archive assembly command.
+source. See the [SW-4 evidence](../evidence/sw-4/README.md) for the review
+fields and intervals. The [SW-5 evidence](../evidence/sw-5/README.md) gives
+the installed replay and archive commands.
 
 ### Reproduce the committed Rust plan
 
@@ -213,13 +215,17 @@ for the historical change notes.
 
 For paired TypeScript coverage, run the same pinned manifest a second time
 with `scripts/sweep/run.mjs --installed`. Give that run a distinct `--output`
-and use scratch on disk. The runner uses a root lockfile
-and runs npm `ci --ignore-scripts`, pnpm `install --frozen-lockfile
---ignore-scripts`, or Yarn `install --immutable --mode=skip-build`. Yarn 1
-uses `--frozen-lockfile --ignore-scripts`. The runner disables pnpm hooks
-and project Yarn plugins and keeps caches in the scratch directory. Git
-dependencies and unsupported or absent lockfiles are recorded as unavailable.
-The Nest pin uses its contributor guide's `--legacy-peer-deps` option.
+and use scratch on disk. The runner uses the declared manager and its root
+lockfile. Bun uses the text `bun.lock`, and the Nub pin uses `pnpm-lock.yaml`.
+npm runs `ci --ignore-scripts`. pnpm, Bun and Nub use
+`install --frozen-lockfile --ignore-scripts`. Yarn Berry uses
+`install --immutable --mode=skip-build`. Yarn 1 uses
+`install --frozen-lockfile --ignore-scripts`. The runner disables pnpm hooks
+and project Yarn plugins. It keeps installer caches and checksum-verified
+native tools in scratch on the dev server. The install receipt records the
+observed version and arguments. Git dependencies and unavailable tools or
+lockfiles are reported in the receipt. The Nest pin uses its contributor
+guide's `--legacy-peer-deps` option.
 Installed-mode graph commands enter an unprivileged Linux network namespace
 after installation. The runner needs `unshare` with user namespaces enabled.
 

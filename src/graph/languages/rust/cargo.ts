@@ -64,6 +64,8 @@ export interface Crate {
   dependencyGraphKnown?: boolean;
   libraryDependencyGraphKnown?: boolean;
   edition?: Edition | null;
+  /** The minor component of a declared Rust 1.x minimum. */
+  rustVersionMinor?: number;
   procMacro?: boolean;
   dependencies?: Dependency[];
 }
@@ -380,6 +382,18 @@ export function crates(
         ? null
         : edition(table(ws?.package)!.edition)
       : edition(pkg.edition);
+    const rawRustVersion = pkg["rust-version"];
+    const rustVersion =
+      table(rawRustVersion)?.workspace === true
+        ? table(ws?.package)?.["rust-version"]
+        : rawRustVersion;
+    const parsedRustVersion =
+      /^1(?:\.(0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))?)?$/.exec(
+        string(rustVersion) ?? "",
+      );
+    const rustVersionMinor = parsedRustVersion
+      ? Number(parsedRustVersion[1] ?? 0)
+      : NaN;
     let known = workspace.known;
     let libraryKnown = workspace.known;
     // Configs are searched from the invocation directory. When the member
@@ -797,6 +811,7 @@ export function crates(
         workspace: workspace.known ? (workspace.doc?.path ?? null) : null,
         edition:
           targetEdition === undefined ? pkgEdition : edition(targetEdition),
+        ...(Number.isSafeInteger(rustVersionMinor) ? { rustVersionMinor } : {}),
         dependencyGraphKnown: known,
         libraryDependencyGraphKnown: libraryKnown,
         ...(kind === "lib" && lib?.["proc-macro"] === true

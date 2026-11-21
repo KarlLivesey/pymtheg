@@ -282,7 +282,7 @@ export const rustPhases = {
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "43",
+  version: "45",
   extensions: [".rs"],
   contextFiles: [
     "Cargo.toml",

@@ -4,20 +4,43 @@
 // <store dir> (removed after the run), the source the pristine pin.
 //   node scripts/reindex/cold-cost.mjs <store dir> <out.json> <rounds> <label=dist>... -- <pin dir>...
 import { spawnSync } from "node:child_process";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, join } from "node:path";
+import {
+  compareRows,
+  setPageCache,
+  storeRows,
+  withoutGoSurface,
+} from "./dump.mjs";
 
 const args = process.argv.slice(2);
+const compareGo = args.includes("--go-surface");
+if (compareGo) args.splice(args.indexOf("--go-surface"), 1);
+const option = (name) => {
+  const at = args.indexOf(name);
+  return at < 0 ? undefined : args.splice(at, 2)[1];
+};
+const cache = option("--cache-pages");
+const save = option("--save-after");
+if (save) mkdirSync(save, { recursive: true });
 const split = args.indexOf("--");
 const [storeDir, out, rounds, ...builds] = args.slice(0, split);
 const pins = args.slice(split + 1);
 const here = new URL(".", import.meta.url).pathname;
 const runs = [];
-for (const pin of pins)
+for (const pin of pins) {
+  let baseline;
   for (let round = 0; round < Number(rounds); round++)
     for (const build of builds) {
       const [label, dist] = build.split("=");
       const store = join(storeDir, `cold-cost-${process.pid}.sqlite`);
+      if (cache !== undefined) setPageCache(store, Number(cache));
       const child = spawnSync(
         "/usr/bin/time",
         [
@@ -33,8 +56,28 @@ for (const pin of pins)
         { stdio: ["ignore", "ignore", "pipe"], encoding: "utf8" },
       );
       const stderr = child.stderr ?? "";
+      if (child.status === 0 && save && label === "after") {
+        const saved = join(save, `${basename(pin)}.sqlite`);
+        copyFileSync(store, saved);
+        if (cache !== undefined) setPageCache(saved, 0);
+      }
+      let equality;
+      if (child.status === 0 && compareGo) {
+        const rows = withoutGoSurface(storeRows(store));
+        baseline ??= rows;
+        equality = {
+          rows: Object.fromEntries(
+            Object.entries(rows).map(([table, records]) => [
+              table,
+              records.length,
+            ]),
+          ),
+          differences: compareRows(baseline, rows),
+        };
+      }
       for (const suffix of ["", "-wal", "-shm"])
         if (existsSync(store + suffix)) rmSync(store + suffix);
+      if (child.status !== 0) throw Error(stderr);
       const line = stderr.split("\n").find((l) => l.startsWith("C22TIME"));
       const time = line
         ? line.split(" ").slice(1).map(Number)
@@ -46,8 +89,10 @@ for (const pin of pins)
         wallS: time[0],
         cpuS: Math.round((time[1] + time[2]) * 10) / 10,
         peakMiB: Math.round(time[3] / 1024),
+        ...(equality ? { equality } : {}),
       };
       runs.push(run);
       console.log(JSON.stringify(run));
+      writeFileSync(out, JSON.stringify(runs, null, 1));
     }
-writeFileSync(out, JSON.stringify(runs, null, 1));
+}
