@@ -906,6 +906,12 @@ the project links whose target, or one of whose candidates, is library unit
 It finds only stored library targets: unresolved links may hide more uses. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
 
+An explicit source-only index can reuse a verified completion checkpoint
+after one content inventory. It reports zero indexed files and the current
+stored counts. A change to content, settings or dependencies, a missing
+checkpoint, or a retryable failure enters the regular index path.
+[C-33](changes/C-33.md)
+
 Source-only Go can reuse the stored link decisions outside an edit's affected
 files. An edit with the same declaration and import facts re-decides just the
 edited file. A change confined to ordinary function declarations can follow

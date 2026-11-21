@@ -1510,6 +1510,7 @@ export function typescriptModule(
       }
       return results;
     },
+    resolutionNeedsFiles: false,
     resolve({ symbols, links }) {
       const byKey = new Map<string, string>();
       for (const symbol of symbols)

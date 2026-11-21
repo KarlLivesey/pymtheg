@@ -400,34 +400,43 @@ test("A3: snapshot compiler resolves alias and barrel on cold reopen, then confi
 
 test("A4: storage read/write failures propagate, preserving existing facts instead of pretending a parser failed", async () => {
   await sandbox(async ({ root, store, database }) => {
-    await writeFile(join(root, "x.toy"), "def x\ncall missing\n");
+    const source = join(root, "x.toy");
+    const original = "def x\ncall missing\n";
+    await writeFile(source, original);
     await indexProject(root, registry(), store);
     const symbols = store.findSymbols();
     const links = store.links();
     const bytes = await readFile(database);
-    for (const asyncFailure of [false, true]) {
-      const broken = new Proxy(store, {
-        get(target, key) {
-          if (key === "getFile")
-            return asyncFailure
-              ? async () => {
-                  throw Error("storage unavailable");
-                }
-              : () => {
-                  throw Error("storage unavailable");
-                };
-          const value = Reflect.get(target, key);
-          return typeof value === "function" ? value.bind(target) : value;
-        },
-      });
-      await assert.rejects(
-        indexProject(root, registry(), broken),
-        /storage unavailable/,
-      );
-      assert.deepEqual(store.findSymbols(), symbols);
-      assert.deepEqual(store.links(), links);
-      assert.deepEqual(await readFile(database), bytes);
+    for (const [read, text] of [
+      ["fileSummaries", original],
+      ["getFile", "def x\ncall changed\n"],
+    ]) {
+      await writeFile(source, text);
+      for (const asyncFailure of [false, true]) {
+        const broken = new Proxy(store, {
+          get(target, key) {
+            if (key === read)
+              return asyncFailure
+                ? async () => {
+                    throw Error("storage unavailable");
+                  }
+                : () => {
+                    throw Error("storage unavailable");
+                  };
+            const value = Reflect.get(target, key);
+            return typeof value === "function" ? value.bind(target) : value;
+          },
+        });
+        await assert.rejects(
+          indexProject(root, registry(), broken),
+          /storage unavailable/,
+        );
+        assert.deepEqual(store.findSymbols(), symbols);
+        assert.deepEqual(store.links(), links);
+        assert.deepEqual(await readFile(database), bytes);
+      }
     }
+    await writeFile(source, original);
     const brokenWriter = new Proxy(store, {
       get(target, key) {
         if (key === "replaceAnalysis")
