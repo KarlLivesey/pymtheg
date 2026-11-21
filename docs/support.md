@@ -717,7 +717,10 @@ models checkout-local package links in a virtual `node_modules`. Claims
 `deno.json`, `deno.jsonc` and conventional import-map filenames. Each file
 is analysed under its owning config (nearest containing directory, then
 `tsconfig` before `jsconfig`); genuinely tied configs are merged to the weakest
-answer.
+answer. A shared base never owns a file that a project config also includes:
+a config that other configs extend, that names no `files` or `include` of its
+own, that is not named `tsconfig.json` or `jsconfig.json`, and that no project
+reference or package script names.
 
 - **Definite:** module imports; import and export bindings to the original
   declaration through barrels, `export *`, renames and default exports; CommonJS

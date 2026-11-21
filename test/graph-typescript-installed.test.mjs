@@ -866,3 +866,257 @@ export declare const exportedApi: ExportedApi;
   ]);
   assert.deepEqual(data.links, []);
 });
+
+// Shared test-global declarations: Vitest's `vitest/globals` and Jest's
+// `@types/jest`, each declaring a global `expect`.
+async function testGlobals(write) {
+  await write("node_modules/vitest/package.json", manifest("vitest", "1.0.0"));
+  await write(
+    "node_modules/vitest/globals.d.ts",
+    "declare global { function expect(value: unknown): void; }\nexport {};\n",
+  );
+  await write(
+    "node_modules/@types/jest/package.json",
+    manifest("@types/jest", "1.0.0"),
+  );
+  await write(
+    "node_modules/@types/jest/index.d.ts",
+    "declare function expect(value: unknown): void;\n",
+  );
+}
+const ownerOf = (store, path) => store.getFile(path).result.data;
+
+test("a base config that projects only extend does not compete for their files (solution with build and spec configs)", async () => {
+  // The shape of a solution config referencing a build config that excludes
+  // tests and a spec config with Vitest globals, both extending one base
+  // that selects nothing of its own.
+  const { request, read, write } = await project();
+  await testGlobals(write);
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      files: [],
+      references: [
+        { path: "./tsconfig.build.json" },
+        { path: "./tsconfig.spec.json" },
+      ],
+    }),
+  );
+  await write(
+    "tsconfig.base.json",
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        types: [],
+        moduleResolution: "Bundler",
+        module: "ESNext",
+      },
+    }),
+  );
+  await write(
+    "tsconfig.build.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts"],
+    }),
+  );
+  await write(
+    "tsconfig.spec.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      compilerOptions: { types: ["vitest/globals"] },
+      include: ["src"],
+    }),
+  );
+  await write("src/app.ts", "export function app() {}\n");
+  await write(
+    "src/app.test.ts",
+    'import { app } from "./app";\nexpect(app());\n',
+  );
+  await request("index");
+  read((store, call) => {
+    assert.equal(
+      ownerOf(store, "src/app.test.ts").project,
+      "tsconfig.spec.json",
+    );
+    assert.equal(ownerOf(store, "src/app.test.ts").projects, undefined);
+    const expect = target(call("src/app.test.ts", "expect"));
+    assert.equal(expect.unit, "vitest");
+    assert.equal(expect.symbol, "expect");
+    // A file both project configs include is still analysed under both.
+    assert.deepEqual(ownerOf(store, "src/app.ts").projects, [
+      "tsconfig.build.json",
+      "tsconfig.spec.json",
+    ]);
+    assert.equal(call("src/app.test.ts", "app").resolution, "resolved");
+  });
+});
+
+test("spec files that every tsconfig.json excludes belong to the spec config, not to the base the build configs extend", async () => {
+  // A monorepo shape: package build configs extend `packages/tsconfig.build.json`,
+  // which names no files; the root `tsconfig.json` excludes spec files; the
+  // root `tsconfig.spec.json` includes them with Vitest globals.
+  const { request, read, write } = await project();
+  await testGlobals(write);
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: { types: [] },
+      include: ["packages/**/*"],
+      exclude: ["node_modules", "**/*.spec.ts"],
+    }),
+  );
+  await write(
+    "tsconfig.spec.json",
+    JSON.stringify({
+      extends: "./tsconfig.json",
+      compilerOptions: { types: ["vitest/globals"] },
+      include: ["packages/**/*.spec.ts"],
+      exclude: ["node_modules"],
+    }),
+  );
+  await write(
+    "packages/tsconfig.build.json",
+    JSON.stringify({ compilerOptions: { strict: true, types: [] } }),
+  );
+  await write(
+    "packages/tsconfig.json",
+    JSON.stringify({
+      files: [],
+      references: [{ path: "./p/tsconfig.build.json" }],
+    }),
+  );
+  await write(
+    "packages/p/tsconfig.build.json",
+    JSON.stringify({
+      extends: "../tsconfig.build.json",
+      include: ["*.ts"],
+      exclude: ["test/**/*", "*.spec.ts"],
+    }),
+  );
+  // A sample's own script compiles its own `tsconfig.build.json`, not the
+  // packages' base of the same name.
+  await write(
+    "sample/app/package.json",
+    JSON.stringify({
+      name: "app",
+      scripts: { build: "tsc -p tsconfig.build.json" },
+    }),
+  );
+  await write("packages/p/index.ts", "export function run() {}\n");
+  await write(
+    "packages/p/test/run.spec.ts",
+    'import { run } from "../index";\nexpect(run());\n',
+  );
+  await request("index");
+  read((store, call) => {
+    assert.equal(
+      ownerOf(store, "packages/p/test/run.spec.ts").project,
+      "tsconfig.spec.json",
+    );
+    assert.equal(
+      target(call("packages/p/test/run.spec.ts", "expect")).unit,
+      "vitest",
+    );
+    assert.equal(
+      call("packages/p/test/run.spec.ts", "run").resolution,
+      "resolved",
+    );
+    // The package's own source keeps its build config.
+    assert.equal(
+      ownerOf(store, "packages/p/index.ts").project,
+      "packages/p/tsconfig.build.json",
+    );
+  });
+});
+
+test("two project configs that bind different test globals stay undecided, even beside a shared base", async () => {
+  const { request, read, write } = await project();
+  await testGlobals(write);
+  await write(
+    "tsconfig.base.json",
+    JSON.stringify({ compilerOptions: { strict: true } }),
+  );
+  await write(
+    "tsconfig.jest.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      compilerOptions: { types: ["jest"] },
+      include: ["src"],
+    }),
+  );
+  await write(
+    "tsconfig.vitest.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      compilerOptions: { types: ["vitest/globals"] },
+      include: ["src"],
+    }),
+  );
+  await write("src/a.test.ts", "expect(1);\n");
+  await request("index");
+  read((store, call) => {
+    assert.deepEqual(ownerOf(store, "src/a.test.ts").projects, [
+      "tsconfig.jest.json",
+      "tsconfig.vitest.json",
+    ]);
+    const expect = call("src/a.test.ts", "expect");
+    assert.notEqual(expect.resolution, "resolved");
+    assert.ok(
+      expect.resolution !== "library" || expect.libraries.length > 1,
+      JSON.stringify(expect),
+    );
+  });
+});
+
+test("a base config that a package script compiles, or that a solution references, still competes", async () => {
+  for (const variant of ["script", "reference"]) {
+    const { request, read, write } = await project();
+    await testGlobals(write);
+    await write(
+      "package.json",
+      JSON.stringify({
+        name: "fixture",
+        private: true,
+        ...(variant === "script"
+          ? { scripts: { check: "tsc -p tsconfig.base.json" } }
+          : {}),
+      }),
+    );
+    if (variant === "reference")
+      await write(
+        "tsconfig.json",
+        JSON.stringify({
+          files: [],
+          references: [{ path: "./tsconfig.base.json" }],
+        }),
+      );
+    await write(
+      "tsconfig.base.json",
+      JSON.stringify({ compilerOptions: { types: [] } }),
+    );
+    await write(
+      "tsconfig.spec.json",
+      JSON.stringify({
+        extends: "./tsconfig.base.json",
+        compilerOptions: { types: ["vitest/globals"] },
+        include: ["src"],
+      }),
+    );
+    await write("src/a.test.ts", "expect(1);\n");
+    await request("index");
+    read((store, call) => {
+      assert.deepEqual(
+        ownerOf(store, "src/a.test.ts").projects,
+        ["tsconfig.base.json", "tsconfig.spec.json"],
+        variant,
+      );
+      assert.equal(
+        call("src/a.test.ts", "expect").data.reason,
+        "ambiguous-project",
+        variant,
+      );
+    });
+  }
+});
