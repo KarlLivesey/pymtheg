@@ -30,9 +30,12 @@ the warm declaration-input replay.
 Export the candidate's bare and installed experiments with
 `scripts/sweep/coverage-export.mjs` and the SW-3 reference samples. Merge the
 candidate TypeScript exports into the earlier cumulative input with
-`plan-input.mjs BASE BARE INSTALLED OUTPUT.gz`. Run `coverage.mjs` with the
-SW-3 baseline, then use `evidence/c-11/plan.mjs` to replace the generated
-TypeScript section of the plan.
+`plan-input.mjs BASE BARE INSTALLED OUTPUT.gz`. Run `plan-refresh.mjs INPUT.gz
+PLAN [OUTPUT]` to regenerate the paired replay inside the TypeScript
+section of the SW-4 plan. The SW-4 inventory and reviewed sample remain
+the baseline for its ceiling and reason counts. The sweep regeneration
+test builds the full plan from both committed inputs and compares every
+byte with the checked-in plan.
 
 The compact audit archives list public checkout paths, source destinations,
 compiler output names, and verdicts. The full declaration text stays in
@@ -60,9 +63,16 @@ the same seed and a limit above the population. Run
 `assumption-exclusions.mjs SCRATCH BUILD RECEIPT OLD_DRAW MARKED_DRAW`
 against the candidate's snapshot. It joins the original sites to the
 marked sites and reads the candidate's captured build guards to assign
-exclusions. To audit the current marks, use `compare.mjs` with the installed
-receipt in both positions and `--marked` after the seed and size. Pass
-the resulting 60-site draw to `emit-check.mjs`.
+exclusions. `assumption-provenance.mjs SCRATCH RECEIPT` checks the
+top-level entry note on every marked row. To audit the current marks, use
+`compare.mjs` with the installed receipt in both positions and `--marked`
+after the seed and size. Pass the resulting 60-site draw to `emit-check.mjs`.
+
+The round 2 comparison uses cold replays of `190adc4` on the retained
+bare and installed checkouts for Astro, Excalidraw, Hono and Mermaid.
+`round-2.json` records the comparison, exclusion census, provenance
+counts and cost. The survivor audit uses `c25-round2-2026` and excludes
+Hono because its opaque bundler config withholds all the former marks.
 
 `built-targets.mjs SCRATCH INSTALLED_RECEIPT` counts checkout destinations
 at compiler output paths, destinations whose path matches Git ignore

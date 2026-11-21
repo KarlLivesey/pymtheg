@@ -24,7 +24,7 @@ test("assumed Level 2 links remain in the total and are counted separately", () 
   assert.equal(score.assumedLevel2, 5);
 });
 
-test("one committed sweep regenerates the complete coverage plan byte for byte", () => {
+test("the committed sweep and TypeScript replay regenerate the coverage plan byte for byte", () => {
   const root = fileURLToPath(new URL("../..", import.meta.url));
   const checkedIn = readFileSync(join(root, "docs/coverage-plan.md"));
   const scratch = mkdtempSync(join(tmpdir(), "pymtheg-coverage-plan-"));
@@ -36,6 +36,8 @@ test("one committed sweep regenerates the complete coverage plan byte for byte",
   try {
     execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", input,
       "--plan", plan, "--attempts", attempts, "--item-changes", itemChanges], { cwd: root });
+    execFileSync(process.execPath, ["evidence/c-25/plan-refresh.mjs",
+      "evidence/c-25/coverage-plan-input.json.gz", plan], { cwd: root });
     assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
     assert.ok(readFileSync(attempts).equals(readFileSync(join(root, "evidence/sw-4/attempts.md"))), "regenerated attempt report differs");
     assert.ok(readFileSync(itemChanges).equals(readFileSync(join(root, "evidence/sw-4/items.md"))), "regenerated item report differs");
