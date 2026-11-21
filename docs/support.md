@@ -831,6 +831,16 @@ answer.
   every checkout file a program loads, imported files included; a file past
   it is left out of that program only (installed declarations have their
   own budget).
+- **Files whose analysis would not return (C-26):** a file where the
+  compiler's flow analysis would follow a cycle of flow nodes without a
+  limit fails, with the line and column, before any query reaches it. The
+  check reads the bound flow graph only, so the outcome depends on the
+  source alone. Other non-returning work (another compiler loop, a Go or
+  Rust analysis loop) has no bound yet. A file the compiler throws on in a
+  later project is failed for the store; links into it from earlier
+  projects become `target-unavailable`, and their other links are flagged.
+  The 100-file cap counts compiler failures a program imports from another
+  project.
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.

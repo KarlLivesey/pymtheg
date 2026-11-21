@@ -2946,3 +2946,25 @@ out, or failed by a compiler exception, are unavailable (as for parse and
 bind failures), not invalid code. One cap of 100 counts every contained
 exception in a program. A file dropped late makes its project be extracted
 again. See [C-13](changes/C-13.md).
+
+### C-26 Non-returning analysis: a deterministic check before any deadline
+
+A file whose analysis would not return fails with a reason. Where the cause
+can be decided from the source, it is, with no clock. TypeScript 5.9's
+`getTypeAtFlowNode` follows single-successor flow steps in an uncounted loop.
+After binding, the module follows the same steps from every flow node of a
+captured file. A file where they repeat a node fails ("its control-flow
+analysis would not return", with line and column) under C-13's containment
+and cap. On microsoft/TypeScript it flags exactly the three
+`unreachableFlowAfterThrowing*` conformance tests, and nothing on the seven
+identity pins. Under a stopped taint walk the judge's dependence graphs are
+not explored: their answers would be overridden by `taint-budget-exhausted`.
+A file the compiler throws on in a later project is failed for the store.
+Earlier projects' links into it become `target-unavailable`, and their other
+links are flagged `no-unseen-declarations`. The cap counts compiler failures
+a program imports. **Trade:** other non-returning work (another compiler
+loop, exponential type work, a Go or Rust loop) still has no bound. A
+wall-clock watchdog in a worker is the only general bound. It is not built
+until a case needs it, because it would make results depend on the machine
+for the files it stops. **Rules out:** time limits where a deterministic
+property exists. See [C-26](changes/C-26.md).
