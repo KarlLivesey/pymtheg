@@ -106,6 +106,124 @@ async function indexFixture(t, files) {
   return store;
 }
 
+test("core inherent dot calls need a proven receiver and first probe", async () => {
+  const fixture = new URL("./fixtures/rust-c31/", import.meta.url);
+  const source = await readFile(new URL("src/lib.rs", fixture), "utf8");
+  const cargo = await readFile(new URL("Cargo.toml", fixture), "utf8");
+  const lookup = await graph({ "src/lib.rs": source }, { "Cargo.toml": cargo });
+  for (const [call, symbol] of [
+    ["read(&[]).unwrap", "option::Option::unwrap"],
+    ["write().unwrap", "result::Result::unwrap"],
+    ["borrowed.is_some", "option::Option::is_some"],
+    ["text.len", "str::len"],
+    ['r"words".as_bytes', "str::as_bytes"],
+    ["'a'.is_alphabetic", "char::is_alphabetic"],
+    ["2u32.pow", "u32::pow"],
+    ["count.to_le_bytes", "u32::to_le_bytes"],
+    ["text.parse", "str::parse"],
+    ['"standard".len', "str::len"],
+    ['"core".len', "str::len"],
+    ["value.unwrap", "option::Option::unwrap"],
+  ])
+    assert.deepEqual(
+      lookup("calls", call),
+      [
+        {
+          ecosystem: "rust-std",
+          unit: "core",
+          symbol,
+          evidence: "declaring-owner",
+        },
+      ],
+      call,
+    );
+  assert.equal(lookup("calls", "custom.unwrap")[0]?.unit, undefined);
+  for (const call of [
+    "changed.len",
+    "text.parse().unwrap",
+    '"words".to_string',
+    'b"words".len',
+    'br"words".len',
+    'c"words".as_ptr',
+    "b'a'.is_alphabetic",
+    "1.max",
+    "probe.choose",
+    "reference.single",
+    "blanket.blanketed",
+    "wrapped.selected",
+    "other.earlier",
+    "option.len",
+    "mutable.is_some",
+  ])
+    assert.deepEqual(lookup("calls", call), [null], call);
+  assert.deepEqual(lookup("calls", "switching.choose"), [null, null]);
+});
+
+test("core method ownership follows the Cargo compiler floor", async (t) => {
+  const source = `#![no_std]
+    trait FloatExtension { fn abs(self) -> f32; }
+    impl FloatExtension for f32 { fn abs(self) -> f32 { self } }
+    fn calls(a: f32, b: f64, text: &str) {
+      a.abs();
+      b.signum();
+      text.len();
+      1f32.max(2.0);
+      1f64.max(2.0);
+      0xff32.max(2);
+    }`;
+  for (const [label, cargo, coreFloats, coreStr] of [
+    ["2021", manifest(), false, true],
+    ["1.83", manifest("2021", 'rust-version="1.83"'), false, true],
+    ["1.85", manifest("2021", 'rust-version="1.85.0"'), true, true],
+    ["2024", manifest("2024"), true, true],
+    ["2015", manifest("2015"), false, false],
+    ["1.27", manifest("2015", 'rust-version="1.27"'), false, true],
+  ])
+    await t.test(label, async (t) => {
+      const store = await indexFixture(t, {
+        "Cargo.toml": cargo,
+        "src/lib.rs": source,
+      });
+      const links = store.links();
+      function check(call, symbol, available) {
+        const link = links.find(
+          (l) => l.kind === "calls" && l.targetName === call,
+        );
+        assert.ok(link, call);
+        if (available) {
+          assert.equal(link.resolution, "library", call);
+          assert.equal(link.libraries[0].unit, "core", call);
+          assert.equal(link.libraries[0].symbol, symbol, call);
+        } else {
+          assert.equal(link.resolution, "unresolved", call);
+          assert.match(
+            link.data.uncertainty,
+            /^core-method-owner-version-unverified\b/,
+            call,
+          );
+        }
+      }
+      check("a.abs", "f32::abs", coreFloats);
+      check("b.signum", "f64::signum", coreFloats);
+      check("text.len", "str::len", coreStr);
+      check("1f32.max", "f32::max", true);
+      check("1f64.max", "f64::max", true);
+      assert.equal(
+        links.find((l) => l.targetName === "0xff32.max").resolution,
+        "unresolved",
+      );
+    });
+  const lookup = await graph(
+    { "member/src/lib.rs": source },
+    {
+      "Cargo.toml":
+        '[workspace]\nmembers=["member"]\n[workspace.package]\nrust-version="1.85"\n',
+      "member/Cargo.toml": manifest("2021", "rust-version.workspace=true"),
+    },
+  );
+  assert.equal(lookup("calls", "a.abs")[0]?.symbol, "f32::abs");
+});
+
 test("library paths, imports, preludes, Cargo aliases and version sources", async () => {
   const lookup = await graph(
     {

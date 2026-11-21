@@ -1,0 +1,34 @@
+[
+  {
+    "id": "crossbeam-rs/crossbeam",
+    "run": "main-a",
+    "wallSeconds": 177.92,
+    "userSeconds": 40.2,
+    "systemSeconds": 76.42,
+    "peakRssKiB": 767772
+  },
+  {
+    "id": "crossbeam-rs/crossbeam",
+    "run": "candidate-a",
+    "wallSeconds": 182.06,
+    "userSeconds": 39.48,
+    "systemSeconds": 74.97,
+    "peakRssKiB": 748128
+  },
+  {
+    "id": "crossbeam-rs/crossbeam",
+    "run": "main-b",
+    "wallSeconds": 145.63,
+    "userSeconds": 41.7,
+    "systemSeconds": 76.54,
+    "peakRssKiB": 783980
+  },
+  {
+    "id": "crossbeam-rs/crossbeam",
+    "run": "candidate-b",
+    "wallSeconds": 117.2,
+    "userSeconds": 39.33,
+    "systemSeconds": 53.79,
+    "peakRssKiB": 760820
+  }
+]
