@@ -2873,8 +2873,7 @@ export function extractFile(
     const required = parameters.filter(
       (parameter) => !parameter.questionToken && !parameter.initializer,
     ).length;
-    if (args.length < required || args.length > parameters.length)
-      return false;
+    if (args.length < required || args.length > parameters.length) return false;
     return args.every((argument, index) => {
       const parameter = parameters[index]!;
       const symbol = checker.getSymbolAtLocation(parameter.name);

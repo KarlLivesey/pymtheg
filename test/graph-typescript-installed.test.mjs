@@ -1353,7 +1353,10 @@ test("a call on a member merged from several declarations links the declaration 
     // Both merged declarations accept the arguments: the checker's choice is
     // declaration order, so it stays a candidate set.
     const [log] = calls("logger.log");
-    assert.ok(log.resolution !== "library" || log.libraries.length !== 1, JSON.stringify(log));
+    assert.ok(
+      log.resolution !== "library" || log.libraries.length !== 1,
+      JSON.stringify(log),
+    );
     // A union receiver is dispatch: never narrowed to one arm.
     const [run] = calls("either.run");
     assert.ok(

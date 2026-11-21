@@ -2,7 +2,7 @@
 
 [Change note](../../docs/changes/C-30.md) · [Hand-check](hand-check.md)
 
-Measured on the dev server on 21 November 2026: main `0ccd239` and this
+Measured on the dev server on 21 November 2026: main `c6b77dc` (after the review fixes; first round `0ccd239`) and this
 branch's build, nine TypeScript pins (`pins.json`), bare and installed.
 
 ## Files
@@ -17,6 +17,9 @@ branch's build, nine TypeScript pins (`pins.json`), bare and installed.
 - `changed-definite-installed.jsonl`, `changed-definite-bare.jsonl`: every
   link that was Level 2 on main and is not, or has another target.
 - `hand-check.md`, `hand-check.jsonl`: the 20 reviewed newly definite links.
+- `candidate-to-definite-installed.jsonl`: every installed link that was a
+  candidate set on main and is definite now (43), all reviewed: 29
+  merged-member calls and 14 Vite type references and imports.
 - `work.tsv`: per run and pin, compiler programs, file analyses, cold CPU
   seconds and peak MiB (`tools/programs.mjs`).
 - `cost-1-main.json`, `cost-2-candidate.json`, `cost-3-main.json`: Hono and
