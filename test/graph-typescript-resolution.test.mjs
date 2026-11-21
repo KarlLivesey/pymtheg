@@ -3653,13 +3653,13 @@ test("Turborepo-style workspaces with identical package IDs keep their own impor
         `${entry}#${name}`,
       );
     }
-    assert.notEqual(
+    assert.equal(
       graph.link(
         "examples/with-yarn/apps/web/eslint.config.js",
         '"@repo/eslint-config/next"',
         "imports",
       ).resolution,
-      "resolved",
+      "unresolved",
     );
   });
 });
