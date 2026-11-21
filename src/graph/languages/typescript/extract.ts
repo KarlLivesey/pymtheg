@@ -260,6 +260,8 @@ interface Lookup {
   memberCall?: boolean;
   typeQuery?: boolean;
   recoveredMember?: boolean;
+  /** The one merged declaration of `symbol` that the call's signature selects. */
+  selected?: ts.Declaration;
 }
 const clip = (text: string) => {
   const flat = text
@@ -953,6 +955,10 @@ export function extractFile(
         current = checker.getAliasedSymbol(current);
       }
       let declarations = current.declarations ?? [];
+      if (found.selected && depth === 0 && current === found.symbol)
+        declarations = declarations.filter(
+          (declaration) => declaration === found.selected,
+        );
       if (globals.hasInstalledTypes && firstAlias && declarations.length > 1) {
         const isAugmentation = (declaration: ts.Declaration) =>
           ts.isModuleDeclaration(declaration) &&
@@ -2785,7 +2791,98 @@ export function extractFile(
           );
       }
     }
+    // A member merged from several declarations (interface merging, module
+    // augmentation) of one receiver type: the checker's selected signature
+    // names the declaration the call binds. A union or intersection receiver
+    // is dispatch or a synthesized member, never narrowed.
+    if (
+      call &&
+      !found.reason &&
+      found.targets.length + (found.libraryFacts?.length ?? 0) > 1
+    ) {
+      const selected = selectedMergedDeclaration(symbol, call);
+      if (selected) {
+        const narrowed = targetsOf(
+          { ...symbol, at, construct: extra.construct === true, selected },
+          "call",
+        );
+        if (
+          !narrowed.reason &&
+          narrowed.targets.length + (narrowed.libraryFacts?.length ?? 0) === 1
+        )
+          found = narrowed;
+      }
+    }
     link(owner, "calls", name, at, found, extra);
+  }
+  function selectedMergedDeclaration(
+    found: Lookup,
+    call: ts.CallExpression | ts.NewExpression,
+  ): ts.Declaration | undefined {
+    const symbol = found.symbol;
+    if (
+      !symbol ||
+      symbol === LIMIT ||
+      symbol.flags & ts.SymbolFlags.Alias ||
+      !found.receiver ||
+      found.name === undefined ||
+      (symbol.declarations?.length ?? 0) < 2
+    )
+      return undefined;
+    const declaration = checker.getResolvedSignature(call)?.declaration;
+    if (
+      !declaration ||
+      ts.isJSDocSignature(declaration) ||
+      !symbol.declarations!.includes(declaration)
+    )
+      return undefined;
+    const type = checker.getApparentType(
+      checker.getNonNullableType(checker.getTypeAtLocation(found.receiver)),
+    );
+    if (type.isUnionOrIntersection()) return undefined;
+    if (checker.getPropertyOfType(type, found.name) !== symbol)
+      return undefined;
+    // The selection proves the declaration only when no declaration from
+    // another body (another interface, augmentation or library) could also
+    // accept these arguments; otherwise it is declaration order.
+    const others = symbol.declarations!.filter(
+      (other) => other.parent !== declaration.parent,
+    );
+    return others.some((other) => mayAccept(other, call))
+      ? undefined
+      : declaration;
+  }
+  /** Whether a declaration's signature could accept the call's arguments. */
+  function mayAccept(
+    declaration: ts.Declaration,
+    call: ts.CallExpression | ts.NewExpression,
+  ): boolean {
+    if (!ts.isFunctionLike(declaration) || declaration.typeParameters?.length)
+      return true;
+    const signature = checker.getSignatureFromDeclaration(
+      declaration as ts.SignatureDeclaration,
+    );
+    if (!signature || signature.typeParameters?.length) return true;
+    const parameters = declaration.parameters.filter(
+      (parameter) =>
+        !(ts.isIdentifier(parameter.name) && parameter.name.text === "this"),
+    );
+    if (parameters.some((parameter) => parameter.dotDotDotToken)) return true;
+    const args = call.arguments ?? [];
+    if (args.some(ts.isSpreadElement)) return true;
+    const required = parameters.filter(
+      (parameter) => !parameter.questionToken && !parameter.initializer,
+    ).length;
+    if (args.length < required || args.length > parameters.length) return false;
+    return args.every((argument, index) => {
+      const parameter = parameters[index]!;
+      const symbol = checker.getSymbolAtLocation(parameter.name);
+      if (!symbol || !ts.isIdentifier(parameter.name)) return true;
+      return checker.isTypeAssignableTo(
+        checker.getTypeAtLocation(argument),
+        checker.getTypeOfSymbolAtLocation(symbol, parameter),
+      );
+    });
   }
   function binding(
     owner: string,
