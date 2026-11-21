@@ -18,6 +18,7 @@ import { dirname, join } from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { executeGraph } from "../dist/graph/commands.js";
+import { graphWork, resetGraphWork } from "../dist/graph/work.js";
 import {
   discoverLanguages,
   indexProject,
@@ -568,6 +569,65 @@ test("Go: a direct graph write invalidates reuse even without a source edit", as
     const report = await executeGraph({ command: "index", root });
     assert.equal(report.sync.complete, true);
     assert.deepEqual(compareRows(storeRows(path), cold), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+for (const mutation of ["replaceFile", "resolveLinks", "SQL delete"]) {
+  test(`Go: the direct indexer repairs a clean graph after ${mutation}`, async () => {
+    const base = mkdtempSync(join(tmpdir(), "c27-direct-repair-"));
+    const root = join(base, "tree");
+    mkdirSync(root);
+    writeFileSync(
+      join(root, "a.go"),
+      "package a\nfunc F() {}\nfunc Use() { F() }\n",
+    );
+    const path = join(base, "graph.sqlite");
+    let store = new SqliteGraphStore(path);
+    try {
+      await indexProject(root, registry, store);
+      const cold = storeRows(path);
+      if (mutation === "replaceFile") store.replaceFile(store.getFile("a.go"));
+      else if (mutation === "resolveLinks") store.resolveLinks([]);
+      else {
+        const db = new DatabaseSync(path);
+        try {
+          db.prepare("DELETE FROM graph_links WHERE kind='calls'").run();
+        } finally {
+          db.close();
+        }
+      }
+      assert.notDeepEqual(compareRows(storeRows(path), cold), []);
+      if (mutation !== "replaceFile") {
+        store.close();
+        store = new SqliteGraphStore(path);
+      }
+      await indexProject(root, registry, store);
+      assert.equal(targetFile(store, "a.go", "F"), "a.go");
+      assert.deepEqual(compareRows(storeRows(path), cold), []);
+    } finally {
+      store.close();
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+}
+
+test("Go: the command path re-resolves one file after a plain body edit", async () => {
+  const root = mkdtempSync(join(tmpdir(), "c27-command-body-"));
+  try {
+    const edited = join(root, "a.go");
+    writeFileSync(edited, "package a\nfunc F() int { return 1 }\n");
+    writeFileSync(
+      join(root, "use.go"),
+      "package a\nfunc Use() int { return F() }\n",
+    );
+    await executeGraph({ command: "index", root });
+    writeFileSync(edited, "package a\nfunc F() int { return 2 }\n");
+    resetGraphWork();
+    const result = await executeGraph({ command: "index", root });
+    assert.equal(result.sync.complete, true);
+    assert.equal(graphWork.counts["resolve.go.decisionFiles"], 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

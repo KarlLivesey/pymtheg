@@ -359,12 +359,6 @@ export async function executeGraph(
       options.progress?.({ phase: "inventory", done: 0, total });
       report = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
-        // Direct graph writes invalidate the checkpoint even when source hashes
-        // match. Re-check inside the owned run, before it writes any records.
-        canReuseAnalysis: () =>
-          previousState !== null &&
-          readCheckpoint(currentStore)?.fingerprint ===
-            previousState.fingerprint,
         ...(options.signal || toolchainOn ? { signal } : {}),
         ...(toolchainOn
           ? {

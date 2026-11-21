@@ -65,6 +65,9 @@ export function surface(result: ParseResult, fact: FileFact): Surface {
         ]),
       ]),
     ),
+    // Source-only calls read the generic flag and stored signature/results.
+    // A named constraint used in a result descriptor is already in symbol data.
+    // The resolver does not check type arguments against the full constraint.
     functions: contentHash(
       JSON.stringify(symbols.filter(ordinaryFunction).map(symbolFacts)),
     ),

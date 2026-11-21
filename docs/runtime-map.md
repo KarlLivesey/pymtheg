@@ -1664,6 +1664,13 @@ and counts every context file as changed, so no module reuses stored
 analysis and every row is rewritten. `graphCommandState()` returns nothing while the
 mark is set, so `graph status` does not report complete.
 
+**Completed analysis (C-27).** An owned successful run records its completed
+incremental module versions when clearing its mark. The next run reads those
+versions with its ownership baseline. Triggers on graph facts clear this
+record and the command checkpoint in the modifying transaction. An indexer
+with missing or invalidated evidence rebuilds the affected module from
+source, including parsed rows with unchanged source hashes.
+
 Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
 (`query`, optional `symbol`). Every link answer shows certainty `library` and
 the library's unit, symbol and `outside-project` place, never a missing local

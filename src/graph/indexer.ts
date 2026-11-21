@@ -62,8 +62,6 @@ export interface IndexOptions {
   toolchainDirectory?: string;
   /** The environment a toolchain is located from (default process.env). */
   environment?: Readonly<Record<string, string | undefined>>;
-  /** An owning caller can withhold reuse when its previous checkpoint is invalid. */
-  canReuseAnalysis?: () => boolean;
   signal?: AbortSignal;
 }
 const message = (error: unknown): string =>
@@ -138,6 +136,7 @@ export async function indexProject(
   // replaced some files' records and not others, while each still matches
   // its source hash, so nothing it touched can be trusted as unchanged.
   const unfinished = (await store.beginIndexRun?.()) === true;
+  const completed = await store.completedAnalysis?.();
   // Storage reads are deliberately outside all source/module error catches, before any writes.
   const oldFiles = await stage("index.previous", () => summaries(store));
   const oldContexts = await stage("index.previous", () => store.contexts());
@@ -233,21 +232,27 @@ export async function indexProject(
   // A change in ownership or membership can affect project-wide lookups.
   const canReuse =
     !unfinished &&
+    completed &&
     store.beginIndexRun &&
     store.finishIndexRun &&
     store.analysisLinksAt &&
     store.moduleInputLinksAt &&
     claims.size === oldFiles.length &&
-    oldFiles.every((file) => claims.get(file.path)?.id === file.module) &&
-    oldFiles.some((file) => claims.get(file.path)?.incrementalAnalysis) &&
-    options.canReuseAnalysis?.() !== false;
+    oldFiles.every((file) => claims.get(file.path)?.id === file.module);
   const previousFiles = new Map<string, GraphFile>();
   const incompatible = new Set<string>();
   for (const [path, module] of claims) {
     const source = captures.get(path)!;
-    const reuse = canReuse === true && module.incrementalAnalysis === true;
+    const trusted = completed?.get(module.id) === module.version;
+    const reuse =
+      canReuse === true && module.incrementalAnalysis === true && trusted;
+    // A direct store write can remove parsed links even while the source hash
+    // still matches. Rebuild parse facts as well when the completion is gone.
+    const rebuild =
+      unfinished ||
+      (!!completed && module.incrementalAnalysis === true && !trusted);
     const previous = await stage("index.previous", () =>
-      previousParse(store, source, module, unfinished, reuse),
+      previousParse(store, source, module, rebuild, reuse),
     );
     if (previous.unchanged) {
       report.unchanged++;
@@ -295,6 +300,7 @@ export async function indexProject(
       if (
         module.incrementalAnalysis &&
         module.analyze &&
+        completed?.get(module.id) === module.version &&
         !incompatible.has(module.id)
       )
         deferred.set(module.id, []);
@@ -620,11 +626,17 @@ export async function indexProject(
   // The modules that own at least one stored file, after analysis.
   const modules = new Set((await summaries(store)).map((file) => file.module));
   for (const module of registry.modules) await resolveModule(module);
+  const incremental = registry.modules.filter(
+    (module) => module.incrementalAnalysis,
+  );
   await store.finishIndexRun?.(
     [...report.analysisErrors, ...report.resolutionErrors].some((error) =>
-      registry.modules.some(
-        (module) => module.id === error.module && module.incrementalAnalysis,
-      ),
+      incremental.some((module) => module.id === error.module),
+    ),
+    new Map(
+      incremental
+        .filter((module) => modules.has(module.id))
+        .map((module) => [module.id, module.version]),
     ),
   );
   return await stage("index.report", () =>
@@ -637,7 +649,7 @@ async function previousParse(
   store: GraphStorage,
   source: ContextFile,
   module: LanguageModule,
-  unfinished: boolean,
+  rebuild: boolean,
   keepPrevious: boolean,
 ): Promise<{ unchanged: boolean; file?: GraphFile }> {
   const old = await store.getFile(source.path);
@@ -646,7 +658,7 @@ async function previousParse(
   // Every record of an unfinished run is written again, including records
   // whose hashes already match the captured files.
   if (
-    !unfinished &&
+    !rebuild &&
     compatible &&
     source.status === "clean" &&
     old.hash === source.hash &&

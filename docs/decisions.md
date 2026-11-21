@@ -3016,8 +3016,10 @@ connection's `wal_checkpoint(TRUNCATE)` during a run stops it as overtaken
 **Decided (C-27).** A language module may return the complete set of paths
 whose previously stored notes and link decisions must be replaced. The
 indexer uses this result only with owned index runs and a store that can
-validate and compare links by file. It validates that the set covers every
-edited and analyzed path, writes the final analyzed facts for those edits,
+validate and compare links by file. The store must provide completed module
+versions from the run's opening snapshot. Graph writes invalidate that
+record even through another connection. The indexer validates that the set
+covers every edited and analyzed path, writes the final analyzed facts for those edits,
 and limits link writes to the validated set. A failed module pass keeps the
 unfinished mark so a retry cannot reuse incomplete decisions.
 

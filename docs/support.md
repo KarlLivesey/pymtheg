@@ -882,9 +882,10 @@ files. An edit with the same declaration and import facts re-decides just the
 edited file. A change confined to ordinary function declarations can follow
 package imports back to their callers. Changes that may affect project-wide
 method sets, build configuration, package membership or unreadable files use
-a full Go pass. Recovery after an unfinished index and the opt-in toolchain
-route also use a full pass. The same file tree produces the same graph after a
-fresh or incremental index. [C-27](changes/C-27.md)
+a full Go pass. Reuse requires a recorded completed Go index in the store.
+An unfinished run or a direct graph write requires recovery. The opt-in
+toolchain route uses a full pass. The same file tree produces the same
+graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing

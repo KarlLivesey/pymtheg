@@ -361,8 +361,13 @@ export interface GraphStorage {
    * the store, or throws without writing.
    */
   beginIndexRun?(): StorageResult<boolean>;
-  /** With incomplete=true the store retains the unfinished mark for the retry. */
-  finishIndexRun?(incomplete?: boolean): StorageResult<void>;
+  /** Module versions whose completed decisions this run found in its opening snapshot. */
+  completedAnalysis?(): StorageResult<ReadonlyMap<string, string>>;
+  /** An incomplete run retains its mark. A successful owned run records reusable module decisions. */
+  finishIndexRun?(
+    incomplete?: boolean,
+    completed?: ReadonlyMap<string, string>,
+  ): StorageResult<void>;
   failedFiles?(): StorageResult<FailedFile[]>;
   /** parseFailure distinguishes cacheable parser failures from retryable project failures. */
   replaceFile(file: GraphFile, parseFailure?: boolean): StorageResult<void>;

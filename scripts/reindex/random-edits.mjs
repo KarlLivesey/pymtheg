@@ -16,6 +16,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { compareRows, setPageCache, storeRows } from "./dump.mjs";
 
 const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
@@ -120,6 +121,29 @@ if (!existsSync(graph)) {
   incremental(join(base, "first.json"));
 }
 const projectId = temporary ? directId : storeRows(graph).project[0];
+// Choose renames from declarations a different file actually called in the
+// initial graph. Keep that list for deterministic replay after an interruption.
+const signatureTargetPath = join(base, "signature-targets.json");
+let signatureTargets = [];
+if (repo.language === "go") {
+  if (!existsSync(signatureTargetPath)) {
+    const db = new DatabaseSync(graph, { readOnly: true });
+    try {
+      const targets = db
+        .prepare(
+          `SELECT DISTINCT s.file,s.name FROM graph_links l
+        JOIN graph_symbols s ON s.id=l.target
+        WHERE l.module='go' AND l.kind='calls' AND s.kind='function' AND s.file!=l.file
+        ORDER BY s.file,s.name`,
+        )
+        .all();
+      writeFileSync(signatureTargetPath, JSON.stringify(targets));
+    } finally {
+      db.close();
+    }
+  }
+  signatureTargets = JSON.parse(readFileSync(signatureTargetPath, "utf8"));
+}
 // Edits that keep, move or break code: a comment line, a blank line, a
 // duplicated line, a deleted line, a no-op statement after an opening brace.
 const kinds = ["comment", "blank", "duplicate", "delete", "statement"];
@@ -196,22 +220,24 @@ function goEdit(step, file, source) {
       break;
     }
     case "signature": {
-      const functions = [
-        ...source.matchAll(/^func [\p{L}_][\p{L}\p{N}_]*\(\)(?=[^\n{}]*\{)/gmu),
-      ];
-      if (functions.length) {
-        const match = pick(functions);
-        return {
-          file,
-          kind,
-          text: insert(match.index + match[0].length - 1, "_ int"),
-        };
+      const start = Math.floor(random() * signatureTargets.length);
+      for (const { file: targetFile, name: targetName } of [
+        ...signatureTargets.slice(start),
+        ...signatureTargets.slice(0, start),
+      ]) {
+        const text = sourceOf(targetFile);
+        const header = new RegExp(
+          `^(func\\s+)${targetName}(?=\\s*[\\[(])`,
+          "mu",
+        );
+        if (header.test(text))
+          return {
+            file: targetFile,
+            kind,
+            text: text.replace(header, `$1${name}`),
+          };
       }
-      return {
-        file,
-        kind,
-        text: source + `\nfunc ${name}(_ int) int { return 1 }\n`,
-      };
+      break;
     }
     case "interface": {
       const interfaces = [...source.matchAll(/^type \w+ interface \{/gm)];
@@ -294,11 +320,12 @@ function goEdit(step, file, source) {
 // Replay the seed from pristine source when resuming so no PRNG state or
 // generated source needs to be kept in the evidence.
 const sourceByFile = new Map();
+const sourceOf = (file) =>
+  sourceByFile.get(file) ??
+  readFileSync(join(scratch, "pins", name, file), "utf8");
 for (let step = 0; step < expectedSteps; step++) {
   let file = pick(files);
-  const original =
-    sourceByFile.get(file) ??
-    readFileSync(join(scratch, "pins", name, file), "utf8");
+  const original = sourceOf(file);
   let edit;
   let at = 0;
   if (repo.language === "go") edit = goEdit(step, file, original);
