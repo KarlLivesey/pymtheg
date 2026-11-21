@@ -12,7 +12,9 @@ import type {
   ResolutionContext,
   ResolutionResult,
 } from "../../types.js";
+import { stageSync } from "../../work.js";
 import {
+  directoryOf,
   directoryOfImport,
   importPathOf,
   libraryOrigin,
@@ -316,10 +318,6 @@ const failed = (files: string[]): Decision => ({
   invalid: unique(files).sort(),
 });
 
-const directoryOf = (path: string) => {
-  const directory = posix.dirname(path);
-  return directory === "." ? "" : directory;
-};
 const exported = (name: string) => /^\p{Lu}/u.test(name);
 const unique = <T>(items: T[]) => [...new Set(items)];
 /** Package name a non-project import is conventionally referred to by (only used to recognise qualifiers). */
@@ -406,6 +404,7 @@ export function linkNotes(
   moduleId: string,
   files: readonly GraphFile[],
   contextFiles: readonly ContextFile[],
+  resolutionFiles?: ReadonlySet<string>,
 ): Map<string, Map<number, LinkNote>> {
   const symbols: GraphSymbol[] = [];
   const links: GraphLink[] = [];
@@ -421,6 +420,7 @@ export function linkNotes(
         module: moduleId,
         status: file.result.status,
       });
+    if (resolutionFiles && !resolutionFiles.has(file.path)) continue;
     file.result.links.forEach((link, index) =>
       links.push({
         ...link,
@@ -444,6 +444,7 @@ export function linkNotes(
     contextFiles,
     symbols,
     links,
+    ...(resolutionFiles ? { resolutionFiles } : {}),
   });
   resolver.run();
   const output = new Map<string, Map<number, LinkNote>>();
@@ -467,6 +468,22 @@ export function linkNotes(
   for (const [linkId, decided] of resolver.toolchain)
     note(linkId).toolchain = decided;
   return output;
+}
+
+/** Global facts seed these lookups. A file can warm its own lookups as it is
+ * resolved, independently of which other files had links decided. */
+class FileMemo<T> {
+  private readonly shared = new Map<string, T>();
+  private local?: Map<string, T>;
+  nextFile(): void {
+    this.local = new Map();
+  }
+  get(key: string): T | undefined {
+    return this.local?.get(key) ?? this.shared.get(key);
+  }
+  set(key: string, value: T): void {
+    (this.local ?? this.shared).set(key, value);
+  }
 }
 
 class GoResolver {
@@ -501,13 +518,16 @@ class GoResolver {
   private decls = new Map<string, Map<string, GraphSymbol[]>>();
   private members = new Map<string, GraphSymbol[]>();
   private methodsByName = new Map<string, GraphSymbol[]>();
-  private embedsBySource = new Map<string, GraphLink[]>();
+  private embedsBySource = new Map<
+    string,
+    Pick<GraphLink, "file" | "range" | "data">[]
+  >();
   private implementers = new Map<string, GraphSymbol[]>();
   /** Proven implementers plus types not refuted (an external embedded type might supply a method). */
   private possible = new Map<string, GraphSymbol[]>();
   /** Interfaces whose method set is fully known, so their implementer list is complete. */
   private complete = new Set<string>();
-  private memo = new Map<string, TypeValue>();
+  private memo = new FileMemo<TypeValue>();
   /**
    * How many answers the depth limit or a cycle guard has cut short. A cached
    * answer (`memo`, `views`, `hiddenMemo`, `externalMemo`) is kept only when
@@ -519,7 +539,21 @@ class GoResolver {
     this.cutoffs++;
     return value;
   }
-  private selections = new Map<string, Selection>();
+  private selections = new FileMemo<Selection>();
+  private decisionFile?: string;
+
+  private beginDecisionFile(path: string): void {
+    if (path === this.decisionFile) return;
+    this.decisionFile = path;
+    for (const memo of [
+      this.memo,
+      this.views,
+      this.selections,
+      this.hiddenMemo,
+      this.externalMemo,
+    ])
+      memo.nextFile();
+  }
 
   private readonly context: ResolutionContext;
   constructor(
@@ -539,12 +573,12 @@ class GoResolver {
   }
 
   run(): ResolutionResult {
-    this.index();
     const added: AddedLink[] = [];
-    this.implementsLinks(added);
-    this.toolchainImplements(added);
+    this.indexGlobalFacts(added);
+    const scope = this.context.resolutionFiles;
+    if (!scope) this.toolchainImplements(added);
     for (const pkg of this.pkgs.values())
-      if (pkg.symbol)
+      if (pkg.symbol && (!scope || scope.has(pkg.symbol.file)))
         for (const path of pkg.files) {
           const file = this.byFileKey.get(`${path}\u0000file`);
           if (file)
@@ -560,6 +594,7 @@ class GoResolver {
         }
     const resolutions: LinkResolution[] = [];
     for (const link of this.context.links) {
+      this.beginDecisionFile(link.file);
       const name = link.data as { builtinName?: boolean } | undefined;
       let decision: Decision;
       try {
@@ -1157,7 +1192,7 @@ class GoResolver {
     // files (the dispatch label "structural only" counts as not).
     if (
       given.includes(external) &&
-      !this.shadow().resolveLink(link).open?.includes(external)
+      !this.shadow(link.file).resolveLink(link).open?.includes(external)
     )
       return unique([unseen, ...given.filter((reason) => reason !== external)]);
     return unique(lossyMember ? [...given, unseen] : given);
@@ -1165,16 +1200,23 @@ class GoResolver {
 
   private shadowResolver?: GoResolver;
   /** The project without lossy packages (only to name reasons). */
-  private shadow(): GoResolver {
+  private shadow(path: string): GoResolver {
     if (!this.shadowResolver) {
       this.shadowResolver = new GoResolver(this.moduleId, this.context, true);
-      this.shadowResolver.index();
-      this.shadowResolver.implementsLinks([]);
+      this.shadowResolver.indexGlobalFacts([]);
     }
+    this.shadowResolver.beginDecisionFile(path);
     return this.shadowResolver;
   }
 
   // ---- indexing ----------------------------------------------------------
+
+  private indexGlobalFacts(added: AddedLink[]): void {
+    stageSync("go.globalIndex", () => {
+      this.index();
+      this.implementsLinks(added);
+    });
+  }
 
   /**
    * Layer 1: files whose package membership cannot be proven, treated exactly
@@ -1223,6 +1265,8 @@ class GoResolver {
   private fileDirectories = new Set<string>();
 
   private index(): void {
+    // incremental.ts fingerprints the facts used by cross-file lookups here.
+    // New cross-file inputs must participate in that proof or force a full pass.
     for (const file of this.context.files) {
       this.fileDirectories.add(directoryOf(file.path));
       const parts = file.path.split("/");
@@ -1357,9 +1401,35 @@ class GoResolver {
         symbol,
       );
     }
-    for (const link of this.context.links)
-      if (link.kind === "embeds" && link.sourceId)
-        push2(this.embedsBySource, link.sourceId, link);
+    if (this.context.resolutionFiles) {
+      // All embedding facts participate in method sets, including the ones
+      // whose existing decisions are being reused. Only their parse facts
+      // are needed, with the same source order as the complete input.
+      for (const file of this.context.files) {
+        if (file.module !== this.moduleId || !this.files.has(file.path))
+          continue;
+        const embeds = file.result.links.filter(
+          (link) => link.kind === "embeds",
+        );
+        embeds.sort(
+          (a, b) =>
+            a.range.start - b.range.start ||
+            a.range.end - b.range.end ||
+            compareText(a.targetName, b.targetName),
+        );
+        for (const link of embeds) {
+          const owner = this.byFileKey.get(
+            `${file.path}\u0000${link.sourceKey}`,
+          );
+          if (owner)
+            push2(this.embedsBySource, owner.id, { ...link, file: file.path });
+        }
+      }
+    } else {
+      for (const link of this.context.links)
+        if (link.kind === "embeds" && link.sourceId)
+          push2(this.embedsBySource, link.sourceId, link);
+    }
     for (const info of this.files.values())
       for (const item of info.fact.imports) {
         const {
@@ -2105,7 +2175,6 @@ class GoResolver {
       return syms;
     const key = `${syms
       .map((symbol) => symbol.id)
-      .sort()
       .join(",")}\u0000${JSON.stringify(this.constraintOf(from) ?? null)}`;
     if (this.variantMemo.has(key)) return this.variantMemo.get(key);
     const answer = this.computeCalledVariants(syms, from);
@@ -2309,7 +2378,7 @@ class GoResolver {
     return false;
   }
 
-  private views = new Map<string, View>();
+  private views = new FileMemo<View>();
   /**
    * The structure of any project type, used by every consumer (selection and
    * promotion, method sets, `implements`, dispatch, carriers):
@@ -2492,14 +2561,12 @@ class GoResolver {
     // the table, which depends on the referencing module's `go` directive.
     const stdKey =
       std && !skipExternal ? `s:${this.goDirective(from) ?? "-"}` : "";
-    const memoKey = `${stdKey}${skipExternal ? "x" : ""}${types
-      .map((type) => type.id)
-      .sort()
-      .join(
-        ",",
-      )}\u0000${name}\u0000${access ?? ""}\u0000${from === undefined ? "" : this.files.get(from)?.fact.test ? `t:${directoryOf(from)}` : "n"}\u0000${from === undefined ? "" : JSON.stringify(this.constraintOf(from) ?? null)}`;
+    // Selection can prefer a declaration in the reader's own file, even
+    // when another reader in the same package has the same build constraint.
+    const memoKey = `${stdKey}${skipExternal ? "x" : ""}${types.map((type) => type.id).join(",")}\u0000${name}\u0000${access ?? ""}\u0000${from ?? ""}`;
     const cached = this.selections.get(memoKey);
     if (cached) return cached;
+    const cutoffs = this.cutoffs;
     // A type declared in several build variants is a different type in each
     // configuration: search each choice of variant separately (choosing only
     // when a variant set is reached), and agree only on what they all find.
@@ -2528,7 +2595,7 @@ class GoResolver {
       else results.push(run);
     }
     result ??= combineVariants(results);
-    this.selections.set(memoKey, result);
+    if (this.cutoffs === cutoffs) this.selections.set(memoKey, result);
     return result;
   }
 
@@ -3347,6 +3414,11 @@ class GoResolver {
         // identity comparison only annotates it.
         if (unknown) continue;
         push2(this.implementers, iface.id, type);
+        if (
+          this.context.resolutionFiles &&
+          !this.context.resolutionFiles.has(type.file)
+        )
+          continue;
         added.push({
           key: `implements:${type.key}:${iface.id}`,
           file: type.file,
@@ -4444,7 +4516,7 @@ class GoResolver {
     );
   }
 
-  private hiddenMemo = new Map<string, boolean>();
+  private hiddenMemo = new FileMemo<boolean>();
   /**
    * Can code outside the project obtain package `pkgKey`'s unexported method `name`
    * (and so implement interfaces that need it)? Only through an exported CARRIER
@@ -4517,7 +4589,7 @@ class GoResolver {
     return !relative.split("/").includes("internal");
   }
 
-  private externalMemo = new Map<string, boolean>();
+  private externalMemo = new FileMemo<boolean>();
   /** The type embeds, at any depth, a type outside the project (or an unresolvable one). */
   private embedsExternal(type: GraphSymbol, seen = new Set<string>()): boolean {
     const cached = this.externalMemo.get(type.id);

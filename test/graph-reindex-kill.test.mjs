@@ -141,6 +141,21 @@ test("Go: a re-index killed after any write is repaired by the next one", async 
   t.diagnostic(`write boundaries: ${tried}`);
 });
 
+test("Go: a killed scoped re-index is repaired by the next one", async (t) => {
+  const tried = await everyKillPoint(
+    {
+      "go.mod": "module example.com/m\n\ngo 1.22\n",
+      "a/a.go": "package a\nfunc Existing() {}\n",
+      "b/b.go":
+        'package b\nimport "example.com/m/a"\nfunc Use() { a.Added() }\n',
+      "independent/other.go": "package independent\nfunc Unrelated() {}\n",
+    },
+    { "a/a.go": "package a\nfunc Existing() {}\nfunc Added() {}\n" },
+  );
+  assert.ok(tried >= 3, `write boundaries tried: ${tried}`);
+  t.diagnostic(`write boundaries: ${tried}`);
+});
+
 test("Rust: a re-index killed after any write is repaired by the next one", async (t) => {
   const tried = await everyKillPoint(
     {

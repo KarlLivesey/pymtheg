@@ -32,10 +32,12 @@ test("the committed sweep and TypeScript replay regenerate the coverage plan byt
   const attempts = join(scratch, "attempts.md");
   const itemChanges = join(scratch, "items.md");
   const input = "evidence/sw-4/coverage-plan-input.json.gz";
+  const replay = "evidence/sw-5/coverage-plan-input.json.gz";
   writeFileSync(plan, "Placeholder\n");
   try {
     execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", input,
       "--plan", plan, "--attempts", attempts, "--item-changes", itemChanges], { cwd: root });
+    execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", replay, "--plan", plan], { cwd: root });
     execFileSync(process.execPath, ["evidence/c-25/plan-refresh.mjs",
       "evidence/c-25/coverage-plan-input.json.gz", plan], { cwd: root });
     assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
@@ -51,6 +53,19 @@ test("the committed sweep and TypeScript replay regenerate the coverage plan byt
     }
     rmdirSync(scratch);
   }
+});
+
+test("SW-5 replays every SW-4 installed fallback and preserves the other observations", () => {
+  const archive = (chunk) => JSON.parse(gunzipSync(readFileSync(new URL(`../../evidence/${chunk}/coverage-plan-input.json.gz`, import.meta.url))));
+  const before = archive("sw-4");
+  const after = archive("sw-5");
+  const usable = ({ outcome, install }) => outcome === "finished" && install?.status === "installed";
+  assert.deepEqual(after.modes.bare, before.modes.bare);
+  assert.deepEqual(after.modes["go-toolchain"], before.modes["go-toolchain"]);
+  assert.deepEqual(after.samples, before.samples);
+  assert.deepEqual(after.modes.installed.repos.filter(({ measuredCommit }) => !measuredCommit), before.modes.installed.repos.filter(usable));
+  assert.deepEqual(after.modes.installed.repos.filter(({ measuredCommit }) => measuredCommit).map(({ id }) => id),
+    before.modes.installed.repos.filter((repo) => !usable(repo)).map(({ id }) => id));
 });
 
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";

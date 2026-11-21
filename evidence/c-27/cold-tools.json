@@ -1,0 +1,65 @@
+[
+ {
+  "pin": "golang_tools",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 506.94,
+  "cpuS": 456.1,
+  "peakMiB": 2424,
+  "equality": {
+   "rows": {
+    "graph_files": 1986,
+    "graph_contexts": 5,
+    "graph_parse_failures": 17,
+    "graph_symbols": 31175,
+    "graph_links": 253517,
+    "graph_candidates": 12861,
+    "graph_library_targets": 85908,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "golang_tools",
+  "round": 0,
+  "build": "after",
+  "wallS": 433.3,
+  "cpuS": 422.4,
+  "peakMiB": 2396,
+  "equality": {
+   "rows": {
+    "graph_files": 1986,
+    "graph_contexts": 5,
+    "graph_parse_failures": 17,
+    "graph_symbols": 31175,
+    "graph_links": 253517,
+    "graph_candidates": 12861,
+    "graph_library_targets": 85908,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "golang_tools",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 336.81,
+  "cpuS": 349.2,
+  "peakMiB": 2475,
+  "equality": {
+   "rows": {
+    "graph_files": 1986,
+    "graph_contexts": 5,
+    "graph_parse_failures": 17,
+    "graph_symbols": 31175,
+    "graph_links": 253517,
+    "graph_candidates": 12861,
+    "graph_library_targets": 85908,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]
