@@ -453,6 +453,9 @@ or `.cargo/config` as context, read by a snapshot-only
 TOML reader (an unsupported or invalid manifest, including any TOML datetime,
 makes that whole manifest unknown). Private items are ordinary symbols.
 
+- **Determinism:** the Rust graph is a function of the snapshot. Graph ids
+  (and so the order stores list rows in) include the project's random id;
+  no Rust answer depends on that order ([C-24](changes/C-24.md)).
 - **Cancellation:** the graph CLI can interrupt Rust analysis and resolution
   with SIGINT or SIGTERM. Interrupted syncs leave an incomplete index and can
   be retried. When an import path reaches the resolver's depth boundary, an
@@ -501,7 +504,10 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   of a trait the type implements or derives, or of any checkout trait; every
   import in scope resolves into the checkout or names a standard trait whose
   methods are known; no unknown macro, failed file, non-standard derive or
-  attribute macro can add one. Every other dot call is unresolved with
+  attribute macro can add one. An inherent impl whose self type cannot be
+  placed is a possible candidate only for types of its own crate (E0116);
+  an unplaced trait impl stays possible in every crate in reach
+  ([C-24](changes/C-24.md)). Every other dot call is unresolved with
   would-be targets and a reason (`later-probe-step`, `trait-dispatch`,
   `receiver-type-unverified`, …); no dot call has a closed candidate set.
   Trait methods (even of a checkout trait implemented for the type), `Box`,
@@ -580,7 +586,13 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   and named imports establish the export for compiling code when registry
   provenance is verified. Feature facts can identify namespace facets.
   A registry re-export needs a verified registry edge to the implementing
-  crate. Checkout implementations need an output proof. A glob which could only
+  crate for its expansion; the macro link itself (which facade export the
+  name is) needs only the verified facade. With no `Cargo.lock`, a plain
+  version requirement verifies both when the root manifest has no
+  `[patch]`/`[replace]` entry for the implementing crate and no captured
+  `.cargo/config` anywhere in the checkout sets `paths`, `[source]` or
+  `[patch]` ([C-24](changes/C-24.md)).
+  Checkout implementations need an output proof. A glob which could only
   compete with an established outer macro or path head does not prevent
   the proof, since rustc rejects that ambiguity. An uncaptured macro-use
   import and a glob without an established competing binding can still

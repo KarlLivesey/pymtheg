@@ -1,0 +1,49 @@
+# C-24 cold index cost
+
+## Four merged sweeps side by side (one session, same storage)
+
+From [cost.mjs](cost.mjs) on the sweep results (three main runs, one branch run).
+
+| Pin | Main CPU s (3 runs) | C-24 CPU s | vs main mean | Main peak RSS MiB | C-24 peak RSS MiB | vs main mean |
+| --- | --- | ---: | ---: | --- | ---: | ---: |
+| BurntSushi/ripgrep | 78.2 / 79.0 / 74.6 | 64.0 | -17.2% | 779 / 747 / 744 | 833 | 10.1% |
+| DioxusLabs/dioxus | 784.9 / 795.8 / 775.8 | 715.3 | -8.9% | 2530 / 2673 / 2737 | 2637 | -0.4% |
+| RustCrypto/hashes | 38.7 / 43.1 / 47.3 | 42.3 | -1.8% | 467 / 469 / 465 | 473 | 1.2% |
+| actix/actix-web | 222.6 / 215.6 / 214.5 | 213.9 | -1.7% | 1330 / 1306 / 1337 | 1254 | -5.3% |
+| alacritty/alacritty | 108.5 / 103.0 / 112.0 | 64.0 | -40.6% | 741 / 742 / 730 | 777 | 5.3% |
+| cberner/redb | 120.1 / 112.8 / 130.2 | 137.4 | 13.5% | 1167 / 1081 / 1090 | 1053 | -5.3% |
+| clap-rs/clap | 112.2 / 123.7 / 96.7 | 96.2 | -13.2% | 863 / 901 / 952 | 926 | 2.3% |
+| crossbeam-rs/crossbeam | 64.3 / 67.5 / 65.6 | 64.1 | -2.6% | 794 / 790 / 773 | 771 | -1.9% |
+| fjall-rs/fjall | 55.4 / 41.9 / 46.9 | 48.8 | 1.6% | 538 / 551 / 543 | 537 | -1.2% |
+| helix-editor/helix | 261.4 / 260.3 / 269.8 | 277.4 | 5.1% | 1282 / 1205 / 1293 | 1399 | 11.0% |
+| ratatui/ratatui | 184.1 / 186.0 / 164.0 | 163.2 | -8.3% | 1041 / 1081 / 1042 | 1009 | -4.3% |
+| rust-embedded/cortex-m | 19.8 / 18.3 / 28.8 | 27.6 | 23.8% | 374 / 379 / 297 | 363 | 3.8% |
+| rust-lang/mdBook | 71.1 / 79.7 / 57.8 | 72.8 | 4.6% | 602 / 635 / 668 | 653 | 2.8% |
+| rustls/rustls | 215.0 / 216.2 / 235.2 | 240.9 | 8.4% | 1479 / 1377 / 1401 | 1435 | 1.1% |
+| serde-rs/serde | 117.6 / 134.2 / 81.7 | 78.1 | -29.7% | 838 / 948 / 887 | 831 | -6.7% |
+| tauri-apps/tauri | 243.6 / 245.1 / 251.7 | 253.5 | 2.7% | 1319 / 1556 / 1422 | 1367 | -4.6% |
+| tokio-rs/axum | 88.9 / 91.3 / 91.3 | 86.2 | -4.8% | 971 / 920 / 904 | 973 | 4.4% |
+| tree-sitter/tree-sitter | 108.6 / 110.5 / 100.7 | 101.6 | -4.6% | 1127 / 1103 / 1133 | 1126 | 0.4% |
+| **All pins** | **2888 (mean)** | **2747** | **-4.9%** | **18376 (sum of means)** | **18416** | **0.2%** |
+
+## Controlled sequential runs
+
+From [cost-runs.sh](cost-runs.sh): main, branch, main, each a cold index of the same checkout copy under its own project id. CPU is user + system seconds; RSS is peak KiB.
+
+```
+alacritty main2 cpu=61.56 wall=0:57.08 rss_kib=757424
+alacritty c24e cpu=60.88 wall=0:58.67 rss_kib=770020
+alacritty main2 cpu=62.75 wall=0:56.07 rss_kib=771004
+rustls main2 cpu=217.37 wall=3:25.62 rss_kib=1496244
+rustls c24e cpu=206.27 wall=3:04.28 rss_kib=1440780
+rustls main2 cpu=195.92 wall=2:49.13 rss_kib=1591572
+```
+
+## Canonical order
+
+From [order-cost.mjs](order-cost.mjs), five repeats on finished stores:
+
+```
+dioxus      {"files":884,"symbols":16657,"links":149377,"milliseconds":[285,357,263,289,289]}
+tree-sitter {"files":113,"symbols":3981,"links":54637,"milliseconds":[87,78,78,79,79]}
+```

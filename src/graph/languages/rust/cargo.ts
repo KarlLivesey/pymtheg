@@ -27,6 +27,13 @@ export type Edition = "2015" | "2018" | "2021" | "2024";
 export interface MacroRegistry {
   implementations: readonly string[];
   registryOnly: boolean;
+  /**
+   * C-24: no lockfile, a plain registry requirement and no captured override
+   * mechanism, so Cargo takes the facade and the packages it depends on from
+   * the default registry. Names a root-manifest `[patch]`/`[replace]` entry
+   * touches are excluded.
+   */
+  unlocked?: { excluded: readonly string[] };
 }
 export interface Dependency {
   name: string;
@@ -129,6 +136,21 @@ export function crates(
     }));
   const byPath = new Map(docs.map((d) => [d.path, d]));
   const directorySource = cargoSources(contexts);
+  // C-24: Cargo reads configuration from the directory it runs in and every
+  // ancestor, so a config anywhere in the checkout may apply to a build. Any
+  // captured config that sets `paths`, `[source]` or `[patch]`, or that cannot
+  // be read, leaves unlocked registry sources unestablished.
+  const unlockedSourcesFixed = contexts
+    .filter((c) => /(?:^|\/)\.cargo\/config(?:\.toml)?$/.test(c.path))
+    .every((c) => {
+      const value = c.status === "clean" ? readToml(c.text) : null;
+      return (
+        !!value &&
+        value.paths === undefined &&
+        value.source === undefined &&
+        value.patch === undefined
+      );
+    });
   const locks = new Map(
     contexts
       .filter((c) => p.basename(c.path) === "Cargo.lock")
@@ -625,6 +647,15 @@ export function crates(
                       source.identity === "crates-io" &&
                       source.directory === undefined,
                   ),
+                ...(unlockedSourcesFixed && libraryKnown
+                  ? {
+                      unlocked: {
+                        excluded: [
+                          ...new Set(overrides.map((o) => o.name)),
+                        ].sort(),
+                      },
+                    }
+                  : {}),
               }
             : undefined;
         if (vendor !== undefined) {

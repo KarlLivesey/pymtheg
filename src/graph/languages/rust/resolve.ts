@@ -41,6 +41,7 @@ import {
 } from "./library-audit.js";
 import {
   dependencyUnit,
+  cargoMacroFacadeKnown,
   cargoMacroReexport,
   cargoMacroSourceKnown,
   exportNamespace,
@@ -2949,7 +2950,25 @@ export function resolveRust(
       if (!outerReads) rootScopeReads.length = 0;
       activeLookup = outer;
     }
-    if (result.complete) {
+    // C-24: a cycle cut answers "nothing more here" for a lookup already on
+    // the stack. A result that met such a cut at an ancestor is the answer
+    // for this entry point only: memoised as context-free, whichever lookup
+    // ran first would decide every later one (cfg-alternative sibling files
+    // importing from a parent that globs them back). Such a result is reused
+    // only under the same ancestor tests, like an incomplete one.
+    const stackFree =
+      cycleCuts === cutsBefore ||
+      (!!trace && trace.valid && [...trace.required].every((g) => g === guard));
+    if (result.complete && !stackFree) {
+      if (trace && stateKey !== undefined) {
+        observedIncompleteGuards.add(cacheKey);
+        trace.required.delete(guard);
+        trace.excluded.add(guard);
+        outer?.trace.absorb(trace, outer.expansion);
+        if (trace.fits() && revision === lookupRevision)
+          incompleteLookups.set(stateKey, { result, cut: true, trace });
+      } else if (outer) outer.trace.valid = false;
+    } else if (result.complete) {
       // A complete entry preempts a previous incomplete result or cycle cut,
       // including when another saved lookup depended on that answer.
       if (observedIncompleteGuards.has(cacheKey)) clearIncompleteLookups();
@@ -4471,7 +4490,7 @@ export function resolveRust(
     }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
   const unknownImpls = new Map<string, GraphSymbol[]>(),
-    unknownInherent = new Set<string>();
+    unknownInherent = new Map<string, Set<string>>();
   const memberOwners = new Map<string, GraphSymbol>();
   const extensionNames = new Set<string>();
   const allMembers = new Map<string, GraphSymbol[]>();
@@ -4519,7 +4538,12 @@ export function resolveRust(
     inherent: boolean,
   ): void {
     unknownImpls.set(root, unique([...(unknownImpls.get(root) ?? []), ...ms]));
-    if (inherent) for (const m of ms) unknownInherent.add(m.id);
+    if (inherent)
+      for (const m of ms)
+        unknownInherent.set(
+          m.id,
+          new Set([...(unknownInherent.get(m.id) ?? []), root]),
+        );
   }
   for (const impl of symbols.filter((s) => s.kind === "impl"))
     if (!ownerPlace(impl.file, str(data(impl).scope)).length) {
@@ -5043,8 +5067,20 @@ export function resolveRust(
           return false;
         return receiver.includes("&") || borrow === "owned";
       });
+    // An inherent impl is allowed only in the crate that defines its type
+    // (E0116), so an unplaced inherent impl in another crate cannot add a
+    // method to these types. Trait impls stay: other crates may write them.
+    const typeRoots = new Set(
+      type.symbols.flatMap((t) =>
+        ownerPlace(t.file, str(data(t).scope)).map((p) => p.crate.root),
+      ),
+    );
     const unknown = unknownMethods(loc.crate.root, name).filter(
-        (m) => !instance || data(m).receiverKind !== "none",
+        (m) =>
+          (!instance || data(m).receiverKind !== "none") &&
+          [...(unknownInherent.get(m.id) ?? ["*"])].some(
+            (r) => r === "*" || typeRoots.has(r),
+          ),
       ),
       targets = unique([...matches.map((m) => m.symbol), ...unknown]);
     const accessibleHint = (m: GraphSymbol) => {
@@ -6277,9 +6313,12 @@ export function resolveRust(
         namespace === "macro" &&
         path.unit.ecosystem === "cargo" &&
         cargoMacroReexport(path) &&
-        !cargoMacroSourceKnown(path)
+        // C-24: the name is the facade's export once the facade is a
+        // verified registry release; expansion proofs still need the
+        // implementing crate's source (scopeMacroExport).
+        !cargoMacroFacadeKnown(path)
       )
-        return refuseLibrary("macro implementation source unverified");
+        return refuseLibrary("macro facade source unverified");
       const exported = exportNamespace(path);
       if (
         !libraryProbe &&
