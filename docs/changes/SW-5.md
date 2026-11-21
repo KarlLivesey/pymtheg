@@ -7,6 +7,15 @@ product commit and build digest. The bare graphs, other installed results,
 Go toolchain results and source review come from SW-4.
 [Replay evidence](../../evidence/sw-5/README.md)
 
+All five installers completed. Zod, Nest and T3 Code added 67,600
+Level 2 links without recorded assumptions. On the 20 TypeScript pins,
+installed Level 2 rose from 80.37% to 85.23%. Proven coverage rose from
+76.84% to 81.70%, and assumption-marked links account for 3.53% in both
+measurements. Microsoft TypeScript still uses its bare receipt after the
+60-minute cold-index limit. Turborepo finished the sweep with an incomplete graph containing
+Go and Rust links and zero TypeScript links.
+[Per-pin measurements](../../evidence/sw-5/README.md#replay-results) · [Generated plan](../coverage-plan.md)
+
 ## TypeScript compiler and range failures
 
 **microsoft/TypeScript.** SW-4 recorded `Debug Failure. False expression.`

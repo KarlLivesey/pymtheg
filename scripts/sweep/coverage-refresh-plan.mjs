@@ -170,6 +170,9 @@ export function renderPlan(input, base, pins, catalog, legacy) {
   const installedUsable = installed.filter((repo) => repo.counts && repo.install?.status === "installed").length;
   const installedFallback = installed.filter((repo) => !repo.counts || repo.install?.status !== "installed")
     .map(({ id, install, outcome, failure }) => `${id} (${install?.reason ?? `${outcome}${failure?.stage ? ` at ${failure.stage}` : ""}`})`);
+  const installedWithoutTypeScript = installed.filter((repo) => repo.install?.status === "installed" &&
+    repo.counts?.typescript.links === 0 && repo.failedModules?.typescript)
+    .map((repo) => `${repo.id} (${number(repo.failedModules.typescript)} failed files)`);
   const replays = Map.groupBy(installed.filter(({ measuredCommit }) => measuredCommit), ({ measuredCommit }) => measuredCommit);
   const replayNotes = [...replays].map(([commit, rows]) =>
     `Installed attempts for ${rows.map(({ id }) => id).join(", ")} were measured later at ${inline(commit)}. The installed totals use these attempts where usable and keep the original measurements for the other pins.`);
@@ -202,6 +205,7 @@ export function renderPlan(input, base, pins, catalog, legacy) {
       ? `${installedUsable}/${installed.length} TypeScript pins completed the installed graph and sweep queries with lifecycle scripts disabled. Each unusable installed attempt contributes its bare graph when available.`
       : `TypeScript dependencies installed and indexed on ${installedUsable}/${installed.length} pins with lifecycle scripts disabled. Each unusable installed attempt contributes its bare graph when available.`,
     ...(installedFallback.length ? [`Installed-mode fallbacks include ${installedFallback.join(", ")}.`] : []),
+    ...(installedWithoutTypeScript.length ? [`Installed graphs with zero TypeScript links after analysis failed include ${installedWithoutTypeScript.join(", ")}.`] : []),
     `The offline Go toolchain provided facts on ${goUsed.length}/${go.length} Go pins. Go links in other languages' pins use the bare graph.${goUsed.length < go.length ? " Go pins with unusable opt-in attempts also use the bare graph." : ""}`,
     `[Per-pin outcomes, fallback details, time and memory](../evidence/${archive}/${replays.size ? "README.md" : "attempts.md"})`, "",
     "## Support items", "",

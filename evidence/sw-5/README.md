@@ -64,6 +64,58 @@ no in-checkout TypeScript input for any of the five.
 The source check traces 20 matched SW-4 misses to their new targets in the
 installed graphs. [Source checks](source-check.md)
 
+## Replay results
+
+The original installed score paired each unavailable attempt with its SW-4
+bare graph. The replay still uses that fallback for Microsoft TypeScript.
+Its install succeeded, then the runner reached the 60-minute limit at
+`graph analyze typescript: 0/27194` and sent a shutdown signal. Turborepo
+completed its sweep queries with an incomplete graph. The `Invalid UTF-16
+range` analysis error marked all 3,094 TypeScript and JavaScript files
+failed. The finished graph supplies Go and Rust links and zero TypeScript
+links. Its package layout cannot be assessed through TypeScript links in
+this receipt. [Diagnoses and reproductions](../../docs/changes/SW-5.md#typescript-compiler-and-range-failures)
+
+The rates divide each Level 2 count by all stored TypeScript and JavaScript
+links for that pin. The proven column excludes links with recorded
+assumptions. A dash means the pin contributed zero TypeScript links.
+
+| Pin | Links | Level 2 | Proven | Assumption-marked |
+| --- | ---: | ---: | ---: | ---: |
+| changesets/changesets | 12,646 → 12,646 | 86.99% → 86.99% | 86.99% → 86.99% | 0.00% → 0.00% |
+| colinhacks/zod | 81,042 → 81,042 | 83.86% → 94.65% | 83.86% → 94.65% | 0.00% → 0.00% |
+| dexie/Dexie.js | 36,431 → 36,431 | 56.25% → 56.25% | 56.25% → 56.25% | 0.00% → 0.00% |
+| excalidraw/excalidraw | 104,519 → 104,519 | 93.36% → 93.36% | 93.36% → 93.36% | 0.00% → 0.00% |
+| honojs/hono | 72,340 → 72,340 | 64.15% → 64.15% | 64.15% → 64.15% | 0.00% → 0.00% |
+| mermaid-js/mermaid | 125,657 → 125,657 | 89.17% → 89.17% | 89.17% → 89.17% | 0.00% → 0.00% |
+| microsoft/TypeScript | 0 → 0 | — → — | — → — | — → — |
+| nestjs/nest | 165,330 → 165,330 | 74.78% → 91.55% | 74.78% → 91.55% | 0.00% → 0.00% |
+| oclif/core | 14,188 → 14,188 | 95.07% → 95.07% | 95.07% → 95.07% | 0.00% → 0.00% |
+| pingdotgg/t3code | 162,711 → 162,711 | 72.34% → 91.48% | 72.34% → 91.48% | 0.00% → 0.00% |
+| pmndrs/zustand | 7,099 → 7,099 | 82.65% → 82.65% | 82.65% → 82.65% | 0.00% → 0.00% |
+| puppeteer/puppeteer | 58,244 → 58,244 | 78.00% → 78.00% | 77.05% → 77.05% | 0.95% → 0.95% |
+| react-hook-form/react-hook-form | 49,115 → 49,115 | 74.90% → 74.90% | 74.90% → 74.90% | 0.00% → 0.00% |
+| reduxjs/redux-toolkit | 57,208 → 57,208 | 80.02% → 80.02% | 80.02% → 80.02% | 0.00% → 0.00% |
+| trpc/trpc | 107,470 → 107,470 | 88.80% → 88.80% | 88.80% → 88.80% | 0.00% → 0.00% |
+| vercel/turborepo | 0 → 0 | — → — | — → — | — → — |
+| vitejs/vite | 55,575 → 55,575 | 82.23% → 82.23% | 70.07% → 70.07% | 12.15% → 12.15% |
+| vitest-dev/vitest | 116,220 → 116,220 | 82.26% → 82.26% | 50.35% → 50.35% | 31.92% → 31.92% |
+| withastro/astro | 152,561 → 152,561 | 85.38% → 85.38% | 82.29% → 82.29% | 3.09% → 3.09% |
+| yargs/yargs | 12,205 → 12,205 | 52.65% → 52.65% | 52.65% → 52.65% | 0.00% → 0.00% |
+| **All 20 TypeScript pins** | 1,390,561 → 1,390,561 | 80.37% → 85.23% | 76.84% → 81.70% | 3.53% → 3.53% |
+
+The timing figures are observations on the shared dev server. The SW-4
+comparison uses the bare cold index because all five prior installed
+attempts fell back. Peak is the cold stage's measured resident memory.
+
+| Pin | SW-4 bare cold (s / MiB) | SW-5 installed cold (s / MiB) | SW-5 installed total (s) |
+| --- | ---: | ---: | ---: |
+| colinhacks/zod | 92.7 / 1,666.0 | 313.7 / 1,708.5 | 356.9 |
+| microsoft/TypeScript | 1,848.6 / 4,586.7 | 3,368.3 / 2,860.0 (limit) | 3,610.8 |
+| nestjs/nest | 221.1 / 1,882.8 | 937.9 / 2,833.4 | 1,159.9 |
+| pingdotgg/t3code | 192.2 / 2,107.7 | 651.2 / 2,942.2 | 785.9 |
+| vercel/turborepo | 1,966.7 / 5,601.3 | 1,959.6 / 5,473.3 | 2,548.7 |
+
 ## Reproduction
 
 Run on the dev server from the sweep tree. Use a build of the measured
