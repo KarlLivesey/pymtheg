@@ -13,7 +13,7 @@
 //                                 (statement journals) in memory
 // Timings are observations; counts are deterministic.
 //   node scripts/store-cost/measure.mjs <dist> <root> <graph.sqlite> <out.json> [--variant V]
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import sqlite from "node:sqlite";
@@ -34,7 +34,8 @@ for (const part of parts)
       "no-dirty-triggers",
       "late-indexes",
       "temp-memory",
-    ].includes(part)
+    ].includes(part) &&
+    !/^batch=[1-9][0-9]*$/.test(part)
   )
     throw Error(`unknown variant ${part}`);
 
@@ -67,9 +68,41 @@ const proto = sqlite.DatabaseSync.prototype;
 const prepare = proto.prepare;
 const exec = proto.exec;
 let inStatement = false;
+// batch=N (measurement only): the store's write transactions are merged,
+// N to one commit, by holding the transaction open across N of them. It
+// prices fewer, larger transactions; it does not keep the run's crash rules.
+const batch = Number(
+  [...parts].find((part) => part.startsWith("batch="))?.slice(6) ?? 1,
+);
+let held = 0;
+let heldDeferred = 0;
 proto.exec = function (sql) {
   if (parts.has("temp-memory") && sql.includes("PRAGMA foreign_keys=ON"))
     exec.call(this, "PRAGMA temp_store=MEMORY");
+  if (batch > 1) {
+    const open = this.isTransaction;
+    if (sql === "BEGIN IMMEDIATE" && open && held) return;
+    if (sql === "BEGIN" && open && held) {
+      heldDeferred++;
+      return;
+    }
+    if (sql === "COMMIT" && heldDeferred) {
+      heldDeferred--;
+      return;
+    }
+    if (sql === "COMMIT" && ++held < batch) return;
+    if (sql === "COMMIT") held = 0;
+    if (sql === "ROLLBACK") held = 0;
+    if (
+      /^PRAGMA (journal_mode|synchronous=FULL|temp_store=MEMORY)/.test(sql) &&
+      open &&
+      held
+    ) {
+      if (sql.startsWith("PRAGMA temp_store")) return;
+      held = 0;
+      exec.call(this, "COMMIT");
+    }
+  }
   const e = entry(sql);
   const started = performance.now();
   try {
@@ -148,6 +181,15 @@ if (parts.has("late-indexes"))
 side.close();
 resetGraphWork();
 statements.clear();
+const io = () =>
+  Object.fromEntries(
+    readFileSync("/proc/self/io", "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => line.split(": "))
+      .map(([name, value]) => [name, Number(value)]),
+  );
+const ioBefore = io();
 const cpu = process.cpuUsage();
 const wall = performance.now();
 let report;
@@ -214,6 +256,14 @@ writeFileSync(
       cpuMs: Math.round((used.user + used.system) / 1000),
       lateIndexMs: Math.round(lateIndexMs),
       maxRssKiB: process.resourceUsage().maxRSS,
+      // Bytes this process wrote: write_bytes reached the storage layer
+      // (page cache of the disk or memory-backed file system).
+      io: Object.fromEntries(
+        Object.entries(io()).map(([name, value]) => [
+          name,
+          value - ioBefore[name],
+        ]),
+      ),
       report: {
         claimed: report.claimed,
         failedCount: report.failedCount,

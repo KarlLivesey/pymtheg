@@ -8,6 +8,7 @@
 //   no-foreign-keys     PRAGMA foreign_keys=OFF
 //   no-secondary        without the secondary indexes
 //   temp-memory         PRAGMA temp_store=MEMORY (statement journals in memory)
+//   temp-memory-at-begin  MEMORY only while each write transaction begins
 // Prints microseconds per row. Timings are observations.
 //   node scripts/store-cost/micro.mjs <dist> <dir> [files] [per]
 import { existsSync, rmSync } from "node:fs";
@@ -28,6 +29,7 @@ for (const variant of [
   "no-foreign-keys",
   "no-secondary",
   "temp-memory",
+  "temp-memory-at-begin",
   "production",
 ]) {
   const path = join(dir, `micro-${variant}.sqlite`);
@@ -61,7 +63,9 @@ for (const variant of [
   let linkMs = 0;
   for (let f = 0; f < files; f++) {
     const path = `pkg${f % 20}/file${f}.go`;
-    db.exec("BEGIN IMMEDIATE");
+    if (variant === "temp-memory-at-begin")
+      db.exec("PRAGMA temp_store=MEMORY; BEGIN IMMEDIATE; PRAGMA temp_store=DEFAULT");
+    else db.exec("BEGIN IMMEDIATE");
     file.run(path, `{"path":"${path}","text":"${pad}"}`, "clean");
     let started = performance.now();
     for (let s = 0; s < per; s++)

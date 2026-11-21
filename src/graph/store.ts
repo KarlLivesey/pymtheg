@@ -211,16 +211,6 @@ export class SqliteGraphStore implements GraphStorage {
         .get()!.value as string;
       if (projectId !== undefined && projectId !== this.projectId)
         throw Error("Graph belongs to a different project");
-      // C-35: the invalidation triggers write, so every graph write statement
-      // inside a transaction keeps a statement journal, which SQLite writes
-      // to a temporary file once it outgrows a small buffer. With this cost
-      // per row a cold restic index spent 224 of 238 s in SQL; with the
-      // journals in memory, 10 s. A statement journal only undoes one
-      // statement and is never read for crash recovery, so the run mark, the
-      // completion records and their triggers keep their guarantees. Each one
-      // is bounded by the pages one statement changes. Set after the schema
-      // work above, so an index built on open still sorts in temporary files.
-      this.db.exec("PRAGMA temp_store=MEMORY");
     } catch (error) {
       this.db.close();
       throw error;
@@ -292,8 +282,25 @@ export class SqliteGraphStore implements GraphStorage {
   };
   private transaction(action: () => void): void {
     this.beforeWrite();
-    this.db.exec("BEGIN IMMEDIATE");
+    // C-35: the invalidation triggers write, so each graph write statement in
+    // a transaction keeps a statement journal. SQLite keeps it in a temporary
+    // file once it outgrows a small buffer, which cost hundreds of
+    // microseconds per row: a cold restic index spent 50 of 64 s in SQL in
+    // memory-backed storage, 12 s with these journals in memory. SQLite
+    // chooses where they go when the write transaction begins, so temporary
+    // storage is in memory only for the BEGIN. Sorts, which would otherwise
+    // be held in memory whole, keep their temporary files. A statement
+    // journal only undoes one statement and is never used to recover from a
+    // crash; it holds at most the pages one statement changes.
+    this.db.exec("PRAGMA temp_store=MEMORY");
     try {
+      this.db.exec("BEGIN IMMEDIATE");
+    } catch (error) {
+      this.db.exec("PRAGMA temp_store=DEFAULT");
+      throw error;
+    }
+    try {
+      this.db.exec("PRAGMA temp_store=DEFAULT");
       const run = this.indexRun;
       // Every commit of an index run first proves, under the write lock,
       // that no other run has written since it began: its first commit that
