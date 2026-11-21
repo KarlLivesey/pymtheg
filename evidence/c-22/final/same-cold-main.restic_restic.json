@@ -1,0 +1,15 @@
+{
+ "root": "restic_restic",
+ "rows": {
+  "graph_files": 559,
+  "graph_contexts": 1,
+  "graph_parse_failures": 0,
+  "graph_symbols": 8092,
+  "graph_links": 64165,
+  "graph_candidates": 9333,
+  "graph_library_targets": 18022,
+  "project": 1
+ },
+ "equal": true,
+ "differences": []
+}

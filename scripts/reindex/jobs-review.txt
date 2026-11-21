@@ -1,0 +1,6 @@
+measure AFTER cli/cli m-final
+measure AFTER helix-editor/helix m-final
+measure AFTER trpc/trpc m-final
+measure AFTER restic/restic m-final
+measure AFTER honojs/hono m-final
+measure AFTER BurntSushi/ripgrep m-final
