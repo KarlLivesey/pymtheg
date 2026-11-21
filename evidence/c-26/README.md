@@ -1,7 +1,8 @@
 # C-26 evidence
 
 All runs used the dev server, Node 24.21.0 with its default heap unless a
-heap size is named. **Main** is `5364e87` (C-22 merged) for identity and
+heap size is named. **Main** is `0ccd239` (C-22, C-25 and SW-4 merged) for
+identity and `5364e87` (C-22 merged) for
 cost; the microsoft/TypeScript traces on main used `7d3762b`, whose
 TypeScript module is the same. **C-26** is this branch. Timings and memory
 are observations on a shared, loaded machine. The change note is
