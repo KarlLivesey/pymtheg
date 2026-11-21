@@ -1,0 +1,24 @@
+{
+  "testedTree": "ca444a8",
+  "main": "c6b77dc",
+  "buildExit": 0,
+  "typeCheckExit": 0,
+  "formatCheckExit": 0,
+  "reindexHarnessFormatExit": 0,
+  "focusedEqualityKillAndOwnership": { "passed": 45, "failed": 0 },
+  "focusedCommandAndStorage": { "passed": 20, "failed": 0 },
+  "firstFullTest": {
+    "passed": 3227,
+    "failed": 2,
+    "failures": [
+      "A verified no-edit CLI index omitted its completion progress event",
+      "The storage failure fixture injected a getFile error on a path that now reads fileSummaries"
+    ]
+  },
+  "npmTest": { "exit": 0, "passed": 3229, "failed": 0, "skipped": 0 },
+  "seededComparisons": {
+    "e6d7f17": { "restic/restic": 60, "cli/cli": 20 },
+    "a3c555a": { "restic/restic": 3, "cli/cli": 2 }
+  },
+  "coldComparisons": { "originalMainPins": 5, "mergedRustPins": 1 }
+}
