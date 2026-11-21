@@ -208,8 +208,8 @@ test("failed parent erases child ancestry: no invented inherited macro or cause"
   g.unknown("m", "macros");
   const l = g.links.find((l) => l.kind === "macros" && l.targetName === "m");
   assert.equal(l.data.cause, undefined);
-  assert.equal(l.data.targets, undefined);
-  assert.notEqual(l.data.uncertainty, "invalid-code");
+  assert.deepEqual(l.data.targets ?? [], []);
+  assert.equal(l.data.uncertainty, "crate-placement-unavailable");
 });
 test("M1: later same-scope textual definition wins", async () => {
   // rustc: the second m returns 2u16.

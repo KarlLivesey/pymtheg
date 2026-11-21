@@ -561,7 +561,14 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   dependency when the source and selected version are proven. This covers
   crates.io, alternate registry indexes, and Git URLs with their ref selectors.
   A replacement with an unproven checkout target leaves the link unresolved.
-  Receiver calls still require the declaring owner.
+  Receiver calls still require the declaring owner. When `no_std` can apply,
+  an unshadowed prelude name shared with `std` records its declaration in
+  `core`. When `no_core` can apply, sysroot names need an explicit binding
+  and implicit prelude targets stay open. The standard-library catalog and
+  audited registry releases can verify explicit import namespaces. A
+  re-export uses the public path the import spells. Successfully analysed
+  links below Level 2 carry a stored
+  explanation, including whole-crate imports and checkout candidate sets.
 - **Names beside Rust macros.** A withheld path can resolve when every
   relevant expansion has a bounded set of names and that set excludes the
   name being looked up. The graph inspects captured `macro_rules!` arms,
@@ -879,6 +886,16 @@ the project links whose target, or one of whose candidates, is library unit
 `candidateSet` counts (MCP: action `uses`, `query` the unit, optional `symbol`).
 It finds only stored library targets: unresolved links may hide more uses. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
+
+Source-only Go can reuse the stored link decisions outside an edit's affected
+files. An edit with the same declaration and import facts re-decides just the
+edited file. A change confined to ordinary function declarations can follow
+package imports back to their callers. Changes that may affect project-wide
+method sets, build configuration, package membership or unreadable files use
+a full Go pass. Reuse requires a recorded completed Go index in the store.
+An unfinished run or a direct graph write requires recovery. The opt-in
+toolchain route uses a full pass. The same file tree produces the same
+graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing

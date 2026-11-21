@@ -3,11 +3,11 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { gzipSync } from "node:zlib";
-import { combineLabels, draw, firstBlocker, modeNames, readLabels, sampleSize, schema, seed, verifyModes } from "./coverage-refresh-data.mjs";
+import { gunzipSync, gzipSync } from "node:zlib";
+import { combineLabels, draw, firstBlocker, modeNames, overlayInstalled, readLabels, sampleSize, schema, seed, verifyModes } from "./coverage-refresh-data.mjs";
 
 const { values, positionals } = parseArgs({ allowPositionals: true, options: {
-  commit: { type: "string" }, labels: { type: "string" }, output: { type: "string" },
+  commit: { type: "string" }, labels: { type: "string" }, output: { type: "string" }, base: { type: "string" },
   module: { type: "string" }, from: { type: "string", default: "1" }, limit: { type: "string", default: "150" },
 } });
 const [action] = positionals;
@@ -57,6 +57,13 @@ if (action === "export") {
   for (const { repos } of Object.values(modes)) for (const repo of repos) delete repo.shortlist;
   const data = { schema, measuredCommit: values.commit, seed, sampleSize, modes, samples };
   writeFileSync(values.output, gzipSync(`${JSON.stringify(data)}\n`, { level: 9 }));
+} else if (action === "overlay-installed") {
+  if (!values.base || !values.output) throw Error("overlay-installed needs --base ARCHIVE --commit SHA --output FILE");
+  const data = JSON.parse(gunzipSync(readFileSync(values.base)));
+  if (data.schema !== schema) throw Error("Expected a refresh archive");
+  data.modes = overlayInstalled(data.modes, read(exportPath("installed")), values.commit);
+  verifyModes(data.modes, read("sweep/repos.json"));
+  writeFileSync(values.output, gzipSync(`${JSON.stringify(data)}\n`, { level: 9 }));
 } else {
-  throw Error("Use export, draw, context or assemble");
+  throw Error("Use export, draw, context, assemble or overlay-installed");
 }

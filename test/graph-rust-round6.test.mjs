@@ -388,7 +388,7 @@ test("file failure: module paths and absent scope names name broken files, never
   scope.unknown("maybe");
   assert.equal(
     scope.links.find((l) => l.targetName === "maybe").data.uncertainty,
-    undefined,
+    "name-binding-unverified",
   );
   const root = await graph({
     "src/lib.rs": "fn bad(){let x=;}",

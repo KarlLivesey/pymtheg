@@ -207,22 +207,7 @@ export class SqliteGraphStore implements GraphStorage {
                 `ALTER TABLE graph_parse_failures ADD COLUMN ${name} TEXT`,
               );
         });
-      // Completion belongs to this database and is invalidated even by other API writers.
-      for (const table of [
-        "graph_files",
-        "graph_contexts",
-        "graph_symbols",
-        "graph_links",
-        "graph_candidates",
-        "graph_library_targets",
-        "graph_parse_failures",
-      ])
-        for (const event of ["INSERT", "UPDATE", "DELETE"])
-          this.db
-            .exec(`CREATE TRIGGER IF NOT EXISTS graph_command_dirty_${table}_${event}
-            AFTER ${event} ON ${table}
-            WHEN EXISTS(SELECT 1 FROM graph_meta WHERE key='command-complete') BEGIN
-              DELETE FROM graph_meta WHERE key='command-complete'; END;`);
+      this.installInvalidationTriggers();
       this.db
         .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('project',?)")
         .run(projectId ?? randomUUID());
@@ -235,6 +220,36 @@ export class SqliteGraphStore implements GraphStorage {
       this.db.close();
       throw error;
     }
+  }
+  private installInvalidationTriggers(): void {
+    if (
+      this.db
+        .prepare(
+          "SELECT 1 FROM sqlite_master WHERE name='graph_index_dirty_graph_files_INSERT' AND type='trigger'",
+        )
+        .get()
+    )
+      return;
+    // Upgrade the command-only triggers together. Both receipts belong to
+    // the graph itself, so writes through another connection invalidate them too.
+    const ddl = [];
+    for (const table of [
+      "graph_files",
+      "graph_contexts",
+      "graph_symbols",
+      "graph_links",
+      "graph_candidates",
+      "graph_library_targets",
+      "graph_parse_failures",
+    ])
+      for (const event of ["INSERT", "UPDATE", "DELETE"])
+        ddl.push(`DROP TRIGGER IF EXISTS graph_command_dirty_${table}_${event};
+          CREATE TRIGGER IF NOT EXISTS graph_index_dirty_${table}_${event}
+          AFTER ${event} ON ${table}
+          WHEN EXISTS(SELECT 1 FROM graph_meta WHERE key='command-complete')
+            OR EXISTS(SELECT 1 FROM graph_meta WHERE key='analysis-complete') BEGIN
+            DELETE FROM graph_meta WHERE key IN ('command-complete','analysis-complete'); END;`);
+    this.db.exec(`BEGIN IMMEDIATE;\n${ddl.join("\n")}\nCOMMIT;`);
   }
   /**
    * Statements for one write operation, each prepared once and reused for
@@ -264,6 +279,7 @@ export class SqliteGraphStore implements GraphStorage {
         /** The data version after its last commit (or at its beginning). */
         version: number;
         takeOver: boolean;
+        completed: ReadonlyMap<string, string>;
         /** Another connection committed between two of its commits. */
         interleaved: boolean;
       } = {
@@ -291,7 +307,9 @@ export class SqliteGraphStore implements GraphStorage {
           )
           .run(run.id);
         this.db
-          .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
+          .prepare(
+            "DELETE FROM graph_meta WHERE key IN ('command-complete','analysis-complete')",
+          )
           .run();
       } else if (run.state === "written") {
         if (this.indexRunMark() !== run.id) throw new GraphIndexTakenOver();
@@ -714,6 +732,11 @@ export class SqliteGraphStore implements GraphStorage {
     const byId = new Map(current.map((link) => [link.id, link]));
     for (const link of desired) {
       const before = byId.get(link.id);
+      if (before && before.data !== link.data)
+        sql("UPDATE graph_links SET body=? WHERE id=?").run(
+          JSON.stringify(link),
+          link.id,
+        );
       // An unresolved link has no target rows. The library insert triggers
       // the class update, so there are no old relationships to clear.
       if (
@@ -798,18 +821,36 @@ export class SqliteGraphStore implements GraphStorage {
   analysisLinks(module: string): GraphLink[] {
     return this.selectLinks("l.module=?", [module]);
   }
+  // Unary + keeps SQLite from scanning the module index for a path lookup.
+  private static linksAt =
+    "l.file IN (SELECT value FROM json_each(?)) AND +l.module=?";
+  analysisLinksAt(module: string, paths: ReadonlySet<string>): GraphLink[] {
+    return this.selectLinks(SqliteGraphStore.linksAt, [
+      JSON.stringify([...paths]),
+      module,
+    ]);
+  }
   /**
    * One module's parsed links as a resolver receives them: unresolved, with
    * no target, candidates or library targets, so none of those rows is read.
    * Each is the record moduleLinks() returns, with those fields cleared.
    */
   moduleInputLinks(module: string): GraphLink[] {
+    return this.selectModuleInputLinks("l.module=?", [module]);
+  }
+  moduleInputLinksAt(module: string, paths: ReadonlySet<string>): GraphLink[] {
+    return this.selectModuleInputLinks(SqliteGraphStore.linksAt, [
+      JSON.stringify([...paths]),
+      module,
+    ]);
+  }
+  private selectModuleInputLinks(where: string, values: string[]): GraphLink[] {
     return this.db
       .prepare(
         `SELECT l.body,f.status AS sourceStatus FROM graph_links l JOIN graph_files f${this.fileStatusIndex} ON f.path=l.file
-        WHERE l.module=? AND l.origin='parse' ORDER BY l.id`,
+        WHERE ${where} AND l.origin='parse' ORDER BY l.id`,
       )
-      .all(module)
+      .all(...values)
       .map((row) => {
         const { libraries: _previous, ...link } = JSON.parse(
           row.body as string,
@@ -967,10 +1008,12 @@ export class SqliteGraphStore implements GraphStorage {
     // The baseline and the mark are one read snapshot.
     let version: number;
     let takeOver: boolean;
+    let completed: ReadonlyMap<string, string>;
     this.db.exec("BEGIN");
     try {
       version = this.commandDataVersion();
       takeOver = this.unfinishedIndexRun();
+      completed = takeOver ? new Map() : this.readCompletedAnalysis();
     } finally {
       this.db.exec("COMMIT");
     }
@@ -979,31 +1022,69 @@ export class SqliteGraphStore implements GraphStorage {
       id: randomUUID(),
       version,
       takeOver,
+      completed,
       interleaved: false,
     };
     if (!takeOver) return false;
     this.transaction(() => {});
     return true;
   }
-  /** Clears the mark in the run's last commit, if this run still owns it. */
-  finishIndexRun(): void {
+  private readCompletedAnalysis(): ReadonlyMap<string, string> {
+    const row = this.db
+      .prepare("SELECT value FROM graph_meta WHERE key='analysis-complete'")
+      .get();
+    if (typeof row?.value === "string") {
+      try {
+        const entries: unknown = JSON.parse(row.value);
+        if (
+          Array.isArray(entries) &&
+          entries.every(
+            (entry) =>
+              Array.isArray(entry) &&
+              entry.length === 2 &&
+              entry.every((part) => typeof part === "string"),
+          )
+        )
+          return new Map<string, string>(entries);
+      } catch {
+        // A malformed receipt cannot prove reuse.
+      }
+    }
+    return new Map();
+  }
+  completedAnalysis(): ReadonlyMap<string, string> {
+    return this.indexRun.state === "idle" ? new Map() : this.indexRun.completed;
+  }
+  /** Clears the mark and records completed decisions if the run still owns the store. */
+  finishIndexRun(
+    incomplete = false,
+    completed: ReadonlyMap<string, string> = new Map(),
+  ): void {
     const run = this.indexRun;
     try {
+      if (incomplete && run.state !== "idle") this.transaction(() => {});
       // A run another connection wrote into keeps its mark: the next run
       // redoes everything.
-      if (run.state === "written")
+      if (!incomplete && run.state === "written")
         this.transaction(() => {
-          if (!run.interleaved)
+          if (run.interleaved) return;
+          this.db.prepare("DELETE FROM graph_meta WHERE key='index-run'").run();
+          if (completed.size)
             this.db
-              .prepare("DELETE FROM graph_meta WHERE key='index-run'")
-              .run();
+              .prepare("INSERT INTO graph_meta VALUES ('analysis-complete',?)")
+              .run(
+                JSON.stringify(
+                  [...completed].sort(([a], [b]) => compare(a, b)),
+                ),
+              );
         });
       // What the run read and wrote is current while no other connection
       // commits after the version taken under its last write lock (or at
       // its beginning if it wrote nothing); the completion checks it under
       // its own write lock.
       if (run.state !== "idle")
-        this.finishedVersion = run.interleaved ? Number.NaN : run.version;
+        this.finishedVersion =
+          incomplete || run.interleaved ? Number.NaN : run.version;
     } finally {
       this.indexRun = { state: "idle" };
     }

@@ -17,6 +17,18 @@ const TABLES = {
   graph_library_targets: "link,id,role",
 };
 
+/** Set a temporary store's SQLite page cache without changing its graph schema or indexing path. */
+export function setPageCache(path, pages) {
+  if (!Number.isSafeInteger(pages) || pages < 0 || pages > 262144)
+    throw Error("Cache size must be 0 to 262144 pages");
+  const db = new DatabaseSync(path);
+  try {
+    db.exec(`PRAGMA default_cache_size = ${pages}`);
+  } finally {
+    db.close();
+  }
+}
+
 /** Table name → canonical row strings, sorted. */
 export function storeRows(path) {
   const db = new DatabaseSync(path, { readOnly: true });
@@ -68,6 +80,29 @@ export function compareRows(a, b, limit = 5) {
       });
   }
   return differences;
+}
+
+/** C-27 cold comparisons across versions allow only the new cache metadata. */
+export function withoutGoSurface(rows) {
+  return {
+    ...rows,
+    graph_files: rows.graph_files.map((line) => {
+      const row = JSON.parse(line);
+      const file = JSON.parse(row.body);
+      if (file.module !== "go" || file.version !== "32") return line;
+      file.version = "31";
+      if (file.result.data) delete file.result.data.surface;
+      return JSON.stringify({ ...row, body: JSON.stringify(file) });
+    }),
+    graph_parse_failures: rows.graph_parse_failures.map((line) => {
+      const row = JSON.parse(line);
+      if (row.module === "go" && row.version === "32") row.version = "31";
+      return JSON.stringify(row);
+    }),
+    graph_contexts: rows.graph_contexts.filter(
+      (line) => !/(?:^|\/)vendor\/modules\.txt$/.test(JSON.parse(line).path),
+    ),
+  };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

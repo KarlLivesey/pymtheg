@@ -100,6 +100,11 @@ export function verifyModes(modes, pins) {
     for (const pin of expected) {
       const repo = byId.get(pin.id);
       if (!repo || repo.commit !== pin.commit || repo.language !== pin.language) throw Error(`Missing ${mode} attempt for ${pin.id}`);
+      if ((repo.measuredCommit !== undefined || repo.build !== undefined) &&
+          (mode !== "installed" || !/^[a-f0-9]{40}$/.test(repo.measuredCommit) ||
+            !/^[a-f0-9]{64}$/.test(repo.build?.sha256) || !repo.build.node)) {
+        throw Error(`Invalid replay provenance for ${pin.id}`);
+      }
       if (repo.outcome === "finished") {
         for (const [module, kind, outcome, reasons, count] of repo.inventory) {
           if (!modules.includes(module) || !kind || !["ambiguous", "library", "unresolved"].includes(outcome) ||
@@ -118,6 +123,24 @@ export function verifyModes(modes, pins) {
     }
   }
   if (digests.size !== 1) throw Error("All modes must use the same build");
+}
+
+export function overlayInstalled(modes, replay, measuredCommit) {
+  if (replay.mode !== "installed" || JSON.stringify(replay.missColumns) !== JSON.stringify(missColumns) ||
+      !/^[a-f0-9]{40}$/.test(measuredCommit) || !/^[a-f0-9]{64}$/.test(replay.release?.sha256) || !replay.release.node) {
+    throw Error("Expected an installed export with measured build provenance");
+  }
+  const previous = new Map(modes.installed.repos.map((repo) => [repo.id, repo]));
+  const seen = new Set();
+  for (const repo of replay.repos) {
+    const pin = previous.get(repo.id);
+    if (!pin || pin.commit !== repo.commit || pin.language !== repo.language || seen.has(repo.id)) {
+      throw Error(`Unexpected installed replay attempt for ${repo.id}`);
+    }
+    seen.add(repo.id);
+    previous.set(repo.id, { ...repo, measuredCommit, build: replay.release });
+  }
+  return { ...modes, installed: { ...modes.installed, repos: [...previous.values()] } };
 }
 
 const itemAnswers = new Set(["yes", "no", "unknown"]);

@@ -2802,6 +2802,26 @@ directory source. A proven package selection is required to resolve inside it.
 Rust coverage now credits recorded targets on graphs made by the supporting
 module version. See [C-9](changes/C-9.md).
 
+### C-29 Rust prelude and missing-link explanations
+
+When a crate can build with `no_std`, the resolver can name a `core`
+declaration shared by both edition preludes. This requires the usual lexical,
+import and macro shadowing checks. The source must also establish the
+availability of an implicit prelude. Edition-specific entries use the existing
+prelude table. A possible `no_core` configuration withholds implicit sysroot
+and prelude targets. The spelling of a definite, previously supported `std`
+path is preserved. Explicit imports use their written export when the catalog
+establishes the export namespace for that library unit. Whole-crate imports
+retain their unit target.
+
+Rust analysis records the reason on a link whenever neither checkout
+resolution nor the library path proof supplies one symbol. This uses the same
+lookups as resolution, after the ordinary decisions and macro-scope retries.
+Final resolution records a disagreement when the link remains open despite
+analysis supplying no blocker. A later final decision clears that explanation
+when the link reaches Level 2.
+See [C-29](changes/C-29.md).
+
 ### C-12 Rust lexical macro scope
 
 The resolver can clear an opaque expansion for one name when captured
@@ -3025,3 +3045,22 @@ crash, a kill or a refused completion the next index redoes everything once
 snapshot each record came from would narrow that and is not built. Another
 connection's `wal_checkpoint(TRUNCATE)` during a run stops it as overtaken
 (a safe false alarm; no product path does it). [C-22](changes/C-22.md)
+
+### Go re-index can reuse decisions outside the affected files (C-27)
+
+**Decided (C-27).** A language module may return the complete set of paths
+whose previously stored notes and link decisions must be replaced. The
+indexer uses this result only with owned index runs and a store that can
+validate and compare links by file. The store must provide completed module
+versions from the run's opening snapshot. Graph writes invalidate that
+record even through another connection. The indexer validates that the set
+covers every edited and analyzed path, writes the final analyzed facts for those edits,
+and limits link writes to the validated set. A failed module pass keeps the
+unfinished mark so a retry cannot reuse incomplete decisions.
+
+Go keeps hashes of lookup facts with each successfully parsed file. It
+uses the edited paths alone when those facts match. It follows reverse
+imports for changes confined to ordinary functions that global type facts
+cannot read. Other surface changes use the whole module. Go builds global
+indexes from the saved facts for the affected links. The C-22 cold equality
+rule and run ownership apply to every path. [C-27](changes/C-27.md)

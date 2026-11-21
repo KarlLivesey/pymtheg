@@ -4,21 +4,24 @@
 // reverted and re-indexed again. After every revert the store must equal the
 // cold store row for row (a free equality check of the incremental path).
 // Each index runs in a fresh process (index-once.mjs), as the CLI does.
-//   node scripts/reindex/measure.mjs <dist> <scratch> <repo id> <out dir> [--profile edit,...]
+//   node scripts/reindex/measure.mjs <dist> <scratch> <repo id> <out dir> [--profile edit,...] [--cold-store FILE]
 import { execFileSync } from "node:child_process";
 import {
+  copyFileSync,
   cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { compareRows, storeRows } from "./dump.mjs";
 
 const args = process.argv.slice(2);
 const profileAt = args.indexOf("--profile");
 const profile = profileAt >= 0 ? args.splice(profileAt, 2)[1].split(",") : [];
+const coldAt = args.indexOf("--cold-store");
+const coldStore = coldAt < 0 ? undefined : resolve(args.splice(coldAt, 2)[1]);
 const [distArg, scratch, id, outArg] = args;
 if (!distArg || !scratch || !id || !outArg)
   throw Error("usage: measure.mjs <dist> <scratch> <repo id> <out dir>");
@@ -70,7 +73,10 @@ function index(step) {
     }, complete ${r.complete}`,
   );
 }
-index("cold");
+if (coldStore) {
+  mkdirSync(dirname(graph), { recursive: true });
+  copyFileSync(coldStore, graph);
+} else index("cold");
 const cold = storeRows(graph);
 index("warm");
 const path = join(root, pin.file);

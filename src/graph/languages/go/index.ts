@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { realpath } from "node:fs/promises";
-import { posix, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createTagsParser } from "../../tree-sitter.js";
 import type {
@@ -9,11 +9,14 @@ import type {
   Json,
   LanguageModule,
   ParseResult,
+  ScopedAnalysis,
   SourceInput,
 } from "../../types.js";
+import { count, stage } from "../../work.js";
 import { GoExtractor } from "./extract.js";
 import { syntaxFailure } from "./failure.js";
-import { importPathOf, readLayout } from "./gomod.js";
+import { directoryOf, importPathOf, readLayout } from "./gomod.js";
+import { affectedFiles, surface } from "./incremental.js";
 import type { FileFact } from "./model.js";
 import { linkNotes, resolveGo } from "./resolve.js";
 import { installation, runHelper } from "./toolchain.js";
@@ -70,7 +73,10 @@ function parser(): Promise<Helper> {
         result.symbols = extractor.symbols;
         result.links = extractor.links;
         result.diagnostics = [...extractor.diagnostics];
-        result.data = { go: extractor.fact as unknown as Json };
+        result.data = {
+          go: extractor.fact as unknown as Json,
+          surface: surface(result, extractor.fact),
+        };
       },
     });
   })().catch((error: unknown) => {
@@ -89,11 +95,6 @@ async function parse(source: SourceInput): Promise<ParseResult> {
     pending = undefined;
   }
 }
-
-const directoryOf = (path: string) => {
-  const directory = posix.dirname(path);
-  return directory === "." ? "" : directory;
-};
 
 /**
  * Hosts ONE `package` symbol per (directory, package name) in a deterministic
@@ -167,13 +168,12 @@ async function toolchainFacts(
   return facts;
 }
 
-async function analyze({
-  files,
-  contextFiles,
-  toolchain,
-}: Parameters<NonNullable<LanguageModule["analyze"]>>[0]): Promise<
-  AnalyzedFile[]
-> {
+async function analyze(
+  context: Parameters<NonNullable<LanguageModule["analyze"]>>[0],
+): Promise<AnalyzedFile[] | ScopedAnalysis> {
+  const { files, contextFiles, toolchain } = context;
+  const scope = toolchain ? undefined : affectedFiles(context);
+  if (scope?.size === 0) return { files: [], resolutionFiles: [] };
   const layout = readLayout(contextFiles);
   const groups = new Map<string, typeof files>();
   for (const file of files) {
@@ -228,7 +228,8 @@ async function analyze({
   // Recompute every file's facts from its parse facts: drop the previous host symbol and overflow notes.
   const next = new Map<string, ParseResult>();
   for (const file of files) {
-    if (file.result.status === "failed") continue;
+    if (file.result.status === "failed" || (scope && !scope.has(file.path)))
+      continue;
     const symbols = file.result.symbols.filter(
       (symbol) => symbol.key !== PACKAGE_KEY,
     );
@@ -258,14 +259,14 @@ async function analyze({
     );
     const fact = (file.result.data as unknown as { go?: FileFact } | undefined)
       ?.go;
-    const scope =
+    const packageScope =
       fact?.package === undefined
         ? undefined
         : packageNames.get(`${directoryOf(file.path)}\u0000${fact.package}`);
     for (const use of fact?.predeclared ?? []) {
       const shadowed =
-        scope?.plain.has(use.n) ||
-        (file.path.endsWith("_test.go") && scope?.test.has(use.n));
+        packageScope?.plain.has(use.n) ||
+        (file.path.endsWith("_test.go") && packageScope?.test.has(use.n));
       if (!shadowed) continue;
       parsed.push({
         sourceKey: use.src,
@@ -354,12 +355,16 @@ async function analyze({
     }
   // Over-cap candidate sets (left unresolved) and real builtin calls are only known
   // project-wide; record them on the links themselves.
-  const notes = linkNotes(
-    ID,
-    files.map((file) =>
-      next.has(file.path) ? { ...file, result: next.get(file.path)! } : file,
+  count("analyze.go.decisionFiles", scope?.size ?? files.length);
+  const notes = await stage("analyze.go.notes", () =>
+    linkNotes(
+      ID,
+      files.map((file) =>
+        next.has(file.path) ? { ...file, result: next.get(file.path)! } : file,
+      ),
+      contextFiles,
+      scope,
     ),
-    contextFiles,
   );
   for (const [path, group] of notes) {
     const result = next.get(path)!;
@@ -454,16 +459,24 @@ async function analyze({
     if (result && JSON.stringify(result) !== JSON.stringify(file.result))
       output.push({ path: file.path, result });
   }
-  return output;
+  return scope ? { files: output, resolutionFiles: [...scope] } : output;
 }
 
 const go: LanguageModule = {
   id: ID,
-  version: "31",
+  version: "32",
   extensions: [".go"],
-  contextFiles: ["go.mod", "go.work"],
+  contextFiles: ["go.mod", "go.work", "**/vendor/modules.txt"],
+  incrementalAnalysis: true,
   parse,
   analyze,
-  resolve: (context) => resolveGo(ID, context),
+  resolve: (context) => {
+    count(
+      "resolve.go.decisionFiles",
+      context.resolutionFiles?.size ??
+        context.files.filter((file) => file.module === ID).length,
+    );
+    return resolveGo(ID, context);
+  },
 };
 export default go;
