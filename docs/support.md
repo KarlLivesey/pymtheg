@@ -514,7 +514,8 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   that first supplied the declaration in `core`. The compiler floor is the
   higher of the edition's minimum and the package's declared `rust-version`,
   including workspace inheritance. A floor below the entry's version leaves
-  `core-method-owner-version-unverified`.
+  `core-method-owner-version-unverified`. Compiler verification for edition
+  2015 reaches Rust 1.31.
   A competing type binding, opaque scope, or build that could omit `core`
   withholds the proof. Trait selection, autoref and deref still require
   separate probe proofs.

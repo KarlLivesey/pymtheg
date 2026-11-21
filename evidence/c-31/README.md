@@ -3,12 +3,15 @@
 [Change note](../../docs/changes/C-31.md)
 
 The ten pins are the same public Rust pins used for C-29. Both builds ran in
-source-only mode on the dev server with Node 24 and Rust 1.98.1. Main was
+source-only mode on the dev server with Node 24 and Rust 1.98.1. Main for the
+review fix was `ecc0c2d`. The original redb and Fjall cost runs used
 `e291a60`. The SHA-256 digest in the coverage export identifies the candidate
 build. All paths in the published rows are relative to the pinned checkout.
 
 - [Cross-table](cross-table.tsv) gives exact counts per receiver class, target
   evidence and pin. A zero means the cell had no links on that pin.
+- [Follow-up counts](diagnosis-followup.json) counts full stored blockers,
+  assertion macro heads, potential `Self` returns and where chains stop.
 - [Diagnosis](diagnosis.jsonl.gz) contains one JSON array per selected stored
   link. The fields are pin, file, line, column, start and end offsets, method,
   first reason, matching reasons, receiver class, target evidence, typing gap,
@@ -26,6 +29,8 @@ build. All paths in the published rows are relative to the pinned checkout.
   Level 2 links using `c31-gains-v1`.
 - [Paired cold cost](cost-paired.json) records the timing and memory
   observations on redb and Fjall.
+- [Crossbeam cold cost](cost-crossbeam.json) records the four alternating
+  main and candidate runs for the review fix.
 - [Coverage export](coverage-plan-input.json.gz) is the SW-4 inventory for the
   candidate source-only subset. The full main plan also needs the other pins
   and modes.
@@ -46,7 +51,7 @@ node evidence/c-31/diagnose.mjs
 node evidence/c-31/tabulate.mjs
 node evidence/c-31/check-catalog.mjs
 node evidence/c-31/compare.mjs
-node evidence/c-31/cost.mjs
+node evidence/c-31/cost.mjs --crossbeam
 node scripts/sweep/coverage-export.mjs --refresh \
   --results "$PYM_SCRATCH/final.json" --scratch "$PYM_SCRATCH/final" \
   --output "$PYM_SCRATCH/final-export.json"
