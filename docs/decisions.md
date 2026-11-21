@@ -2946,3 +2946,48 @@ out, or failed by a compiler exception, are unavailable (as for parse and
 bind failures), not invalid code. One cap of 100 counts every contained
 exception in a program. A file dropped late makes its project be extracted
 again. See [C-13](changes/C-13.md).
+
+### Re-index cost is measured by operation counts; one read per module write (C-22)
+
+**Decided (C-22):** re-index speed is judged by deterministic work counts
+(files hashed, parsed and extracted, programs built, links presented to a
+resolver, links compared, rows written, records decoded, SQL statements),
+recorded by observation-only counters in `src/graph/work.ts`; timings on the
+shared dev server are observations. A sound incremental index must leave the
+store identical, row for row, to a cold index of the same tree (same project
+id); `test/graph-reindex-equality.test.mjs` and `scripts/reindex/` check that.
+The resolve phase now reads a module's links once after its resolver returns
+and the store writes from that validated result (`replaceAnalysis` given
+the validated links), where it
+read them three times and derived the result twice; the resolver's own input
+reads only the parsed link records it receives unresolved, and analysis reads
+only its own module's files. **Why:** these reads were the largest
+repository-proportional cost of a Go or Rust one-file edit that could be removed
+without changing what any phase computes. **Trade:** the store's write trusts
+that `desired` came from `resolutionFacts` over the `current` it is given; the
+indexer is the only caller. **Not done:** language analysis is still
+whole-program on every run (TypeScript rebuilds every program; Go and Rust
+resolve the whole project twice); the change note sketches what an
+edit-proportional route needs. **Also decided (C-22):** a re-index with no
+edit must store exactly what a cold index stores, bare and with dependencies
+installed. Within one run every read of an installed file returns the
+bytes of its first read, recorded by those bytes' hash and the stamp of the
+handle that read them; whether a file changed is decided by its content,
+the stamp being only the cheap first check; a file whose bytes on disk
+differ at the end of the run is recorded with a stamp that cannot match, so
+the next run re-analyses
+(another install hard-linking the same pnpm store file changed its ctime and
+made it absent, so a warm sweep index lost `expect-type` declarations; a
+first fix let two programs of one run see different bytes). An index run
+chooses the journal before its data-version baseline, marks the store with
+its own identifier in its first write's commit, proves under the write lock
+at every commit that no other run has written (an overtaken run stops
+without writing), and clears only its own mark in its last commit; the
+completion is re-checked under its own write lock; a no-edit `graph index`
+writes no row (it advances only SQLite's file change counter); a run that finds the mark rewrites every record and reuses no stored
+analysis, and the graph is not complete while it is set. **Trade:** after a
+crash, a kill or a refused completion the next index redoes everything once
+(the cost of a cold index of the same files); a per-file record of which
+snapshot each record came from would narrow that and is not built. Another
+connection's `wal_checkpoint(TRUNCATE)` during a run stops it as overtaken
+(a safe false alarm; no product path does it). [C-22](changes/C-22.md)

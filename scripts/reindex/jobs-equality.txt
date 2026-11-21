@@ -1,0 +1,6 @@
+random AFTER restic/restic 2211 20
+random AFTER BurntSushi/ripgrep 2212 20
+measure MAIN restic/restic main-1
+measure MAIN honojs/hono main-1
+measure MAIN restic/restic main-2
+measure MAIN honojs/hono main-2

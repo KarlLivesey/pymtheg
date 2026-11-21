@@ -1,0 +1,15 @@
+{
+ "root": "trpc_trpc",
+ "rows": {
+  "graph_files": 1353,
+  "graph_contexts": 421,
+  "graph_parse_failures": 0,
+  "graph_symbols": 17804,
+  "graph_links": 107470,
+  "graph_candidates": 14,
+  "graph_library_targets": 35621,
+  "project": 1
+ },
+ "equal": true,
+ "differences": []
+}

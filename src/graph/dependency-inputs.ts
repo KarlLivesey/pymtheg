@@ -37,7 +37,35 @@ const stamp = (path: string, stat: BigIntStats) =>
     stat.ctimeNs,
   ].join("\0");
 const MAX_FILE = 4 * 1024 * 1024;
+/**
+ * The content hash of the regular file at `absolute` now, or undefined.
+ * Used only where a stamp moved: metadata alone (a hard link added by
+ * another install sharing the package store changes ctime and nlink) never
+ * decides whether bytes changed (C-22).
+ */
+function hashNow(absolute: string): string | undefined {
+  try {
+    const fd = openSync(
+      absolute,
+      constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+    );
+    try {
+      const stat = fstatSync(fd, { bigint: true });
+      if (!stat.isFile() || stat.size > MAX_FILE) return undefined;
+      return contentHash(readFileSync(fd));
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return undefined;
+  }
+}
 const CACHE_SIZE = 24 * 1024 * 1024;
+/**
+ * Recorded for a file whose bytes on disk no longer match the bytes this run
+ * used: no lstat stamp equals it, so the next run sees the input as changed.
+ */
+const STALE = "\0stale";
 // Retain text, not compiler nodes. An unchanged file can be shared by several
 // programs or by the next index in the same process.
 const textCache = new Map<
@@ -97,23 +125,69 @@ class Paths {
   }
 }
 
-export function changedDependencyInputs(
+/**
+ * The recorded inputs that changed since they were recorded, and the records
+ * as they now are. The stamp is the cheap first check; when it moved, a file
+ * whose bytes were read is changed only if its content hash now differs from
+ * the one recorded. Metadata that another install moved is no change: such a
+ * record is returned with the stamp it has now, which a cold index would
+ * record too.
+ */
+export function checkDependencyInputs<
+  T extends { path: string; hash?: string; dependency?: DependencyStamp },
+>(
   root: string,
-  inputs: readonly { path: string; dependency?: DependencyStamp }[],
-): string[] {
-  const watched = inputs.filter((entry) => entry.dependency);
-  if (!watched.length) return [];
+  inputs: readonly T[],
+): { changed: string[]; current: T[]; restamped: boolean } {
+  const changed: string[] = [];
+  let restamped = false;
+  if (!inputs.some((entry) => entry.dependency))
+    return { changed, current: [...inputs], restamped };
   const paths = new Paths(root);
-  return watched.flatMap(({ path, dependency }) => {
+  const current = inputs.map((entry) => {
+    const { path, hash, dependency } = entry;
+    if (!dependency) return entry;
     const location = installed(path) ? paths.location(path) : undefined;
     const actual = location ? stamp(location.path, location.stat) : "";
-    return actual === dependency!.stamp ? [] : [path];
+    if (actual === dependency.stamp) return entry;
+    if (
+      hash &&
+      actual &&
+      location!.stat.isFile() &&
+      hashNow(join(paths.root, location!.path)) === hash
+    ) {
+      restamped = true;
+      return { ...entry, dependency: { ...dependency, stamp: actual } };
+    }
+    changed.push(path);
+    return entry;
   });
+  return { changed, current, restamped };
+}
+
+/** The recorded inputs that changed since they were recorded (see above). */
+export function changedDependencyInputs(
+  root: string,
+  inputs: readonly {
+    path: string;
+    hash?: string;
+    dependency?: DependencyStamp;
+  }[],
+): string[] {
+  return checkDependencyInputs(root, inputs).changed;
 }
 
 export class DependencyInputs {
   private readonly paths: Paths;
   private readonly entries = new Map<string, ContextFile>();
+  /**
+   * The bytes this run used, by installed location: the first read wins for
+   * the whole run, so every program sees the same text (C-22).
+   */
+  private readonly used = new Map<
+    string,
+    { text: string; hash: string; stamp: string; paths: Set<string> }
+  >();
 
   constructor(
     root: string,
@@ -124,7 +198,29 @@ export class DependencyInputs {
 
   refreshed = false;
 
+  /**
+   * Every probed input with the identity of what this run used. For a file
+   * read this run whose stamp on disk moved, the content decides: the same
+   * bytes are recorded with the stamp they have now; different bytes (or
+   * none) are recorded as stale, so the next run analyses again.
+   */
   records(): ContextFile[] {
+    for (const [location, used] of this.used) {
+      const absolute = join(this.paths.root, location);
+      let now = "";
+      try {
+        now = stamp(location, lstatSync(absolute, { bigint: true }));
+      } catch {
+        // Gone: no longer what was used.
+      }
+      if (now === used.stamp) continue;
+      const same = now !== "" && hashNow(absolute) === used.hash;
+      for (const path of used.paths)
+        this.entries.get(path)!.dependency = {
+          module: this.module,
+          stamp: same ? now : STALE,
+        };
+    }
     return [...this.entries.values()];
   }
 
@@ -196,33 +292,58 @@ export class DependencyInputs {
       location.stat.size > MAX_FILE
     )
       return undefined;
+    const record = this.entries.get(path)!;
+    const used = this.used.get(location.path);
+    if (used) {
+      used.paths.add(path);
+      record.hash = used.hash;
+      record.dependency = { module: this.module, stamp: used.stamp };
+      if (path.endsWith("/package.json")) record.text = used.text;
+      return used.text;
+    }
     const absolute = join(this.paths.root, location.path);
     const mark = stamp(location.path, location.stat);
     let captured = textCache.get(absolute);
     if (captured?.stamp !== mark) {
-      try {
-        const fd = openSync(
-          absolute,
-          constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
-        );
+      // Checked against its own handle, and decided by content: a link added
+      // by another install sharing the package store moves the inode's
+      // ctime and nlink, not its bytes, and must not make a present
+      // declaration absent (C-22). When the handle's stamp moved during the
+      // read, the file is read again: the same bytes are used as they are;
+      // different bytes mean it is being written, so it is tried once more
+      // and then treated as absent. The stamp recorded is the handle's
+      // after the read.
+      captured = undefined;
+      for (let attempt = 0; attempt < 2 && !captured; attempt++)
         try {
-          if (stamp(location.path, fstatSync(fd, { bigint: true })) !== mark)
-            return undefined;
-          const bytes = readFileSync(fd);
-          if (stamp(location.path, fstatSync(fd, { bigint: true })) !== mark)
-            return undefined;
-          captured = {
-            stamp: mark,
-            text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
-            hash: contentHash(bytes),
-            size: bytes.length,
-          };
-        } finally {
-          closeSync(fd);
+          const fd = openSync(
+            absolute,
+            constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK,
+          );
+          try {
+            const before = fstatSync(fd, { bigint: true });
+            if (!before.isFile() || before.size > MAX_FILE) return undefined;
+            const bytes = readFileSync(fd);
+            const after = stamp(location.path, fstatSync(fd, { bigint: true }));
+            const hash = contentHash(bytes);
+            if (
+              stamp(location.path, before) !== after &&
+              hashNow(absolute) !== hash
+            )
+              continue;
+            captured = {
+              stamp: after,
+              text: new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+              hash,
+              size: bytes.length,
+            };
+          } finally {
+            closeSync(fd);
+          }
+        } catch {
+          return undefined;
         }
-      } catch {
-        return undefined;
-      }
+      if (!captured) return undefined;
       const obsolete = textCache.get(absolute);
       if (obsolete) cachedBytes -= obsolete.size;
       textCache.delete(absolute);
@@ -234,9 +355,15 @@ export class DependencyInputs {
         textCache.delete(oldest);
       }
     }
-    const record = this.entries.get(path)!;
     record.hash = captured.hash;
+    record.dependency = { module: this.module, stamp: captured.stamp };
     if (path.endsWith("/package.json")) record.text = captured.text;
+    this.used.set(location.path, {
+      text: captured.text,
+      hash: captured.hash,
+      stamp: captured.stamp,
+      paths: new Set([path]),
+    });
     return captured.text;
   }
 }

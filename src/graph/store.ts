@@ -8,6 +8,7 @@ import {
 import { randomUUID } from "node:crypto";
 import { compare, fileFacts, validateResult } from "./identity.js";
 import { LinkDecider, resolutionFacts } from "./analysis.js";
+import { count } from "./work.js";
 import type {
   ContextFile,
   GraphStorage,
@@ -17,6 +18,7 @@ import type {
   GraphLink,
   GraphSymbol,
   SymbolQuery,
+  ValidatedAnalysis,
   LinkResolution,
   Neighbourhood,
   ResolutionResult,
@@ -106,6 +108,7 @@ export class SqliteGraphStore implements GraphStorage {
    * the life of the store (C-2).
    */
   private decodeFile(body: string): GraphFile {
+    count("store.fileRecordsDecoded");
     return JSON.parse(body) as GraphFile;
   }
   constructor(
@@ -114,7 +117,9 @@ export class SqliteGraphStore implements GraphStorage {
     options: { readOnly?: boolean; sqliteVersion?: string } = {},
   ) {
     this.sqliteVersion = options.sqliteVersion;
-    this.db = openDatabase(path, { readOnly: options.readOnly ?? false });
+    this.db = countStatements(
+      openDatabase(path, { readOnly: options.readOnly ?? false }),
+    );
     try {
       if (options.readOnly) {
         const schema = this.db
@@ -246,16 +251,73 @@ export class SqliteGraphStore implements GraphStorage {
       return statement;
     };
   }
+  /**
+   * This connection's index run (C-22): its identifier, the store's data
+   * version when it began, whether it takes over a mark found then, and
+   * whether its own mark is written yet.
+   */
+  private indexRun:
+    | { state: "idle" }
+    | {
+        state: "pending" | "written";
+        id: string;
+        /** The data version after its last commit (or at its beginning). */
+        version: number;
+        takeOver: boolean;
+        /** Another connection committed between two of its commits. */
+        interleaved: boolean;
+      } = {
+    state: "idle",
+  };
   private transaction(action: () => void): void {
     this.beforeWrite();
     this.db.exec("BEGIN IMMEDIATE");
     try {
+      const run = this.indexRun;
+      // Every commit of an index run first proves, under the write lock,
+      // that no other run has written since it began: its first commit that
+      // no other connection has committed at all since it began reading;
+      // each later one that the mark is still its own. Otherwise it writes
+      // nothing more.
+      if (run.state === "pending") {
+        if (
+          this.commandDataVersion() !== run.version ||
+          (!run.takeOver && this.indexRunMark() !== undefined)
+        )
+          throw new GraphIndexTakenOver();
+        this.db
+          .prepare(
+            "INSERT INTO graph_meta VALUES ('index-run',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+          )
+          .run(run.id);
+        this.db
+          .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
+          .run();
+      } else if (run.state === "written") {
+        if (this.indexRunMark() !== run.id) throw new GraphIndexTakenOver();
+        // A writer that is not an index run: this run's result is no longer
+        // its own, so it publishes no completion.
+        if (this.commandDataVersion() !== run.version) run.interleaved = true;
+      }
       action();
+      // Read under the write lock, before the commit: this connection's own
+      // commit does not change it, another connection's later one does.
+      const version =
+        run.state === "idle" ? undefined : this.commandDataVersion();
       this.db.exec("COMMIT");
+      if (run.state !== "idle") {
+        run.state = "written";
+        run.version = version!;
+      }
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
     }
+  }
+  private indexRunMark(): string | undefined {
+    return this.db
+      .prepare("SELECT value FROM graph_meta WHERE key='index-run'")
+      .get()?.value as string | undefined;
   }
   files(): GraphFile[] {
     // One stored body at a time: never every body string and its decoding at once.
@@ -383,8 +445,15 @@ export class SqliteGraphStore implements GraphStorage {
     validateResult(file.text, file.result);
     const facts = fileFacts(this.projectId, file);
     const sql = this.writer();
+    count("store.filesWritten");
+    count("store.symbolRowsWritten", facts.symbols.length);
     this.transaction(() => {
-      sql("DELETE FROM graph_links WHERE file=?").run(file.path);
+      count(
+        "store.linkRowsDeleted",
+        Number(
+          sql("DELETE FROM graph_links WHERE file=?").run(file.path).changes,
+        ),
+      );
       sql(
         "INSERT INTO graph_files VALUES (?,?,?) ON CONFLICT(path) DO UPDATE SET body=excluded.body,status=excluded.status",
       ).run(file.path, JSON.stringify(file), file.result.status);
@@ -428,6 +497,7 @@ export class SqliteGraphStore implements GraphStorage {
     link: GraphLink,
     sql: (sql: string) => StatementSync,
   ): void {
+    count("store.linkRowsInserted");
     sql("INSERT INTO graph_links VALUES (?,?,?,?,?,?,?,?,?)").run(
       link.id,
       link.file,
@@ -466,8 +536,15 @@ export class SqliteGraphStore implements GraphStorage {
       );
   }
   removeFile(path: string): void {
-    this.beforeWrite();
-    this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
+    count("store.filesRemoved");
+    const remove = () =>
+      this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
+    // A write of an index run carries or checks its mark.
+    if (this.indexRun.state !== "idle") this.transaction(remove);
+    else {
+      this.beforeWrite();
+      remove();
+    }
   }
   findSymbols(query: SymbolQuery = {}): GraphSymbol[] {
     const conditions: string[] = [];
@@ -655,6 +732,7 @@ export class SqliteGraphStore implements GraphStorage {
           JSON.stringify(link.libraries ?? [])
       )
         continue;
+      count("store.linkTargetsRewritten");
       sql("UPDATE graph_links SET target=? WHERE id=?").run(
         link.targetId,
         link.id,
@@ -692,22 +770,69 @@ export class SqliteGraphStore implements GraphStorage {
         this.writeTargets(current, desired, this.writer()),
       );
   }
-  replaceAnalysis(module: string, result: ResolutionResult): void {
-    const current = this.selectLinks("l.module=?", [module]);
-    const sql = this.writer();
+  replaceAnalysis(
+    module: string,
+    result: ResolutionResult,
+    validated?: ValidatedAnalysis,
+  ): void {
+    if (validated)
+      return this.writeAnalysis(validated.current, validated.desired);
+    const current = this.analysisLinks(module);
     const desired = resolutionFacts(
       this.projectId,
       module,
       result,
       (path) => {
-        const row = sql("SELECT body FROM graph_files WHERE path=?").get(path);
+        const row = this.db
+          .prepare("SELECT body FROM graph_files WHERE path=?")
+          .get(path);
         return row ? this.decodeFile(row.body as string) : undefined;
       },
       this.findSymbols(),
       current,
       (path) => this.cleanContext(path),
     );
+    this.writeAnalysis(current, desired);
+  }
+  /** Every link of one module, parsed and added, as links() reports them. */
+  analysisLinks(module: string): GraphLink[] {
+    return this.selectLinks("l.module=?", [module]);
+  }
+  /**
+   * One module's parsed links as a resolver receives them: unresolved, with
+   * no target, candidates or library targets, so none of those rows is read.
+   * Each is the record moduleLinks() returns, with those fields cleared.
+   */
+  moduleInputLinks(module: string): GraphLink[] {
+    return this.db
+      .prepare(
+        `SELECT l.body,f.status AS sourceStatus FROM graph_links l JOIN graph_files f${this.fileStatusIndex} ON f.path=l.file
+        WHERE l.module=? AND l.origin='parse' ORDER BY l.id`,
+      )
+      .all(module)
+      .map((row) => {
+        const { libraries: _previous, ...link } = JSON.parse(
+          row.body as string,
+        ) as GraphLink;
+        void _previous;
+        return {
+          ...link,
+          targetId: null,
+          targetStatus: null,
+          sourceStatus: row.sourceStatus as GraphLink["sourceStatus"],
+          candidates: [],
+          resolution: "unresolved" as const,
+        };
+      });
+  }
+  /** Writes only the rows of `desired` that differ from `current`. */
+  private writeAnalysis(
+    current: readonly GraphLink[],
+    desired: readonly GraphLink[],
+  ): void {
+    count("store.linksCompared", current.length);
     if (sameLinks(current, desired)) return;
+    const sql = this.writer();
     this.transaction(() => {
       const wanted = new Map(desired.map((link) => [link.id, link]));
       const previous = new Map(current.map((link) => [link.id, link]));
@@ -716,8 +841,10 @@ export class SqliteGraphStore implements GraphStorage {
           link.origin === "analysis" &&
           (!wanted.has(link.id) ||
             JSON.stringify(link) !== JSON.stringify(wanted.get(link.id)))
-        )
+        ) {
+          count("store.linkRowsDeleted");
           sql("DELETE FROM graph_links WHERE id=?").run(link.id);
+        }
       for (const link of desired)
         if (
           link.origin === "analysis" &&
@@ -793,8 +920,11 @@ export class SqliteGraphStore implements GraphStorage {
   }
   graphCommandState(): unknown {
     try {
+      // An index run that did not finish leaves no complete graph (C-22).
       const row = this.db
-        .prepare("SELECT value FROM graph_meta WHERE key='command-complete'")
+        .prepare(
+          "SELECT value FROM graph_meta WHERE key='command-complete' AND NOT EXISTS(SELECT 1 FROM graph_meta WHERE key='index-run')",
+        )
         .get();
       return row ? JSON.parse(row.value as string) : null;
     } catch {
@@ -802,15 +932,112 @@ export class SqliteGraphStore implements GraphStorage {
     }
   }
   invalidateGraphCommandState(): void {
+    // Nothing to remove is no write (C-6).
+    if (
+      !this.db
+        .prepare("SELECT 1 FROM graph_meta WHERE key='command-complete'")
+        .get()
+    )
+      return;
     this.beforeWrite();
     this.db
       .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
       .run();
   }
+  /**
+   * C-22: whether an index run began writing and did not finish. Its writes
+   * may have replaced some files' records and not others.
+   */
+  unfinishedIndexRun(): boolean {
+    return this.indexRunMark() !== undefined;
+  }
+  /**
+   * Begins an index run with its own identifier. Its mark is written in the
+   * same commit as its first write, with the completion record's removal,
+   * so a run that writes nothing leaves the file as it was, and any write of
+   * the run that survives a crash has the mark with it. A mark already there
+   * belongs to a run that did not finish or is still running: this run
+   * takes it over at once (that run then writes nothing more) and returns
+   * true, and must treat everything as changed.
+   */
+  beginIndexRun(): boolean {
+    // The journal is chosen first: nothing this run does after the baseline
+    // below changes the data version except its own commits (C-22).
+    this.beforeWrite();
+    // The baseline and the mark are one read snapshot.
+    let version: number;
+    let takeOver: boolean;
+    this.db.exec("BEGIN");
+    try {
+      version = this.commandDataVersion();
+      takeOver = this.unfinishedIndexRun();
+    } finally {
+      this.db.exec("COMMIT");
+    }
+    this.indexRun = {
+      state: "pending",
+      id: randomUUID(),
+      version,
+      takeOver,
+      interleaved: false,
+    };
+    if (!takeOver) return false;
+    this.transaction(() => {});
+    return true;
+  }
+  /** Clears the mark in the run's last commit, if this run still owns it. */
+  finishIndexRun(): void {
+    const run = this.indexRun;
+    try {
+      // A run another connection wrote into keeps its mark: the next run
+      // redoes everything.
+      if (run.state === "written")
+        this.transaction(() => {
+          if (!run.interleaved)
+            this.db
+              .prepare("DELETE FROM graph_meta WHERE key='index-run'")
+              .run();
+        });
+      // What the run read and wrote is current while no other connection
+      // commits after the version taken under its last write lock (or at
+      // its beginning if it wrote nothing); the completion checks it under
+      // its own write lock.
+      if (run.state !== "idle")
+        this.finishedVersion = run.interleaved ? Number.NaN : run.version;
+    } finally {
+      this.indexRun = { state: "idle" };
+    }
+  }
+  /**
+   * The data version at which this connection's last finished run was
+   * current. A completion record is written only while it still is (C-22).
+   */
+  private finishedVersion: number | undefined;
+  private finishedRunCurrent(): boolean {
+    return (
+      this.finishedVersion === undefined ||
+      this.commandDataVersion() === this.finishedVersion
+    );
+  }
   commandDataVersion(): number {
     return Number(this.db.prepare("PRAGMA data_version").get()!.data_version);
   }
   completeGraphCommandState(state: unknown, expectedVersion?: number): boolean {
+    // An index that changed nothing writes nothing (C-6): the same record,
+    // over the same data and with no run unfinished, is left as it is.
+    const body = JSON.stringify(state);
+    const same = this.db
+      .prepare(
+        "SELECT 1 FROM graph_meta WHERE key='command-complete' AND value=? AND NOT EXISTS(SELECT 1 FROM graph_meta WHERE key='index-run')",
+      )
+      .get(body);
+    if (
+      same &&
+      this.finishedRunCurrent() &&
+      (expectedVersion === undefined ||
+        this.commandDataVersion() === expectedVersion)
+    )
+      return true;
     this.beforeWrite();
     let written = false;
     // The completion record is durable when this returns: its commit is
@@ -823,10 +1050,21 @@ export class SqliteGraphStore implements GraphStorage {
       // Lock publication so another connection cannot commit between validation and publication.
       this.transaction(() => {
         if (
-          expectedVersion !== undefined &&
-          this.commandDataVersion() !== expectedVersion
-        )
+          !this.finishedRunCurrent() ||
+          (expectedVersion !== undefined &&
+            this.commandDataVersion() !== expectedVersion)
+        ) {
+          // Another connection committed after the run's last write: what
+          // is stored is no longer only the run's. Marked unfinished, in the
+          // same locked transaction, so the next run redoes everything
+          // (C-22).
+          this.db
+            .prepare(
+              "INSERT INTO graph_meta VALUES ('index-run','interleaved') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            )
+            .run();
           return;
+        }
         this.db
           .prepare(
             "INSERT INTO graph_meta VALUES ('command-complete',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -1052,6 +1290,16 @@ export class SqliteGraphStore implements GraphStorage {
   }
   close(): void {
     try {
+      // A writable connection that wrote nothing but found a log left by a
+      // killed run still leaves the store at rest (C-6): a healthy store is
+      // not touched.
+      if (
+        !this.writeAheadLog &&
+        this.path !== undefined &&
+        this.db.isOpen &&
+        this.db.prepare("PRAGMA journal_mode").get()?.journal_mode === "wal"
+      )
+        this.beforeWrite();
       // The last connection checkpoints the log into the database (synced)
       // and the store is left with a rollback journal, as at rest before C-6.
       if (this.writeAheadLog && this.db.isOpen) closeWriteAheadLog(this.db);
@@ -1105,3 +1353,53 @@ const libraryTables = `CREATE TABLE IF NOT EXISTS graph_library_targets(link TEX
     UPDATE graph_links SET resolution=${resolutionOf("OLD.link", "target")}
       WHERE id=OLD.link AND resolution IS NOT ${resolutionOf("OLD.link", "target")};
   END;`;
+
+/**
+ * Counts every SQL statement this connection executes (C-22 observation:
+ * `store.sqlStatements`). The statements and their results are unchanged.
+ */
+function countStatements(db: DatabaseSync): DatabaseSync {
+  const prepare = db.prepare.bind(db);
+  const exec = db.exec.bind(db);
+  db.exec = (sql: string) => {
+    count("store.sqlStatements");
+    return exec(sql);
+  };
+  db.prepare = ((sql: string, ...rest: unknown[]) => {
+    const statement = (prepare as (...args: unknown[]) => StatementSync)(
+      sql,
+      ...rest,
+    );
+    for (const method of ["run", "get", "all", "iterate"] as const) {
+      const original = statement[method].bind(statement) as (
+        ...args: unknown[]
+      ) => unknown;
+      (statement as unknown as Record<string, unknown>)[method] = (
+        ...args: unknown[]
+      ) => {
+        count("store.sqlStatements");
+        return original(...args);
+      };
+    }
+    return statement;
+  }) as DatabaseSync["prepare"];
+  return db;
+}
+
+/**
+ * Another graph index run started on the same store and took it over (C-22):
+ * this run stopped before writing anything more.
+ */
+export class GraphIndexTakenOver extends Error {
+  /** As MCP and other callers present it: another writer, retry later. */
+  readonly code = "concurrent-update";
+  readonly retryable = true;
+  readonly action =
+    "Wait for the other graph index run to finish, then retry if its result is not complete. No complete answer is claimed.";
+  constructor() {
+    super(
+      "Another graph index run started on this store and took it over (or the store changed while this run was reading it); this run stopped without writing more. Run `pymtheg graph index` again if the other run did not finish.",
+    );
+    this.name = "GraphIndexTakenOver";
+  }
+}
