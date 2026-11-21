@@ -7,6 +7,7 @@ import type {
   GraphSymbol,
   LibraryEvidence,
   LibraryTarget,
+  SourceRange,
 } from "./types.js";
 export const contentHash = (text: string | Uint8Array): string =>
   createHash("sha256").update(text).digest("hex");
@@ -53,6 +54,13 @@ export function fileFacts(
   }));
   return { symbols, links };
 }
+export const validSourceRange = (value: SourceRange, length: number): boolean =>
+  Number.isInteger(value.start) &&
+  Number.isInteger(value.end) &&
+  value.start >= 0 &&
+  value.end >= value.start &&
+  value.end <= length;
+
 export function validateResult(
   text: string,
   result: import("./types.js").ParseResult,
@@ -66,14 +74,8 @@ export function validateResult(
     throw Error("Invalid parse failure kind");
   if (result.status !== "clean" && !result.diagnostics.length)
     throw Error("Incomplete parse needs a diagnostic");
-  const range = (value: import("./types.js").SourceRange) => {
-    if (
-      !Number.isInteger(value.start) ||
-      !Number.isInteger(value.end) ||
-      value.start < 0 ||
-      value.end < value.start ||
-      value.end > text.length
-    )
+  const range = (value: SourceRange) => {
+    if (!validSourceRange(value, text.length))
       throw Error("Invalid UTF-16 range");
   };
   const keys = new Set<string>();

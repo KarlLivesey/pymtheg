@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
+import { posix } from "node:path";
 import ts from "typescript";
 import { contentHash } from "../../index.js";
+import { validSourceRange } from "../../identity.js";
 import type {
   AnalyzedFile,
   Diagnostic,
@@ -98,6 +100,7 @@ import {
   CONTEXT_PATTERNS,
   fromVirtual,
   projectModel,
+  relativeSpecifier,
   syntaxFailure,
   toVirtual,
 } from "./project.js";
@@ -109,7 +112,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `41+typescript-${ts.version}`;
+const MODULE_VERSION = `42+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -950,7 +953,8 @@ export function typescriptModule(
         model.workspaceCatalogs,
         context.dependencyInputs,
       );
-      const captured = new Set(files.map((file) => file.path));
+      const byPath = new Map(files.map((file) => [file.path, file]));
+      const captured = new Set(byPath.keys());
       const results: AnalyzedFile[] = [];
       // A broken config or manifest fails only the files it governs, not the module.
       for (const [path, message] of model.failures)
@@ -1053,21 +1057,58 @@ export function typescriptModule(
           ReturnType<typeof entryProvenance>
         >();
         const resolveModule = (
-          host: ts.CompilerHost,
-          specifier: string,
-          from: string,
+          session: Session,
+          specifier: ts.StringLiteralLike,
         ) => {
-          const selected = model.selectSpecifier(specifier, from);
+          const source = specifier.getSourceFile();
+          const from = fromVirtual(source.fileName);
+          if (from === undefined) return undefined;
+          const selected = model.selectSpecifier(specifier.text, from);
           if (selected === undefined) return undefined;
-          const resolved = ts.resolveModuleName(
-            selected,
-            toVirtual(from),
-            group.options,
-            host,
-          ).resolvedModule?.resolvedFileName;
-          return resolved === undefined
-            ? undefined
-            : fromVirtual(host.realpath?.(resolved) ?? resolved);
+          const { host, program } = session;
+          const mode = relativeSpecifier(selected)
+            ? program.getModeForUsageLocation(source, specifier)
+            : undefined;
+          const resolve = (text: string, resolutionMode: ts.ResolutionMode) =>
+            ts.resolveModuleName(
+              text,
+              source.fileName,
+              group.options,
+              host,
+              undefined,
+              undefined,
+              resolutionMode,
+            ).resolvedModule;
+          let resolved = resolve(selected, mode);
+          if (!resolved && mode === ts.ModuleKind.ESNext) {
+            // Preserve the legacy extension-only edge when adding a file
+            // extension would reach that same file in the real mode. A
+            // permissive lookup can also find an index or a package entry,
+            // which an ESM directory import must never target.
+            if (/(?:\/|(?:^|\/)\.\.?)$/.test(selected)) return undefined;
+            const fallback = resolve(selected, undefined);
+            const candidate = posix.resolve(
+              posix.dirname(source.fileName),
+              selected,
+            );
+            if (
+              fallback &&
+              // With rootDirs, a directory entry and an explicitly
+              // extended file in another overlay can select the same path.
+              posix.dirname(fallback.resolvedFileName) ===
+                posix.dirname(candidate) &&
+              resolve(selected + fallback.extension, mode)?.resolvedFileName ===
+                fallback.resolvedFileName
+            )
+              resolved = fallback;
+          }
+          return (
+            resolved &&
+            fromVirtual(
+              host.realpath?.(resolved.resolvedFileName) ??
+                resolved.resolvedFileName,
+            )
+          );
         };
         /**
          * What a captured target file is. `script` means only: analysed, no
@@ -1115,7 +1156,7 @@ export function typescriptModule(
         ):
           | { result: ParseResult }
           | { limit: string }
-          | { assertion: string; blame: string | undefined }
+          | { drop: string; blame: string | undefined }
           | { internal: string } => {
           lastAsked = undefined;
           if (exhaustedSessions.has(session))
@@ -1168,8 +1209,7 @@ export function typescriptModule(
                 fresh: model.fresh,
                 explicitTypes: group.explicitTypes === true,
                 ...(renamed ? { renamed } : {}),
-                resolveModule: (specifier, from) =>
-                  resolveModule(session.host, specifier, from),
+                resolveModule: (specifier) => resolveModule(session, specifier),
                 hasDenoImports: model.hasDenoImports,
                 selectSpecifier: model.selectSpecifier,
                 workspaceReason: model.workspaceReason,
@@ -1182,6 +1222,26 @@ export function typescriptModule(
               },
               libraries,
             );
+            // The core validates the batch as a whole. Check this file's
+            // positions here so bad compiler facts can use the same drop
+            // and rebuild path as a compiler exception.
+            const length = byPath.get(path)!.text.length;
+            if (
+              source.text.length !== length ||
+              result.symbols.some(
+                ({ range }) => !validSourceRange(range, length),
+              ) ||
+              result.links.some(
+                ({ range }) => !validSourceRange(range, length),
+              ) ||
+              result.diagnostics.some(
+                ({ range }) => range && !validSourceRange(range, length),
+              )
+            )
+              return {
+                drop: `${COMPILER_FAILURE}: Invalid UTF-16 range in the extracted facts for ${path}`,
+                blame: path,
+              };
             statistics.extracted++;
             if (taintExhausted(session.checker)) {
               // Later checkers of this session (rebuilt from this program,
@@ -1194,7 +1254,7 @@ export function typescriptModule(
           } catch (error) {
             if (error instanceof CheckerLimit) return { limit: error.key };
             if (isCompilerAssertion(error))
-              return { assertion: compilerFailure(error), blame: askedFile() };
+              return { drop: compilerFailure(error), blame: askedFile() };
             return { internal: internalErrorMessage(path, error) };
           }
         };
@@ -1239,23 +1299,21 @@ export function typescriptModule(
                 `The TypeScript checker exhausted its stack more than ${MAX_LIMIT_RETRIES} times in this file`,
               );
             }
-            if ("assertion" in outcome) {
-              // The compiler's own assertion: the file it was reading fails
-              // with the compiler's message, and the program is rebuilt
-              // without it (its checker is untrustworthy). When that was
-              // another file, this one is extracted again.
+            if ("drop" in outcome) {
+              // A compiler assertion or invalid range makes the file's facts
+              // unavailable. Rebuild without it before extracting other files.
               const blamed =
                 outcome.blame !== undefined && captured.has(outcome.blame)
                   ? outcome.blame
                   : path;
-              session.drop(blamed, outcome.assertion);
+              session.drop(blamed, outcome.drop);
               if (session === normal) {
                 markUnseen(blamed);
                 if (!group.roots.includes(toVirtual(blamed)))
-                  retract(blamed, outcome.assertion);
+                  retract(blamed, outcome.drop);
               }
               if (blamed !== path) continue;
-              return failed(outcome.assertion);
+              return failed(outcome.drop);
             }
             return operationalFailure(outcome.internal);
           }
@@ -1492,7 +1550,6 @@ export function typescriptModule(
       // context-dependent failure. Tied configs may order diagnostics differently.
       const diagnosticSet = (diagnostics: readonly Diagnostic[]) =>
         JSON.stringify(diagnostics.map((item) => JSON.stringify(item)).sort());
-      const byPath = new Map(files.map((file) => [file.path, file]));
       for (const item of results) {
         if (
           item.result.status !== "failed" ||

@@ -3511,6 +3511,159 @@ test("extension lookup preserves a relative module edge and augmentation leaves 
   );
 });
 
+for (const [module, moduleResolution, extension, type, bindsDirectory] of [
+  ["CommonJS", "Node10", "ts", "commonjs", true],
+  ["Node16", "Node16", "cts", "module", true],
+  ["Node16", "Node16", "ts", "module", false],
+  ["NodeNext", "NodeNext", "ts", "commonjs", true],
+  ["NodeNext", "NodeNext", "mts", "commonjs", false],
+  ["ESNext", "Bundler", "ts", "module", true],
+]) {
+  test(`directory imports follow ${moduleResolution} in a ${extension} file in a ${type} package`, async () => {
+    // tRPC's client tests reach the public entry with ".."; its
+    // unstable-handles tests also use "." to reach their own entry.
+    const source = `src/__tests__/resource.${extension}`;
+    const imports = [
+      [".", "here", "src/__tests__/index.ts"],
+      ["..", "parent", "src/index.ts"],
+      ["./", "here", "src/__tests__/index.ts"],
+      ["../", "parent", "src/index.ts"],
+      ["../jsx/", "component", "src/jsx/index.tsx"],
+      ["../decl", "declared", "src/decl/index.d.ts"],
+      ["../typed/", "typed", "src/typed/public.d.ts"],
+      ["../routed", "routed", "src/routed-entry.d.ts"],
+      ["./overlay", "overlaid", "src/__tests__/overlay/overlay.ts"],
+    ];
+    await project(
+      {
+        "package.json": JSON.stringify({ type }),
+        "tsconfig.json": JSON.stringify({
+          compilerOptions: {
+            module,
+            moduleResolution,
+            jsx: "preserve",
+            rootDirs: ["src/__tests__", "src/__tests__/overlay"],
+          },
+        }),
+        [source]: imports
+          .flatMap(([specifier, name], index) => [
+            `import { ${name} as use${index} } from "${specifier}";`,
+            `use${index}();`,
+          ])
+          .join("\n"),
+        "src/index.ts": "export function parent() {}",
+        "src/__tests__/index.ts": "export function here() {}",
+        "src/jsx/index.tsx": "export function component() { return <div />; }",
+        "src/decl/index.d.ts": "export declare function declared(): void;",
+        "src/typed/package.json": JSON.stringify({ types: "./public.d.ts" }),
+        "src/typed/public.d.ts": "export declare function typed(): void;",
+        "src/routed/package.json": JSON.stringify({
+          types: "../routed-entry.d.ts",
+        }),
+        "src/routed-entry.d.ts": "export declare function routed(): void;",
+        "src/__tests__/overlay/package.json": JSON.stringify({
+          types: "./overlay.ts",
+        }),
+        "src/__tests__/overlay/overlay.ts": "export function overlaid() {}",
+      },
+      async (graph, report) => {
+        clean(report);
+        for (const [index, [specifier, name, target]] of imports.entries()) {
+          const entry = graph.link(
+            source,
+            JSON.stringify(specifier),
+            "imports",
+          );
+          const call = graph.link(source, `use${index}`, "calls");
+          if (bindsDirectory) {
+            assert.equal(graph.target(entry), `${target}#${target}`);
+            assert.equal(graph.target(call), `${target}#${name}`);
+          } else {
+            assert.equal(entry.resolution, "unresolved");
+            assert.equal(entry.data.reason, "missing-module");
+            assert.equal(call.resolution, "unresolved");
+          }
+        }
+      },
+    );
+  });
+}
+
+test("Turborepo-style workspaces with identical package IDs keep their own imports", async () => {
+  const files = {};
+  for (const [workspace, declaration] of [
+    ["basic", "export function basicOnly() { return 'longer package body'; }"],
+    ["with-yarn", "export const own = 1;"],
+  ]) {
+    const root = `examples/${workspace}`;
+    files[`${root}/package.json`] = JSON.stringify({
+      workspaces: ["apps/*", "packages/*"],
+    });
+    files[`${root}/apps/web/package.json`] = JSON.stringify({
+      dependencies: { "@repo/eslint-config": "workspace:*" },
+    });
+    files[`${root}/packages/eslint-config/package.json`] = JSON.stringify({
+      name: "@repo/eslint-config",
+      version: "0.0.0",
+      exports: { "./next": "./next.js" },
+    });
+    files[`${root}/packages/eslint-config/next.js`] = declaration;
+    const name = workspace === "basic" ? "basicOnly" : "own";
+    files[`${root}/apps/web/eslint.config.js`] =
+      `import { ${name} } from "@repo/eslint-config/next"; export default ${name};`;
+  }
+  files["examples/with-yarn/packages/other/package.json"] = JSON.stringify({
+    name: "@repo/eslint-config",
+    version: "0.0.0",
+    exports: { "./next": "./next.js" },
+  });
+  files["examples/with-yarn/packages/other/next.js"] = "export const own = 2;";
+  files["examples/with-yarn/apps/web/eslint.config.js"] = [
+    'import { own as unselected } from "@repo/eslint-config/next";',
+    'import { own } from "../../packages/eslint-config/next.js";',
+    "export default [own, unselected];",
+  ].join("\n");
+  // A separate importer has an explicit route to the short copy, while the
+  // ordinary name is shared by two members of the same workspace.
+  files["examples/with-yarn/apps/explicit/package.json"] = JSON.stringify({
+    dependencies: {
+      "@repo/eslint-config": "workspace:../../packages/eslint-config",
+    },
+  });
+  files["examples/with-yarn/apps/explicit/eslint.config.js"] =
+    'import { own } from "@repo/eslint-config/next"; export default own;';
+  await project(files, async (graph, report) => {
+    clean(report);
+    assert.deepEqual(report.failed, []);
+    for (const [workspace, app, name] of [
+      ["basic", "web", "basicOnly"],
+      ["with-yarn", "explicit", "own"],
+    ]) {
+      const root = `examples/${workspace}`;
+      const source = `${root}/apps/${app}/eslint.config.js`;
+      const entry = `${root}/packages/eslint-config/next.js`;
+      assert.equal(
+        graph.target(
+          graph.link(source, '"@repo/eslint-config/next"', "imports"),
+        ),
+        `${entry}#${entry}`,
+      );
+      assert.equal(
+        graph.target(graph.link(source, name, "imports")),
+        `${entry}#${name}`,
+      );
+    }
+    assert.notEqual(
+      graph.link(
+        "examples/with-yarn/apps/web/eslint.config.js",
+        '"@repo/eslint-config/next"',
+        "imports",
+      ).resolution,
+      "resolved",
+    );
+  });
+});
+
 test("extends and implements resolve to checkout definitions and named outside imports", async () => {
   await project(
     {

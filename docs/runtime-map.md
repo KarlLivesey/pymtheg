@@ -1746,6 +1746,13 @@ Installed registry packages and
 existing outputs stay on the ordinary route.
 [C-25](changes/C-25.md)
 
+Module 42 accepts TypeScript's trailing-separator directory probes against
+the snapshot and uses the importing file's resolution mode for relative
+directory edges. When a package route selects a captured file, the compiler
+uses the snapshot path as its file identity. Invalid extracted UTF-16
+ranges enter the compiler session's file-drop and rebuild path before the
+core validates the analysis batch. [C-32](changes/C-32.md)
+
 Rust records library paths during resolution starting with module 29. Its library lookup uses
 the captured namespace, import, placement and `cfg` facts, with a separate
 lookup cache key for the outside search. `library.ts` supplies edition prelude

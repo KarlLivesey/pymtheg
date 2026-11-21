@@ -62,6 +62,8 @@ export const fromVirtual = (path: string): string | undefined =>
     ? undefined
     : path.slice(1);
 
+export const relativeSpecifier = (value: string) => /^\.\.?(\/|$)/.test(value);
+
 export const matchesPathAlias = (text: string, patterns: readonly string[]) =>
   patterns.some((pattern) => {
     const star = pattern.indexOf("*");
@@ -433,11 +435,7 @@ const isConfig = (path: string) => {
   return /^(tsconfig|jsconfig).*\.json$/.test(base);
 };
 const isRelativeReference = (value: string) =>
-  value.startsWith("./") ||
-  value.startsWith("../") ||
-  value === "." ||
-  value === ".." ||
-  value.startsWith("/");
+  relativeSpecifier(value) || value.startsWith("/");
 
 /** Virtual paths must not turn a host path outside the checkout into a
  * captured input or output by normalizing it against the virtual `/`. */
@@ -735,9 +733,16 @@ export function projectModel(
     (dependencyFile(name)
       ? dependencies?.read(dependencyPath(name))
       : undefined);
-  const directoryExists = (name: string) =>
-    fs.directoryExists(name) ||
-    (dependencies?.directoryExists(dependencyPath(name)) ?? false);
+  const directoryExists = (name: string) => {
+    // The resolver preserves a directory separator on probes for ".", ".."
+    // and explicit directory spellings. Snapshot directory keys omit it.
+    const directory =
+      name.length > 1 && name.endsWith("/") ? name.slice(0, -1) : name;
+    return (
+      fs.directoryExists(directory) ||
+      (dependencies?.directoryExists(dependencyPath(directory)) ?? false)
+    );
+  };
   let installedConfigRead = false;
   const parseHost: ts.ParseConfigHost = {
     useCaseSensitiveFileNames: true,
@@ -1320,7 +1325,23 @@ export function projectModel(
       realpath: real,
     };
     const workspaceRecovery = entries.available && !group.limitations.length;
-    if (deno.active || workspaceRecovery) {
+    const checkoutPackageIds =
+      workspace.links.size > 0 || dependencies !== undefined;
+    // TypeScript uses (name, version, subpath, peers) to redirect duplicate
+    // package files to a single SourceFile. Two checkout packages can share
+    // that ID but contain different text and declarations. The resolved
+    // snapshot path already supplies the identity of a checkout file.
+    const checkoutIdentity = <
+      T extends ts.ResolvedModuleFull | ts.ResolvedTypeReferenceDirective,
+    >(
+      resolved: T | undefined,
+    ): T | undefined =>
+      resolved?.packageId &&
+      resolved.resolvedFileName &&
+      fs.files.has(real(resolved.resolvedFileName))
+        ? { ...resolved, packageId: undefined }
+        : resolved;
+    if (deno.active || workspaceRecovery || checkoutPackageIds) {
       const cache = ts.createModuleResolutionCache(
         created.getCurrentDirectory(),
         (name) => name,
@@ -1346,7 +1367,7 @@ export function projectModel(
             literal,
             deno.active ? options : importingOptions,
           );
-          const result = ts.resolveModuleName(
+          const resolution = ts.resolveModuleName(
             selected,
             containingFile,
             options,
@@ -1355,6 +1376,11 @@ export function projectModel(
             redirected,
             mode,
           );
+          const resolvedModule = checkoutIdentity(resolution.resolvedModule);
+          const result =
+            resolvedModule === resolution.resolvedModule
+              ? resolution
+              : { ...resolution, resolvedModule };
           // The checker uses this flag to diagnose a TypeScript extension in
           // the written literal. A map can supply an extension the literal lacks.
           if (
@@ -1488,6 +1514,52 @@ export function projectModel(
           if (!chosen || !proof || typeof proof !== "object") return result;
           return { ...retry, resolvedModule: redirect(proof) };
         });
+      if (checkoutPackageIds) {
+        const typeCache = ts.createTypeReferenceDirectiveResolutionCache(
+          created.getCurrentDirectory(),
+          created.getCanonicalFileName,
+          undefined,
+          cache.getPackageJsonInfoCache(),
+        );
+        const defaultMode = (
+          ts as typeof ts & {
+            getDefaultResolutionModeForFileWorker(
+              file: ts.SourceFile,
+              options: ts.CompilerOptions,
+            ): ts.ResolutionMode;
+          }
+        ).getDefaultResolutionModeForFileWorker;
+        created.resolveTypeReferenceDirectiveReferences = (
+          references,
+          containingFile,
+          redirected,
+          options,
+          source,
+        ) =>
+          references.map((reference) => {
+            const mode = ts.getModeForFileReference(
+              reference,
+              source &&
+                defaultMode(source, redirected?.commandLine.options ?? options),
+            );
+            const resolution = ts.resolveTypeReferenceDirective(
+              typeof reference === "string" ? reference : reference.fileName,
+              containingFile,
+              options,
+              created,
+              redirected,
+              typeCache,
+              mode,
+            );
+            const resolvedTypeReferenceDirective = checkoutIdentity(
+              resolution.resolvedTypeReferenceDirective,
+            );
+            return resolvedTypeReferenceDirective ===
+              resolution.resolvedTypeReferenceDirective
+              ? resolution
+              : { ...resolution, resolvedTypeReferenceDirective };
+          });
+      }
     }
     caches.set(created, sources);
     asked.set(created, requested);

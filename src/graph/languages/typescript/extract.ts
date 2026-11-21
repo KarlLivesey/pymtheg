@@ -27,6 +27,7 @@ import {
   fromVirtual,
   LIB_ROOT,
   matchesPathAlias,
+  relativeSpecifier,
   toVirtual,
 } from "./project.js";
 import type { entryProvenance, UnbuiltEntry } from "./workspace-entries.js";
@@ -66,7 +67,7 @@ export interface RenameContext {
   /** Present when this file's compiler text was renamed. */
   renamed?: Renamed | undefined;
   /** Resolves a module specifier from a file to a captured path, if any. */
-  resolveModule: (specifier: string, from: string) => string | undefined;
+  resolveModule: (specifier: ts.StringLiteralLike) => string | undefined;
   hasDenoImports: boolean;
   selectSpecifier: (specifier: string, from: string) => string | undefined;
   workspaceReason: (
@@ -277,7 +278,6 @@ const isEntityChain = (node: ts.Expression): boolean =>
     ts.isStringLiteralLike(node.argumentExpression) &&
     isEntityChain(node.expression));
 
-const relativeSpecifier = (value: string) => /^\.\.?(\/|$)/.test(value);
 const requiredProperty = (element: ts.BindingElement) =>
   element.dotDotDotToken || element.initializer
     ? undefined
@@ -1285,7 +1285,7 @@ export function extractFile(
         program,
         checker,
         captured,
-        resolveModule: context.resolveModule,
+        resolveModule: (specifier) => specifierResolution(specifier).path,
         invalid: (at) => context.moduleKind(at) === "invalid",
         failedNames: context.failedNames,
       },
@@ -1424,8 +1424,7 @@ export function extractFile(
       failedNames: context.failedNames,
       failedModule: (specifier) => {
         if (!ts.isStringLiteralLike(specifier)) return undefined;
-        const from = fromVirtual(specifier.getSourceFile().fileName);
-        const module = from && context.resolveModule(specifier.text, from);
+        const module = specifierResolution(specifier).path;
         return module && context.moduleKind(module) === "invalid"
           ? module
           : undefined;
@@ -2280,13 +2279,12 @@ export function extractFile(
       specifier.getSourceFile(),
     );
     const resolved = resolution?.resolvedModule?.resolvedFileName;
-    const from = fromVirtual(specifier.getSourceFile().fileName) ?? path;
     const selected = selectedSpecifier(specifier);
     const fallback =
       selected !== undefined &&
       !resolved &&
       (!resolution || relativeSpecifier(selected))
-        ? context.resolveModule(specifier.text, from)
+        ? context.resolveModule(specifier)
         : undefined;
     const result = {
       path: resolved
@@ -3028,7 +3026,7 @@ export function extractFile(
           argument &&
           ts.isStringLiteralLike(argument)
         ) {
-          const target = context.resolveModule(argument.text, path);
+          const target = context.resolveModule(argument);
           link(
             owner,
             "imports",
