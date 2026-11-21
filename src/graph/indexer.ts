@@ -794,17 +794,20 @@ async function runResolve(
         ...(resolutionFiles
           ? { resolutionFiles: new Set(resolutionFiles) }
           : {}),
-        files: await input("Files", async () =>
-          own(
-            await read(() =>
-              resolutionFiles &&
-              module.scopedFileLinkKinds &&
-              store.resolutionFiles
-                ? store.resolutionFiles(module.scopedFileLinkKinds)
-                : store.files(),
-            ),
-          ),
-        ),
+        files:
+          module.resolutionNeedsFiles === false
+            ? []
+            : await input("Files", async () =>
+                own(
+                  await read(() =>
+                    resolutionFiles &&
+                    module.scopedFileLinkKinds &&
+                    store.resolutionFiles
+                      ? store.resolutionFiles(module.scopedFileLinkKinds)
+                      : store.files(),
+                  ),
+                ),
+              ),
         contextFiles: structuredClone(contexts),
         symbols: await input("Symbols", async () =>
           own(await read(() => store.findSymbols())),

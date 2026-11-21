@@ -6,6 +6,7 @@ import {
   openWriteAheadLog,
 } from "../storage/local.js";
 import { randomUUID } from "node:crypto";
+import { totalmem } from "node:os";
 import { compare, fileFacts, validateResult } from "./identity.js";
 import { LinkDecider, resolutionFacts } from "./analysis.js";
 import { count } from "./work.js";
@@ -147,6 +148,19 @@ export class SqliteGraphStore implements GraphStorage {
         return;
       }
       this.path = path;
+      // Connection-local and allocated as pages are touched. Use at most
+      // 1/64 of available system/container memory, with a 64 MiB ceiling.
+      // Keep explicit SQLite defaults and the standard cache on readers.
+      const memory = Math.min(
+        totalmem(),
+        process.constrainedMemory() || Infinity,
+      );
+      const cacheKiB = Math.min(64 * 1024, Math.floor(memory / (64 * 1024)));
+      if (
+        cacheKiB > 2000 &&
+        this.db.prepare("PRAGMA cache_size").get()?.cache_size === -2000
+      )
+        this.db.exec(`PRAGMA cache_size=-${cacheKiB}`);
       this.db.exec(`PRAGMA foreign_keys=ON;
         CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
       this.db

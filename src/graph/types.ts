@@ -258,6 +258,8 @@ export interface LanguageModule {
   incrementalAnalysis?: true;
   /** For scoped resolution only, the file-level parsed link kinds read across files. */
   scopedFileLinkKinds?: readonly string[];
+  /** This resolver uses symbol and link facts without reading file records. */
+  resolutionNeedsFiles?: false;
   parse?: (source: SourceInput) => ParseResult | Promise<ParseResult>;
   /** Explicit whole-program phase. May construct a compiler program from the supplied snapshot. */
   analyze?: (
