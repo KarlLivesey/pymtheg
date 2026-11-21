@@ -742,7 +742,10 @@ is analysed under its owning config (nearest containing directory, then
 answer. A shared base never owns a file that a project config also includes:
 a config that other configs extend, that names no `files` or `include` of its
 own, that is not named `tsconfig.json` or `jsconfig.json`, and that no project
-reference or package script names.
+reference, package script or test runner config (Vitest `typecheck.tsconfig`,
+ts-jest `tsconfig`) names. A call on a member merged from several
+declarations of one receiver type links the declaration of the signature
+the checker selects.
 
 - **Definite:** module imports; import and export bindings to the original
   declaration through barrels, `export *`, renames and default exports; CommonJS

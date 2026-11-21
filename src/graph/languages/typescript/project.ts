@@ -1045,6 +1045,7 @@ export function projectModel(
   // Config files a package script names (`tsc -p tsconfig.check.json`),
   // resolved from the package directory and any `cd` earlier in the script.
   const scriptConfigs = new Set<string>();
+  const runnerConfigs = new Set<string>();
   for (const file of contexts) {
     if (posix.basename(file.path) !== "package.json") continue;
     let scripts: unknown;
@@ -1074,15 +1075,72 @@ export function projectModel(
       }
     }
   }
+  // Configs a test runner is told to type-check or compile with: Vitest's
+  // `typecheck.tsconfig` and ts-jest's `tsconfig`, in a runner config file or
+  // a manifest's `jest` block. Only literal paths are read; a runner config
+  // whose `tsconfig` setting is not a literal could name any config, so then
+  // no config counts as a shared base.
+  let runnerUnreadable = false;
+  const runnerPath = (directory: string, value: string) =>
+    posix.normalize(posix.join(directory, value.replace(/^<rootDir>\//, "")));
+  for (const file of files) {
+    const name = posix.basename(file.path);
+    if (
+      !/^(?:vitest|vite|jest)(?:\.[\w-]+)*\.(?:config|workspace|projects)(?:\.[\w-]+)*\.[cm]?[jt]s$/.test(
+        name,
+      )
+    )
+      continue;
+    const directory = posix.dirname(file.path);
+    // The runner resolves the path from its root, which a config may move.
+    const moved = [
+      ...file.text.matchAll(/\broot(?:Dir)?\b["']?\s*:\s*([^,}\n]*)/g),
+    ].some((match) => !/^["'`]\.?\/?["'`]$/.test(match[1]!.trim()));
+    for (const match of file.text.matchAll(/\btsconfig\b["']?\s*:\s*(\S)/g)) {
+      const quote = match[1]!;
+      const rest = file.text.slice(match.index! + match[0].length);
+      const literal =
+        quote === '"' || quote === "'" || quote === "`"
+          ? new RegExp(`^([^${quote}\\n$]*)${quote}`).exec(rest)?.[1]
+          : undefined;
+      if (literal === undefined || moved) runnerUnreadable = true;
+      else runnerConfigs.add(runnerPath(directory, literal));
+    }
+  }
+  for (const file of contexts) {
+    if (posix.basename(file.path) !== "package.json") continue;
+    let jest: unknown;
+    try {
+      jest = (
+        JSON.parse(file.text.replace(/^\uFEFF/, "")) as { jest?: unknown }
+      ).jest;
+    } catch {
+      continue;
+    }
+    const visit = (value: unknown) => {
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === "object")
+        for (const [key, item] of Object.entries(value)) {
+          if (key === "tsconfig") {
+            if (typeof item === "string")
+              runnerConfigs.add(runnerPath(posix.dirname(file.path), item));
+            else if (item !== false) runnerUnreadable = true;
+          } else visit(item);
+        }
+    };
+    visit(jest);
+  }
   const sharedBase = (group: ProjectGroup) => {
     const config = group.config;
     if (
       config === null ||
+      runnerUnreadable ||
       group.failure ||
       group.explicitSelection ||
       !extended.has(config) ||
       referenced.has(config) ||
-      scriptConfigs.has(config)
+      scriptConfigs.has(config) ||
+      runnerConfigs.has(config)
     )
       return false;
     const name = posix.basename(config);
