@@ -697,7 +697,12 @@ export async function executeGraph(
       }
       return response;
     };
-    return store ? store.readCommandSnapshot(finish) : finish();
+    const response = store ? store.readCommandSnapshot(finish) : finish();
+    if (verifiedNoEdit && response.sync.report) {
+      const total = response.sync.report.claimed;
+      options.progress?.({ phase: "complete", done: total, total });
+    }
+    return response;
   } finally {
     stageSync("command.sqliteClose", () => store?.close());
   }
