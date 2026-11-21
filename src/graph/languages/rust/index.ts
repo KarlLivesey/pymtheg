@@ -8,7 +8,7 @@ import { resolveRust, type RustDecisionScope } from "./resolve.js";
 import { count } from "../../work.js";
 import { macroScopeAssumption } from "./macro-scope.js";
 import { runRustPhase } from "./phase-runner.js";
-import { rustSurface } from "./incremental.js";
+import { rustFingerprint } from "./incremental.js";
 
 const TARGET_HINT_LIMIT = 16;
 
@@ -24,7 +24,7 @@ const cargoInputs = (files: readonly ContextFile[]) =>
   files.map(({ path, status, text }) => ({ path, status, text }));
 
 type Crates = ReadonlyMap<string, ReturnType<typeof crates>[number]>;
-const crateRoots = (
+export const crateRoots = (
   contextFiles: Parameters<typeof crates>[0],
   files: readonly Pick<GraphFile, "path">[],
 ): Crates =>
@@ -36,7 +36,7 @@ const crateRoots = (
   );
 
 /** The facts the analysis pass starts from: the parse facts without earlier annotations. */
-function analysisInput(
+export function analysisInput(
   f: Pick<GraphFile, "path" | "result">,
   roots: Crates,
 ): Pick<GraphFile, "path" | "result"> {
@@ -150,28 +150,39 @@ type ScopedRequest = RustAnalysisInput & {
  * and with its old ones, in the analysis and the resolution pass. Answers
  * met without a cut do not depend on which lookups ran before them, so the
  * edited file's decisions equal a cold index's, and adding or removing its
- * lookups cannot change another file's.
+ * lookups cannot change another file's. When all of an edited file's facts,
+ * before and after analysis, are the same up to offset ranks, its old lookups
+ * are its new ones, and the new check stands for both.
  */
-function scopedAnalysis(
-  request: ScopedRequest,
-):
+function scopedAnalysis(request: ScopedRequest):
   | { reason: string }
-  | { files: Pick<GraphFile, "path" | "result">[]; cuts: number } {
+  | {
+      files: Pick<GraphFile, "path" | "result">[];
+      cuts: number;
+      isomorphic: boolean;
+    } {
   const { projectId, files, contextFiles, scope, previous } = request;
   const before = new Map(previous.map((file) => [file.path, file]));
   const current = new Map(files.map((file) => [file.path, file]));
   const roots = crateRoots(contextFiles, files);
+  // Isomorphic: every fact of the file is the same up to offset ranks, so
+  // its old and new lookups are the same and one check covers both.
+  let isomorphic = true;
   for (const path of scope) {
     const old = before.get(path),
       now = current.get(path);
     if (!old || !now) return { reason: "previous-record" };
     if (old.result.status !== "clean" || now.result.status !== "clean")
       return { reason: "status" };
+    const oldInput = analysisInput(old, roots).result,
+      newInput = analysisInput(now, roots).result;
     if (
-      rustSurface(analysisInput(old, roots).result) !==
-      rustSurface(analysisInput(now, roots).result)
+      rustFingerprint(oldInput, "surface") !==
+      rustFingerprint(newInput, "surface")
     )
       return { reason: "surface" };
+    isomorphic &&=
+      rustFingerprint(oldInput, "all") === rustFingerprint(newInput, "all");
   }
   const restored = files.map((file) => before.get(file.path) ?? file);
   const analysis = rustPhases.analyze({
@@ -182,22 +193,24 @@ function scopedAnalysis(
   });
   if (analysis.decisionCuts) return { reason: "lookup-cut" };
   if (
+    !isomorphic &&
     rustPhases.analyze({ projectId, files: restored, contextFiles, scope })
       .decisionCuts
   )
     return { reason: "lookup-cut" };
   const analyzed = new Map(analysis.files.map((file) => [file.path, file]));
-  for (const path of scope)
-    if (
-      rustSurface(analyzed.get(path)!.result) !==
-      rustSurface(before.get(path)!.result)
-    )
+  for (const path of scope) {
+    const now = analyzed.get(path)!.result,
+      old = before.get(path)!.result;
+    if (rustFingerprint(now, "surface") !== rustFingerprint(old, "surface"))
       return { reason: "analyzed-surface" };
+    isomorphic &&= rustFingerprint(now, "all") === rustFingerprint(old, "all");
+  }
   const after = files.map((file) => {
     const result = analyzed.get(file.path)?.result;
     return result ? { ...file, result } : file;
   });
-  for (const records of [after, restored])
+  for (const records of isomorphic ? [after] : [after, restored])
     if (
       rustPhases.resolve({
         ...resolutionInput(projectId, records, contextFiles),
@@ -205,7 +218,7 @@ function scopedAnalysis(
       }).decisionCuts
     )
       return { reason: "lookup-cut" };
-  return { files: analysis.files, cuts: analysis.cuts };
+  return { files: analysis.files, cuts: analysis.cuts, isomorphic };
 }
 
 export const rustPhases = {
@@ -442,6 +455,7 @@ const rust: LanguageModule = {
       count("analyze.rust.lookupCuts", output.cuts);
       if (output.scoped) {
         count("analyze.rust.scopedFiles", request.scope.length);
+        if (output.isomorphic) count("analyze.rust.isomorphicScopes");
         return { files: output.files, resolutionFiles: request.scope };
       }
       count(`analyze.rust.fullPass.${output.reason}`);
@@ -513,6 +527,7 @@ const rust: LanguageModule = {
     const output = signal
       ? await runRustPhase({ phase: "resolve", context: input }, signal)
       : rustPhases.resolve(input);
+    count("resolve.rust.decisionFiles", input.files.length);
     count("resolve.rust.lookupCuts", output.cuts);
     return output.result;
   },

@@ -133,7 +133,7 @@ const projectId =
 // initial graph. Keep that list for deterministic replay after an interruption.
 const signatureTargetPath = join(base, "signature-targets.json");
 let signatureTargets = [];
-if (repo.language === "go") {
+if (repo.language === "go" || repo.language === "rust") {
   if (!existsSync(signatureTargetPath)) {
     const db = new DatabaseSync(graph, { readOnly: true });
     try {
@@ -141,10 +141,10 @@ if (repo.language === "go") {
         .prepare(
           `SELECT DISTINCT s.file,s.name FROM graph_links l
         JOIN graph_symbols s ON s.id=l.target
-        WHERE l.module='go' AND l.kind='calls' AND s.kind='function' AND s.file!=l.file
+        WHERE l.module=? AND l.kind='calls' AND s.kind='function' AND s.file!=l.file
         ORDER BY s.file,s.name`,
         )
-        .all();
+        .all(repo.language);
       writeFileSync(signatureTargetPath, JSON.stringify(targets));
     } finally {
       db.close();
@@ -325,6 +325,159 @@ function goEdit(step, file, source) {
   return { file, kind: "comment", text: source + "\n// Random edit.\n" };
 }
 
+// C-36: Rust edits weighted to what other files read: signatures, imports,
+// macros, module structure, attributes and file membership.
+const rustKinds = [
+  "body",
+  "comment",
+  "export",
+  "signature",
+  "signature",
+  "import",
+  "import",
+  "macro",
+  "macro",
+  "mod-add",
+  "mod-add",
+  "file-delete",
+  "cfg",
+  "derive",
+];
+const rustCreated = [];
+function rustEdit(step, file, source) {
+  const kind = pick(rustKinds);
+  const insert = (at, text) => source.slice(0, at) + text + source.slice(at);
+  // After any inner attributes, doc comments and blank lines at the top.
+  const head = /^(?:\s*(?:#!\[[^\n]*\]|\/\/[^\n]*)\n)*/.exec(source)[0].length;
+  const name = `c36_random_${step}`;
+  switch (kind) {
+    case "body": {
+      const functions = [
+        ...source.matchAll(/^\s*(?:pub[^\n]*?)?fn [^\n;]*\{$/gm),
+      ];
+      if (functions.length) {
+        const match = pick(functions);
+        return {
+          file,
+          kind,
+          text: insert(match.index + match[0].length, "\n    let _ = 0;"),
+        };
+      }
+      break;
+    }
+    case "export":
+      return {
+        file,
+        kind,
+        text: source + `\npub fn ${name}() -> u32 {\n    1\n}\n`,
+      };
+    case "signature": {
+      const start = Math.floor(random() * signatureTargets.length);
+      for (const { file: targetFile, name: targetName } of [
+        ...signatureTargets.slice(start),
+        ...signatureTargets.slice(0, start),
+      ]) {
+        const text = sourceOf(targetFile);
+        const header = new RegExp(`(\\bfn\\s+)${targetName}(?=\\s*[<(])`, "u");
+        if (header.test(text))
+          return {
+            file: targetFile,
+            kind,
+            text: text.replace(header, `$1${name}`),
+          };
+      }
+      break;
+    }
+    case "import": {
+      const uses = [...source.matchAll(/^use [^\n]*;\n/gm)];
+      if (uses.length && random() < 0.5) {
+        const match = pick(uses);
+        return {
+          file,
+          kind: "remove-import",
+          text:
+            source.slice(0, match.index) +
+            source.slice(match.index + match[0].length),
+        };
+      }
+      return {
+        file,
+        kind: "add-import",
+        text: insert(
+          head,
+          `use std::${pick(["collections::*", "fmt::Write as _", "io::{self, Read}", "sync::Arc"])};\n`,
+        ),
+      };
+    }
+    case "macro": {
+      const macros = [...source.matchAll(/macro_rules!\s*\w+\s*\{/g)];
+      if (macros.length && random() < 0.5) {
+        const match = pick(macros);
+        return {
+          file,
+          kind: "change-macro",
+          text: insert(match.index + match[0].length, `\n    (${name}) => {};`),
+        };
+      }
+      return {
+        file,
+        kind: "add-macro",
+        text: insert(head, `macro_rules! ${name} {\n    () => {};\n}\n`),
+      };
+    }
+    case "mod-add": {
+      // A module file's children sit beside mod.rs, lib.rs and main.rs, and
+      // in a directory named after any other file.
+      const owner = file.split("/").pop();
+      const added = ["mod.rs", "lib.rs", "main.rs"].includes(owner)
+        ? join(dirname(file), `${name}.rs`)
+        : join(dirname(file), owner.slice(0, -3), `${name}.rs`);
+      rustCreated.push({ added, parent: file });
+      sourceByFile.set(added, `pub fn ${name}() -> u32 {\n    1\n}\n`);
+      return {
+        file,
+        kind,
+        text: insert(head, `pub mod ${name};\n`),
+        also: added,
+      };
+    }
+    case "file-delete":
+      if (rustCreated.length) {
+        const { added } = rustCreated.splice(
+          Math.floor(random() * rustCreated.length),
+          1,
+        )[0];
+        return { file: added, kind };
+      }
+      break;
+    case "cfg":
+    case "derive": {
+      const items = [
+        ...source.matchAll(
+          kind === "cfg"
+            ? /^(?:pub(?:\([^)]*\))? )?(?:fn|struct|enum|mod|const|static|trait|type) /gm
+            : /^(?:pub(?:\([^)]*\))? )?(?:struct|enum) /gm,
+        ),
+      ];
+      if (items.length) {
+        const match = pick(items);
+        return {
+          file,
+          kind,
+          text: insert(
+            match.index,
+            kind === "cfg"
+              ? `#[cfg(feature = "${name}")]\n`
+              : "#[derive(Debug)]\n",
+          ),
+        };
+      }
+      break;
+    }
+  }
+  return { file, kind: "comment", text: source + "\n// c36 random edit\n" };
+}
+
 // Replay the seed from pristine source when resuming so no PRNG state or
 // generated source needs to be kept in the evidence.
 const sourceByFile = new Map();
@@ -337,6 +490,7 @@ for (let step = 0; step < expectedSteps; step++) {
   let edit;
   let at = 0;
   if (repo.language === "go") edit = goEdit(step, file, original);
+  else if (repo.language === "rust") edit = rustEdit(step, file, original);
   else {
     const lines = original.split("\n");
     let kind = pick(kinds);
@@ -362,6 +516,10 @@ for (let step = 0; step < expectedSteps; step++) {
   const path = join(root, file);
   if (text !== undefined) writeFileSync(path, text);
   else if (existsSync(path)) rmSync(path);
+  if (edit.also) {
+    mkdirSync(dirname(join(root, edit.also)), { recursive: true });
+    writeFileSync(join(root, edit.also), sourceByFile.get(edit.also));
+  }
   incremental(join(base, `step-${step}.json`));
   const cold = temporary ?? join(base, `cold-${step}.sqlite`);
   clearStore(cold);
@@ -401,7 +559,16 @@ for (let step = 0; step < expectedSteps; step++) {
     differences,
     wallMs: measured.wallMs,
     failed: measured.report?.failedCount,
-    resolvedFiles: measured.counts?.["resolve.go.decisionFiles"] ?? 0,
+    resolvedFiles:
+      measured.counts?.[`resolve.${repo.language}.decisionFiles`] ?? 0,
+    ...(repo.language === "rust"
+      ? {
+          scoped: measured.counts?.["analyze.rust.scopedFiles"] ?? 0,
+          fullPass: Object.keys(measured.counts ?? {})
+            .filter((key) => key.startsWith("analyze.rust.fullPass."))
+            .map((key) => key.slice("analyze.rust.fullPass.".length)),
+        }
+      : {}),
     ...(noEdit ? { noEdit } : {}),
   });
   console.log(

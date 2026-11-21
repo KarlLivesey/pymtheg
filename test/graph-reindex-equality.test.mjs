@@ -1095,9 +1095,13 @@ const rustNarrowed = (() => {
 })();
 
 test("Rust: comment and body edits re-decide only the edited file", async () => {
-  const scoped = (store, work) => {
-    assert.equal(work["analyze.rust.scopedFiles"], 1);
+  const scoped = (isomorphic) => (store, work) => {
+    const path = Object.keys(work).filter((key) =>
+      key.startsWith("analyze.rust."),
+    );
+    assert.equal(work["analyze.rust.scopedFiles"], 1, path.join());
     assert.equal(work["resolve.rust.decisionFiles"], 1);
+    assert.equal(work["analyze.rust.isomorphicScopes"], isomorphic);
   };
   const compared = await equalAfterEveryStep(rustWorkspace, [
     {
@@ -1107,7 +1111,7 @@ test("Rust: comment and body edits re-decide only the edited file", async () => 
           "core/src/shapes.rs",
           "// leading comment\n" + rustWorkspace["core/src/shapes.rs"],
         ),
-      check: scoped,
+      check: scoped(1),
     },
     {
       name: "body-only edit",
@@ -1116,7 +1120,19 @@ test("Rust: comment and body edits re-decide only the edited file", async () => 
         "    Point { x: 1, y: 2, shape: Shape::Square(1) }",
         "    let _ = 0;\n    Point { x: 1, y: 2, shape: Shape::Square(1) }",
       ),
-      check: scoped,
+      check: scoped(1),
+    },
+    {
+      // New calls move no surface link here (the file has no attribute or
+      // later item links), but its old lookups differ from its new ones and
+      // are checked separately.
+      name: "body edit that adds calls",
+      edit: rewrite(
+        "core/src/names.rs",
+        "    0\n",
+        "    let _ = crate::shapes::make().sum();\n    0\n",
+      ),
+      check: scoped(undefined),
     },
     {
       name: "a new export changes the surface",
@@ -1151,7 +1167,7 @@ test("Rust: comment and body edits re-decide only the edited file", async () => 
         assert.equal(work["analyze.rust.scopedFiles"], undefined),
     },
   ]);
-  assert.equal(compared.length, 8);
+  assert.equal(compared.length, 9);
 });
 
 for (const shape of rustCrossFileEdits)
