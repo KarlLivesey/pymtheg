@@ -2982,7 +2982,8 @@ is the only config that includes a file, it still owns that file. The
 ranking among project configs is unchanged: two project configs that tie
 are still analysed under both and merged. A call on a member merged from
 several declarations of one receiver type links the declaration of the
-signature the checker selects; a union or intersection receiver is never
+signature the checker selects, when no declaration from another body could
+also accept the arguments; a union or intersection receiver is never
 narrowed.
 [C-30](changes/C-30.md)
 

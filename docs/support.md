@@ -745,7 +745,8 @@ own, that is not named `tsconfig.json` or `jsconfig.json`, and that no project
 reference, package script or test runner config (Vitest `typecheck.tsconfig`,
 ts-jest `tsconfig`) names. A call on a member merged from several
 declarations of one receiver type links the declaration of the signature
-the checker selects.
+the checker selects, when no declaration from another body could also
+accept the arguments.
 
 - **Definite:** module imports; import and export bindings to the original
   declaration through barrels, `export *`, renames and default exports; CommonJS
