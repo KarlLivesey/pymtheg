@@ -52,3 +52,30 @@ node --test test/graph-rust-macro-scope.test.mjs
 - [Coverage export](coverage-plan-input.json.gz) is the SW-4 inventory of the
   ten candidate runs. The coverage plan on main regenerates from a full
   sweep, so this change adds only the measured subset input.
+
+## Removed attribute identity extension
+
+These files measure the work-in-progress commit `d3a44f0` against the first
+part (`72163e4`). That extension was removed because it added no Level 2
+link. Reproduce them from `d3a44f0`, which also holds the fixture and the
+compiler witness script: run `compare.mjs` with `72163e4` as the baseline,
+then `node evidence/c-34/attribute-classes.mjs` in the same scratch directory.
+
+- [Class transitions](attribute-classes.tsv) show the before and after counts
+  by original class, pin and number of stored blockers.
+- [Replacement reasons](attribute-reasons.tsv) show the below-Level-2
+  transitions that no longer carry the opacity reason.
+- [Mixed combinations](attribute-mixed.tsv) count the exact unbounded origin
+  classes from the original census, including overlapping causes per site.
+- [Extension comparison](attribute-comparison.json) compares all definite
+  targets, symbols, site counts and assumptions against the first part.
+- [Extension cost](attribute-cost.json) records the paired cold runs against
+  the first part.
+
+## Final head
+
+After the removal, the ten pins were indexed again with `c6b77dc` and the
+final head. `compare.mjs` reproduced `comparison.json` byte for byte, and
+the per-pin export counts equalled the committed export.
+[Final cold runs](cost-final.json) repeat the paired main, candidate, main
+runs on redb and Fjall with `node evidence/c-31/cost.mjs`.
