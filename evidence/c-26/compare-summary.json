@@ -1,0 +1,226 @@
+[
+  {
+    "id": "excalidraw/excalidraw",
+    "symbols": {
+      "before": 13405,
+      "after": 13405
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 104519,
+      "after": 104519
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 61330,
+    "definiteKept": 61330,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1323,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 16539,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "honojs/hono",
+    "symbols": {
+      "before": 5773,
+      "after": 5773
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 72340,
+      "after": 72340
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 34654,
+    "definiteKept": 34654,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 4470,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 12289,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "reduxjs/redux-toolkit",
+    "symbols": {
+      "before": 7918,
+      "after": 7918
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 57208,
+      "after": 57208
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 23993,
+    "definiteKept": 23993,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 761,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 14696,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "trpc/trpc",
+    "symbols": {
+      "before": 17804,
+      "after": 17804
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 107470,
+      "after": 107470
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 53059,
+    "definiteKept": 53059,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 2356,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 33270,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vitejs/vite",
+    "symbols": {
+      "before": 10186,
+      "after": 10186
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 55576,
+      "after": 55576
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 23263,
+    "definiteKept": 23263,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 422,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 19806,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vitest-dev/vitest",
+    "symbols": {
+      "before": 17973,
+      "after": 17973
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 116220,
+      "after": 116220
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 72614,
+    "definiteKept": 72614,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 559,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 20276,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "withastro/astro",
+    "symbols": {
+      "before": 26243,
+      "after": 26243
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 152561,
+      "after": 152561
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 65124,
+    "definiteKept": 65124,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 6618,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 64876,
+    "libraryTargetsChanged": []
+  }
+]
