@@ -607,6 +607,16 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   the proof, since rustc rejects that ambiguity. An uncaptured macro-use
   import and a glob without an established competing binding can still
   withhold the name. [C-18](changes/C-18.md)
+- **Built-in attribute effects.** A known inert compiler attribute adds no
+  names. A proven standard derive adds trait implementations and introduces
+  no names in the surrounding lexical scope. The graph checks the attribute or
+  derive binding at its module placement. For newly proved bindings, an open
+  glob, a macro-use import that could supply the name, or a named competing
+  macro keeps the effect open. The language prelude remains available with
+  `no_implicit_prelude`. The tool prelude is disabled by that attribute, and
+  the macro-use prelude is disabled from edition 2018 onward. Tool attributes
+  also require a known tool prefix with no competing type binding.
+  [C-34](changes/C-34.md)
 - **Clean expansion (both rules below).** A workspace `macro_rules!` arm is
   clean when the code it emits has no attribute anywhere (so no `#[cfg]` can
   remove a call) and no item other than a readable `use` (no `fn`, `mod`,

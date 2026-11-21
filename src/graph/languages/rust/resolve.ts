@@ -261,6 +261,7 @@ interface Place {
   shadowableAttributes?: AttributeOrigin[];
   attributeGates?: AttributeGate[];
   noImplicitPrelude?: boolean;
+  noImplicitPreludeUnconditional?: boolean;
   directoryUnverified?: boolean;
   // A module member path does not restart lookup in the extern prelude.
   libraryModuleMember?: boolean;
@@ -1010,6 +1011,9 @@ export function resolveRust(
               !!place.directoryUnverified || layout.uncertain,
             noImplicitPrelude:
               !!place.noImplicitPrelude || !!data(s).noImplicitPrelude,
+            noImplicitPreludeUnconditional:
+              !!place.noImplicitPreludeUnconditional ||
+              !!data(s).noImplicitPreludeUnconditional,
             parent: place,
             symbol: s,
             conditions: [
@@ -1134,6 +1138,10 @@ export function resolveRust(
                 !!place.noImplicitPrelude ||
                 !!data(s).noImplicitPrelude ||
                 !!data(units.get(file) ?? {}).noImplicitPrelude,
+              noImplicitPreludeUnconditional:
+                !!place.noImplicitPreludeUnconditional ||
+                !!data(s).noImplicitPreludeUnconditional ||
+                !!data(units.get(file) ?? {}).noImplicitPreludeUnconditional,
               parent: place,
               symbol: s,
               conditions: [
@@ -1183,6 +1191,8 @@ export function resolveRust(
       directory: p.dirname(crate.root),
       parent: null,
       noImplicitPrelude: !!data(units.get(crate.root) ?? {}).noImplicitPrelude,
+      noImplicitPreludeUnconditional: !!data(units.get(crate.root) ?? {})
+        .noImplicitPreludeUnconditional,
       symbol: units.get(crate.root)!,
       conditions: (data(units.get(crate.root) ?? {}).conditions ??
         []) as string[],
@@ -6398,10 +6408,16 @@ export function resolveRust(
   let libraryRefusals: Refusal[] = [];
   let diagnosingLibrary = false;
   let libraryDiagnostic: string | undefined;
+  let libraryDiagnosticOpaque = false;
   function refuseLibrary(detail: string, scopes: string[] = []): undefined {
     if (libraryAudit && !libraryProbe) libraryRefusals.push({ detail, scopes });
     if (auditingMacroIdentity) auditedMacroRefusal = detail;
-    if (diagnosingLibrary) libraryDiagnostic ??= detail;
+    if (diagnosingLibrary) {
+      libraryDiagnostic ??= detail;
+      libraryDiagnosticOpaque ||= detail.includes(
+        "opaque-item-may-shadow-name",
+      );
+    }
     return undefined;
   }
   function libraryFor(l: GraphLink, d: Data): LibraryTarget | undefined {
@@ -6768,18 +6784,30 @@ export function resolveRust(
     scope: string,
   ): boolean {
     if (!macroUseDerive(loc.crate.root, name)) return false;
-    const imports = (externCratesByFile.get(loc.crate.root) ?? []).filter(
-      (link) =>
-        !str(data(link).scope) &&
-        (
+    // Unlike the language prelude, the macro-use prelude is disabled by
+    // no_implicit_prelude starting with edition 2018.
+    if (loc.noImplicitPreludeUnconditional && loc.crate.edition !== "2015")
+      return false;
+    const imports = (externCratesByFile.get(loc.crate.root) ?? []).flatMap(
+      (link) => {
+        if (str(data(link).scope)) return [];
+        const requests = (
           (data(link).macroUseRequests ?? []) as {
             names: string[] | null;
             conditions: string[];
           }[]
-        ).some((request) => !request.names || request.names.includes(name)),
+        ).filter((request) => !request.names || request.names.includes(name));
+        return requests.length ? [{ link, requests }] : [];
+      },
     );
     if (!imports.length) return true;
-    return imports.some((link) => {
+    return imports.some(({ link, requests }) => {
+      if (
+        !requests.some((request) =>
+          possible([...(loc.conditions ?? []), ...request.conditions]),
+        )
+      )
+        return false;
       if (canonicalSysrootImport(link, loc.crate)) return false;
       const path = `$extern::${link.targetName}`;
       // A missing or uncaptured crate can export this name. A captured facade
@@ -6823,9 +6851,14 @@ export function resolveRust(
     const rule = attributeRules.get(head);
     if (!rule || !knownAttributeName(name)) return false;
     if (rule.category === "builtin") return true;
-    if (!loc.crate.edition || loc.noImplicitPrelude) return false;
+    if (!loc.crate.edition) return false;
     const tool = rule.category === "tool";
-    if (!tool && scopeMacroUseCompetes(head, loc, scope)) return false;
+    if (tool && loc.noImplicitPrelude) return false;
+    if (
+      !tool &&
+      (corePreludeUnavailable(loc) || scopeMacroUseCompetes(head, loc, scope))
+    )
+      return false;
     return hasNoMacroBinding(
       probeMacroBinding(
         head,
@@ -6833,7 +6866,10 @@ export function resolveRust(
         scope,
         "attribute",
         tool ? "type" : "macro",
-        head,
+        // New language-prelude proofs must see the actual glob exports.
+        loc.noImplicitPrelude || (!tool && macroUseDerive(loc.crate.root, head))
+          ? undefined
+          : head,
       ),
     );
   }
@@ -6864,7 +6900,7 @@ export function resolveRust(
     const prelude =
       bare &&
       flavor === "derive" &&
-      !loc.noImplicitPrelude &&
+      !corePreludeUnavailable(loc) &&
       standardDerives.has(head)
         ? head
         : undefined;
@@ -6874,7 +6910,9 @@ export function resolveRust(
       scope,
       flavor === "bang" ? "bang" : "attribute",
       "macro",
-      prelude,
+      loc.noImplicitPrelude || macroUseDerive(loc.crate.root, head)
+        ? undefined
+        : prelude,
     );
     if (prelude && hasNoMacroBinding(result)) return "standard derive";
     const binding = result.library;
@@ -6975,8 +7013,24 @@ export function resolveRust(
   function macroScopeEffect(
     origin: OpaqueOrigin,
   ): MacroScopeEffect | undefined {
-    const { loc, name, scope, start, input } = origin;
-    if (loc.uncertain || loc.directoryUnverified) return;
+    const { loc: recorded, name, scope, start, input } = origin;
+    // Origins are recorded at the file placement. An attribute in an inline
+    // module resolves at the declaration that contains it. Two cfg variants
+    // of the same module name can have different prelude directives.
+    const loc = origin.attribute
+      ? ownerPlace(recorded.file, scope).find((entry) => {
+          if (entry === recorded) return true;
+          const range = entry.symbol?.range;
+          if (!range || start < range.start || start >= range.end) return false;
+          let parent = entry.parent;
+          while (parent && parent.file === recorded.file) {
+            if (parent === recorded) return true;
+            parent = parent.parent;
+          }
+          return false;
+        })
+      : recorded;
+    if (!loc || loc.uncertain || loc.directoryUnverified) return;
     const attributeAt = origin.conditions
       ? {
           ...loc,
@@ -7656,6 +7710,7 @@ export function resolveRust(
     libraryEligible: boolean;
     retry: boolean;
     adjusted: boolean;
+    reason?: string;
     associatedFallback?: true;
     trace?: ScopeTrace;
     selected?: true;
@@ -7738,6 +7793,7 @@ export function resolveRust(
         libraryEligible,
         retry,
         adjusted: d !== original,
+        ...(found.reason ? { reason: found.reason } : {}),
         ...(found.associatedFallback ? { associatedFallback: true } : {}),
         ...(retry && captured.trace ? { trace: captured.trace } : {}),
         ...(selected
@@ -7910,6 +7966,7 @@ export function resolveRust(
     libraryChanges: number;
     libraryEligible: boolean;
     fallbackHidLibrary: boolean;
+    reason?: string;
   };
   function retryMacroScope({
     link,
@@ -7918,6 +7975,7 @@ export function resolveRust(
     libraryChanges,
     libraryEligible,
     fallbackHidLibrary,
+    reason,
   }: MacroRetry): void {
     if (link.kind !== "macros" && itemPresence(link).length) return;
     for (const mode of ["proven", "assumed"] as const) {
@@ -7928,12 +7986,14 @@ export function resolveRust(
           !!d.blocked !== !!ordinary.blocked ||
           !!d.conditionalBinding !== !!ordinary.conditionalBinding;
         let canTryLibrary = libraryEligible;
+        let retryFound: Found | undefined;
         if (
           bindingChanged ||
           checkoutChanges & modeBit[mode] ||
           fallbackHidLibrary
         ) {
           const found = checkoutFound(link, d);
+          retryFound = found;
           if (found.complete && found.symbols.length === 1) {
             resolutions.push({
               linkId: link.id,
@@ -7948,6 +8008,30 @@ export function resolveRust(
             !found.failedFiles?.length &&
             !((d.conditions ?? []) as string[]).some((c) => c.includes("?"));
         }
+        // Keep the remaining obstruction when a proven lexical retry
+        // actually passed the original guard. Assumptions and skipped
+        // associated probes cannot justify changing a stored reason.
+        const revised =
+          uncertain &&
+          mode === "proven" &&
+          !fallbackHidLibrary &&
+          reason === "opaque-item-may-shadow-name" &&
+          retryFound &&
+          !retryFound.failedFiles?.length &&
+          (retryFound.complete || !!retryFound.reason) &&
+          !retryFound.reason?.includes("opaque-item-may-shadow-name")
+            ? retryFound
+            : undefined;
+        if (!canTryLibrary && revised?.reason) {
+          uncertain?.(
+            link,
+            unique(revised.symbols),
+            revised.reason,
+            undefined,
+            revised.opaqueAttributes,
+          );
+          missing?.delete(link.id);
+        }
         // The ordinary library lookup already refused this site. When only
         // the checkout guards changed, that refusal still applies.
         if (
@@ -7957,8 +8041,24 @@ export function resolveRust(
             !(libraryChanges & modeBit[mode]))
         )
           continue;
-        const library = libraryFor(link, d);
-        if (!library) continue;
+        libraryDiagnostic = undefined;
+        libraryDiagnosticOpaque = false;
+        diagnosingLibrary = !!revised;
+        let library: LibraryTarget | undefined;
+        try {
+          library = libraryFor(link, d);
+        } finally {
+          diagnosingLibrary = false;
+        }
+        if (!library) {
+          if (revised && !libraryDiagnosticOpaque) {
+            const cause =
+              revised.reason ?? missingReason(link, d, libraryDiagnostic);
+            uncertain?.(link, [], cause, undefined, revised.opaqueAttributes);
+            missing?.delete(link.id);
+          }
+          continue;
+        }
         resolutions.push({ linkId: link.id, library });
         markScopeResult?.(link, mode === "assumed");
         if (library.symbol) missing?.delete(link.id);
@@ -7979,6 +8079,7 @@ export function resolveRust(
     trace,
     selected,
     associatedFallback = false,
+    reason,
   } of librarySites) {
     if (libraryAudit) libraryRefusals = [];
     const captured: {
@@ -8012,6 +8113,7 @@ export function resolveRust(
         libraryChanges,
         libraryEligible,
         fallbackHidLibrary,
+        ...(reason ? { reason } : {}),
       });
     if (selected)
       auditedSites.push({

@@ -90,6 +90,69 @@ async function projectObservations(sources, manifest, manifests = []) {
 const proved = (target) => ({ target, assumes: [] });
 const assumed = (target) => ({ target, assumes: ["rust-external-macro-name"] });
 
+test("Rust compiler attributes keep their language-prelude identity across cfg and edition-aware macro-use", async () => {
+  const source = await readFile(
+    new URL("fixtures/graph-rust-c34-attributes/src/lib.rs", import.meta.url),
+    "utf8",
+  );
+  const at = await observations(source, 'competing = "1"');
+  assert.deepEqual(
+    at("calls", "outside", "// inactive macro-use"),
+    proved("outside"),
+  );
+  assert.deepEqual(at("calls", "outside", "// active macro-use"), proved(null));
+  assert.deepEqual(
+    at("calls", "outside", "// language prelude"),
+    proved("without_prelude::outside"),
+  );
+  assert.deepEqual(at("calls", "outside", "// explicit derive"), proved(null));
+  assert.deepEqual(
+    at("calls", "outside", "// builtin test"),
+    proved("selectors::outside"),
+  );
+  assert.deepEqual(at("calls", "outside", "// explicit test"), proved(null));
+  assert.deepEqual(
+    at("calls", "outside", "// active macro-use in the other declaration"),
+    proved(null),
+  );
+});
+
+test("Rust derive scope proof inspects glob exports in modules without the implicit prelude", async () => {
+  const at = await observations(
+    `
+    #[no_implicit_prelude]
+    mod captured {
+      mod names { pub struct Debug; }
+      use names::*;
+      fn outside() {}
+      fn caller() {
+        #[derive(Debug)] struct Item;
+        outside(); // type-only glob
+      }
+    }
+    #[no_implicit_prelude]
+    mod uncaptured {
+      extern crate competing;
+      use competing::*;
+      fn outside() {}
+      fn caller() {
+        #[derive(Debug)] struct Item;
+        outside(); // unknown macro export
+      }
+    }
+  `,
+    'competing = "1"',
+  );
+  assert.deepEqual(
+    at("calls", "outside", "// type-only glob"),
+    proved("captured::outside"),
+  );
+  assert.deepEqual(
+    at("calls", "outside", "// unknown macro export"),
+    proved(null),
+  );
+});
+
 test("Rust macro impls with fixed item boundaries cannot introduce a sibling name", async () => {
   const at = await observations(
     await readFile(

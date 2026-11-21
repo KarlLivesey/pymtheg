@@ -1,0 +1,10 @@
+[package]
+name = "c34-attributes"
+version = "0.0.0"
+edition = "2021"
+
+[features]
+foreign = []
+
+[dependencies]
+competing = { path = "competing" }
