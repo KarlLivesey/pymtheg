@@ -1,4 +1,4 @@
-# rank	static-answer	item-answer	source finding
+# rank	static-answer	item-answer	source finding	target origin
 00001401f72b1938a008667622b520a9f264d0d73d6b658ef8ab9ceaae90b783	outside	unknown	The crlib leaktest import identifies AfterTest. The stored call is its returned cleanup, whose callable body is outside this checkout.
 00053e50f17deebe4d1c9021bc1dfaca7c8a78f49787a31220f659cece0ab0c0	outside	yes	walT.Dump is a Cobra command. Its Flags result is a pflag FlagSet whose Var declaration is outside the pin.
 0007357610cd91c07196a9430d06f718a50e4756c713dc47c3ab3d78ada9aa87	none	no	fn ranges over the filesystemWriteOps table. Different iterations call different function values.
@@ -11,7 +11,7 @@
 000b0c90896f213b20015bafe69dc1f44dd052efc7aeb9446a3989845aa3a31f	none	no	nextFunc is assigned one of two closures in this loop, depending on the test case.
 000beb5a6db7c6b47bdf72d173da5fbd7e18204a8b52d8fb4d5442ef4d3e472e	bare	yes	makeTest is a single closure assigned earlier in equal_test.go. The call does not choose between declarations.
 000cc636e9db46c9a4d0266d14194fc9cdbea1cea5d4632e4a87d1abde92f430	none	no	The command closes over its injected runF parameter. The supplied function value can select different bodies.
-000ebddc19857b2b6d4f20b16f363d721a38dec8abab2af9b8f977e300384b40	bare	yes	moving is a set of go/types.Object. Propagating that element type can name the standard interface's declared Name API.
+000ebddc19857b2b6d4f20b16f363d721a38dec8abab2af9b8f977e300384b40	bare	yes	moving is a set of go/types.Object. Propagating that element type can name the standard interface's declared Name API.	standard-library
 000eec396aeca85057ee1005cf2558c2ce90ad7a9b66ef06398dc280e86dd6a9	bare	yes	apptest.Ctx obtains the app's pooled context. This call uses ordinary fiber.New, whose pool supplies DefaultCtx and its checked-in Request method.
 0011fe6ec5b7a8757d63791f8307d051fa16d78b6354321f8ceef32d195d7ad1	bare	yes	stubAutolinkLister declares List with the exact local AutolinkListClient signature. Both sides are present in the checkout.
 001262a527178c0b6e64fa26d3c2f01dc46142a3bbccc63382cba84b861ba40a	bare	yes	The generated LSP declarations define InsertTextFormatPlainText in the same package. The new expression reads that constant.
@@ -29,13 +29,13 @@
 00257bcca935fe5ff0f775a568d762ea2151e680100292ffcc6fe7bf0dfe5c71	bare	yes	The deferred done is the cleanup closure returned at the end of the checked-in newFourslash helper.
 0026dc08409ecf09d5b37589eaccd6fb0207448d9a8291e3d6e8c128e3baf6d8	none	no	event.Start forwards ExportPair, which returns different closures depending on whether an exporter is enabled.
 00271141bfd9e961f0511c5951a77b0e861d53ec0eae39a2bb42ea72ef058657	bare	yes	The test dot-imports the local tests/util package, which declares the generic ToAny function.
-0027a91e70c20e87b9742b32cd6882dffb1b7ae75d728ccc080b88a84cbeadaa	outside	yes	The parameter is explicitly simd.Mask8s in a Go experiment build. The toolchain's experimental package supplies ToInt8s.
+0027a91e70c20e87b9742b32cd6882dffb1b7ae75d728ccc080b88a84cbeadaa	bare	yes	The goexperiment.simd build tag and the explicit simd.Mask8s parameter identify the toolchain experiment’s ToInt8s method.	standard-library
 0028d68b3fd0263280798e984fd06089fbe0adc1c12a09fda9a9ab2d108d6379	none	no	reply is a callback parameter supplied to this JSON-RPC handler. The handler itself has no fixed callable binding.
 002a91565b85d28ec40ee29c58b35ff87a07457af3aac78ac2c9dbe9be9206e6	bare	yes	This generated test defers the single cleanup closure returned as NewFourslash's second result.
 002b7d1f62b92659dbc4b2bf972b400cec03ade65347d2c6be5e17ca24bacd52	bare	yes	The local test utility package declares the Ignored sentinel and the test imports it with a dot binding.
 002bc885a2980d4b68b1a43e79d9b2784f2ded71d96cd6710864227cb0c31b49	none	no	Extension implements ProtoType(FieldDescriptor). The proposed isFileDescriptor relation requires ProtoType(FileDescriptor), which Extension does not provide.
 002c08acb9902550d7337d06773d2c959f82fec4fe81852ceb7eb3cf1a473e39	none	no	The tHelper assertion checks an arbitrary supplied test object. Helper can dispatch to different implementations.
-0031ff67c99b02523e3e7cec71d4246f59ccfd2bfd1773030f42cf52932fbf83	outside	unknown	The selected call is the stop function returned by iter.Pull. Its library implementation is needed to determine whether there is one named target.
+0031ff67c99b02523e3e7cec71d4246f59ccfd2bfd1773030f42cf52932fbf83	none	no	Shipped iter.Pull source fixes stopA to its returned stop closure. The closure has no named library symbol for Level 2.
 0033995922ba976a64f076d641644b36d80fe53d8bbed00a41652f511b925593	none	no	Reader.NewIter returns an iterator interface. Its concrete table iterator depends on the table format, and SeekGE has different implementations.
 003449871afcb2d9618da48cc472bb84c17fc90167a779f8a77fb66e436cb143	bare	yes	The function assigns search once to the recursive closure above this call. The call within that closure refers to the same body.
 0034c73581170463e27e30f0e1b587c88dfcc9b7e52eb3df9819f54b6eeab44e	none	no	PD is the data-block iterator type parameter. Row and column instantiations select different SeekPrefixGE implementations.
@@ -54,7 +54,7 @@
 003cce6361a30a33c2be42414320dc34c3061ef53922da4c3b98ad0c35811627	bare	yes	The deferred variable is the second result of NewFourslash, which forwards one checked-in cleanup body.
 003e1e020fc8bc0fe8dc310eabe4e07b372ab0e9ddca57f46db3335d23dfc857	none	no	The test takes an arbitrary Reader and calls Error through the returned point-iterator interface. Different table forms can supply different iterator bodies.
 003e4c6cb08125f41c6fd13f80bc37051428b8c8db71a1598a1986073fe26f6f	bare	yes	The stub explicitly receives *prompter.MockPrompter. The repository's mock prompter directly declares RegisterSelect.
-003fbdbdaed15a2b43f4a3fa2a37b0eefb45f3c4e89143edfd1cb20c2b9989a3	bare	yes	This pointer conversion names the standard go/ast.TypeSwitchStmt declaration. Its explicit package binding gives the type target.
+003fbdbdaed15a2b43f4a3fa2a37b0eefb45f3c4e89143edfd1cb20c2b9989a3	bare	yes	This pointer conversion names the standard go/ast.TypeSwitchStmt declaration. Its explicit package binding gives the type target.	standard-library
 0001ab165f4fc940875141b56f0c37c813382e66ac02b2dd1b82b4bfd52bc04a	none	no	This site imports the whole net/http/httptest package and selects no member.
 00034e3e050b1d0cd7557d6aaeddd1166c51e1ab30ca6aced8d62d8cf2c0b723	none	no	The stored site is the fmt package import, with no selected member.
 00071fe6a14e8474024e314e5b0c9497eb8103b61602e697ee1a996e199c7b93	none	no	This import names the whole fmt package. The site selects no library member.
@@ -95,16 +95,16 @@
 00029d0d7883831381ceac41e3bf0fc7b1926ede6361895f50fc8fcb66ce517e	none	no	The tracer accepts a filesystem interface. Its WriteFile dispatches to the supplied real, test or hosted filesystem implementation.
 0003231812f237e400a8d05daae225d1bb146fc2456117dda75599f2d3f7e64d	none	no	ingestCleanup accepts objstorage.Provider. The interface method can dispatch to more than the captured provider.Remove.
 0003da9683d157389ff3bbdfb4ae155f9a5cfca1ed58c91776269377ed543b25	none	no	Intersect takes a haser interface. other.Has dispatches to the implementation of the supplied set.
-000504e312cf1352da4841168ec8c1ca2de2c329226a34193e2cee7f4c1b583a	none	no	The descriptor returns a protoreflect.FieldDescriptors interface and ByName has several implementations, including filedesc.
+000504e312cf1352da4841168ec8c1ca2de2c329226a34193e2cee7f4c1b583a	bare	yes	The initializer uses the generated testeditions message. TypeBuilder sets MessageInfo.Desc to *filedesc.Message. Message.Fields returns *filedesc.Fields, which declares ByName. The test package does not reassign largeMessageDesc.
 00054fc35ad0bbfbc77a31b9ade08039d02f8e70c590853f18815ad84047fac0	none	no	The watcher callback shadows t with the testingT interface. Different test harness implementations can supply Fatal.
 000768da51a4d253d5aca1fcdb71c858b93b6a75d343620ff59e721a7cf60bec	bare	yes	The fake editor assigns Server through the checked-in ServerDispatcher constructor. The client-side watched-files stub can be selected through that assignment.
-000b5a26a8a5bd372c2abc8262f7b31d027e285232886b911b078d00332d0e0d	none	no	largeMessageDesc is used through its reflection interface. Fields has several candidate receiver implementations.
+000b5a26a8a5bd372c2abc8262f7b31d027e285232886b911b078d00332d0e0d	bare	yes	The initializer’s generated message obtains its descriptor from TypeBuilder, which sets MessageInfo.Desc to *filedesc.Message. That type declares Fields. The test package does not reassign largeMessageDesc.
 0010bf6e909e25fbd1181282e1a81f16a551fbe4e6d7b9b095a5fa4ba242fe14	bare	yes	The fixture creates its filesystem exclusively through vfstest.FromMap. The checked-in iovfs constructor supplies the concrete wrapper's ReadFile.
-001436cb1d08e50b0b614bfb2187e49e5c2b11d9fafda144b3c5326923217cfe	none	no	The generated ProtoReflect returns a protoreflect.Message interface. Descriptor can dispatch through the resulting wrapper or message state.
+001436cb1d08e50b0b614bfb2187e49e5c2b11d9fafda144b3c5326923217cfe	bare	yes	The typed nil skips the message-state path in ProtoReflect. MessageInfo.MessageOf sends the nil pointer to atomicNilMessage.Init, which returns *messageReflectWrapper. That type declares Descriptor.
 00164d672e10cbb01d4ce2a8b75bdf49dde537a61f230de55ad0fe325d26d696	none	no	The builder accepts an injected SymbolTracker interface. Distinct tracker implementations can handle ReportTruncationError.
 001b11a9ba6d9344b9e3d036ba624a3489caa0dd211c672996cf9351a4ed52bf	none	no	Extraction dispatches through the reader's property-extractor interface. The checkout contains more than one applicable Extract body.
 001c7ed9804e0800a1d574578cd42be370b8bae5718af0ab2645491937c31b88	bare	yes	The snapshot test obtains testFS through the checked-in FromMap and iovfs wrapper. Following that constructor can identify CaseSensitivity.
-001ea07a5cbdf5636349debc723073bf0e3aa7a26228f47c3c87b4583cc5458d	none	no	The reflection result exposes OneofDescriptors through an interface. ByName's implementation depends on the descriptor value.
+001ea07a5cbdf5636349debc723073bf0e3aa7a26228f47c3c87b4583cc5458d	bare	yes	The generated test3_opaque message uses TypeBuilder, which sets MessageInfo.Desc to *filedesc.Message. Message.Oneofs returns *filedesc.Oneofs, which declares ByName.
 0023b56a8f78ddf358014465d5487324c0dd4077870abc0ec8b32af6ad37ace9	bare	yes	InitFlakey returns &flakey on its success path. The Linux caller's concrete Teardown method is declared in dmflakey.go.
 002509fe08cd8968a9d67acd21160243a5d0ce39820e899d73aec3fb224512ca	bare	yes	App.Domain returns a literal &domainRouter as Router. Its concrete Get method is declared in domain.go.
 00254297c0819269f922f4a42c83887a23998f36234633e73ed07aff89fc0fa9	none	no	The watcher runner passes the callback a testingT interface, so Fatal can come from different harness implementations.
@@ -123,7 +123,7 @@
 0016a14d9b748f5a3479bdcf19214b1af55a05f20ad81ff080cf810750dc0461	outside	yes	The test callback explicitly types td as *datadriven.TestData. Its ScanArgs member is declared by that dependency.
 00190c0498f5cd593ec3b1ebe68d79b8f1f9f6b5c20cf61828f270dd070ce93b	outside	yes	The parameter is explicitly *openapi3.SchemaRef. Its dependency declaration supplies the Value field.
 001c3e74e85dc0c753154d6f99d8d11036bbeb4a49c68aa9f65ea30272ca956a	bare	no	symbols.All supplies checkout AST symbols and Symbol.Flags is defined in ast/symbol.go. This is a local module binding, so library-member support alone misses it.
-002a024565929e2330004ec8d9bb14c6df75cb757857e3572a7ac100b8e6665e	outside	yes	The receiver is a syscall.Stat_t under the FreeBSD or NetBSD build condition. The corresponding platform declarations supply Mtimespec.
+002a024565929e2330004ec8d9bb14c6df75cb757857e3572a7ac100b8e6665e	bare	yes	The FreeBSD or NetBSD build tag and explicit *syscall.Stat_t assertion select the platform’s shipped Stat_t.Mtimespec field.	standard-library
 002d49b249759ce2662e48ad41d45706a61e9c582704e88802ca9a211a1a39cd	outside	yes	The test declares attr as the dependency's fuse.Attr. Its external declaration supplies the Inode field.
 003088e47fb15a42ed79fc748df89ed6d497857259b3104d134c2808c7bb65d9	outside	yes	The callback declares d as *datadriven.TestData. Its Input field belongs to the external test dependency.
 00362b43dffcefbca55200b1f45620d38f88eaf5dea1dded7818e9d8ed112bc8	outside	yes	The manpage generator takes *cobra.Command, whose external declaration owns CommandPath.
@@ -131,7 +131,7 @@
 003db949cf10b00270f914138fb6ef7f32c75bbb28777a9352613e765cbc78d4	outside	yes	ParseMod returns ParsedModule with a *modfile.File. The external module parser declares Require on that file.
 0040d84aeb67e3a816ef56101ac43f83c8b708cfe770743d742489eb782bb246	outside	yes	The receiver is explicitly *pflag.FlagSet. The external package declares BoolVar.
 0041d7d61c23fe45b3117ac67efc4547e9487306f6bba3f3177cd8ddb4223755	outside	yes	Setup assigns a *gocui.View to the header. The external UI package declares Wrap.
-0043925f7e674d68b055402cc2653c0c46aadb6a1b8ffc8f30b327579f4a2e97	outside	yes	The encoding/binary LittleEndian variable has a private standard-library concrete type. The toolchain's declaration gives the exact Uint32 owner.
+0043925f7e674d68b055402cc2653c0c46aadb6a1b8ffc8f30b327579f4a2e97	bare	yes	The encoding/binary binding and LittleEndian selector identify the standard littleEndian value. Shipped language data supplies its concrete type and Uint32 method.	standard-library
 00080c7fd62568b753d9b841093594efed10ced9525d4e27a4e3c1de2da7ccba	bare	yes	The file requires !protoopaque. Its TestAllTypes type excludes the alternate declaration in the protoopaque file.
 000bc459bec01989b4436cfc537ae17653c8d136737b9c4464ae2c329f822de5	bare	yes	The ForeignEnum referenced by this conversion is declared under !protoopaque here. The alternative requires protoopaque.
 000dab20e8f458cf7eeedfbf56d11f6aa286535a1f6d0b8076aea1762be532c4	bare	yes	This receiver type occurs in the !protoopaque file. The other TestPackedTypes declaration cannot build with it.
@@ -149,95 +149,95 @@
 00462a0862836c9d0b1908f5d2345734f0fa612b40d24b1727a8b41ffc40a602	bare	yes	The caller is in the !protoopaque generated file, so only the matching TestAllTypes_OneofGroup type can build with it.
 001eb19fd4dced1e719723e845f43a7e0edc8df1445666ba16b9d2521a96b215	bare	yes	CaseSensitive is a value of the checkout's tspath.CaseSensitivity type. pathkey.go declares its PathKey method.
 00607fd2203f64e224ebd835198fc0f56b896db9ed9347f4e006748a3e606a6d	none	no	The bundler's filesystem is supplied through an interface. Real and mock filesystem values select different IsAbs methods.
-00003871e9ee8100282fc91159c1f1ae21833b2a5ad4d4424b581db0fbaca555	outside	unknown	Local read returns Result. Resolving unwrap to its declaration takes the standard-library source.
+00003871e9ee8100282fc91159c1f1ae21833b2a5ad4d4424b581db0fbaca555	bare	yes	The checked-in read helper returns Result, which selects the standard Result::unwrap.	standard-library
 00003b3a96373fd29e499e6ec50eb1f27bab366d9808bc9b6700f795f3c629e2	outside	unknown	The key variant's constructor fixes the type passed to into, but Key is imported from the window library. Its declared field type is needed to prove this conversion.
 00004312e69b22587f7ea88686eda4b380cbce5034f81850bb3936a2f128c5af	bare	yes	The local Args type declares new in the recognizer module.
-00009a7a445ea1d2a877305d8466a798b5b9907af076dee242781db1a3a936af	bare	yes	PlatformEventData::downcast in packages/html/src/events/mod.rs returns Option<&T>. The next call is the standard Option::expect.
-0000b7516cb1e1e0b452415b6cbcc70d5d2232122d9b06badd9459a2d66ee274	outside	unknown	JobObject::new is converted by Result::ok to Option. is_some belongs to the standard library.
+00009a7a445ea1d2a877305d8466a798b5b9907af076dee242781db1a3a936af	bare	yes	PlatformEventData::downcast in packages/html/src/events/mod.rs returns Option<&T>. The next call is the standard Option::expect.	standard-library
+0000b7516cb1e1e0b452415b6cbcc70d5d2232122d9b06badd9459a2d66ee274	bare	yes	JobObject::new is converted by Result::ok to Option. is_some belongs to the standard library.	standard-library
 00010bfadce3779d6dfd3c8fe21c386f0c5b3f9cbb265dc931b02e6760b2d254	bare	yes	App::new returns (EventLoop<UserWindowEvent>, Self). app.rs declares the called handle_start_cause_init method on App.
-000118b04d0a3d2d7250d796c7742f942c7d63d744f9c2c9f3af47c7533f0425	bare	yes	make_aggregate_resolver returns the local aggregate resolver that declares get_filtered_packages.
-00011aff953bfdae1b1565ef1bff72946d2b4138c47f16221d52ac81498cdb15	outside	unknown	Declaration.field is Option<String>. as_deref comes from the standard library.
-00015388042be44ddecf2e45c249a39581ed30e20916539454e8b3fc76c2d4d5	bare	yes	bound_to_bytes returns Bound<Vec<u8>>. Bound::map supplies a reference to the Vec, whose as_slice method is known.
-00017f0945e9ae1d5c0f6aea3e2d2608ac0dd65fd482ca1c258fba96cbdf97cd	outside	unknown	The response workspaces field supplies the iterator. Iterator::map is a standard-library declaration.
+000118b04d0a3d2d7250d796c7742f942c7d63d744f9c2c9f3af47c7533f0425	bare	yes	The aggregate resolver’s checked-in get_filtered_packages returns Result<HashMap<PackageName, PackageInclusionReason>, ResolutionError>. The selected outer call is Result::unwrap.	standard-library
+00011aff953bfdae1b1565ef1bff72946d2b4138c47f16221d52ac81498cdb15	bare	yes	Declaration.field is Option<String>. as_deref comes from the standard library.	standard-library
+00015388042be44ddecf2e45c249a39581ed30e20916539454e8b3fc76c2d4d5	bare	yes	bound_to_bytes returns Bound<Vec<u8>>. Bound::map supplies a reference to the Vec, whose as_slice method is known.	standard-library
+00017f0945e9ae1d5c0f6aea3e2d2608ac0dd65fd482ca1c258fba96cbdf97cd	bare	yes	Checked-in DiscoveryResponse.workspaces is Vec<WorkspaceData>. Its IntoIterator implementation supplies the standard iterator, whose map method is selected.	standard-library
 0001b024c5eb7a2aac74f2b0d890962e506e973ebf894497013d9d0f9c391c10	outside	yes	WebDataTransfer.data is explicitly web_sys::DataTransfer. Its generated binding supplies clear_data_with_format.
-0001c352c68d7363429e6710f5fdba9e00ff975d0a135ea27865d769829682b3	outside	unknown	raw_args is explicitly Vec<OsString>. Vec::push is a standard-library declaration.
+0001c352c68d7363429e6710f5fdba9e00ff975d0a135ea27865d769829682b3	bare	yes	raw_args is explicitly Vec<OsString>. Vec::push is a standard-library declaration.	standard-library
 00022ab8c71a061dae42efd6c510db53efac523343813b769413f455a5c146e0	bare	yes	new_scope returns the checked-in Scope type, which declares is_allowed in this file.
 000240dd6e117a9a8fd64e29dec11e8bced1176de39d040be6c45f40c5ca1e49	bare	yes	The checked-in HttpResponse::Ok creates the builder whose body method is declared in response/builder.rs.
-00025e9c644163f010903557bc630de2c08dbf41c2630b08dbe6f9c774b68179	outside	unknown	The local from_std_path returns Result. The outer unwrap is from the standard library.
+00025e9c644163f010903557bc630de2c08dbf41c2630b08dbe6f9c774b68179	bare	yes	The local from_std_path returns Result. The outer unwrap is from the standard library.	standard-library
 00027385fc0d8013e7d524475d5bd7d92e80e3287bf1564ea456448fd9da31e8	bare	yes	prev is initialized by Buffer::empty in this test. The checkout's Buffer implementation supplies diff.
-00027777f2a1b86e7c1541eb69c1ea89f516167427d5b29311c693d2a345c525	outside	unknown	Target::Exact binds the enum's String payload. is_empty comes from String or its dereferenced str.
-0002b97f022185efa834e60215b4d137ecb90be24eec697338fec72c117a5793	bare	yes	IntrospectionReportItem.reachability_notes is Vec<String>. The known slice dereference provides the contains method.
+00027777f2a1b86e7c1541eb69c1ea89f516167427d5b29311c693d2a345c525	bare	yes	Target::Exact binds a String payload. The standard String type declares is_empty.	standard-library
+0002b97f022185efa834e60215b4d137ecb90be24eec697338fec72c117a5793	bare	yes	IntrospectionReportItem.reachability_notes is Vec<String>. The known slice dereference provides the contains method.	standard-library
 0003193cf6b6658dabf2426f0503e4e1e07d9f1a386bf964fbad6b94bff984d4	bare	yes	Sparkline::default produces Sparkline. The explicit local widget type owns the marker method.
-0003548c957490cfe3e6aa6815dabfd3289d074f133ee0b5a7f783a975be904d	outside	unknown	TargetSelector.parent_dir is optional. The as_deref and map methods belong to Option.
-00038e7b3b9c2d05a94b03a312b9458524df8c3e08fd6a7dd756ab092f2c1478	bare	yes	root_anchor_idx is an Option<usize> parameter. The written receiver type establishes Option::and_then.
+0003548c957490cfe3e6aa6815dabfd3289d074f133ee0b5a7f783a975be904d	bare	yes	TargetSelector.parent_dir is optional. The as_deref and map methods belong to Option.	standard-library
+00038e7b3b9c2d05a94b03a312b9458524df8c3e08fd6a7dd756ab092f2c1478	bare	yes	root_anchor_idx is an Option<usize> parameter. The written receiver type establishes Option::and_then.	standard-library
 00039b8c3df17d143e829d56fe30027eaee2f84c450989b12d9ee004b1bcae5e	bare	yes	The test constructs its Terminal with a TestBackend. Terminal declares backend in the checked-in terminal module.
-0003b16405ce9fddf56943b3fb2aa8d31503ae9f97e35c644d543f6c2432b9ea	outside	unknown	next_jest_tests returns Vec<NodeId>. len belongs to the standard library.
-0003d18c8d4766672b6d1901c4b1fe930aeef20471941fc0c867878c6e39da0b	outside	unknown	The fixture setup closure receives a filesystem root. join belongs to std::path::Path.
-0003edb3fa8a8a01a7ed132b1fe20929efb67020f8e7d0391758eba88598a3fb	outside	unknown	words.get(i) yields an optional borrow. copied belongs to Option in the standard library.
-000406c3b990fac78fc742d629ba4d2fdeb95cd9aa174741aebca598422da124	bare	yes	The checked-in resize method returns Result<(), B::Error>. Its call chain ends at the standard Result::unwrap.
-00049b1d1b0ade609b5d85f32919eb3e2f264e8c719dac10bbd67aa9402e5d72	outside	unknown	The not_downloaded field is wrapped in a lock. The lock implementation is outside the local type.
-0004c48dbaba5cea32a58f00d925986779a3de740217a71de40e7ebed0bd59f6	outside	unknown	The hubs lists are Vec<Vec<u32>>. Slice iteration needs the standard-library declaration.
+0003b16405ce9fddf56943b3fb2aa8d31503ae9f97e35c644d543f6c2432b9ea	bare	yes	next_jest_tests returns Vec<NodeId>. len belongs to the standard library.	standard-library
+0003d18c8d4766672b6d1901c4b1fe930aeef20471941fc0c867878c6e39da0b	bare	yes	The checked-in setup helper types the closure argument root as &Path. This selects std::path::Path::join.	standard-library
+0003edb3fa8a8a01a7ed132b1fe20929efb67020f8e7d0391758eba88598a3fb	bare	yes	words.get(i) yields an optional borrow. copied belongs to Option in the standard library.	standard-library
+000406c3b990fac78fc742d629ba4d2fdeb95cd9aa174741aebca598422da124	bare	yes	The checked-in resize method returns Result<(), B::Error>. Its call chain ends at the standard Result::unwrap.	standard-library
+00049b1d1b0ade609b5d85f32919eb3e2f264e8c719dac10bbd67aa9402e5d72	bare	yes	The checked-in not_downloaded field is declared as an imported std::sync::Mutex of a HashMap. Its lock call selects Mutex::lock.	standard-library
+0004c48dbaba5cea32a58f00d925986779a3de740217a71de40e7ebed0bd59f6	bare	yes	The hubs lists are Vec<Vec<u32>>. Dereferencing the Vec leads to the standard slice iter method.	standard-library
 00051eb8169175c36a419794bf04cabefeb90be4e3389171422627b22834ede3	outside	unknown	tempfile::tempdir yields the external TempDir whose path method is called.
 00059b870a348c98b532d1ec0515e26c12e13a2be6d6a3acd9b52b10b4466458	bare	yes	ServerSessionMemoryCache::new returns Arc<Self>. The concrete cache's local StoresServerSessions implementation supplies put after deref.
-000635023523cb21fa61c156a148e39e20c3019f36d9f40b7d926fab13311a11	outside	unknown	contents is annotated Vec<(&str, Vec<u8>)>. The iterator method comes from the standard library.
+000635023523cb21fa61c156a148e39e20c3019f36d9f40b7d926fab13311a11	bare	yes	contents is annotated Vec<(&str, Vec<u8>)>. The iterator method comes from the standard library.	standard-library
 0006809d0c2e7aca108fe497eb70861076f19065bbb9df7c0bc3cc934e1aa633	none	no	The method forwards through the boxed generic Sink S. Distinct instantiations, including trait objects, can supply different binary_data bodies.
 000681b1e4ecf6b91b033ce7292354bb6d8cb8e5e9e9f571b7fba92c70da8ff6	bare	yes	root.read returns the local request collection. Its resolve method is declared in the request implementation.
 0006b46ca34bfaf3c28308c536e6248e6ab79ee35f6c735fbd000a278865c09b	bare	yes	clap::Command::new constructs the checkout's re-exported Command. Its builder implementation declares disable_help_flag.
-0006fbe8018d7fa247627115f4469126b0d2d361ca6268a4b98881cb387c625a	outside	unknown	TempDir.path returns a standard Path. Path::to_str requires the standard-library declaration.
+0006fbe8018d7fa247627115f4469126b0d2d361ca6268a4b98881cb387c625a	outside	unknown	The standard Path::to_str target requires the return type of the third-party tempfile crate’s TempDir::path declaration.
 0007625819f7e13806ccd30e1a354321ed9d67a7f7327c21b6391164d2687f05	outside	unknown	Store derive produces the todos accessor over the HashMap field. The result's iterator path needs the generated Store declarations.
-00079b655e67662dc916e41c273129d2af6960fb3ecbdb51b6258083c62fbee0	bare	yes	write_all_plaintext_bounded declares output as &mut Vec<u8>. The statically known Vec supplies clear.
-0007ac0aa86535a1324c68cea9a9d954005c3b508fdfa59ec696ec216fcd414c	bare	yes	The local async_pipe returns an AsyncSender. Its AsyncWrite implementation returns io::Result, which supplies Result::unwrap.
-0007cc2e403a7ad6be1bee0f787e44aa47d26a04d064d8ddc9ffc5ce7edcabd0	bare	yes	element_stack is a Vec<Option<ElementId>>. Its standard slice dereference supplies the last method.
-00081bfb2aac5b6e6eb9ff3c7642c4b0733f3b30ef6dde3b35a06a1c3351d28e	outside	unknown	CandidateCheck.not_erased is a vector of path and reason pairs. The push method belongs to Vec.
-000823259321cfb785fb524008c9c327054f0f9aa0c975796b32981539aca193	outside	unknown	TsConfig comes from oxc_resolver. Its directory method supplies the standard Path used here.
+00079b655e67662dc916e41c273129d2af6960fb3ecbdb51b6258083c62fbee0	bare	yes	write_all_plaintext_bounded declares output as &mut Vec<u8>. The statically known Vec supplies clear.	standard-library
+0007ac0aa86535a1324c68cea9a9d954005c3b508fdfa59ec696ec216fcd414c	bare	yes	The checked-in async_pipe returns AsyncSender. Its checked-in AsyncWrite implementation explicitly returns std::io::Result<()> from write_all. The awaited result selects Result::unwrap.	standard-library
+0007cc2e403a7ad6be1bee0f787e44aa47d26a04d064d8ddc9ffc5ce7edcabd0	bare	yes	element_stack is a Vec<Option<ElementId>>. Its standard slice dereference supplies the last method.	standard-library
+00081bfb2aac5b6e6eb9ff3c7642c4b0733f3b30ef6dde3b35a06a1c3351d28e	bare	yes	CandidateCheck.not_erased is a vector of path and reason pairs. The push method belongs to Vec.	standard-library
+000823259321cfb785fb524008c9c327054f0f9aa0c975796b32981539aca193	outside	unknown	The standard Path::to_path_buf target requires the directory return type from oxc_resolver’s TsConfig.
 0008934cf9a7f6a0195d578488f5270ed2d91803389aec6da589d021ceca4d5b	outside	unknown	The local explicitly constructs tokio::sync::Barrier. Barrier::wait is declared in Tokio.
 0008b24a349829cc05ea1bdfd64447608c9d72d7b82a106d27cdd3f808b41ea7	outside	yes	The value is returned from the rfd file dialog. Naming Path::to_path_buf depends on the external FileHandle.path declaration.
 00094162ea8f42925ba85b0b7ca1543899367a10989a403b6c9e9ccac68ff828	outside	yes	raw is created by Vec::unescape_bytes, an extension API. Its external return declaration is needed to identify the selected is_empty owner.
 00094984dcc1fdd6be525c56361a6531cc700d0beda7976d473efa3a5846cf0d	bare	yes	The local path wrapper returned by join_component defines ensure_dir.
-00099306b51cb50fbd119296ad4a9e5bc0e9e545b402127b64130c814fc21372	outside	unknown	The constant is annotated &[u8]. len is a standard slice method.
-0009ae24d3f865cfcc42031e9693ca5f19447493f860f9dc8a549ba7617463fe	bare	yes	decode_next explicitly types val as a mutable reference to a byte slice reference. Autoderef reaches the standard slice len method.
-0009b06a64e4cffa5267ab202ba71a1481fe3df04b6a6d91605f4a757595d475	bare	yes	The compared state's advance_actions is a Vec of pairs. Its slice dereference supplies iter.
-0009c06a74abd1dccdddc0d9f9420cc8bbc071d173b8bd240c27575f5815a30e	outside	unknown	s comes from String::with_capacity. push_str is a standard-library declaration.
-0009c37c5da9662558a077e9ab038822becab20051ca8744d4c9286478fc5297	outside	unknown	project_from_path annotates p as &Path. to_path_buf comes from the standard library.
-0009cfadd5a69d0ca206047fd46e87c36f84dce5dbefe32ab515104af8f39c4e	outside	unknown	The local select helper returns Result. The outer unwrap targets a standard-library method.
+00099306b51cb50fbd119296ad4a9e5bc0e9e545b402127b64130c814fc21372	bare	yes	The constant is annotated &[u8]. len is a standard slice method.	standard-library
+0009ae24d3f865cfcc42031e9693ca5f19447493f860f9dc8a549ba7617463fe	bare	yes	decode_next explicitly types val as a mutable reference to a byte slice reference. Autoderef reaches the standard slice len method.	standard-library
+0009b06a64e4cffa5267ab202ba71a1481fe3df04b6a6d91605f4a757595d475	bare	yes	The compared state's advance_actions is a Vec of pairs. Its slice dereference supplies iter.	standard-library
+0009c06a74abd1dccdddc0d9f9420cc8bbc071d173b8bd240c27575f5815a30e	bare	yes	s comes from String::with_capacity. push_str is a standard-library declaration.	standard-library
+0009c37c5da9662558a077e9ab038822becab20051ca8744d4c9286478fc5297	bare	yes	project_from_path annotates p as &Path. to_path_buf comes from the standard library.	standard-library
+0009cfadd5a69d0ca206047fd46e87c36f84dce5dbefe32ab515104af8f39c4e	bare	yes	The parent managed-run test module declares select as returning Result<Option<Arc<ManagedRun>>, String>. The first unwrap selects Result::unwrap, as in the rustls async pipe.	standard-library
 0009e617532a95c940cb1b051a853fa277ada492df78b59a5c16dcaaf0335977	outside	unknown	The local InitJavascript derives Template. Its render_default method comes through the generated implementation and accepting trait.
 0009e900a84ed9222d02017fca182c519e12a96c5f2106912e721aa89596d9a9	outside	yes	The receiver is the result of an external EnvFilter constructor. Its signature establishes that the await-free chain selects Result::unwrap_or_else.
-000a257b992a5bb2572ac0661818a5deef43bf69b1686589cfeba21350693160	outside	unknown	root comes from temp.path(). The join target belongs to std::path::Path.
+000a257b992a5bb2572ac0661818a5deef43bf69b1686589cfeba21350693160	outside	unknown	root comes from temp.path(), where temp is constructed by the third-party tempfile crate. That signature is needed to establish the standard Path::join owner.
 000a343484e41524c0b01d09821c922e7ef9b134e79311c6cb1a04c7f69829a9	bare	yes	The local test service and call_service return its response. The checked-in Actix service response supplies status.
 000a79f0823edca85dc10f8e317f4152ca368db4b74a1fdd65d7bc98f301637f	outside	yes	features_array comes from toml_edit Item::as_array_mut; its Array declaration supplies len.
-000b0038dd0156e4d801e02e3478b3debf1b01c512a521fa7eff939c90eff889	outside	unknown	combined_output returns String. String dereferences for the standard str search method.
-000b0e3c2d2636d21ce074819edabc36d83034329330060f57b4066dc079e501	outside	unknown	The vec! expansion supplies a Vec of test definitions. The selector needs the standard-library vector declaration.
-000b31736ebac7c4e2ec25018fe0c85dd7d27645ce0ffc5e061643fe9ef653ab	outside	unknown	The explicit fs::write writes the fixture manifest. Its implementation is in std::fs.
-000b346e8e85439da8eb69caf6173431079c4c72cb783f6687c40793d4576975	bare	yes	The test imports std::fs::OpenOptions. The new constructor returns OpenOptions and therefore selects the known read method.
+000b0038dd0156e4d801e02e3478b3debf1b01c512a521fa7eff939c90eff889	bare	yes	combined_output returns String. String dereferences for the standard str search method.	standard-library
+000b0e3c2d2636d21ce074819edabc36d83034329330060f57b4066dc079e501	bare	yes	The standard vec! macro builds a Vec of test definitions. That fixes the receiver of IntoIterator::into_iter.	standard-library
+000b31736ebac7c4e2ec25018fe0c85dd7d27645ce0ffc5e061643fe9ef653ab	bare	yes	The explicit fs::write writes the fixture manifest. Its implementation is in std::fs.	standard-library
+000b346e8e85439da8eb69caf6173431079c4c72cb783f6687c40793d4576975	bare	yes	The test imports std::fs::OpenOptions. The new constructor returns OpenOptions and therefore selects the known read method.	standard-library
 000b4fe198f3f359adcd688b5ef1acd34528696b084c57ad0d7662e002d65538	outside	yes	The receiver comes from serde_json::to_string. Its external Result return type proves the later standard unwrap member.
-000b5c962e30444498e075e19edf3147d3d709e21a2f3d98528ae65c4c88d770	outside	unknown	The receiver is a string literal. to_string is supplied by the standard ToString trait.
-000b7a3602ca25d94e893bc3e1ea179d596a4b3f0b1163f34f1fa27fe9a2d1d7	outside	unknown	The receiver is constructed with std::process::Command::new. Command::args comes from the standard library.
+000b5c962e30444498e075e19edf3147d3d709e21a2f3d98528ae65c4c88d770	bare	yes	The receiver is a string literal. to_string is supplied by the standard ToString trait.	standard-library
+000b7a3602ca25d94e893bc3e1ea179d596a4b3f0b1163f34f1fa27fe9a2d1d7	bare	yes	The receiver is constructed with std::process::Command::new. Command::args comes from the standard library.	standard-library
 000baec84a29943a1263e55551950f67e8070937547ea1912436387bc73b9860	outside	unknown	The grid cell's flags type is declared inside bitflags!. Its contains member is produced by the dependency macro.
-000003671f17761ac45e5e9d06e8224a1b1aee009f1311ed449dab2a3cb9b222	bare	yes	The cache get_mut gives an Option tuple. The left pattern uses the standard Some variant and binds its fields.
+000003671f17761ac45e5e9d06e8224a1b1aee009f1311ed449dab2a3cb9b222	bare	yes	The cache get_mut gives an Option tuple. The left pattern uses the standard Some variant and binds its fields.	standard-library
 000007d65007630b5984c675ed25b9b366befbc74c7ff65363b6b5291d839644	bare	yes	The match is in the implementation of the checked-in AnyOrSome enum. The path names its Any variant.
 000096d4e0703c1cc6088f2aca3a993fe8b9d42b293491dfcc677acd7998b774	bare	yes	record_run names payload as a parameter of type &RunMetricsPayload. This argument refers to that binding.
-0000c9fb8707ac4b5c1ba5101373746d5e1a443d504d6d3b1c8746a5043cf0d5	outside	unknown	map receives the function item str::to_owned, a standard-library ToOwned implementation.
-0000d15b1e3aba6e620aa71b6572cb97bb9b7c830c97ca8e70df2789ea6f5894	bare	yes	The header's derive invokes the built-in Debug macro. Its immediate imports give no competing derive binding.
+0000c9fb8707ac4b5c1ba5101373746d5e1a443d504d6d3b1c8746a5043cf0d5	bare	yes	map receives the function item str::to_owned, a standard-library ToOwned implementation.	standard-library
+0000d15b1e3aba6e620aa71b6572cb97bb9b7c830c97ca8e70df2789ea6f5894	bare	yes	The header's derive invokes the built-in Debug macro. Its immediate imports give no competing derive binding.	standard-library
 0000ed39ccd5c427a2d83fcf9a7294d5649d4b040723974d3e1f421fc12311b4	bare	yes	The explicit use serde::Serialize identifies the derive macro through the written package and name.
-0001666ce504d09efdffb4fa8dead07b2541ad3d9c357d67e917019386fc07da	outside	unknown	The outer assert! around matches! uses the standard assertion macro.
+0001666ce504d09efdffb4fa8dead07b2541ad3d9c357d67e917019386fc07da	bare	yes	The outer assert! around matches! uses the standard assertion macro.	standard-library
 00019bd4ab91caff26fd9f85a4d341bbac93c53ed04370f6008346ff9ec40001	bare	yes	The byte-slice callback declares offset locally. The range expression uses the callback parameter.
-00019df0f071936cf1a64bf2ee72268006efe07a6f835fc0c37ca35a77c23c9d	bare	yes	The comparison is an ordinary built-in assert_eq invocation in the payload tests, with no visible override.
+00019df0f071936cf1a64bf2ee72268006efe07a6f835fc0c37ca35a77c23c9d	bare	yes	The comparison is an ordinary built-in assert_eq invocation in the payload tests, with no visible override.	standard-library
 0001bd2be81ac160142e5b3a2f5e4e2a9ca17f5333da1777061ab98ba995a331	bare	yes	The branch reads x_title_width from the enclosing function's lexical binding. It is independent of the chart type.
 0001db823c4c4766aea00c29b8a4e1f72202cbeb5b667748d4d4c596fff4e8f1	none	no	The rstest function consumes case::left as a labelled test-case marker. The label has no independently declared macro target.
 0002534e923d9c91ec6ee351a360100b114e025142e1f1e326584159706f5c27	bare	yes	The Last arm of the local Adjacency enum binds item before returning it in the tuple.
 0002c3611e84ba4da1151c52000ec58273f339e214aeda2784aefa503dcd870e	bare	yes	The enclosing serialize_enum function declares cattrs. This call uses that same parameter in the match arm.
-0002f15efef756d55a157667a458a316f8c4e18f6b8d253ad9657ddf1ca4187a	outside	unknown	The assert_eq! checks Greedy and Weighted floor results using the standard assertion macro.
+0002f15efef756d55a157667a458a316f8c4e18f6b8d253ad9657ddf1ca4187a	bare	yes	The assert_eq! checks Greedy and Weighted floor results using the standard assertion macro.	standard-library
 0002f53df07ec663cb14fa641293da40afa1ffb4073930031a031f3967232e1f	bare	yes	s is the lexical str parameter of from_str. The value reference selects that binding.
-00037d239d8cfcc6fea9da291eaa920bfac1dc3a81c075993bb68187544300b6	outside	unknown	The assertion passes Some as an Option pattern. The variant comes from the standard prelude.
+00037d239d8cfcc6fea9da291eaa920bfac1dc3a81c075993bb68187544300b6	bare	yes	The assertion passes Some as an Option pattern. The variant comes from the standard prelude.	standard-library
 0003d464b842e9dbc7074998e73afed752014013f80444487553bf86d4c09324	bare	yes	The function declares one mutable new_npm_packages vector. Borrowing it in the install call preserves that local binding.
 000441059725840acf9840fb3d14534dc59fe91e379dbaab8b61ad736fceb62d	bare	yes	The cx argument directly references the Context parameter declared on the preceding line.
 0004617c29e2dcb496fa50870a9a9a763aef4f0b605463c6e61b5bcce7819ea9	bare	yes	The vector destructuring initializes cd as a mutable local. The later SIMD expression reads that lexical binding.
 0004886bf4c91365e2b156382fc4194c8ef31749f72e114b16b2902dd74a8c4f	bare	yes	serializer is the lexical parameter of this serialize implementation. Its generic type does not change the value binding.
 00048e663a3d59c98029572a0892b5226ab2b6812357870314fff060e87292aa	bare	yes	The enclosing arm constructs a local reasons vector and returns that same binding.
-0004f170983c7ed1ca3030b868950353e1b4ef5161286497ca6dbe33dbe0766b	bare	yes	The derive list names Rust's built-in Eq macro. The surrounding imports provide no competing Eq binding.
-00054dd073741b2d9ff56fd3323a6f7ecc13978dd1bbba41e4f1c3e9c5b0764c	bare	yes	The test's Item derive names the built-in PartialEq. The checked imports give no alternate macro of that name.
-0005b2cd0a0bd70c21d2e6bd3621471a1679b96bab47e3647028a7b200d47a59	bare	yes	The handshake test uses the built-in assert macro on the client state. The adjacent source has no alternate macro binding.
-000618c5718019defac1e7cedb31cf4b17782d9d9376bb1bf357aff9b3a171bc	outside	unknown	The outer assert! around the JavaScript mode check uses the standard assertion macro.
+0004f170983c7ed1ca3030b868950353e1b4ef5161286497ca6dbe33dbe0766b	bare	yes	The derive list names Rust's built-in Eq macro. The surrounding imports provide no competing Eq binding.	standard-library
+00054dd073741b2d9ff56fd3323a6f7ecc13978dd1bbba41e4f1c3e9c5b0764c	bare	yes	The test's Item derive names the built-in PartialEq. The checked imports give no alternate macro of that name.	standard-library
+0005b2cd0a0bd70c21d2e6bd3621471a1679b96bab47e3647028a7b200d47a59	bare	yes	The handshake test uses the built-in assert macro on the client state. The adjacent source has no alternate macro binding.	standard-library
+000618c5718019defac1e7cedb31cf4b17782d9d9376bb1bf357aff9b3a171bc	bare	yes	The outer assert! around the JavaScript mode check uses the standard assertion macro.	standard-library
 0006492c43a9c15e16894f5f3dffc1d600f481fbb650d5419f47cc380401b865	bare	yes	The enclosing call-expression arm binds span, which is passed to self.unk here.
 00068149d2d7340d5b17025cb82b445d43d9215dc4e99d511b42fd42f46474a7	bare	yes	The immediately preceding let binds sep from the flag cached in within_separator. The condition selects that variable.
 00069dadf3c5b4af0930499213be2b89c88000cc1ea62d96edd9f4019897b2b1	bare	yes	example_exe is a local value consumed by join. The borrow still refers to the existing lexical binding.
@@ -246,44 +246,44 @@
 00074363cacbd26b8efbbc44996d0a0b70443f4809e7c0b5ea1232da00627d1c	bare	yes	The surrounding file loop binds f. The argument precedes another use of the same f in range_text.
 0007a71bda25fbb6cb207cabbb8e2c7a52691d17ad44ee94aaba8329db0807a7	bare	yes	Arg is the local clap builder re-export in this test. Its associated new declaration is in the checkout.
 0007d04b5c78de22c125172c3e71470443dd4715243a870e891b72bc33cec528	bare	yes	serialize_entry declares value as a parameter. The forwarded argument still refers to that single lexical declaration.
-00086d3480d550155b280fcc40586969066cbe0582ae2b7ded0650d43d1e8119	bare	yes	The worker-pool test invokes the standard assert_eq macro, with no competing binding visible in the test module.
+00086d3480d550155b280fcc40586969066cbe0582ae2b7ded0650d43d1e8119	bare	yes	The worker-pool test invokes the standard assert_eq macro, with no competing binding visible in the test module.	standard-library
 0008a580880d8af6023cd4d8c76089656c88329180c15c3835453d5f3d8b036b	bare	yes	The local Arg builder returns its own type from long. The same checked-in impl declares value_parser.
-00014ce6e681227048dfa7e6eae63a3ff558f797c5870de37e839d53cc47b0b3	outside	unknown	The signature uses String unqualified in the slice of patterns. It is the standard prelude type.
+00014ce6e681227048dfa7e6eae63a3ff558f797c5870de37e839d53cc47b0b3	bare	yes	The signature uses String unqualified in the slice of patterns. It is the standard prelude type.	standard-library
 0001e79b66beae2bbaf18d2292534040229b88ea422d4d80eab1ded0743191e7	bare	yes	The written mio::Interest::READABLE path identifies the library type and associated constant.
 0002c21f3b81fc26200dd1f55976783945719fcba8c62b84975ddb506831ee4c	bare	yes	The explicit serde import identifies Serialize, and this impl clause names that imported trait.
 0003addac0edab05d8e01d5dc96f31b1de41240694487ecfe609758ea7008aaa	outside	unknown	PyAny is supplied through the pyo3 prelude glob. The crate's exported declarations establish the exact binding.
 0003d27bbea4426a1e7f8e6e3cbccf65f927974cd0f2876b55c05487500e0279	bare	yes	The import selects TASK_LANG, a const declared in the checked-in audit module.
 0004ab617bb2d4c8f4407e3ca525997d354807b0ce1fa1a30408d54d9bf92660	bare	yes	Constraint is explicitly imported from ratatui_core layout and Length names its checked-in enum variant.
-000577564e47515e937cceb7fa44a5faee0786ef61a403348f76df40e87bf6f9	bare	yes	The test field uses the ordinary prelude String. Its local derive and helper attributes do not supply a competing String binding.
+000577564e47515e937cceb7fa44a5faee0786ef61a403348f76df40e87bf6f9	bare	yes	The test field uses the ordinary prelude String. Its local derive and helper attributes do not supply a competing String binding.	standard-library
 0006063a85c6bfc2d8eba3e03e498f05757b90faca10bbf341952f4027f96eaf	bare	yes	Result is explicitly imported from crate in this file. The checked-in binding is established without names from generated declarations.
-00060dbff34cc8756cc012bb30d2c85b12e62134a587c859d41ac99824a5d942	outside	unknown	The explicit use std::fmt::Debug supplies the supertrait. Its definition is outside the checkout.
-00060fd7d1f3a981be157fc3c86fa038d362dd22540b18df4ef5d7c2a08ba27f	bare	yes	The function returns Option<&str>, and its match arms use the standard Some constructor. No alternate Some is imported here.
+00060dbff34cc8756cc012bb30d2c85b12e62134a587c859d41ac99824a5d942	bare	yes	The explicit std::fmt::Debug import fixes the supertrait’s library unit and name.	standard-library
+00060fd7d1f3a981be157fc3c86fa038d362dd22540b18df4ef5d7c2a08ba27f	bare	yes	The function returns Option<&str>, and its match arms use the standard Some constructor. No alternate Some is imported here.	standard-library
 00063785e12d1c76e2b3d068603f133f18b6a8d180d05d0064801317eb047aff	bare	yes	The explicit use tao::keyboard::ModifiersState supplies both the library unit and its exported type spelling.
 0006b5f2da02e859b9c87b59c5d9dcc6a568bed0ed204eb6790fd1bc7f60e6b1	outside	unknown	ffi includes the checked-in TSPoint in one configuration and generated bindings in another. Binding generation is needed to cover the other case.
-000737945b5c915c5eb1e37665f03b586b9f53fdfad5f2a80b0451941a6f0a03	bare	yes	This branch returns the standard Result::Ok constructor. The match and result type already select the variant.
-00074082f1d3941c2850b988a5f5af70df0954ca52bb73ef7bb0a023e2dba3d0	outside	unknown	The equality check uses the standard assert_eq! macro.
+000737945b5c915c5eb1e37665f03b586b9f53fdfad5f2a80b0451941a6f0a03	bare	yes	This branch returns the standard Result::Ok constructor. The match and result type already select the variant.	standard-library
+00074082f1d3941c2850b988a5f5af70df0954ca52bb73ef7bb0a023e2dba3d0	bare	yes	The equality check uses the standard assert_eq! macro.	standard-library
 0007750faaae9aabead7f5602d34a19f033ed63e0dc3b04c43861ea0d19830f4	bare	yes	The written serde_test import identifies Token. The path selects its MapEnd variant.
-000905e0b48fa77a603a3926bcd6ae3d5b4ecfa95ef2678206ec539ffa0ad9e8	outside	unknown	The successful LocalLookup arm returns the standard Result::Ok variant.
-000a1cf91b22c3a9239f468c21cc07976685418f5f12ae6ad17c5429c943c105	bare	yes	The collect annotation directly names the standard Result type. The proc-macro file imports syn's Error without importing a competing Result.
+000905e0b48fa77a603a3926bcd6ae3d5b4ecfa95ef2678206ec539ffa0ad9e8	bare	yes	The successful LocalLookup arm returns the standard Result::Ok variant.	standard-library
+000a1cf91b22c3a9239f468c21cc07976685418f5f12ae6ad17c5429c943c105	bare	yes	The collect annotation directly names the standard Result type. The proc-macro file imports syn's Error without importing a competing Result.	standard-library
 000a9d87bebe820962c59a457cb194854ea335f6aaed84ded166a233894399c6	bare	yes	The use path names crate::buffer::Cell explicitly. The checkout supplies its declaration through the buffer module.
 000b161710b178468907d0d5a47f1f21ce52ecae1e23b406a98c3fc5ffd9db35	bare	yes	The checked-in Actix header module re-exports actix_http, which explicitly re-exports http::header::CONTENT_TYPE.
 000ce7e2db6dc992e5f96a5c5d77d17ff4e3cebbc97b1eec92ab047bd3c33336	outside	unknown	The assertion helper is imported from the external serde_test crate.
 000d29e044c13419cce4c2eac2a1b7ad95264d1b738ae2f1cf5e0bd049f02d84	bare	yes	The explicit tauri_utils import selects display_path, whose declaration is present in the workspace.
 000d84c4dfa075ce22f0caa5f1fbca5e76f6355713406a8462986866e0f35d11	bare	yes	The crate import brings in BoxBody for AppRouting's response type. The boxed body is defined in the workspace.
 000e0eb6fa84cfa5550489cb48fdfc963537e05838573de05db0482b075c569a	bare	yes	The explicit crate::build import aliases its checked-in Options struct to BuildOptions.
-000e15a4a63b39f8c819ba44d57ee18b328f2c4ea865c836b55408017e30f199	outside	unknown	The optional bool field uses the standard prelude Option type.
-0000b22f89f1834718927dc2ec110b81e6c6906e9e83ce4d5e0162e7c8d66494	bare	yes	An explicit std::process::Command import supplies the owner of the associated new function.
+000e15a4a63b39f8c819ba44d57ee18b328f2c4ea865c836b55408017e30f199	bare	yes	InlayHintOptions.resolve_provider is written as Option<bool> and the module imports no competing Option. The prelude type is the selected target.	standard-library
+0000b22f89f1834718927dc2ec110b81e6c6906e9e83ce4d5e0162e7c8d66494	bare	yes	An explicit std::process::Command import supplies the owner of the associated new function.	standard-library
 0000ef966d83346b9d3153564c38f9fa5c6f98d5468eb8e431904b6bda693a51	bare	yes	The block module imports Rect from the checked-in ratatui_core layout. Its new constructor has a concrete owner.
 0001cf6cd74513c445d7259d695fe350c99be4b24512533d124b3ee968a36625	bare	yes	The checked-in TaskDefinition type has an explicit impl Default in turborepo-types.
 0001e785082d1805cd3136f41f237f5800175397335f5af614789672b56c442e	outside	unknown	The fully qualified call selects TokioIo in the external hyper_util package.
-0001f09249186a318a0d2ce9b1ec476304b5cb9c60244c436069cace8e09b3f3	bare	yes	The buffer is converted by the standard String::from_utf8. The standard type has no visible alternate binding in this test.
-0002394b357809ffa297f8d96c2a1082955eee496c1e3445dd8b7730be1ac690	bare	yes	The formatting branch explicitly imports std::process::Stdio and calls its associated piped constructor.
+0001f09249186a318a0d2ce9b1ec476304b5cb9c60244c436069cace8e09b3f3	bare	yes	The buffer is converted by the standard String::from_utf8. The standard type has no visible alternate binding in this test.	standard-library
+0002394b357809ffa297f8d96c2a1082955eee496c1e3445dd8b7730be1ac690	bare	yes	The formatting branch explicitly imports std::process::Stdio and calls its associated piped constructor.	standard-library
 0003749b235569e06fd540b30f576cbd2f44e98c71a922bd484c31de535f4d9c	bare	yes	turborepo-errors declares a local inherent impl with Spanned::new.
-00037e969b8610e9f4a86f8ab893d89819e69453802758628a5c6034f026cfbe	bare	yes	The local struct literal supplies the boxed value. The standard Box constructor is the selected associated method.
+00037e969b8610e9f4a86f8ab893d89819e69453802758628a5c6034f026cfbe	bare	yes	The local struct literal supplies the boxed value. The standard Box constructor is the selected associated method.	standard-library
 0004309974d9e3f57976437694d34d75d11fddf729bfeebdb88c2caba59f507c	bare	yes	The alias de is imported from serde. The qualified path explicitly names the Deserialize trait member, with the tuple type on the result.
-0005de174c6fbcffc03b789701bc7b2a9af1bf6bad1ba29681ea61b2eaacf95e	bare	yes	The callback is boxed by the standard Box constructor. The enclosing callback use supplies its type without an alternate Box binding.
-00066ba935a5f468c614721f0861b93440b3519ef5be8fabbcd026de0384a123	bare	yes	The module imports std::path::Path explicitly. Its fixture uses the standard associated Path::new constructor.
-0006e6136c4da3a47a5f55652a6a468ce4c7974facc11b06c06fca3b76d1dd65	outside	unknown	String::from_utf8_lossy converts the harness stderr using the standard library.
+0005de174c6fbcffc03b789701bc7b2a9af1bf6bad1ba29681ea61b2eaacf95e	bare	yes	The callback is boxed by the standard Box constructor. The enclosing callback use supplies its type without an alternate Box binding.	standard-library
+00066ba935a5f468c614721f0861b93440b3519ef5be8fabbcd026de0384a123	bare	yes	The module imports std::path::Path explicitly. Its fixture uses the standard associated Path::new constructor.	standard-library
+0006e6136c4da3a47a5f55652a6a468ce4c7974facc11b06c06fca3b76d1dd65	bare	yes	String::from_utf8_lossy converts the harness stderr using the standard library.	standard-library
 000869fe2e02cb7497344071a5ecc24b26533020261e1d54edab9e4b20b9acd9	outside	unknown	The explicit opentelemetry_http import supplies Bytes in the request body. Its declaration comes from a dependency.
 0006e9cfd2f6bad79a46ebffc05ee2641f7423c004f351420551a463d69f20c8	bare	unknown	The private deserializer re-exports Content from the core crate, whose enum defines I8. The feature gates on that re-export and this match must agree.
 000cd45fe431c98a541da516c12ebd4c88d20702acce5e7c18a3fb0bde972a05	bare	yes	The test imports the public OkmBlock declaration from the checked-in crypto::tls13 module.
@@ -297,7 +297,7 @@
 000cc645a08d49dad3c806b49d43feb909edbb3953f84964a12ac389a75d84e9	bare	yes	Writer.out is a Buffer and the local Buffer impl declares new_line.
 002bcddfabeb224f211306cd8027815a38a99caadb57bb72c9ab035286b48ef0	bare	yes	The source selects a local wait_for_socket method under the shown non-Windows condition.
 0027ed7c17281fff898c0ce59b149b2a6b7b24f0dd31cfc09302e0c059de0220	bare	yes	The imported test helper has a concrete checked-in impl Default for TestRequest.
-000311ccb37f7ee7516b827f010e4fc423bdeddfa5faa9e1ad266aecaa749874	outside	unknown	This early return constructs the standard Option::Some variant around a formatted string.
+000311ccb37f7ee7516b827f010e4fc423bdeddfa5faa9e1ad266aecaa749874	bare	yes	This early return constructs the standard Option::Some variant around a formatted string.	standard-library
 000df55b021b183a0c78e2fb3c9d0afe9101b435daf9124a22dbf5e230ca2076	outside	unknown	The buffer type is re-exported by actix_web::web from the external bytes crate.
 000008e648e0490c56b2e00c34cb93936013fc5b3266ae780ee44c75cf1db1b4	outside	yes	Hono enables Vitest globals, and the selected call is the assertion matcher toBe. The external declarations supply its owner.
 00006f67be12d04945f69aca1ca5f6c20b1d2dadbaca99cbbce44e56fefef5c6	bare	yes	The pinned UI loads shablon before the bundle. Its t proxy always returns the same tag factory body for the literal tr key.
@@ -310,7 +310,7 @@
 00035ae64ab914e2a757b67b089e91e00d45ce32ba1374cfa53cd96e6b3df895	outside	yes	The repository's test command selects Jest. This test has no lexical describe import and needs the framework's ambient declaration.
 0003b121091b82ffcc9b7db9af65f46119e065fe4b6a120c0953778958f14ec5	unknown	unknown	The base Page has an abstract extensionRealms. CDP and BiDi both override it, and the launch configuration must select one before proving a body.
 0004ef7736f62b06b259c975cf54f771af03dc2f8d3f302c62c75ab34c8f3000	bare	yes	The selected bundled expression immediately invokes the visible arrow that forwards the table tag list.
-0004ef84148260370201bdae0f2698b1aac5454d25d02984e406bd01e1e0c8b7	bare	yes	The test reads the checkout's snapshot model, whose threads collection is an array. Propagating that return shape can name Array.prototype.find.
+0004ef84148260370201bdae0f2698b1aac5454d25d02984e406bd01e1e0c8b7	bare	yes	The test reads the checkout's snapshot model, whose threads collection is an array. Propagating that return shape can name Array.prototype.find.	standard-library
 0005984be3448d91abcc4963c416b9eeaccdbfccac899ba6baca6b0675aa7ae4	outside	yes	The middleware test calls a Vitest global assertion. The dependency provides the declaration of the returned toBe matcher.
 0005f4d958607ba575f037d3770a6a47f4526a770e098149695b41e497d4d72a	outside	yes	The tests use Vitest's vi timer control. Its declarations supply the advanceTimersByTimeAsync method.
 0006bbd71f007086d3d2632b7f9fc15e12033cf9d317223414720dc0cd1cc67d	outside	yes	The ambient Vitest expect result supplies the toHaveBeenCalledTimes matcher through assertion declarations.
@@ -368,15 +368,15 @@
 0010d390bba0cb0b95a897cb1313e71df07a224ebd9dc87b07f8d6c1020967fe	none	no	slot is selected from the component's supplied slots object. Its default callback body varies with the caller.
 0012a6094d4b93b9c68af707dc29837e002c1ab5322e570aa460f2a8cd410039	bare	yes	In the enclosing bundle scope ze aliases the checked-in Fe DOM wrapper. This call can reach that single function body.
 001340bd9180aabb585d2fd67487d1b1e118f654f8bb37e5c2c6b67e83d44721	bare	yes	Yi aliases er in this bundle scope. er is assigned the node-type predicate returned by the checked-in Ho factory.
-001359af497e4f9061367645d7b212deb21de674395745f424420f2b17615c28	bare	yes	The bundle binds ap directly to Math.sqrt. That literal stable alias gives the standard library symbol.
+001359af497e4f9061367645d7b212deb21de674395745f424420f2b17615c28	bare	yes	The bundle binds ap directly to Math.sqrt. That literal stable alias gives the standard library symbol.	standard-library
 00003764147a885de8ded38d300dee12e03791d947630393accb5d64eb6d5c69	outside	yes	The test creates svg using d3.select, then calls size on a selectAll result. D3 declarations establish the selection member.
 0001a621b558cd47fca13782e25aceddd00b00ade5b5f928e7f9dedd7ceaa04b	unknown	unknown	The bundled helper obtains n through e.querySelector. Its nearby source does not establish whether e has the standard DOM method.
 00035fcc2448b67ad8b70e2eaf990e2178cb662fb891cddf71f34ab8f9a81eac	none	no	The catch follows both the initial open and the upgrade operation. The exception can be an explicit Error or an earlier IndexedDB rejection.
 000407c7bde31c5c09b137d362e435afb3c2eaea109a550e1180f35f50356379	outside	yes	The call is on an entry from node:fs readdir with withFileTypes true. Node declarations supply Dirent.isDirectory.
 00042c2b0d36dc8f1ca4630f95d3aa5dea87ce6f468782b69b6d876e7ed806ff	none	no	Leaflet's base control calls its onAdd hook through this. The concrete control subclass supplies the body.
-00051d0da657e7b3cb6c3f604b2e5c3a58d03ddd987e2a9bddf5fa76faf8604d	unknown	unknown	The proxy update reads n.get and n.set on a captured object. The excerpt and nearby definitions do not establish a unique owner.
+00051d0da657e7b3cb6c3f604b2e5c3a58d03ddd987e2a9bddf5fa76faf8604d	bare	yes	The outer helper calls v(e, new Map). Recursive v(c, n) calls keep that same Map, which the proxy getter captures. Propagating that binding selects Map.prototype.get.	standard-library
 00067e6055de0213ee97f75e9860730096d8d3b32806f4eeab7ae46eb276ae73	none	no	The menu helper invokes getSubmenuItems on a supplied nested-menu item. The caller provides that callback.
-0006be7bb83d1087fd647e1512b1aa789e85faa80251e96e97727e4363961f69	bare	yes	This test spec initializes bar as an array and passes that same state to its fn. The selected push is the standard Array member.
+0006be7bb83d1087fd647e1512b1aa789e85faa80251e96e97727e4363961f69	bare	yes	This test spec initializes bar as an array and passes that same state to its fn. The selected push is the standard Array member.	standard-library
 000700325695792e9a15d25e60590ebb39eccdf8713db91ff0bd62c00de10cbc	outside	yes	page is the Playwright test fixture. Its Page declaration provides locator.
 000767342ca82a66c442061600337a2aa97f921cbcfc3b9fd71ec106f0e004e5	none	no	The bundled quadtree exposes a setter for _x. The accessor passed at runtime can be any compatible function.
 0009d6e63a2c69605701c78a9d7e5e9ade31fa220485f91e7978a357924d726a	outside	unknown	The marker helper receives elem as a parameter and chains append and attr. A D3 selection declaration could prove the owner if the caller supplies that type.
@@ -418,12 +418,12 @@
 000efc915cf090348ddddb1debef070adedd4fdc3b767126538063b3419506f4	outside	yes	The object initializer calls the Vitest vi mock function. The dependency declaration supplies fn beyond the stored unit.
 000f8f7cce605e23110f190c643bd55fcd4b2bbff05e21e4e7fedc2d785ca556	none	no	The stored import names the whole Node test module. The named imports have their own links.
 00107510507fa6a5d7aa197e92bf0e29c122e527c6d185df1f084ed7bbf10129	outside	yes	The test runner object comes from @effect/vitest. Its external declaration supplies the effect method.
-00030ec1b4beff94393d1b89756a4408756877e586f29cf4e87e9ef66f554ead	outside	unknown	The local helper imports a built App that returns Response. The saved candidates give DOM Body.text and a global Response.text. Ambient declarations are needed to choose the owner.
-000d173c3f3b96b432a9af2aed20f109e34cc9cd0a47f742c32e7c40b3970c87	outside	unknown	The test calls render and then text on Response. Stored DOM and global alternatives need the applicable server ambient declarations to select an owner.
-000d3c15abfc29024658e2609006e4c831c7f47da1fcef734a8218a40a3f2250	outside	unknown	The unqualified constructor is the host's Response binding. The stored DOM and global declarations differ, so selecting the build's ambient types is necessary.
-0010a565e6225f2584ba13c5594adf8f3f8470ed3fad33ad1bd18db870ebb5cb	outside	unknown	The unqualified Response type has stored DOM and global candidates. The supported fetch environment's ambient declaration is needed to choose.
-00118f3eb6baf8f57d7f28d5907ab3c84837eeb7f50519809892c88b311da00a	outside	unknown	The test runs through Node's test module and constructs a global Request. The saved targets include both DOM and global owners, so the active ambient declaration matters.
-0015bfe03db6d28b4efbf2d500406eebebf267d0d29a8488717aa3b7f061804e	bare	yes	The call selects a member through the browser window object. Both candidates use the bundled DOM unit, and the written member access selects its Window declaration.
+00030ec1b4beff94393d1b89756a4408756877e586f29cf4e87e9ef66f554ead	outside	unknown	The test calls text on the response of a checked-in helper backed by built App code. Its Node and Vite ambient declarations can determine which Response or Body declaration owns text.
+000d173c3f3b96b432a9af2aed20f109e34cc9cd0a47f742c32e7c40b3970c87	outside	unknown	The test calls render and then text on a Response. Its checked-in test config requests Node and Vite declarations, so bundled DOM declarations alone do not select the declaring owner.
+000d3c15abfc29024658e2609006e4c831c7f47da1fcef734a8218a40a3f2250	outside	unknown	The constructor is an unqualified Response. The checked-in Astro build config requests Node ambient types, which can affect whether the bundled DOM declaration is the owner.
+0010a565e6225f2584ba13c5594adf8f3f8470ed3fad33ad1bd18db870ebb5cb	outside	unknown	This is a Response type reference in the Astro build project. The checked-in config requests Node ambient types, so a unique bundled DOM owner cannot be established from the type spelling alone.
+00118f3eb6baf8f57d7f28d5907ab3c84837eeb7f50519809892c88b311da00a	outside	unknown	This is a Node test with an unqualified Request constructor. The checked-in test config requests Node ambient declarations, so the bundled DOM constructor alone does not establish the owner.
+0015bfe03db6d28b4efbf2d500406eebebf267d0d29a8488717aa3b7f061804e	bare	yes	The call selects a member through the browser window object. Both candidates use the bundled DOM unit, and the written member access selects its Window declaration.	standard-library
 00179bc825e44748d2b3977442217e828d2620617b12d060e464a16523e64364	outside	unknown	URLSearchParams is unqualified and used in a portable HTTP fixture. The active platform declarations are needed to choose between the stored DOM and Node URL types.
 001b383fce12ff86166e1b1b9395841a430b340afbae6a66aefb02fdbca16f46	bare	yes	The extends clause is in type position and the same source file declares interface $ZodType. The test file's declaration is outside this lexical scope.
 0007f74991cc96a15b6e317b2519dca45f5da66991a73b6d16a0000b5be784ff	bare	yes	A named import binds describe directly to vitest. The workspace-boundary check can establish the external unit for this explicit binding.
@@ -432,7 +432,7 @@
 00118fc479fa9efc58ad23f430ab03ac9472a59ef99fe0d49122b578becf1692	bare	yes	The source imports expect directly from external vitest. The written library export is explicit when workspace membership is established.
 000fca3274d4c2f992d940a0a048b6935d8d6ae880d0060db2a47a8b52abe955	none	no	The occurrence is the const expression in a const assertion. It is TypeScript syntax with no declaration target.
 001702ba91f6046afc47be43ea1323fc6eb660cea7dbab2bf24a860aec21d016	outside	no	The workspace package forwards Redux's types. The original Middleware declaration comes through the external redux export, rather than a bundled language declaration.
-0017b621404f712f8b4c2953f7815bfd5670ae5a694dcb27f41ae617661f7bad	bare	yes	This fixture deliberately throws a real standard Error. The bare JavaScript syntax identifies its constructor.
+0017b621404f712f8b4c2953f7815bfd5670ae5a694dcb27f41ae617661f7bad	bare	yes	This fixture deliberately throws a real standard Error. The bare JavaScript syntax identifies its constructor.	standard-library
 001ba653f78a0441c8148dda3cf440d878a8630e901a3bac9ea7d6171567b134	none	no	The generated SDK deliberately accepts an override client through options. The selected get implementation can vary with that object.
 000cbce0b99e2948ede6ba96595cbf60e35b142cd2fc46e1251f17eee1ec7b17	bare	yes	The file imports PublishReleaseEntry from a literal relative source path. The target type is checked in even though the root configuration extends a preset.
 0012bb85884645b4611a6c79dde71b2b56248c77175cdfc4867531012567feb2	bare	yes	The named runPublish import points at a literal relative run.ts file. The local declaration is available despite the incomplete compiler preset.

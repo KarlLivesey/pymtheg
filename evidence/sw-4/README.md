@@ -44,8 +44,11 @@ The archive publishes each selected file, line and column, stored kind,
 target spelling, reason list, source line excerpt and source-review label.
 `source-review.tsv` holds the hand-entered labels by rank. The note gives
 the source evidence and the immediate cause. `staticAnswer` says `bare`
-when captured source and shipped language data could establish a declaration,
-`outside` when doing so needs a dependency, generated file or toolchain,
+when captured source and shipped language data establish the owner and item.
+That includes the Go standard library, Rust prelude and standard library, and
+TypeScript’s bundled declarations. The TSV marks those bare targets as
+`standard-library`. Use `outside` when identifying the owner or item needs a
+third-party declaration, generated file or additional toolchain facts,
 `none` when there is no single static Level 2 target, and `unknown` when
 the source review cannot establish which applies. `itemAnswer` says whether
 addressing the first-reason support item would provide a definite link.
@@ -63,7 +66,9 @@ the three estimates, and include the full uncertainty of unsampled and
 unknown links. The bare ceiling subtracts the estimated share of total
 links that have no static answer or require outside material. These
 intervals describe uncertainty in a draw from the finished graphs. They
-do not cover new links from unfinished pins or future indexers.
+do not cover new links from unfinished pins or future indexers. The Rust
+sensitivity estimate moves the rows marked `standard-library` from `bare` to
+`outside` and recomputes the ceiling with the same sample and weights.
 
 ## Reproduce the archive
 

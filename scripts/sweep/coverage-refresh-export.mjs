@@ -125,6 +125,7 @@ function publicRun(repo) {
   const failedFiles = index?.failedFileCount;
   const failedModules = index && Object.fromEntries(modules.map((module) => [module,
     index.failures.filter(({ language }) => language === module).reduce((sum, { count }) => sum + count, 0)]));
+  // Count files marked failed for this reason. A single analysis error can affect the whole module.
   const invalidUtf16Files = index?.failures.filter(({ reason }) => reason === "Invalid UTF-16 range")
     .reduce((sum, { count }) => sum + count, 0);
   const indexErrors = index?.errors && Object.fromEntries(Object.entries(index.errors).map(([kind, value]) => [kind, value.count]));

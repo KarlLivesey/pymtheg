@@ -41,8 +41,8 @@ test("one committed sweep regenerates the complete coverage plan byte for byte",
     assert.ok(readFileSync(itemChanges).equals(readFileSync(join(root, "evidence/sw-4/items.md"))), "regenerated item report differs");
     const { samples } = JSON.parse(gunzipSync(readFileSync(join(root, input))));
     const labels = readLabels(readFileSync(join(root, "evidence/sw-4/source-review.tsv"), "utf8"));
-    assert.deepEqual(new Map(samples.map(({ rank, staticAnswer, itemAnswer, note }) =>
-      [rank, { staticAnswer, itemAnswer, note }])), labels);
+    assert.deepEqual(new Map(samples.map(({ rank, staticAnswer, itemAnswer, note, standardLibrary }) =>
+      [rank, { staticAnswer, itemAnswer, note, ...(standardLibrary && { standardLibrary }) }])), labels);
   } finally {
     for (const path of [plan, attempts, itemChanges]) {
       try { unlinkSync(path); } catch (error) { if (error.code !== "ENOENT") throw error; }

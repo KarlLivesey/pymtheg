@@ -8,7 +8,7 @@ at the 0.1.0 release, with its original finished graphs.
 The sweep starts each pin from the fixed public checkout. TypeScript also runs
 with lockfile dependencies installed and lifecycle scripts disabled. The Go
 comparison opts in to the offline toolchain and records where existing cached
-packages supply usable facts. Rust uses the source graph and shows its
+packages supply usable facts. Rust uses the source graph. Both Rust and TypeScript show proven and
 assumption-marked links separately.
 
 Every current missing link contributes its stored kind and reason list to an
@@ -23,7 +23,7 @@ showed 89.79%, 44.27% and 67.69%, respectively. Across the 20 Go pins alone,
 the fresh score is 91.22%, the same as the earlier Go measurement. Microsoft
 TypeScript's Go code alone adds 485,580 Go links to the all-pin denominator.
 The previous plan at `404ee031715022855ef29d1084de3d85f19ac1ca`
-estimated an 87.77% source-only ceiling, below both fresh Go scores.
+estimated a 94.74% source-only ceiling for Go.
 [Fresh archive](../../evidence/sw-4/coverage-plan-input.json.gz) · [Earlier Go measurement](C-17.md)
 
 The previous Rust failed-file item assigned 13.04 points to a reason that

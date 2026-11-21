@@ -36,7 +36,7 @@ Peak is the largest recorded resident-memory peak across the attempt's stages. W
 | labstack/echo | finished | 95.17% | 82.8 | 590.5 | 68.4 | 590.5 | ok, 0 failed files |
 | mattn/go-sqlite3 | finished | 84.09% | 42.2 | 326.6 | 32.7 | 326.6 | ok, 0 failed files |
 | mermaid-js/mermaid | finished | 75.34% | 194.2 | 2221.2 | 156.2 | 2221.2 | ok, 0 failed files |
-| microsoft/TypeScript | finished | — | 2608.3 | 4988.3 | 1848.6 | 4586.7 | 1 analysis errors · TypeScript compiler assertion (Debug Failure. False expression.) · 1 resolution errors · incomplete, 27,194 failed files (27,194 TypeScript / JavaScript) |
+| microsoft/TypeScript | finished | — | 2608.3 | 4988.3 | 1848.6 | 4586.7 | 1 analysis error · TypeScript compiler assertion (Debug Failure. False expression.) · 1 resolution error · incomplete, 27,194 failed files (27,194 TypeScript / JavaScript) |
 | nestjs/nest | finished | 74.78% | 257.2 | 1882.8 | 221.1 | 1882.8 | ok, 0 failed files |
 | oclif/core | finished | 85.77% | 37.4 | 636.7 | 29.5 | 636.7 | ok, 0 failed files |
 | pingdotgg/t3code | finished | 72.34% | 230.7 | 2107.7 | 192.2 | 2107.7 | incomplete, 0 failed files |
@@ -60,7 +60,7 @@ Peak is the largest recorded resident-memory peak across the attempt's stages. W
 | tokio-rs/axum | finished | 39.48% | 163.7 | 924.8 | 135.5 | 924.8 | ok, 0 failed files |
 | tree-sitter/tree-sitter | finished | 43.34% | 139.0 | 1120.6 | 108.4 | 1120.6 | ok, 0 failed files |
 | trpc/trpc | finished | 73.02% | 224.9 | 1145.8 | 164.1 | 998.9 | incomplete, 6 failed files (6 TypeScript / JavaScript) |
-| vercel/turborepo | finished | — | 2510.2 | 5652.7 | 1966.7 | 5601.3 | 1 analysis errors · 3,094 invalid UTF-16 ranges · 1 resolution errors · incomplete, 3,094 failed files (3,094 TypeScript / JavaScript) |
+| vercel/turborepo | finished | — | 2510.2 | 5652.7 | 1966.7 | 5601.3 | 1 analysis error · 3,094 files marked failed due to an invalid UTF-16 range · 1 resolution error · incomplete, 3,094 failed files (3,094 TypeScript / JavaScript) |
 | vitejs/vite | finished | 56.64% | 119.7 | 1045.9 | 75.5 | 1045.9 | incomplete, 4 failed files (4 TypeScript / JavaScript) |
 | vitest-dev/vitest | finished | 77.21% | 187.3 | 1966.2 | 154.4 | 1966.2 | incomplete, 3 failed files (3 TypeScript / JavaScript) |
 | wagoodman/dive | finished | 86.98% | 45.5 | 345.8 | 35.4 | 345.8 | ok, 0 failed files |

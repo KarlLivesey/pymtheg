@@ -27,7 +27,10 @@ export function scoreTable(modes, base, own = false) {
   const render = (module, mode, repos) => {
     const now = score(repos, module, own);
     const then = baselineScore(base.repos, module, own);
-    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)}) | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gap(now)} |`;
+    const proven = { ...now, level2: now.level2 - now.assumed };
+    const assumed = { ...now, level2: now.assumed };
+    const split = now.assumed ? `<br>${number(proven.level2)} proven (${rate(proven)})<br>${number(assumed.level2)} assumption-marked (${rate(assumed)})` : "";
+    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gap(now)} |`;
   };
   return [
     "| Language | Mode | Links now | Level 2 now | Level 2 at 0.1.0 | Links to 90% |",
@@ -52,14 +55,21 @@ function share([lower, upper]) {
   return `${percent(100 * lower)}–${percent(100 * upper)}`;
 }
 
-function ceiling(groups, samples, totals) {
+function ceilingRange(blocked, totals) {
+  const missRate = (totals.links - totals.level2) / totals.links;
+  return share(blocked.interval.toReversed().map((n) => 1 - n * missRate));
+}
+
+function ceiling(groups, samples, totals, module) {
   const impossible = auditRange(groups, samples, ["none"]);
   const outside = auditRange(groups, samples, ["outside"]);
   const blocked = auditRange(groups, samples, ["none", "outside"]);
-  const missRate = (totals.links - totals.level2) / totals.links;
-  const max = blocked.interval.toReversed().map((n) => 1 - n * missRate);
   const unknown = samples.filter(({ staticAnswer }) => staticAnswer === "unknown").length;
-  return `Bare ceiling estimate **${share(max)}**. Of missing links, ${share(impossible.observed)} have no static answer (95% bounds ${share(impossible.interval)}) and ${share(outside.observed)} need material outside the checkout (95% bounds ${share(outside.interval)}). The review could not classify ${unknown} of ${samples.length} sampled links for the ceiling.`;
+  const summary = `Bare ceiling estimate **${ceilingRange(blocked, totals)}**. Of missing links, ${share(impossible.observed)} have no static answer (95% bounds ${share(impossible.interval)}) and ${share(outside.observed)} need material outside the checkout (95% bounds ${share(outside.interval)}). The review could not classify ${unknown} of ${samples.length} sampled links for the ceiling.`;
+  if (module !== "rust") return summary;
+  const reclassified = samples.map((row) => row.standardLibrary ? { ...row, staticAnswer: "outside" } : row);
+  const alternate = auditRange(groups, reclassified, ["none", "outside"]);
+  return `${summary} Counting every standard-library and prelude target as outside lowers the Rust ceiling estimate to **${ceilingRange(alternate, totals)}**.`;
 }
 
 function itemTable(groups, samples, module, totals, catalog, alternateGroups) {
@@ -130,10 +140,10 @@ export function runTables(modes) {
         const detail = [install && [install.manager, install.status, install.reason].filter(Boolean).join(" "),
           stage && [stage, failure.exit != null && `exit ${failure.exit}`, failure.progress, failure.memory].filter(Boolean).join(" · "),
           toolchain && [toolchain.state, toolchain.reason, toolchain.packages && `${toolchain.packages.clean}/${toolchain.packages.total} clean packages`].filter(Boolean).join(" · "),
-          indexErrors?.analysisErrors && `${indexErrors.analysisErrors} analysis errors`,
+          indexErrors?.analysisErrors && `${indexErrors.analysisErrors} analysis error${indexErrors.analysisErrors === 1 ? "" : "s"}`,
           compilerAssertion && `TypeScript compiler assertion (${compilerAssertion})`,
-          invalidUtf16Files && `${number(invalidUtf16Files)} invalid UTF-16 ranges`,
-          indexErrors?.resolutionErrors && `${indexErrors.resolutionErrors} resolution errors`,
+          invalidUtf16Files && `${number(invalidUtf16Files)} files marked failed due to an invalid UTF-16 range`,
+          indexErrors?.resolutionErrors && `${indexErrors.resolutionErrors} resolution error${indexErrors.resolutionErrors === 1 ? "" : "s"}`,
           outcome === "finished" && `${cold.status}, ${number(failedFiles)} failed files${modules ? ` (${modules})` : ""}`].filter(Boolean).join(" · ") || "—";
         const seconds = (value) => value != null ? value.toFixed(1) : "—";
         const memory = (value) => value ? (value / 1024).toFixed(1) : "—";
@@ -160,22 +170,26 @@ export function renderPlan(input, base, pins, catalog, legacy) {
   const installedFallback = installed.filter((repo) => !repo.counts || repo.install?.status !== "installed")
     .map(({ id, install, outcome, failure }) => `${id} (${install?.reason ?? `${outcome}${failure?.stage ? ` at ${failure.stage}` : ""}`})`);
   const changes = catalogChanges(input.modes, catalog, legacy);
-  const rust = score(bare, "rust");
-  const ownRust = score(bare, "rust", true);
+  const typescriptPins = bare.filter(({ language }) => language === "typescript");
+  const allFailed = typescriptPins.filter((repo) => repo.counts?.typescript.links === 0 && repo.failedModules?.typescript);
+  const failedPins = allFailed.map((repo) => `${repo.id} (${number(repo.failedModules.typescript)} files)`).join(" and ");
+  const scoringPins = pairedInstalled.filter((repo) => repo.language === "typescript" && repo.counts?.typescript.links > 0).length;
+  const zeroTypeScriptNote = allFailed.length ? [`${failedPins} finished their bare attempts, but every TypeScript or JavaScript file failed, so they contribute zero TypeScript links and the own-pin scores cover ${scoringPins} of ${typescriptPins.length} TypeScript pins.`] : [];
   const taint = bare.flatMap(({ inventory }) => inventory ?? []).filter(([module, , , reasons]) =>
     module === "rust" && reasons.includes("failed-file-unseen-declarations")).reduce((sum, row) => sum + row[4], 0);
   const missed = bare.filter(({ counts }) => !counts).map(({ id, outcome, failure }) => `${id} (${outcome}${failure?.stage ? ` at ${failure.stage}` : ""})`);
   return [
     "# Coverage plan for 0.2.0", "", scoreTable(input.modes, base), "",
+    ...zeroTypeScriptNote, "",
     "Each stored link counts under its source language in a finished graph, so Go files in a TypeScript pin count under Go and JavaScript counts with TypeScript.",
     "Level 2 credits a resolved checkout target or a library unit with a named symbol. The gap is the number of additional Level 2 links required at the current link count.", "",
     `Measured main commit ${inline(input.measuredCommit)}. Each 0.1.0 entry uses the release's finished bare graphs. The earlier exporter inferred named library targets from the stored facts where it could.`,
     "[Current sweep and source audit](../evidence/sw-4/coverage-plan-input.json.gz) · [0.1.0 breakdown](../evidence/sw-3/breakdown.json.gz)", "",
     "## Coverage within each language's own pins", "", scoreTable(input.modes, base, true), "",
-    `Rust Level 2 includes **${number(rust.level2 - rust.assumed)} proven links (${rate({ ...rust, level2: rust.level2 - rust.assumed })})** and **${number(rust.assumed)} assumption-marked links (${rate({ ...rust, level2: rust.assumed })})**. The Rust pins alone have ${number(ownRust.level2 - ownRust.assumed)} proven (${rate({ ...ownRust, level2: ownRust.level2 - ownRust.assumed })}) and ${number(ownRust.assumed)} assumption-marked links (${rate({ ...ownRust, level2: ownRust.assumed })}).`,
     "[C-19, experimental Rust toolchain coverage measurement](changes/C-19.md), measured a possible route that Pymtheg has yet to implement.", "",
     "## Pin completion", "",
     `**${finished}/${bare.length} bare pins finished.** ${missed.length ? `Unfinished attempts were ${missed.join(", ")}.` : "All bare graphs contribute to the totals."}`,
+    ...zeroTypeScriptNote,
     `TypeScript dependencies installed and indexed on ${installedUsable}/${installed.length} pins with lifecycle scripts disabled. Each unusable installed attempt contributes its bare graph when available.`,
     ...(installedFallback.length ? [`Installed-mode fallbacks include ${installedFallback.join(", ")}.`] : []),
     `The offline Go toolchain provided facts on ${goUsed.length}/${go.length} Go pins. Go links in other languages' pins use the bare graph.${goUsed.length < go.length ? " Go pins with unusable opt-in attempts also use the bare graph." : ""}`,
@@ -190,7 +204,7 @@ export function renderPlan(input, base, pins, catalog, legacy) {
       const review = samples.filter((row) => row.module === module);
       const totals = score(bare, module);
       const alternate = module === "go" ? pairedGo : module === "typescript" ? pairedInstalled : [];
-      return [`### ${languageNames[module]}`, "", ceiling(groups, review, totals), "",
+      return [`### ${languageNames[module]}`, "", ceiling(groups, review, totals, module), "",
         ...(module === "go" ? ["Counts are bare / opt-in offline Go toolchain.", "",
           "The protobuf reflection call `largeMessageDesc.Fields().ByName(\"f34\")` records both `external-implementers-possible` and `structural-match-unverified`. Its count goes under the first reason. [Pinned Go source](https://github.com/protocolbuffers/protobuf-go/blob/ef99f06f37ec921e64fdbcec131a82013f38776e/internal/reflection_test/reflection_test.go#L100)", ""]
           : module === "typescript" ? ["Counts are bare / installed declarations.", ""] : []),

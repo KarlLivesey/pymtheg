@@ -124,14 +124,15 @@ const itemAnswers = new Set(["yes", "no", "unknown"]);
 const staticAnswers = new Set(["bare", "outside", "none", "unknown"]);
 export function readLabels(contents) {
   const labels = new Map();
-  for (const line of contents.trim().split("\n")) {
+  for (const line of contents.split("\n")) {
     if (!line || line.startsWith("#")) continue;
-    const [rank, staticAnswer, itemAnswer, note, ...extra] = line.split("\t");
+    const [rank, staticAnswer, itemAnswer, note, origin = "", ...extra] = line.split("\t");
     if (!/^[a-f0-9]{64}$/.test(rank) || labels.has(rank) || !staticAnswers.has(staticAnswer) ||
-        !itemAnswers.has(itemAnswer) || !note?.trim() || extra.length || staticAnswer === "none" && itemAnswer === "yes") {
+        !itemAnswers.has(itemAnswer) || !note?.trim() || extra.length || staticAnswer === "none" && itemAnswer === "yes" ||
+        origin !== "" && (origin !== "standard-library" || staticAnswer !== "bare")) {
       throw Error("Invalid or duplicate source review label");
     }
-    labels.set(rank, { staticAnswer, itemAnswer, note });
+    labels.set(rank, { staticAnswer, itemAnswer, note, ...(origin && { standardLibrary: true }) });
   }
   return labels;
 }
@@ -149,7 +150,8 @@ export function verifyReview(repos, samples) {
   for (const row of samples) {
     if (!/^[a-f0-9]{64}$/.test(row.rank) || ranks.has(row.rank) || !modules.includes(row.module) ||
         !staticAnswers.has(row.staticAnswer) || !itemAnswers.has(row.itemAnswer) || !row.note?.trim() ||
-        row.staticAnswer === "none" && row.itemAnswer === "yes") throw Error("Invalid or duplicate reviewed link");
+        row.staticAnswer === "none" && row.itemAnswer === "yes" ||
+        row.standardLibrary !== undefined && (row.standardLibrary !== true || row.staticAnswer !== "bare")) throw Error("Invalid or duplicate reviewed link");
     ranks.add(row.rank);
   }
   for (const module of modules) {
