@@ -409,6 +409,22 @@ test("a receiver produced by a macro keeps the failed file as a reason", async (
     .sort((a, b) => a.range.start - b.range.start);
   assert.equal(macro.resolution, "unresolved");
   assert.ok(macro.data.uncertainty.split("; ").includes(FAILED));
-  assert.equal(literal.resolution, "unresolved");
-  assert.equal(literal.data.uncertainty.includes(FAILED), false);
+  assert.equal(literal.resolution, "library");
+  assert.deepEqual(
+    literal.libraries.map(({ ecosystem, unit, symbol, evidence }) => ({
+      ecosystem,
+      unit,
+      symbol,
+      evidence,
+    })),
+    [
+      {
+        ecosystem: "rust-std",
+        unit: "core",
+        symbol: "str::len",
+        evidence: "declaring-owner",
+      },
+    ],
+  );
+  assert.equal(literal.data.uncertainty, undefined);
 });

@@ -1,0 +1,89 @@
+Receiver class	Target evidence	All pins	BurntSushi/ripgrep	actix/actix-web	cberner/redb	crossbeam-rs/crossbeam	fjall-rs/fjall	helix-editor/helix	rust-embedded/cortex-m	rustls/rustls	serde-rs/serde	tokio-rs/axum
+method chain	method owner unknown	26069	1888	4043	10942	1139	652	2916	100	2468	297	1624
+associated path	method owner unknown	18392	545	4770	1579	924	442	2932	57	3018	2097	2028
+no receiver recipe	method owner unknown	16226	1327	3901	4106	2026	755	819	30	2150	101	1011
+unresolved call result	method owner unknown	10793	408	3458	954	1222	241	1113	14	1643	232	1508
+destructured	method owner unknown	5668	101	388	597	1430	35	1725	15	1176	38	163
+associated path	checkout receiver only	5294	128	1365	216	200	63	688	34	1852	252	496
+field	method owner unknown	4981	114	490	881	478	344	989	90	1128	303	164
+pattern-binding	method owner unknown	4681	355	1041	423	358	59	1206	27	576	200	436
+borrow, deref, try or await	method owner unknown	3249	106	954	294	80	781	346	2	244	21	421
+closure-parameter	method owner unknown	3035	190	507	278	427	43	1196	8	206	88	92
+associated path	standard receiver only	2498	304	589	278	356	129	384	11	268	66	113
+written receiver type	method owner unknown	2145	39	273	458	52	32	563	12	346	216	154
+annotation-shape	method owner unknown	1977	141	213	450	67	65	201	28	596	160	56
+field	standard receiver only	1834	349	256	316	123	89	502	8	145	5	41
+macro result or expansion	method owner unknown	1721	114	255	376	37	63	472	61	202	31	110
+std call result	method owner unknown	1613	230	214	239	287	39	345	31	137	46	45
+written receiver type	checkout receiver only	1592	7	348	135	52	16	462	0	311	119	142
+associated path	third-party receiver only	1523	97	133	51	38	94	177	29	109	716	79
+associated path	checkout inherent candidate	1386	4	413	157	81	0	356	2	216	4	153
+generic or associated type	method owner unknown	1322	139	256	50	40	71	135	15	34	411	171
+iterator-item	method owner unknown	1287	174	153	138	62	146	334	2	211	56	11
+field	checkout inherent candidate	1239	259	74	312	132	81	232	9	89	0	51
+written receiver type	standard receiver only	1192	177	136	130	110	16	363	7	178	8	67
+index	method owner unknown	1070	84	51	366	83	17	282	14	131	17	25
+self in impl or trait	method owner unknown	1017	27	616	7	2	5	22	1	198	61	78
+written checkout call result	third-party receiver only	984	530	0	428	0	2	16	0	6	0	2
+control-flow	method owner unknown	954	109	109	110	96	19	362	9	84	25	31
+field	checkout receiver only	911	43	104	301	134	6	251	0	60	0	12
+constructor-shaped checkout call result	checkout inherent candidate	885	366	1	464	43	1	8	2	0	0	0
+string literal	primitive receiver only	878	43	176	95	25	35	246	1	103	69	85
+self in impl or trait	checkout inherent candidate	873	146	116	174	65	17	275	5	42	0	33
+written checkout call result	checkout inherent candidate	869	184	241	258	3	56	104	0	3	0	20
+literal or aggregate	method owner unknown	831	78	85	150	80	66	77	2	200	6	87
+generic-call	method owner unknown	825	13	185	168	127	26	101	3	62	31	109
+struct literal or unit value	method owner unknown	784	128	99	55	68	9	129	14	237	12	33
+written receiver type	checkout inherent candidate	717	77	125	176	112	5	153	10	40	0	19
+path-value	method owner unknown	641	7	53	13	4	14	120	39	359	4	28
+binding-unproved	method owner unknown	634	39	69	40	46	0	232	0	46	24	138
+written checkout call result	method owner unknown	616	0	27	461	7	2	59	4	38	3	15
+written receiver type	third-party receiver only	585	48	111	17	0	9	320	10	6	14	50
+third-party call result	method owner unknown	582	56	95	93	49	44	131	20	63	7	24
+self in impl or trait	checkout receiver only	425	7	49	33	3	14	11	0	114	158	36
+written receiver type	primitive receiver only	424	93	56	66	1	14	126	5	30	1	32
+method chain	standard receiver only	358	217	51	30	16	2	28	1	13	0	0
+field	third-party receiver only	357	75	70	0	0	46	129	0	14	0	23
+written checkout call result	standard receiver only	320	49	41	57	2	7	105	0	51	0	8
+range	method owner unknown	319	2	24	158	58	19	21	0	22	13	2
+binary	method owner unknown	302	7	10	110	23	13	118	1	19	0	1
+impl Trait, dyn Trait or trait Self	method owner unknown	248	3	177	1	1	0	26	0	27	0	13
+associated path	primitive receiver only	204	32	12	92	9	10	8	15	26	0	0
+method chain	checkout inherent candidate	164	91	53	6	1	2	5	0	2	0	4
+closure-call	method owner unknown	158	0	57	34	5	3	39	0	14	3	3
+non-local-value	method owner unknown	144	0	32	6	10	0	36	0	8	2	50
+type_cast	method owner unknown	116	0	3	42	22	0	27	0	20	0	2
+constructor-shaped checkout call result	method owner unknown	109	47	9	13	12	0	6	0	15	5	2
+written checkout call result	checkout receiver only	88	0	8	30	1	1	5	1	31	0	11
+borrow, deref, try or await	checkout inherent candidate	85	1	2	39	3	39	0	0	1	0	0
+self in impl or trait	third-party receiver only	85	0	3	0	0	12	69	0	0	0	1
+field	primitive receiver only	83	5	1	24	1	2	37	0	12	0	1
+method chain	checkout receiver only	76	24	14	15	1	1	20	0	1	0	0
+borrow, deref, try or await	standard receiver only	66	12	9	1	0	29	8	0	0	0	7
+uninitialized	method owner unknown	51	0	0	0	40	0	10	0	0	0	1
+untyped callee kind	method owner unknown	51	16	20	9	0	1	0	0	3	0	2
+struct literal or unit value	checkout inherent candidate	41	16	1	0	1	3	15	0	3	2	0
+method chain	third-party receiver only	39	7	19	0	0	0	9	0	0	0	4
+closure	method owner unknown	30	0	9	0	0	0	0	0	0	0	21
+associated path	checkout receiver only + checkout trait owner	29	0	5	4	0	0	2	0	4	10	4
+constructor-shaped checkout call result	checkout receiver only	25	10	0	12	2	1	0	0	0	0	0
+constructor-shaped checkout call result	standard receiver only	22	22	0	0	0	0	0	0	0	0	0
+struct literal or unit value	checkout receiver only	20	1	7	1	1	0	1	0	2	0	7
+unit	method owner unknown	19	0	0	0	0	0	0	0	0	0	19
+call-expression	method owner unknown	12	0	1	4	1	0	1	0	2	0	3
+borrow, deref, try or await	third-party receiver only	11	3	0	0	0	0	7	0	0	0	1
+call result	method owner unknown	11	0	3	2	0	0	5	0	1	0	0
+method chain	primitive receiver only	9	0	1	3	0	0	5	0	0	0	0
+written checkout call result	primitive receiver only	8	0	0	3	0	0	2	0	0	0	3
+borrow, deref, try or await	checkout receiver only	7	0	3	0	0	1	3	0	0	0	0
+operator	method owner unknown	7	0	0	1	0	0	3	0	3	0	0
+written receiver type	checkout inherent candidate + checkout trait impl candidate	7	0	7	0	0	0	0	0	0	0	0
+self in impl or trait	primitive receiver only	6	0	6	0	0	0	0	0	0	0	0
+self in impl or trait	standard receiver only	6	0	1	4	0	0	0	0	0	0	1
+self in impl or trait	checkout inherent candidate + checkout trait impl candidate	4	0	4	0	0	0	0	0	0	0	0
+self in impl or trait	checkout receiver only + checkout trait owner	4	0	0	0	0	0	0	0	4	0	0
+self in impl or trait	checkout trait impl candidate	4	0	3	0	0	0	0	0	0	0	1
+borrow, deref, try or await	primitive receiver only	3	0	0	0	0	0	1	0	0	0	2
+assignment	method owner unknown	1	0	0	0	0	1	0	0	0	0	0
+field	checkout inherent candidate + checkout trait impl candidate	1	0	0	0	0	0	1	0	0	0	0
+generic_function	method owner unknown	1	0	0	0	0	0	1	0	0	0	0

@@ -1,0 +1,38 @@
+{
+  "associated": {
+    "links": 18392,
+    "written prefix": 18392,
+    "opaque reason": 12801,
+    "opaque with no other reason": 5759,
+    "opaque with no other blocker": 9633
+  },
+  "macroArgument": {
+    "links": 16226,
+    "macro argument": 16226,
+    "assert family spelling": 15063,
+    "assert family sysroot target": 9199
+  },
+  "unresolvedCall": {
+    "links": 10793,
+    "from": 217,
+    "default": 816
+  },
+  "chain": {
+    "links": 26715,
+    "gap: callee-unresolved": 14883,
+    "before first method": 16478,
+    "gap: receiver-method-unresolved": 9387,
+    "first method": 9180,
+    "receiver known": 734,
+    "gap: non-local-value": 315,
+    "gap: try-wrapper": 37,
+    "later": 323,
+    "gap: aggregate": 44,
+    "gap: field-owner": 700,
+    "gap: callee-kind": 7,
+    "gap: deref-owned": 4,
+    "gap: field-unknown": 179,
+    "gap: declaration-placement": 108,
+    "gap: struct-literal-owner": 11
+  }
+}
