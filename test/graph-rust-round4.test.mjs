@@ -422,7 +422,10 @@ test("round 4 alias applicability cannot poison a shared namespace cache", async
         ...(x.candidateIds ? { candidateIds: [...x.candidateIds].sort() } : {}),
       }))
       .sort((a, b) => a.linkId.localeCompare(b.linkId));
-  assert.deepEqual(normalize(g.decisions), normalize(reverse));
+  assert.deepEqual(
+    normalize(g.decisions),
+    normalize(Array.isArray(reverse) ? reverse : reverse.resolutions),
+  );
 });
 test("round 4 generic alias and reference Self do not capture same-named project types", async () => {
   const g = await graph(

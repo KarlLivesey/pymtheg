@@ -18,6 +18,22 @@
       "export": "\nfunc C22Probe() int { return 1 }\n"
     },
     {
+      "id": "golang/tools",
+      "file": "go/ast/astutil/imports.go",
+      "comment": "\n// c27: comment-only edit\n",
+      "anchor": "func AddImport(fset *token.FileSet, f *ast.File, path string) (added bool) {",
+      "body": "\n\t_ = 0",
+      "export": "\nfunc C27Probe() int { return 1 }\n"
+    },
+    {
+      "id": "labstack/echo",
+      "file": "echo.go",
+      "comment": "\n// c27: comment-only edit\n",
+      "anchor": "func New() *Echo {",
+      "body": "\n\t_ = 0",
+      "export": "\nfunc C27Probe() int { return 1 }\n"
+    },
+    {
       "id": "honojs/hono",
       "file": "src/utils/url.ts",
       "comment": "\n// c22: comment-only edit\n",

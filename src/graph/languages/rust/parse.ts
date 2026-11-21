@@ -1056,6 +1056,9 @@ async function createHelper(): Promise<Helper> {
         noStdConditions: effectiveAttributes(tree.rootNode)
           .filter((a) => a.meta.name === "no_std")
           .map((a) => a.guards),
+        noCoreConditions: effectiveAttributes(tree.rootNode)
+          .filter((a) => a.meta.name === "no_core")
+          .map((a) => a.guards),
         ...(fileMacroUse.length ? { macroUseConditions: fileMacroUse } : {}),
         ...(fileModulePath.paths.length || fileModulePath.pathOpaque
           ? { innerModulePath: fileModulePath }
@@ -2114,7 +2117,31 @@ async function createHelper(): Promise<Helper> {
         impl: { type: string; node: Node | null; scope: string },
       ): Record<string, Json> {
         const r = recipe(receiver, fn, scope, impl, false, { nodes: 48 });
-        if (r.k === "?") return { receiverGap: String(r.w) };
+        if (r.k === "?") {
+          // A literal in receiver position has a language-defined type.
+          // Do not infer the type of a local from a literal or erase a borrow
+          // around it. Unsuffixed numbers can take their type from context.
+          const literal =
+            (receiver.type === "string_literal" &&
+              receiver.text.startsWith('"')) ||
+            (receiver.type === "raw_string_literal" &&
+              /^r#*"/.test(receiver.text))
+              ? "&str"
+              : receiver.type === "char_literal" &&
+                  receiver.text.startsWith("'")
+                ? "char"
+                : receiver.type === "integer_literal"
+                  ? (/([ui](?:8|16|32|64|128|size))$/.exec(
+                      receiver.text,
+                    )?.[1] ?? /^\d[\d_]*(f32|f64)$/.exec(receiver.text)?.[1])
+                  : receiver.type === "float_literal"
+                    ? /(f32|f64)$/.exec(receiver.text)?.[1]
+                    : undefined;
+          return {
+            receiverGap: String(r.w),
+            ...(literal ? { receiverLiteralType: literal } : {}),
+          };
+        }
         const old =
           fn && macroAround(receiver, fn)
             ? recipe(receiver, fn, scope, impl, true, { nodes: 48 })

@@ -1,0 +1,242 @@
+{
+ "before": "5364e87",
+ "after": "0ccd239",
+ "bare": [
+  {
+   "pin": "colinhacks/zod",
+   "before": {
+    "links": 81042,
+    "level2": 67963,
+    "noSymbol": 498
+   },
+   "after": {
+    "links": 81042,
+    "level2": 67963,
+    "noSymbol": 498
+   }
+  },
+  {
+   "pin": "dexie/Dexie.js",
+   "before": {
+    "links": 36431,
+    "level2": 19940,
+    "noSymbol": 5921
+   },
+   "after": {
+    "links": 36431,
+    "level2": 19940,
+    "noSymbol": 5921
+   }
+  },
+  {
+   "pin": "honojs/hono",
+   "before": {
+    "links": 72340,
+    "level2": 42129,
+    "noSymbol": 9063
+   },
+   "after": {
+    "links": 72340,
+    "level2": 42129,
+    "noSymbol": 9063
+   }
+  },
+  {
+   "pin": "nestjs/nest",
+   "before": {
+    "links": 165330,
+    "level2": 123638,
+    "noSymbol": 28127
+   },
+   "after": {
+    "links": 165330,
+    "level2": 123638,
+    "noSymbol": 28127
+   }
+  },
+  {
+   "pin": "pocketbase/pocketbase",
+   "before": {
+    "links": 126519,
+    "level2": 66268,
+    "noSymbol": 18984
+   },
+   "after": {
+    "links": 126519,
+    "level2": 66268,
+    "noSymbol": 18984
+   }
+  },
+  {
+   "pin": "puppeteer/puppeteer",
+   "before": {
+    "links": 58244,
+    "level2": 37602,
+    "noSymbol": 10670
+   },
+   "after": {
+    "links": 58244,
+    "level2": 37602,
+    "noSymbol": 10670
+   }
+  },
+  {
+   "pin": "reduxjs/redux-toolkit",
+   "before": {
+    "links": 57208,
+    "level2": 36541,
+    "noSymbol": 10160
+   },
+   "after": {
+    "links": 57208,
+    "level2": 36541,
+    "noSymbol": 10160
+   }
+  },
+  {
+   "pin": "trpc/trpc",
+   "before": {
+    "links": 107470,
+    "level2": 78475,
+    "noSymbol": 9290
+   },
+   "after": {
+    "links": 107470,
+    "level2": 78475,
+    "noSymbol": 9290
+   }
+  },
+  {
+   "pin": "vitest-dev/vitest",
+   "before": {
+    "links": 116220,
+    "level2": 89729,
+    "noSymbol": 5533
+   },
+   "after": {
+    "links": 116220,
+    "level2": 89729,
+    "noSymbol": 5533
+   }
+  },
+  {
+   "pin": "withastro/astro",
+   "before": {
+    "links": 152561,
+    "level2": 117435,
+    "noSymbol": 5287
+   },
+   "after": {
+    "links": 152561,
+    "level2": 118642,
+    "noSymbol": 5287
+   }
+  }
+ ],
+ "installed": [
+  {
+   "pin": "dexie/Dexie.js",
+   "before": {
+    "links": 36431,
+    "level2": 20522,
+    "noSymbol": 5500
+   },
+   "after": {
+    "links": 36431,
+    "level2": 20522,
+    "noSymbol": 5500
+   }
+  },
+  {
+   "pin": "honojs/hono",
+   "before": {
+    "links": 72340,
+    "level2": 46405,
+    "noSymbol": 922
+   },
+   "after": {
+    "links": 72340,
+    "level2": 46405,
+    "noSymbol": 922
+   }
+  },
+  {
+   "pin": "nestjs/nest",
+   "before": {
+    "links": 165330,
+    "level2": 151358,
+    "noSymbol": 6672
+   },
+   "after": {
+    "links": 165330,
+    "level2": 151358,
+    "noSymbol": 6672
+   }
+  },
+  {
+   "pin": "puppeteer/puppeteer",
+   "before": {
+    "links": 58244,
+    "level2": 45437,
+    "noSymbol": 7532
+   },
+   "after": {
+    "links": 58244,
+    "level2": 45437,
+    "noSymbol": 7532
+   }
+  },
+  {
+   "pin": "reduxjs/redux-toolkit",
+   "before": {
+    "links": 57208,
+    "level2": 45838,
+    "noSymbol": 702
+   },
+   "after": {
+    "links": 57208,
+    "level2": 45838,
+    "noSymbol": 702
+   }
+  },
+  {
+   "pin": "trpc/trpc",
+   "before": {
+    "links": 107470,
+    "level2": 95508,
+    "noSymbol": 1848
+   },
+   "after": {
+    "links": 107470,
+    "level2": 95508,
+    "noSymbol": 1848
+   }
+  },
+  {
+   "pin": "vitest-dev/vitest",
+   "before": {
+    "links": 116220,
+    "level2": 95768,
+    "noSymbol": 724
+   },
+   "after": {
+    "links": 116220,
+    "level2": 95768,
+    "noSymbol": 724
+   }
+  },
+  {
+   "pin": "withastro/astro",
+   "before": {
+    "links": 152561,
+    "level2": 130412,
+    "noSymbol": 238
+   },
+   "after": {
+    "links": 152561,
+    "level2": 131625,
+    "noSymbol": 238
+   }
+  }
+ ]
+}

@@ -1,0 +1,1498 @@
+[
+  {
+    "file": "bogo/src/main.rs",
+    "kind": "imports",
+    "spelling": "rustls_aws_lc_rs::hpke",
+    "range": {
+      "start": 1631,
+      "end": 1635
+    },
+    "analysis": {
+      "complete": false,
+      "reason": "opaque-item-may-shadow-name",
+      "symbols": [
+        [
+          "rustls-aws-lc-rs/src/lib.rs",
+          "hpke"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls-aws-lc-rs/src/lib.rs",
+      "hpke"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "opaque-item-may-shadow-name; conditional-name-may-be-absent; opaque-item-may-shadow-name",
+      "symbols": [
+        [
+          "rustls-aws-lc-rs/src/lib.rs",
+          "hpke"
+        ]
+      ]
+    },
+    "line": 42,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls-aws-lc-rs/src/lib.rs",
+        "identity": "hpke"
+      }
+    }
+  },
+  {
+    "file": "openssl-tests/src/ffdhe_kx_with_openssl.rs",
+    "kind": "imports",
+    "spelling": "crate::ffdhe",
+    "range": {
+      "start": 528,
+      "end": 532
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "openssl-tests/src/lib.rs",
+          "ffdhe"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "openssl-tests/src/lib.rs",
+      "ffdhe"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "openssl-tests/src/lib.rs",
+          "ffdhe"
+        ]
+      ]
+    },
+    "line": 15,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "openssl-tests/src/lib.rs",
+        "identity": "ffdhe"
+      }
+    }
+  },
+  {
+    "file": "rustls-ring/src/tls12.rs",
+    "kind": "imports",
+    "spelling": "crate::hmac",
+    "range": {
+      "start": 14807,
+      "end": 14818
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls-ring/src/lib.rs",
+          "hmac"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls-ring/src/lib.rs",
+      "hmac"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls-ring/src/lib.rs",
+          "hmac"
+        ]
+      ]
+    },
+    "line": 441,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls-ring/src/lib.rs",
+        "identity": "hmac"
+      }
+    }
+  },
+  {
+    "file": "rustls-ring/src/tls12.rs",
+    "kind": "imports",
+    "spelling": "crate::hmac",
+    "range": {
+      "start": 16857,
+      "end": 16868
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls-ring/src/lib.rs",
+          "hmac"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls-ring/src/lib.rs",
+      "hmac"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls-ring/src/lib.rs",
+          "hmac"
+        ]
+      ]
+    },
+    "line": 505,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls-ring/src/lib.rs",
+        "identity": "hmac"
+      }
+    }
+  },
+  {
+    "file": "rustls-ring/src/tls13.rs",
+    "kind": "imports",
+    "spelling": "crate::hmac",
+    "range": {
+      "start": 11320,
+      "end": 11331
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls-ring/src/lib.rs",
+          "hmac"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls-ring/src/lib.rs",
+      "hmac"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls-ring/src/lib.rs",
+          "hmac"
+        ]
+      ]
+    },
+    "line": 357,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls-ring/src/lib.rs",
+        "identity": "hmac"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/config.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 589,
+      "end": 602
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 20,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/config.rs",
+    "kind": "imports",
+    "spelling": "crate::compress",
+    "range": {
+      "start": 1299,
+      "end": 1307
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "compress"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "line": 36,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/connection.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 435,
+      "end": 448
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 15,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/connection.rs",
+    "kind": "imports",
+    "spelling": "crate::quic",
+    "range": {
+      "start": 661,
+      "end": 665
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "quic"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "line": 20,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/connection.rs",
+    "kind": "values",
+    "spelling": "quic",
+    "range": {
+      "start": 4408,
+      "end": 4412
+    },
+    "analysis": {
+      "complete": true,
+      "symbols": [
+        [
+          "rustls/src/client/connection.rs",
+          "impl ClientConnectionBuilder::build_quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/client/connection.rs",
+      "impl ClientConnectionBuilder::build_quic"
+    ],
+    "resolution": {
+      "complete": true,
+      "symbols": []
+    },
+    "line": 127,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/connection.rs",
+        "identity": "impl ClientConnectionBuilder::build_quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/ech.rs",
+    "kind": "imports",
+    "spelling": "super::tls13",
+    "range": {
+      "start": 246,
+      "end": 251
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/client/mod.rs",
+          "tls13"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/client/mod.rs",
+      "tls13"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/client/mod.rs",
+          "tls13"
+        ]
+      ]
+    },
+    "line": 10,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/mod.rs",
+        "identity": "tls13"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/hs.rs",
+    "kind": "imports",
+    "spelling": "super::tls13",
+    "range": {
+      "start": 369,
+      "end": 374
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/client/mod.rs",
+          "tls13"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/client/mod.rs",
+      "tls13"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/client/mod.rs",
+          "tls13"
+        ]
+      ]
+    },
+    "line": 14,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/mod.rs",
+        "identity": "tls13"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/hs.rs",
+    "kind": "values",
+    "spelling": "tls13",
+    "range": {
+      "start": 40833,
+      "end": 40838
+    },
+    "analysis": {
+      "complete": true,
+      "symbols": [
+        [
+          "rustls/src/client/hs.rs",
+          "prepare_resumption"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/client/hs.rs",
+      "prepare_resumption"
+    ],
+    "resolution": {
+      "complete": true,
+      "symbols": []
+    },
+    "line": 1089,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/hs.rs",
+        "identity": "prepare_resumption"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/hs.rs",
+    "kind": "values",
+    "spelling": "tls13",
+    "range": {
+      "start": 40874,
+      "end": 40879
+    },
+    "analysis": {
+      "complete": true,
+      "symbols": [
+        [
+          "rustls/src/client/hs.rs",
+          "prepare_resumption"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/client/hs.rs",
+      "prepare_resumption"
+    ],
+    "resolution": {
+      "complete": true,
+      "symbols": []
+    },
+    "line": 1090,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/client/hs.rs",
+        "identity": "prepare_resumption"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/mod.rs",
+    "kind": "imports",
+    "spelling": "crate::compress",
+    "range": {
+      "start": 139,
+      "end": 154
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "compress"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "line": 9,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/tls12.rs",
+    "kind": "imports",
+    "spelling": "crate::tls12",
+    "range": {
+      "start": 1474,
+      "end": 1478
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "tls12"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "tls12"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "tls12"
+        ]
+      ]
+    },
+    "line": 32,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "tls12"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/tls13.rs",
+    "kind": "imports",
+    "spelling": "crate::compress",
+    "range": {
+      "start": 2615,
+      "end": 2623
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "compress"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "line": 64,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/tls13.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 2625,
+      "end": 2631
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 64,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/client/tls13.rs",
+    "kind": "imports",
+    "spelling": "crate::quic",
+    "range": {
+      "start": 2633,
+      "end": 2637
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "quic"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "line": 64,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/common_state.rs",
+    "kind": "imports",
+    "spelling": "crate::quic",
+    "range": {
+      "start": 647,
+      "end": 651
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "quic"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "line": 18,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/conn/mod.rs",
+    "kind": "imports",
+    "spelling": "crate::quic",
+    "range": {
+      "start": 523,
+      "end": 527
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "quic"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "line": 17,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/crypto/cipher/messages.rs",
+    "kind": "imports",
+    "spelling": "crate::quic",
+    "range": {
+      "start": 17219,
+      "end": 17230
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "quic"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "line": 567,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/crypto/mod.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 682,
+      "end": 688
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 21,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/crypto/test_provider.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 584,
+      "end": 588
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 19,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/lib.rs",
+    "kind": "imports",
+    "spelling": "crate::conn::kernel",
+    "range": {
+      "start": 16760,
+      "end": 16766
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/conn/mod.rs",
+          "kernel"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/conn/mod.rs",
+      "kernel"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/conn/mod.rs",
+          "kernel"
+        ]
+      ]
+    },
+    "line": 388,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/conn/mod.rs",
+        "identity": "kernel"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/server/config.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 346,
+      "end": 359
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 14,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/server/config.rs",
+    "kind": "imports",
+    "spelling": "crate::compress",
+    "range": {
+      "start": 1107,
+      "end": 1115
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "compress"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "line": 30,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/server/connection.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 396,
+      "end": 409
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 15,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/server/tls12.rs",
+    "kind": "imports",
+    "spelling": "crate::tls12",
+    "range": {
+      "start": 1499,
+      "end": 1503
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "tls12"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "tls12"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "tls12"
+        ]
+      ]
+    },
+    "line": 36,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "tls12"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/server/tls13.rs",
+    "kind": "imports",
+    "spelling": "crate::compress",
+    "range": {
+      "start": 1950,
+      "end": 1958
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "compress"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "compress"
+        ]
+      ]
+    },
+    "line": 49,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "compress"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/server/tls13.rs",
+    "kind": "imports",
+    "spelling": "crate::quic",
+    "range": {
+      "start": 2706,
+      "end": 2717
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "quic"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "line": 66,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/tls12.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 434,
+      "end": 438
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 14,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/tls13/key_schedule.rs",
+    "kind": "imports",
+    "spelling": "crate::quic",
+    "range": {
+      "start": 540,
+      "end": 551
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "quic"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "line": 17,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/tls13/mod.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 120,
+      "end": 124
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 7,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/tls13/mod.rs",
+    "kind": "imports",
+    "spelling": "crate::quic",
+    "range": {
+      "start": 202,
+      "end": 213
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "quic"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "quic"
+        ]
+      ]
+    },
+    "line": 9,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "quic"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/webpki/client_verifier.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 305,
+      "end": 318
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 13,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  },
+  {
+    "file": "rustls/src/webpki/server_verifier.rs",
+    "kind": "imports",
+    "spelling": "crate::crypto",
+    "range": {
+      "start": 752,
+      "end": 758
+    },
+    "analysis": {
+      "complete": true,
+      "reason": "",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "analysisTarget": [
+      "rustls/src/lib.rs",
+      "crypto"
+    ],
+    "resolution": {
+      "complete": false,
+      "reason": "conditional-name-may-be-absent",
+      "symbols": [
+        [
+          "rustls/src/lib.rs",
+          "crypto"
+        ]
+      ]
+    },
+    "line": 20,
+    "after": {
+      "resolution": "resolved",
+      "target": {
+        "file": "rustls/src/lib.rs",
+        "identity": "crypto"
+      }
+    }
+  }
+]

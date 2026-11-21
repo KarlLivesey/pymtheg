@@ -106,6 +106,124 @@ async function indexFixture(t, files) {
   return store;
 }
 
+test("core inherent dot calls need a proven receiver and first probe", async () => {
+  const fixture = new URL("./fixtures/rust-c31/", import.meta.url);
+  const source = await readFile(new URL("src/lib.rs", fixture), "utf8");
+  const cargo = await readFile(new URL("Cargo.toml", fixture), "utf8");
+  const lookup = await graph({ "src/lib.rs": source }, { "Cargo.toml": cargo });
+  for (const [call, symbol] of [
+    ["read(&[]).unwrap", "option::Option::unwrap"],
+    ["write().unwrap", "result::Result::unwrap"],
+    ["borrowed.is_some", "option::Option::is_some"],
+    ["text.len", "str::len"],
+    ['r"words".as_bytes', "str::as_bytes"],
+    ["'a'.is_alphabetic", "char::is_alphabetic"],
+    ["2u32.pow", "u32::pow"],
+    ["count.to_le_bytes", "u32::to_le_bytes"],
+    ["text.parse", "str::parse"],
+    ['"standard".len', "str::len"],
+    ['"core".len', "str::len"],
+    ["value.unwrap", "option::Option::unwrap"],
+  ])
+    assert.deepEqual(
+      lookup("calls", call),
+      [
+        {
+          ecosystem: "rust-std",
+          unit: "core",
+          symbol,
+          evidence: "declaring-owner",
+        },
+      ],
+      call,
+    );
+  assert.equal(lookup("calls", "custom.unwrap")[0]?.unit, undefined);
+  for (const call of [
+    "changed.len",
+    "text.parse().unwrap",
+    '"words".to_string',
+    'b"words".len',
+    'br"words".len',
+    'c"words".as_ptr',
+    "b'a'.is_alphabetic",
+    "1.max",
+    "probe.choose",
+    "reference.single",
+    "blanket.blanketed",
+    "wrapped.selected",
+    "other.earlier",
+    "option.len",
+    "mutable.is_some",
+  ])
+    assert.deepEqual(lookup("calls", call), [null], call);
+  assert.deepEqual(lookup("calls", "switching.choose"), [null, null]);
+});
+
+test("core method ownership follows the Cargo compiler floor", async (t) => {
+  const source = `#![no_std]
+    trait FloatExtension { fn abs(self) -> f32; }
+    impl FloatExtension for f32 { fn abs(self) -> f32 { self } }
+    fn calls(a: f32, b: f64, text: &str) {
+      a.abs();
+      b.signum();
+      text.len();
+      1f32.max(2.0);
+      1f64.max(2.0);
+      0xff32.max(2);
+    }`;
+  for (const [label, cargo, coreFloats, coreStr] of [
+    ["2021", manifest(), false, true],
+    ["1.83", manifest("2021", 'rust-version="1.83"'), false, true],
+    ["1.85", manifest("2021", 'rust-version="1.85.0"'), true, true],
+    ["2024", manifest("2024"), true, true],
+    ["2015", manifest("2015"), false, false],
+    ["1.27", manifest("2015", 'rust-version="1.27"'), false, true],
+  ])
+    await t.test(label, async (t) => {
+      const store = await indexFixture(t, {
+        "Cargo.toml": cargo,
+        "src/lib.rs": source,
+      });
+      const links = store.links();
+      function check(call, symbol, available) {
+        const link = links.find(
+          (l) => l.kind === "calls" && l.targetName === call,
+        );
+        assert.ok(link, call);
+        if (available) {
+          assert.equal(link.resolution, "library", call);
+          assert.equal(link.libraries[0].unit, "core", call);
+          assert.equal(link.libraries[0].symbol, symbol, call);
+        } else {
+          assert.equal(link.resolution, "unresolved", call);
+          assert.match(
+            link.data.uncertainty,
+            /^core-method-owner-version-unverified\b/,
+            call,
+          );
+        }
+      }
+      check("a.abs", "f32::abs", coreFloats);
+      check("b.signum", "f64::signum", coreFloats);
+      check("text.len", "str::len", coreStr);
+      check("1f32.max", "f32::max", true);
+      check("1f64.max", "f64::max", true);
+      assert.equal(
+        links.find((l) => l.targetName === "0xff32.max").resolution,
+        "unresolved",
+      );
+    });
+  const lookup = await graph(
+    { "member/src/lib.rs": source },
+    {
+      "Cargo.toml":
+        '[workspace]\nmembers=["member"]\n[workspace.package]\nrust-version="1.85"\n',
+      "member/Cargo.toml": manifest("2021", "rust-version.workspace=true"),
+    },
+  );
+  assert.equal(lookup("calls", "a.abs")[0]?.symbol, "f32::abs");
+});
+
 test("library paths, imports, preludes, Cargo aliases and version sources", async () => {
   const lookup = await graph(
     {
@@ -310,7 +428,16 @@ test("prelude credit requires the edition and a clear lexical namespace", async 
     const configured = await graph({
       "src/lib.rs": `#![${attribute}]\nfn f(_: Option<u8>) {}`,
     });
-    assert.deepEqual(configured("types", "Option"), [null]);
+    assert.deepEqual(configured("types", "Option"), [
+      attribute === "no_std"
+        ? {
+            ecosystem: "rust-std",
+            unit: "core",
+            symbol: "option::Option",
+            evidence: "declared-builtin",
+          }
+        : null,
+    ]);
   }
 });
 
@@ -364,14 +491,21 @@ test("workspace dependencies select versions only on a proven Cargo edge", async
   assert.deepEqual(both("types", "Serial::Serialize"), [named]);
 });
 
-test("sysroot names keep their written crate and a no_std crate withholds the std prelude", async () => {
+test("sysroot names keep their written crate and no_std uses the core prelude", async () => {
   const lookup = await graph({
     "src/lib.rs": `#![no_std]
     extern crate alloc as heap;
     fn f(_: Option<heap::vec::Vec<u8>>, x: &mut u8, y: &mut u8) { core::mem::swap(x, y); }
   `,
   });
-  assert.deepEqual(lookup("types", "Option"), [null]);
+  assert.deepEqual(lookup("types", "Option"), [
+    {
+      ecosystem: "rust-std",
+      unit: "core",
+      symbol: "option::Option",
+      evidence: "declared-builtin",
+    },
+  ]);
   assert.deepEqual(lookup("types", "heap::vec::Vec"), [
     {
       ecosystem: "rust-std",
@@ -388,6 +522,183 @@ test("sysroot names keep their written crate and a no_std crate withholds the st
       evidence: "qualified-path",
     },
   ]);
+});
+
+test("no_core withholds implicit sysroot and ordinary prelude names", async (t) => {
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest("2024", "[features]\nbare=[]\n"),
+    "src/lib.rs": `
+    #![feature(no_core)]
+    #![cfg_attr(feature = "bare", no_core)]
+    use std::cell::RefCell;
+    use core::cell::Cell;
+    extern crate core as explicit;
+    use explicit::cell::Cell as ExplicitCell;
+    fn bare(_: Option<u8>) {}
+    #[cfg(not(feature = "bare"))]
+    fn hosted(_: Result<(), ()>) {}
+    `,
+    "src/bin/standalone.rs": `
+    #![feature(no_core)]
+    #![no_core]
+    use std::cell::RefCell;
+    use core::cell::Cell;
+    fn bare(_: Option<u8>) {}
+    fn main() {}
+    `,
+  });
+  const links = store.links();
+  for (const file of ["src/lib.rs", "src/bin/standalone.rs"]) {
+    for (const [kind, spelling] of [
+      ["imports", "std::cell::RefCell"],
+      ["imports", "core::cell::Cell"],
+      ["types", "Option"],
+    ]) {
+      const link = links.find(
+        (l) => l.file === file && l.kind === kind && l.targetName === spelling,
+      );
+      assert.equal(link.resolution, "unresolved", spelling);
+      assert.equal(
+        link.data.uncertainty,
+        "core-prelude-availability-unverified",
+      );
+    }
+  }
+  assert.equal(
+    store.libraryUses("core", "cell::Cell", 10)[0].targetName,
+    "explicit::cell::Cell",
+  );
+  assert.equal(
+    store.libraryUses("std", "result::Result", 10)[0].targetName,
+    "Result",
+  );
+});
+
+test("bare macro_use imports report the unverified exports at a derive", async (t) => {
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest("2024", '[dependencies]\nhelper={path="helper"}\n'),
+    "src/lib.rs":
+      "#[macro_use] extern crate helper; #[derive(Default)] struct Item;",
+    "helper/Cargo.toml": manifest().replace('"app"', '"helper"'),
+    "helper/src/lib.rs": "#[macro_export] macro_rules! ping { () => {} }",
+  });
+  const derive = store
+    .links()
+    .find((l) => l.kind === "macros" && l.targetName === "Default");
+  assert.equal(derive.resolution, "unresolved");
+  assert.equal(derive.data.uncertainty, "macro-use-exports-unverified");
+});
+
+test("Rust links name shared prelude and known imports or explain the blocker", async (t) => {
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest(
+      "2024",
+      '[features]\nbare=[]\n[dependencies]\nwire={package="bytes",version="1.11.1"}\n',
+    ),
+    "Cargo.lock": macroLock([["bytes", "1.11.1"]], "0.1.0"),
+    "src/lib.rs": `
+    #![cfg_attr(feature = "bare", no_std)]
+    use core::cell::RefCell;
+    use wire::Bytes;
+    extern crate wire as byte_crate;
+
+    // After redb's LRU cache.
+    fn get_mut(cached: Option<&mut (u8, bool, u8)>) {
+        assert_eq!(1, 1);
+        if let Some((value, second_chance, _)) = cached {
+            *value = 1;
+            *second_chance = true;
+        }
+    }
+    mod shadow {
+        struct Some(u8);
+        type Result<T> = Option<T>;
+        fn f(input: Result<Some>) { if let Option::Some(Some(_)) = input {} }
+    }
+    mod disabled {
+        #![no_implicit_prelude]
+        fn f(_: Option<u8>) {}
+    }
+    mod opaque {
+        unknown!();
+        fn f(_: Option<u8>) {}
+    }
+    mod glob {
+        use wire::*;
+        fn f(_: Option<u8>) {}
+    }
+    fn no_alloc_prelude(_: String) {}
+    `,
+    // The actix-web pin contains an AnyOrSome file without a mod entry.
+    "src/any_or_some.rs": `
+    enum AnyOrSome<T> { Any, Item(T) }
+    fn item<T>(value: AnyOrSome<T>) -> Option<T> {
+        match value { AnyOrSome::Any => None, AnyOrSome::Item(v) => Some(v) }
+    }
+    `,
+    "admin/threads-seq.rs": "fn elapsed() -> i32 { let end = 1; end }",
+  });
+  const links = store.links();
+  for (const link of links) {
+    if (
+      link.resolution !== "resolved" &&
+      !link.libraries?.some(({ symbol }) => symbol)
+    )
+      assert.ok(link.data?.uncertainty?.trim(), JSON.stringify(link));
+  }
+  const ref = (kind, targetName, scope = "", file = "src/lib.rs") => {
+    const hits = links.filter(
+      (link) =>
+        link.kind === kind &&
+        link.targetName === targetName &&
+        link.data?.scope === scope &&
+        link.file === file,
+    );
+    assert.equal(hits.length, 1, `${file} ${scope} ${kind} ${targetName}`);
+    return hits[0];
+  };
+  const target = (...args) =>
+    ref(...args).libraries?.map(({ unit, symbol }) => [unit, symbol]);
+  assert.deepEqual(target("patterns", "Some", "get_mut"), [
+    ["core", "option::Option::Some"],
+  ]);
+  assert.deepEqual(target("patterns", "Option::Some", "shadow::f"), [
+    ["core", "option::Option::Some"],
+  ]);
+  assert.deepEqual(target("macros", "assert_eq", "get_mut"), [
+    ["core", "assert_eq!"],
+  ]);
+  assert.deepEqual(target("imports", "core::cell::RefCell"), [
+    ["core", "cell::RefCell"],
+  ]);
+  assert.deepEqual(target("imports", "wire::Bytes"), [["bytes", "Bytes"]]);
+  assert.equal(ref("patterns", "Some", "shadow::f").resolution, "resolved");
+  assert.equal(ref("types", "Result", "shadow").resolution, "resolved");
+  for (const [scope, reason] of [
+    ["disabled", "no-implicit-prelude-binding-unverified"],
+    ["opaque", "opaque-item-may-shadow-name"],
+    [
+      "glob",
+      "glob-import-unverified|namespace/import/alias structure is unknown",
+    ],
+  ]) {
+    const link = ref("types", "Option", scope);
+    assert.equal(link.resolution, "unresolved");
+    assert.match(link.data.uncertainty, new RegExp(reason));
+  }
+  assert.equal(
+    ref("types", "String").data.uncertainty,
+    "shared-core-prelude-binding-unavailable",
+  );
+  assert.equal(
+    ref("values", "None", "item", "src/any_or_some.rs").data.uncertainty,
+    "crate-placement-unavailable",
+  );
+  assert.equal(
+    ref("values", "end", "elapsed", "admin/threads-seq.rs").data.uncertainty,
+    "crate-placement-unavailable",
+  );
+  assert.equal(ref("imports", "wire").data.uncertainty, "whole-crate-import");
 });
 
 test("exact library queries include imports and invocations of known macros", async (t) => {
@@ -456,6 +767,27 @@ test("exact library queries include imports and invocations of known macros", as
       candidateSet: 0,
     });
   }
+});
+
+test("a guessed placement does not put a cfg on a known module declaration", async (t) => {
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest(),
+    "src/lib.rs": "mod chosen; mod elsewhere; use crate::chosen as kept;",
+    "src/chosen.rs": "pub fn known() {}",
+    "src/elsewhere.rs": '#[path="./alternate/chosen.rs"] mod chosen;',
+    "src/alternate/chosen.rs": "pub fn alternate() {}",
+  });
+  const chosen = store
+    .links()
+    .find(
+      (link) => link.kind === "imports" && link.targetName === "crate::chosen",
+    );
+  assert.equal(chosen.resolution, "resolved");
+  assert.equal(
+    store.findSymbols().find(({ id }) => id === chosen.targetId).identity,
+    "chosen",
+  );
+  assert.equal(chosen.data.uncertainty, undefined);
 });
 
 test("opaque module items cannot replace a known explicit import in its namespace", async () => {

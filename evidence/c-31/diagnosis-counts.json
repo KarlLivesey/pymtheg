@@ -1,0 +1,160 @@
+{
+  "pinsByReason": [
+    [
+      "BurntSushi/ripgrep",
+      9914,
+      9905,
+      {
+        "receiver-type-unverified": 7666,
+        "path-type-unverified": 1106,
+        "later-probe-step": 836,
+        "inherent-applicability-unverified": 306
+      }
+    ],
+    [
+      "actix/actix-web",
+      27264,
+      26458,
+      {
+        "receiver-type-unverified": 19377,
+        "path-type-unverified": 6467,
+        "inherent-applicability-unverified": 1254,
+        "later-probe-step": 166
+      }
+    ],
+    [
+      "cberner/redb",
+      27536,
+      27519,
+      {
+        "receiver-type-unverified": 23732,
+        "path-type-unverified": 1866,
+        "later-probe-step": 911,
+        "inherent-applicability-unverified": 1029
+      }
+    ],
+    [
+      "crossbeam-rs/crossbeam",
+      10879,
+      10825,
+      {
+        "receiver-type-unverified": 8911,
+        "path-type-unverified": 1482,
+        "later-probe-step": 247,
+        "inherent-applicability-unverified": 239
+      }
+    ],
+    [
+      "fjall-rs/fjall",
+      4810,
+      4808,
+      {
+        "receiver-type-unverified": 3868,
+        "path-type-unverified": 738,
+        "inherent-applicability-unverified": 119,
+        "later-probe-step": 85
+      }
+    ],
+    [
+      "helix-editor/helix",
+      22234,
+      21918,
+      {
+        "receiver-type-unverified": 16897,
+        "inherent-applicability-unverified": 1504,
+        "path-type-unverified": 3295,
+        "later-probe-step": 544
+      }
+    ],
+    [
+      "rust-embedded/cortex-m",
+      749,
+      724,
+      {
+        "receiver-type-unverified": 575,
+        "path-type-unverified": 146,
+        "later-probe-step": 15,
+        "inherent-applicability-unverified": 13
+      }
+    ],
+    [
+      "rustls/rustls",
+      19423,
+      18877,
+      {
+        "receiver-type-unverified": 14090,
+        "path-type-unverified": 5715,
+        "later-probe-step": 105,
+        "inherent-applicability-unverified": 430
+      }
+    ],
+    [
+      "serde-rs/serde",
+      5934,
+      5799,
+      {
+        "path-type-unverified": 3228,
+        "receiver-type-unverified": 2827,
+        "later-probe-step": 2,
+        "inherent-applicability-unverified": 4
+      }
+    ],
+    [
+      "tokio-rs/axum",
+      10190,
+      10118,
+      {
+        "receiver-type-unverified": 7190,
+        "path-type-unverified": 2478,
+        "inherent-applicability-unverified": 473,
+        "later-probe-step": 49
+      }
+    ]
+  ],
+  "totals": {
+    "destructured": 5668,
+    "associated path": 29326,
+    "method chain": 26715,
+    "std call result": 1613,
+    "iterator-item": 1287,
+    "closure-parameter": 3035,
+    "control-flow": 954,
+    "generic or associated type": 1322,
+    "annotation-shape": 1977,
+    "macro result or expansion": 1721,
+    "constructor-shaped checkout call result": 1041,
+    "checkout trait name is only a later form": 253,
+    "field": 9406,
+    "written receiver type": 6662,
+    "no receiver recipe": 16226,
+    "no receiver recipe in macro arguments": 16226,
+    "self in impl or trait": 2424,
+    "pattern-binding": 4681,
+    "written checkout call result": 2885,
+    "generic-call": 825,
+    "index": 1070,
+    "string literal": 878,
+    "borrow, deref, try or await": 3421,
+    "struct literal or unit value": 845,
+    "unresolved call result": 10793,
+    "path-value": 641,
+    "literal or aggregate": 831,
+    "binary": 302,
+    "third-party call result": 582,
+    "impl Trait, dyn Trait or trait Self": 248,
+    "binding-unproved": 634,
+    "untyped callee kind": 51,
+    "range": 319,
+    "non-local-value": 144,
+    "call-expression": 12,
+    "closure-call": 158,
+    "type_cast": 116,
+    "call result": 11,
+    "closure": 30,
+    "operator": 7,
+    "uninitialized": 51,
+    "assignment": 1,
+    "generic_function": 1,
+    "unit": 19
+  }
+}
