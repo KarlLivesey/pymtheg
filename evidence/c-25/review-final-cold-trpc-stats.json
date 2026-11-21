@@ -1,0 +1,19 @@
+[
+  {
+    "pin": "trpc/trpc",
+    "before": 107470,
+    "after": 107470,
+    "beforeL2": 95508,
+    "afterL2": 95508,
+    "shared": 107470,
+    "sharedBeforeL2": 95508,
+    "sharedAfterL2": 95508,
+    "lostSites": 0,
+    "newSites": 0,
+    "withdrawals": 0,
+    "definiteChanges": 0,
+    "checkoutSymbols": 17804,
+    "symbolKeysMatch": true,
+    "gainsByProof": {}
+  }
+]

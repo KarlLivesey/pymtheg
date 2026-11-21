@@ -1,0 +1,759 @@
+{
+  "pin": "honojs/hono",
+  "commit": "676c8f80fcafc49e6e74c847a8f0d9c44cc7faee",
+  "artifact": "hono@4.13.19",
+  "integrity": "sha512-KmXvQAXwcAHV+muzbIwoJ23niEB5nMoDVr9WcRkU8mvjUECm/1+7v4Jgp7P7a+H6MLFrh+vXrGonGrGS+RQfkA==",
+  "seed": "c25-opus-unbundle-2026",
+  "sites": [
+    {
+      "file": "adapters/aws-lambda/test/index.test.ts",
+      "line": 136,
+      "kind": "calls",
+      "name": "c.req.query",
+      "target": [
+        "src/request.ts",
+        "method@4053",
+        0
+      ],
+      "targetLine": 145,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/request.d.ts",
+        "line": 83
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/request.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/aws-lambda/test/index.test.ts",
+      "line": 927,
+      "kind": "calls",
+      "name": "stream.sleep",
+      "target": [
+        "src/utils/stream.ts",
+        "method@1689",
+        0
+      ],
+      "targetLine": 65,
+      "entry": "dist/types/helper/streaming/index.d.ts",
+      "sourceEntry": "src/helper/streaming/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/utils/stream.d.ts",
+        "line": 23
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/helper/streaming/index.d.ts",
+        "owner": [
+          "dist/types/utils/stream.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/aws-lambda/test/index.test.ts",
+      "line": 90,
+      "kind": "calls",
+      "name": "app.post",
+      "target": [
+        "src/hono-base.ts",
+        "property@3326",
+        0
+      ],
+      "targetLine": 122,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono-base.d.ts",
+        "line": 71
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono-base.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/cloudflare-workers/src/serve-static.test.ts",
+      "line": 169,
+      "kind": "references",
+      "name": "Next",
+      "target": [
+        "src/types.ts",
+        "type@853",
+        0
+      ],
+      "targetLine": 35,
+      "entry": "dist/types/types.d.ts",
+      "sourceEntry": "src/types.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/types.d.ts",
+        "line": 14
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/types.d.ts",
+        "owner": [
+          "dist/types/types.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/bun/src/websocket.ts",
+      "line": 68,
+      "kind": "references",
+      "name": "UpgradeWebSocket",
+      "target": [
+        "src/helper/websocket/index.ts",
+        "interface@633",
+        0
+      ],
+      "targetLine": 24,
+      "entry": "dist/types/helper/websocket/index.d.ts",
+      "sourceEntry": "src/helper/websocket/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/helper/websocket/index.d.ts",
+        "line": 17
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/helper/websocket/index.d.ts",
+        "owner": [
+          "dist/types/helper/websocket/index.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/lambda-edge/src/handler.test.ts",
+      "line": 122,
+      "kind": "calls",
+      "name": "c.body",
+      "target": [
+        "src/context.ts",
+        "property@19519",
+        0
+      ],
+      "targetLine": 682,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 400
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/cloudflare-workers/src/serve-static.test.ts",
+      "line": 169,
+      "kind": "references",
+      "name": "Context",
+      "target": [
+        "src/context.ts",
+        "class@8924",
+        0
+      ],
+      "targetLine": 293,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 190
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/bun/test/index.test.ts",
+      "line": 61,
+      "kind": "calls",
+      "name": "app.request",
+      "target": [
+        "src/hono-base.ts",
+        "property@15712",
+        0
+      ],
+      "targetLine": 518,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono-base.d.ts",
+        "line": 213
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono-base.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/bun/test/index.test.ts",
+      "line": 32,
+      "kind": "calls",
+      "name": "app.all",
+      "target": [
+        "src/hono-base.ts",
+        "property@3716",
+        0
+      ],
+      "targetLine": 128,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono-base.d.ts",
+        "line": 77
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono-base.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/cloudflare-workers/src/serve-static.test.ts",
+      "line": 165,
+      "kind": "references",
+      "name": "Next",
+      "target": [
+        "src/types.ts",
+        "type@853",
+        0
+      ],
+      "targetLine": 35,
+      "entry": "dist/types/types.d.ts",
+      "sourceEntry": "src/types.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/types.d.ts",
+        "line": 14
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/types.d.ts",
+        "owner": [
+          "dist/types/types.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/bun/test/index.test.ts",
+      "line": 5,
+      "kind": "imports",
+      "name": "hono/ws",
+      "target": [
+        "src/helper/websocket/index.ts",
+        "module@0",
+        0
+      ],
+      "targetLine": 1,
+      "entry": "dist/types/helper/websocket/index.d.ts",
+      "sourceEntry": "src/helper/websocket/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/helper/websocket/index.d.ts",
+        "line": 1
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/helper/websocket/index.d.ts",
+        "owner": [
+          "dist/types/helper/websocket/index.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/aws-lambda/src/conninfo.ts",
+      "line": 45,
+      "kind": "references",
+      "name": "GetConnInfo",
+      "target": [
+        "src/helper/conninfo/types.ts",
+        "type@633",
+        0
+      ],
+      "targetLine": 45,
+      "entry": "dist/types/helper/conninfo/index.d.ts",
+      "sourceEntry": "src/helper/conninfo/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/helper/conninfo/types.d.ts",
+        "line": 37
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/helper/conninfo/index.d.ts",
+        "owner": [
+          "dist/types/helper/conninfo/types.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/bun/src/ssg.ts",
+      "line": 13,
+      "kind": "references",
+      "name": "FileSystemModule",
+      "target": [
+        "src/helper/ssg/ssg.ts",
+        "interface@1306",
+        0
+      ],
+      "targetLine": 34,
+      "entry": "dist/types/helper/ssg/index.d.ts",
+      "sourceEntry": "src/helper/ssg/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/helper/ssg/ssg.d.ts",
+        "line": 10
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/helper/ssg/index.d.ts",
+        "owner": [
+          "dist/types/helper/ssg/ssg.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/vercel/src/conninfo.ts",
+      "line": 1,
+      "kind": "imports",
+      "name": "GetConnInfo",
+      "target": [
+        "src/helper/conninfo/types.ts",
+        "type@633",
+        0
+      ],
+      "targetLine": 45,
+      "entry": "dist/types/helper/conninfo/index.d.ts",
+      "sourceEntry": "src/helper/conninfo/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/helper/conninfo/types.d.ts",
+        "line": 37
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/helper/conninfo/index.d.ts",
+        "owner": [
+          "dist/types/helper/conninfo/types.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/lambda-edge/src/handler.test.ts",
+      "line": 443,
+      "kind": "calls",
+      "name": "c.text",
+      "target": [
+        "src/context.ts",
+        "property@19970",
+        0
+      ],
+      "targetLine": 700,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 413
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/aws-lambda/test/index.test.ts",
+      "line": 122,
+      "kind": "calls",
+      "name": "c.json",
+      "target": [
+        "src/context.ts",
+        "property@20685",
+        0
+      ],
+      "targetLine": 726,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 426
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/aws-lambda/test/index.test.ts",
+      "line": 92,
+      "kind": "calls",
+      "name": "c.text",
+      "target": [
+        "src/context.ts",
+        "property@19970",
+        0
+      ],
+      "targetLine": 700,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 413
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/lambda-edge/test/index.test.ts",
+      "line": 32,
+      "kind": "calls",
+      "name": "c.req.parseBody",
+      "target": [
+        "src/request.ts",
+        "method@5702",
+        0
+      ],
+      "targetLine": 209,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/request.d.ts",
+        "line": 127
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/request.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/lambda-edge/src/handler.test.ts",
+      "line": 96,
+      "kind": "calls",
+      "name": "app.get",
+      "target": [
+        "src/hono-base.ts",
+        "property@3265",
+        0
+      ],
+      "targetLine": 121,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono-base.d.ts",
+        "line": 70
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono-base.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/bun/src/websocket.ts",
+      "line": 68,
+      "kind": "calls",
+      "name": "defineWebSocketHelper",
+      "target": [
+        "src/helper/websocket/index.ts",
+        "function@2682",
+        0
+      ],
+      "targetLine": 111,
+      "entry": "dist/types/helper/websocket/index.d.ts",
+      "sourceEntry": "src/helper/websocket/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/helper/websocket/index.d.ts",
+        "line": 65
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/helper/websocket/index.d.ts",
+        "owner": [
+          "dist/types/helper/websocket/index.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/cloudflare-workers/src/serve-static.test.ts",
+      "line": 1,
+      "kind": "imports",
+      "name": "Context",
+      "target": [
+        "src/context.ts",
+        "class@8924",
+        0
+      ],
+      "targetLine": 293,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 190
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/lambda-edge/src/handler.test.ts",
+      "line": 226,
+      "kind": "calls",
+      "name": "app.post",
+      "target": [
+        "src/hono-base.ts",
+        "property@3326",
+        0
+      ],
+      "targetLine": 122,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono-base.d.ts",
+        "line": 71
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono-base.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/bun/src/server.test.ts",
+      "line": 10,
+      "kind": "calls",
+      "name": "Context",
+      "target": [
+        "src/context.ts",
+        "class@8924",
+        0
+      ],
+      "targetLine": 293,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 190
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/bun/test/index.test.ts",
+      "line": 10,
+      "kind": "calls",
+      "name": "Hono",
+      "target": [
+        "src/hono.ts",
+        "class@571",
+        0
+      ],
+      "targetLine": 16,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono.d.ts",
+        "line": 12
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/aws-lambda/test/index.test.ts",
+      "line": 171,
+      "kind": "calls",
+      "name": "c.text",
+      "target": [
+        "src/context.ts",
+        "property@19970",
+        0
+      ],
+      "targetLine": 700,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 413
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/lambda-edge/src/handler.test.ts",
+      "line": 443,
+      "kind": "calls",
+      "name": "app.get",
+      "target": [
+        "src/hono-base.ts",
+        "property@3265",
+        0
+      ],
+      "targetLine": 121,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono-base.d.ts",
+        "line": 70
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono-base.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/lambda-edge/src/conninfo.ts",
+      "line": 1,
+      "kind": "imports",
+      "name": "Context",
+      "target": [
+        "src/context.ts",
+        "class@8924",
+        0
+      ],
+      "targetLine": 293,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/context.d.ts",
+        "line": 190
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/context.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/lambda-edge/test/index.test.ts",
+      "line": 31,
+      "kind": "calls",
+      "name": "app.post",
+      "target": [
+        "src/hono-base.ts",
+        "property@3326",
+        0
+      ],
+      "targetLine": 122,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono-base.d.ts",
+        "line": 71
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono-base.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/service-worker/src/handler.ts",
+      "line": 6,
+      "kind": "imports",
+      "name": "Hono",
+      "target": [
+        "src/hono.ts",
+        "class@571",
+        0
+      ],
+      "targetLine": 16,
+      "entry": "dist/types/index.d.ts",
+      "sourceEntry": "src/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/hono.d.ts",
+        "line": 12
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/index.d.ts",
+        "owner": [
+          "dist/types/hono.d.ts"
+        ]
+      }
+    },
+    {
+      "file": "adapters/cloudflare-workers/src/websocket.ts",
+      "line": 28,
+      "kind": "references",
+      "name": "WSReadyState",
+      "target": [
+        "src/helper/websocket/index.ts",
+        "type@1047",
+        0
+      ],
+      "targetLine": 45,
+      "entry": "dist/types/helper/websocket/index.d.ts",
+      "sourceEntry": "src/helper/websocket/index.ts",
+      "publishedDeclaration": {
+        "path": "dist/types/helper/websocket/index.d.ts",
+        "line": 26
+      },
+      "verdict": "right",
+      "compilerEmit": {
+        "entry": "dist/types/helper/websocket/index.d.ts",
+        "owner": [
+          "dist/types/helper/websocket/index.d.ts"
+        ]
+      }
+    }
+  ]
+}

@@ -373,6 +373,89 @@ test("a dependency linked to the checkout root reports the missing workspace ent
   });
 });
 
+test("a physical workspace link follows Astro's declaration-only subpath layout", async () => {
+  const { root, request, read, write } = await project();
+  const manifest = (build) =>
+    JSON.stringify({
+      name: "@astrojs/internal-helpers",
+      type: "module",
+      exports: { "./path": "./dist/path.js" },
+      scripts: { build },
+    });
+  await write("package.json", '{"type":"module"}');
+  await write(
+    "main.ts",
+    'import { prependForwardSlash } from "@astrojs/internal-helpers/path"; prependForwardSlash("docs");',
+  );
+  await write(
+    "checkout-helpers/package.json",
+    manifest("tsc -p tsconfig.build.json"),
+  );
+  await write(
+    "checkout-helpers/tsconfig.build.json",
+    '{"compilerOptions":{"module":"NodeNext","rootDir":"src","outDir":"dist","declaration":true,"emitDeclarationOnly":true},"include":["src"]}',
+  );
+  await write(
+    "checkout-helpers/src/path.ts",
+    'export function prependForwardSlash(path: string) { return "/" + path; }',
+  );
+  await mkdir(join(root, "node_modules/@astrojs"), { recursive: true });
+  await symlink(
+    "../../checkout-helpers",
+    join(root, "node_modules/@astrojs/internal-helpers"),
+    "dir",
+  );
+  await request("index");
+  const check = (assumed) =>
+    read((store, call) => {
+      const link = call("main.ts", "prependForwardSlash");
+      assert.equal(link.resolution, "resolved");
+      assert.equal(
+        store.findSymbols().find(({ id }) => id === link.targetId)?.file,
+        "checkout-helpers/src/path.ts",
+      );
+      assert.deepEqual(link.data.unbuiltEntry, {
+        proof: "tsconfig-emit",
+        build: "checkout-helpers/package.json",
+        config: "checkout-helpers/tsconfig.build.json",
+        output: "checkout-helpers/dist/path.d.ts",
+        source: "checkout-helpers/src/path.ts",
+        ...(assumed && { assumed: true }),
+      });
+      assert.deepEqual(
+        link.data.assumes,
+        assumed ? ["ts-unbuilt-entry-is-compiler-emit"] : undefined,
+      );
+    });
+  check(false);
+  await write("checkout-helpers/package.json", manifest("tsdown"));
+  await request("index");
+  check(true);
+});
+
+test("an output directory outside the checkout supplies no workspace entry proof", async () => {
+  const { root, request, read, write } = await project();
+  await write(
+    "package.json",
+    '{"name":"fixture-root","types":"./dist/index.d.ts","scripts":{"build":"tsc -p tsconfig.build.json"}}',
+  );
+  await write(
+    "tsconfig.build.json",
+    '{"compilerOptions":{"rootDir":"src","outDir":"../dist","declaration":true},"include":["src"]}',
+  );
+  await write("src/index.ts", "export function rootEntry() {}");
+  await write(
+    "sample/main.ts",
+    'import { rootEntry } from "fixture-root"; rootEntry();',
+  );
+  await mkdir(join(root, "sample/node_modules"));
+  await symlink("../..", join(root, "sample/node_modules/fixture-root"), "dir");
+  await request("index");
+  read((_, call) =>
+    assert.equal(call("sample/main.ts", "rootEntry").resolution, "unresolved"),
+  );
+});
+
 test("captured competing test types use the compiler's global symbol", async () => {
   const { request, read, write } = await project();
   await write(
