@@ -3030,3 +3030,27 @@ crash, a kill or a refused completion the next index redoes everything once
 snapshot each record came from would narrow that and is not built. Another
 connection's `wal_checkpoint(TRUNCATE)` during a run stops it as overtaken
 (a safe false alarm; no product path does it). [C-22](changes/C-22.md)
+
+### C-26 Non-returning analysis: a deterministic check before any deadline
+
+A file whose analysis would not return fails with a reason. Where the cause
+can be decided from the source, it is, with no clock. TypeScript 5.9's
+`getTypeAtFlowNode` follows single-successor flow steps in an uncounted loop.
+After binding, the module follows the same steps from every flow node of a
+captured file. A file where they repeat a node fails ("its control-flow
+analysis would not return", with line and column) under C-13's containment
+and cap. On microsoft/TypeScript it flags exactly the three
+`unreachableFlowAfterThrowing*` conformance tests, and nothing on the seven
+identity pins. Under a stopped taint walk the judge's dependence graphs are
+not explored: their answers would be overridden by `taint-budget-exhausted`.
+A file the compiler throws on in a later project is failed for the store.
+Earlier projects' links into it become `target-unavailable`, and their other
+links are flagged `no-unseen-declarations`. The cap counts compiler failures
+a program imports. **Trade:** other non-returning work (another compiler
+loop, exponential type work, a Go or Rust loop) still has no bound. A
+wall-clock watchdog in a worker is the only general bound. It is not built
+until a case needs it, because it would make results depend on the machine
+for the files it stops. Each result records a digest of the module's
+failed files (`failedFilesDigest`), not the map: a map of N failed files in
+each of M separately stored results is N x M in the store. **Rules out:**
+time limits where a deterministic property exists. See [C-26](changes/C-26.md).

@@ -546,3 +546,189 @@ test("exceptions in the syntax phase count toward the one cap on contained excep
     5,
   );
 });
+
+// microsoft/TypeScript's tests/cases/compiler/unreachableFlowAfterThrowing-
+// ForHead1.ts, reduced: a `for` head of throwing, immediately invoked
+// (generator) functions. The compiler's flow analysis of `console` in the
+// body follows a cycle of flow nodes without a limit and never returns. The
+// test is given a generous timeout only so that a regression fails instead
+// of hanging the run; nothing is asserted about time.
+const NON_RETURNING = {
+  "loop.ts": [
+    "for ((function () { throw 1; })(); (function* () { throw 2; })(); (function* () { throw 3; })()) {",
+    '  console.log("x");',
+    "}",
+    "",
+  ].join("\n"),
+  "other.ts": "export function fine() {}\nfine(); // fine-call\n",
+};
+
+test(
+  "a file whose flow analysis would not return fails with that reason, and the rest is read",
+  { timeout: 120_000 },
+  async () => {
+    const result = await indexFiles(NON_RETURNING);
+    assert.deepEqual(Object.keys(failedReasons(result)), ["loop.ts"]);
+    assert.equal(
+      failedReasons(result)["loop.ts"],
+      "The TypeScript compiler failed while analysing this file: its control-flow analysis would not return (the compiler follows a cycle of flow nodes from line 1, column 1 without a limit)",
+    );
+    const fine = linkOn(result, "other.ts", "// fine-call", "fine");
+    assert.equal(fine.target, "other.ts#fine");
+  },
+);
+
+test("loops whose flow analysis returns are not failed", async () => {
+  const result = await indexFiles({
+    "update.ts":
+      'for (let i = 0; i < 3; (function* () { throw 3; })()) {\n  console.log("x");\n}\n',
+    "condition.ts":
+      'for (let i = 0; (function* () { throw 2; })(); i++) {\n  console.log("x");\n}\n',
+    "ordinary.ts": "for (let i = 0; i < 3; i++) {\n  console.log(i);\n}\n",
+    "of.ts":
+      "for (const x of (function* () { throw 1; })()) {\n  console.log(x);\n}\n",
+    "body.ts":
+      "for (let i = 0; i < 3; i++) {\n  (function () { throw 1; })();\n  console.log(i);\n}\n",
+  });
+  assert.deepEqual(result.report.failed, []);
+});
+
+// microsoft/TypeScript's moduleElementsInWrongContext.ts: a namespace inside
+// a plain block is no symbol, but its members were linked to it as their
+// container, and that one invalid link failed every file of the repository.
+test("members of a namespace inside a block belong to the next container out", async () => {
+  const result = await indexFiles({
+    "block.ts":
+      "{\n  export namespace N {\n    export interface I {}\n  }\n}\n",
+    "other.ts":
+      "function helper() {}\nhelper(); // unrelated-call\nexport {};\n",
+  });
+  assert.deepEqual(result.report.failed, []);
+  const contains = result.links.filter(
+    (l) => l.file === "block.ts" && l.kind === "contains",
+  );
+  assert.deepEqual(
+    contains.map((l) => [l.text, l.resolution, l.target]),
+    [["export interface I {}", "resolved", "block.ts#I"]],
+  );
+  assert.equal(
+    linkOn(result, "other.ts", "unrelated-call", "helper").target,
+    "other.ts#helper",
+  );
+});
+
+test("a file the compiler throws on in a later project is failed for the store, and earlier projects that read it are decided again", async () => {
+  const result = await indexFiles(
+    {
+      "a/tsconfig.json": "{}\n",
+      "a/use.ts": [
+        'import { shared } from "../b/x"; // import-shared',
+        "shared(); // call-shared",
+        "export function local() {}",
+        "local(); // call-local",
+        "",
+      ].join("\n"),
+      "b/tsconfig.json": "{}\n",
+      "b/x.ts": "export function shared() {}\nshared();\n",
+    },
+    {
+      module: typescriptModule({
+        // b/x.ts trips the compiler when its own call on line 2 is read,
+        // which only project b's extraction of it does; project a read the
+        // file's declaration without trouble before.
+        checkerFault: (method, node) => {
+          if (
+            inFile(node, "b/x.ts") &&
+            fromExtraction() &&
+            !fromTaint() &&
+            node.getSourceFile().getLineAndCharacterOfPosition(node.getStart())
+              .line === 1
+          )
+            throw assertion("x");
+        },
+      }),
+    },
+  );
+  assert.deepEqual(failedReasons(result), {
+    "b/x.ts":
+      "The TypeScript compiler failed while analysing this file: Debug Failure. injected x",
+  });
+  for (const [marker, text] of [
+    ["// import-shared", "shared"],
+    ["// call-shared", "shared"],
+  ]) {
+    const link = linkOn(result, "a/use.ts", marker, text);
+    assert.equal(link.resolution, "unresolved", marker);
+    assert.equal(link.reason, "target-unavailable", marker);
+  }
+  const local = linkOn(result, "a/use.ts", "// call-local", "local");
+  assert.equal(local.target, "a/use.ts#local");
+  assert.ok(local.assumes.includes("no-unseen-declarations"));
+});
+
+test("the cap counts compiler failures a program imports from another project", async () => {
+  const files = { "a/tsconfig.json": "{}\n", "b/tsconfig.json": "{}\n" };
+  for (let i = 0; i < 60; i++)
+    files[`a/f${String(i).padStart(2, "0")}.ts`] =
+      `export const a${i} = ${i};\n`;
+  // Each of b's 60 files imports one of a's: b's program loads all 60.
+  for (let i = 0; i < 60; i++)
+    files[`b/g${String(i).padStart(2, "0")}.ts`] =
+      `import { a${i} } from "../a/f${String(i).padStart(2, "0")}";\nexport const b${i} = a${i};\n`;
+  const result = await indexFiles(files, {
+    module: typescriptModule({
+      syntaxFault: () => {
+        throw assertion("syntax");
+      },
+    }),
+  });
+  const reasons = failedReasons(result);
+  const own = (prefix, ending) =>
+    Object.entries(reasons).filter(
+      ([path, reason]) => path.startsWith(prefix) && reason.endsWith(ending),
+    ).length;
+  assert.equal(own("a/", "injected syntax"), 60);
+  // b's program loads the 60 failed a-files: with 40 of its own the cap of
+  // 100 is reached, and b's other 20 files fail for the cap.
+  assert.equal(own("b/", "injected syntax"), 40);
+  assert.equal(own("b/", "so the rest were not analysed"), 20);
+});
+
+// microsoft/TypeScript: every stored result carried the map of all 12,473
+// failed files, about 52 GB as JSON across 27,190 results, which ran the
+// indexer out of heap after analysis. A clean file's stored result must not
+// grow with the number of failed files in its project.
+test("a clean file's stored result does not grow with the number of failed files", async () => {
+  const stored = async (failing) => {
+    const files = { "clean.ts": "export function ok() {}\nok(); // ok-call\n" };
+    for (let i = 0; i < failing; i++)
+      files[`broken${String(i).padStart(3, "0")}.js`] = "const = ;\n";
+    const result = await indexFiles(files);
+    assert.equal(result.report.failed.length, failing);
+    const ok = linkOn(result, "clean.ts", "// ok-call", "ok");
+    assert.equal(ok.target, "clean.ts#ok");
+    return JSON.stringify(result.stored.get("clean.ts").result).length;
+  };
+  assert.equal(await stored(200), await stored(2));
+});
+
+test("an unchanged re-index reuses stored results when files have failed", async () => {
+  const { first, second } = await indexFiles(
+    {
+      "broken.js": "const = ;\n",
+      "clean.ts": "export function ok() {}\nok(); // ok-call\n",
+    },
+    { twice: true },
+  );
+  for (const result of [first, second]) {
+    assert.deepEqual(Object.keys(failedReasons(result)), ["broken.js"]);
+    assert.equal(
+      linkOn(result, "clean.ts", "// ok-call", "ok").target,
+      "clean.ts#ok",
+    );
+  }
+  assert.deepEqual(
+    second.stored.get("clean.ts").result,
+    first.stored.get("clean.ts").result,
+  );
+});

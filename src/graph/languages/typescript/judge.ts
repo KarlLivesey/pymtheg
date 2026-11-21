@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 import ts from "typescript";
-import { aliasChain, causesOfSymbol, type Taint } from "./taint.js";
+import {
+  aliasChain,
+  causesOfSymbol,
+  taintUnknown,
+  type Taint,
+} from "./taint.js";
 
 /**
  * The structural judgement (P-E, default-deny; docs/changes/W2-D.md, "The
@@ -564,8 +569,15 @@ export function createJudge(input: JudgeInput): Judge {
     }
     return parts;
   }
-  const reachesGraph = dependenceGraph(valueParts);
-  const typesGraph = dependenceGraph(typeParts);
+  // Under an unknown taint (the walk stopped at its budget) every link these
+  // graphs could clear is reported `taint-budget-exhausted` anyway, and
+  // links that bind a failed file directly are answered from the direct
+  // causes: exploring the program's dependence graph would only cost. On
+  // microsoft/TypeScript one exploration from the global `Object` exhausted
+  // the heap (docs/changes/C-26.md).
+  const unknown = taintUnknown(taint);
+  const reachesGraph = unknown ? () => [] : dependenceGraph(valueParts);
+  const typesGraph = unknown ? () => [] : dependenceGraph(typeParts);
   function reaches(node: ts.Node): string[] {
     return reachesGraph(node);
   }
