@@ -2,7 +2,7 @@
 // C-22 cold-index cost, one run at a time, alternating builds: each run is a
 // fresh process (cold-once.mjs) under GNU time, its store a new file in
 // <store dir> (removed after the run), the source the pristine pin.
-//   node scripts/reindex/cold-cost.mjs <store dir> <out.json> <rounds> <label=dist>... -- <pin dir>...
+//   node scripts/reindex/cold-cost.mjs <store dir> <out.json> <rounds> <label[@cache-pages]=dist>... -- <pin dir>...
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
@@ -22,6 +22,8 @@ import {
 const args = process.argv.slice(2);
 const compareGo = args.includes("--go-surface");
 if (compareGo) args.splice(args.indexOf("--go-surface"), 1);
+const exact = args.includes("--exact");
+if (exact) args.splice(args.indexOf("--exact"), 1);
 const option = (name) => {
   const at = args.indexOf(name);
   return at < 0 ? undefined : args.splice(at, 2)[1];
@@ -38,9 +40,10 @@ for (const pin of pins) {
   let baseline;
   for (let round = 0; round < Number(rounds); round++)
     for (const build of builds) {
-      const [label, dist] = build.split("=");
+      const [runLabel, dist] = build.split("=");
+      const [label, cachePages = cache] = runLabel.split("@");
       const store = join(storeDir, `cold-cost-${process.pid}.sqlite`);
-      if (cache !== undefined) setPageCache(store, Number(cache));
+      if (cachePages !== undefined) setPageCache(store, Number(cachePages));
       const child = spawnSync(
         "/usr/bin/time",
         [
@@ -59,11 +62,12 @@ for (const pin of pins) {
       if (child.status === 0 && save && label === "after") {
         const saved = join(save, `${basename(pin)}.sqlite`);
         copyFileSync(store, saved);
-        if (cache !== undefined) setPageCache(saved, 0);
+        if (cachePages !== undefined) setPageCache(saved, 0);
       }
       let equality;
-      if (child.status === 0 && compareGo) {
-        const rows = withoutGoSurface(storeRows(store));
+      if (child.status === 0 && (compareGo || exact)) {
+        const rawRows = storeRows(store);
+        const rows = compareGo ? withoutGoSurface(rawRows) : rawRows;
         baseline ??= rows;
         equality = {
           rows: Object.fromEntries(
@@ -86,6 +90,7 @@ for (const pin of pins) {
         pin: basename(pin),
         round,
         build: label,
+        ...(cachePages === undefined ? {} : { cachePages: Number(cachePages) }),
         wallS: time[0],
         cpuS: Math.round((time[1] + time[2]) * 10) / 10,
         peakMiB: Math.round(time[3] / 1024),
@@ -94,5 +99,9 @@ for (const pin of pins) {
       runs.push(run);
       console.log(JSON.stringify(run));
       writeFileSync(out, JSON.stringify(runs, null, 1));
+      if (exact && equality.differences.length)
+        throw Error(
+          `${basename(pin)} ${label} differs from the first cold run`,
+        );
     }
 }

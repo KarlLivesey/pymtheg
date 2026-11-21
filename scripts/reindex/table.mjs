@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Prints the C-22 tables from measure.mjs output directories.
-//   node scripts/reindex/table.mjs <out dir> [stages <pin> <step>] [compare <after dir>]
+//   node scripts/reindex/table.mjs <out dir> [stages <pin> <step>] [compare <after dir>] [fixed <after dir>]
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -57,7 +57,45 @@ const groups = [
     (n) => n === "index.report" || n === "command.metadata",
   ],
 ];
-if (mode === "groups") {
+if (mode === "fixed") {
+  const [after] = rest;
+  function fixed(r) {
+    const ms = (pattern) =>
+      Object.entries(r.stages)
+        .filter(([name]) => pattern.test(name))
+        .reduce((total, [, t]) => total + t.cpuMs, 0);
+    const startup = (r.startupCpuMs ?? 0) + (r.moduleLoadCpuMs ?? 0);
+    const groups = [
+      startup,
+      ms(/^command\.modules$/),
+      ms(/^(command\.inventory|index\.(walk|read|hash))$/),
+      ms(/^(index\.previous|(analyze|resolve)\.[^.]+\.input)$/),
+      ms(/^go\.globalIndex$/),
+      ms(/^resolve\.[^.]+\.(validationInput|validate)$/),
+      ms(
+        /^(command\.(sqlite(Open|Close)|checkpoint(Read|Write))|store\.(beginRun|finishRun))$/,
+      ),
+    ];
+    const total = r.cpuMs + startup;
+    return [...groups, total - groups.reduce((t, v) => t + v, 0), total];
+  }
+  console.log(
+    "| Pin | Edit | Start | Load modules | Inventory | Stored inputs | Go global | Validate | Journal and receipts | Other | Total |\n|---|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|",
+  );
+  for (const pin of pins) {
+    const a = load(dir, pin).results;
+    const b = load(after, pin).results;
+    for (const step of ["warm", "body"]) {
+      const x = fixed(a[step]);
+      const y = fixed(b[step]);
+      const pairs = x.map(
+        (value, i) =>
+          `${(value / 1000).toFixed(2)} → ${(y[i] / 1000).toFixed(2)}`,
+      );
+      console.log(`| ${pin} | ${step} | ${pairs.join(" | ")} |`);
+    }
+  }
+} else if (mode === "groups") {
   const [step, after] = rest;
   const cell = (r) => {
     const values = groups.map(([, test]) =>
@@ -114,6 +152,7 @@ if (mode === "groups") {
     for (const step of steps) {
       const x = a[step],
         y = b[step];
+      if (!x || !y) continue;
       const wx = work(x),
         wy = work(y);
       const pair = (p, q) => (p === q ? `${p}` : `${p} → ${q}`);
@@ -130,6 +169,7 @@ if (mode === "groups") {
     const summary = load(dir, pin);
     for (const step of steps) {
       const r = summary.results[step];
+      if (!r) continue;
       const w = work(r);
       const equal =
         step in summary.equality

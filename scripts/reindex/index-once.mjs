@@ -11,9 +11,9 @@ const [dist, root, out] = process.argv.slice(2);
 if (!dist || !root || !out)
   throw Error("usage: index-once.mjs <dist> <root> <out.json>");
 const load = (path) => import(pathToFileURL(resolve(dist, path)).href);
+const totalCpu = process.cpuUsage();
 const { executeGraph } = await load("graph/commands.js");
 const work = await load("graph/work.js").catch(() => undefined);
-const typescript = await load("graph/languages/typescript/index.js");
 work?.resetGraphWork();
 const cpu = process.cpuUsage();
 const wall = performance.now();
@@ -30,6 +30,10 @@ writeFileSync(
     {
       wallMs: Math.round(wallMs),
       cpuMs: Math.round((used.user + used.system) / 1000),
+      moduleLoadCpuMs: Math.round(
+        (cpu.user + cpu.system - totalCpu.user - totalCpu.system) / 1000,
+      ),
+      startupCpuMs: Math.round((totalCpu.user + totalCpu.system) / 1000),
       // Peak resident set of this process, in KiB.
       maxRssKiB: process.resourceUsage().maxRSS,
       complete: response.sync.complete,
@@ -50,7 +54,9 @@ writeFileSync(
         resolutionErrors: report.resolutionErrors,
       },
       counts: work ? { ...work.graphWork.counts } : null,
-      typescript: { ...typescript.statistics },
+      typescript: {
+        ...(await load("graph/languages/typescript/index.js")).statistics,
+      },
       stages: work
         ? Object.fromEntries(
             Object.entries(work.graphWork.stages).map(([name, time]) => [
