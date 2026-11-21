@@ -1,0 +1,65 @@
+[
+ {
+  "pin": "BurntSushi_ripgrep",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 137.29,
+  "cpuS": 123,
+  "peakMiB": 757,
+  "equality": {
+   "rows": {
+    "graph_files": 102,
+    "graph_contexts": 14,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4392,
+    "graph_links": 39819,
+    "graph_candidates": 24,
+    "graph_library_targets": 8159,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "BurntSushi_ripgrep",
+  "round": 0,
+  "build": "after",
+  "wallS": 123.07,
+  "cpuS": 108.5,
+  "peakMiB": 902,
+  "equality": {
+   "rows": {
+    "graph_files": 102,
+    "graph_contexts": 14,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4392,
+    "graph_links": 39819,
+    "graph_candidates": 24,
+    "graph_library_targets": 8159,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "BurntSushi_ripgrep",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 101.31,
+  "cpuS": 92.9,
+  "peakMiB": 769,
+  "equality": {
+   "rows": {
+    "graph_files": 102,
+    "graph_contexts": 14,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4392,
+    "graph_links": 39819,
+    "graph_candidates": 24,
+    "graph_library_targets": 8159,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]
