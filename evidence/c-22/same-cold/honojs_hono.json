@@ -1,0 +1,15 @@
+{
+ "root": "honojs_hono",
+ "rows": {
+  "graph_files": 460,
+  "graph_contexts": 163,
+  "graph_parse_failures": 0,
+  "graph_symbols": 5773,
+  "graph_links": 72340,
+  "graph_candidates": 26,
+  "graph_library_targets": 16760,
+  "project": 1
+ },
+ "equal": true,
+ "differences": []
+}

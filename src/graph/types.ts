@@ -269,6 +269,15 @@ export interface FailedFile {
   reason: string;
   range?: SourceRange;
 }
+/**
+ * One module's resolution as the store writes it, validated from the present
+ * state (C-22): `current` is analysisLinks(module), `desired` is
+ * resolutionFacts over the same links and the present symbols.
+ */
+export interface ValidatedAnalysis {
+  current: readonly GraphLink[];
+  desired: readonly GraphLink[];
+}
 export interface GraphStorage {
   readonly projectId: string;
   /**
@@ -292,6 +301,18 @@ export interface GraphStorage {
   >;
   /** Optional: one module's parsed links, as links() reports them. */
   moduleLinks?(module: string): StorageResult<GraphLink[]>;
+  /**
+   * Optional (C-22): one module's parsed links as a resolver receives them,
+   * each a moduleLinks() record with no target, candidates or library
+   * targets and resolution "unresolved". Fresh records, as independentReads.
+   */
+  moduleInputLinks?(module: string): StorageResult<GraphLink[]>;
+  /**
+   * Optional (C-22): every link of one module, parsed and added, as links()
+   * reports them. With it, the indexer validates once and hands
+   * replaceAnalysis the result (ValidatedAnalysis).
+   */
+  analysisLinks?(module: string): StorageResult<GraphLink[]>;
   /** Optional row counts; the indexer otherwise counts decoded reads. */
   counts?(): StorageResult<{
     symbols: number;
@@ -304,6 +325,19 @@ export interface GraphStorage {
   replaceContexts(files: readonly ContextFile[]): StorageResult<void>;
   /** Optional capability for backends predating failed-parse caching. */
   isParseFailure?(path: string): StorageResult<boolean>;
+  /**
+   * Optional (C-22): an index run marks the store before its first write
+   * and clears the mark with its last. A mark found at the start means the
+   * previous run did not finish; no stored analysis is then reused.
+   */
+  unfinishedIndexRun?(): StorageResult<boolean>;
+  /**
+   * Begins a run owned by this call; true when a mark of another run was
+   * found (and taken over). Each later write of the run proves it still owns
+   * the store, or throws without writing.
+   */
+  beginIndexRun?(): StorageResult<boolean>;
+  finishIndexRun?(): StorageResult<void>;
   failedFiles?(): StorageResult<FailedFile[]>;
   /** parseFailure distinguishes cacheable parser failures from retryable project failures. */
   replaceFile(file: GraphFile, parseFailure?: boolean): StorageResult<void>;
@@ -316,10 +350,15 @@ export interface GraphStorage {
   unresolved(): StorageResult<GraphLink[]>;
   ambiguous(): StorageResult<GraphLink[]>;
   resolveLinks(resolutions: readonly LinkResolution[]): StorageResult<void>;
-  /** Atomically replace this module's derived links and all its target decisions. */
+  /**
+   * Atomically replace this module's derived links and all its target
+   * decisions. `validated`, when given, is what the store would derive from
+   * `result` (C-22); a store may ignore it and derive its own.
+   */
   replaceAnalysis(
     module: string,
     result: ResolutionResult,
+    validated?: ValidatedAnalysis,
   ): StorageResult<void>;
   neighbourhood(
     id: string,
