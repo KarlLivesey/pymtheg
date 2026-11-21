@@ -1056,6 +1056,9 @@ async function createHelper(): Promise<Helper> {
         noStdConditions: effectiveAttributes(tree.rootNode)
           .filter((a) => a.meta.name === "no_std")
           .map((a) => a.guards),
+        noCoreConditions: effectiveAttributes(tree.rootNode)
+          .filter((a) => a.meta.name === "no_core")
+          .map((a) => a.guards),
         ...(fileMacroUse.length ? { macroUseConditions: fileMacroUse } : {}),
         ...(fileModulePath.paths.length || fileModulePath.pathOpaque
           ? { innerModulePath: fileModulePath }

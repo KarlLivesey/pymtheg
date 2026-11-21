@@ -27,6 +27,7 @@ export class LinkDecider {
     symbols: readonly GraphSymbol[],
     /** Whether a path is a clean manifest/lockfile context file in the snapshot. */
     private readonly versionSource: (path: string) => boolean = () => false,
+    private readonly missingLinkReason?: string,
   ) {
     this.byId = new Map(symbols.map((symbol) => [symbol.id, symbol]));
   }
@@ -45,7 +46,7 @@ export class LinkDecider {
       resolution: "unresolved",
     };
     delete next.libraries;
-    if (!decision) return next;
+    if (!decision) return this.explainOpenLink(next);
     if (decision.library !== undefined) {
       if (
         decision.targetId !== undefined ||
@@ -85,7 +86,26 @@ export class LinkDecider {
       next.targetStatus = symbol.status;
       next.resolution = "resolved";
     }
-    return next;
+    return this.explainOpenLink(next);
+  }
+  private explainOpenLink(link: GraphLink): GraphLink {
+    const reason = this.missingLinkReason;
+    if (!reason || link.origin !== "parse") return link;
+    const d = link.data;
+    if (d !== undefined && (!d || typeof d !== "object" || Array.isArray(d)))
+      throw Error("A missing link reason requires object link data");
+    if (
+      link.resolution === "resolved" ||
+      (link.resolution === "library" && link.libraries?.[0]?.symbol)
+    ) {
+      if (d?.uncertainty === reason) {
+        const { uncertainty: _previous, ...data } = d;
+        link.data = data;
+      }
+    } else if (!d?.uncertainty && !d?.reason) {
+      link.data = { ...d, uncertainty: reason };
+    }
+    return link;
   }
 }
 /** Pure validation before storage writes; module mistakes cannot be confused with backend errors. */
@@ -104,7 +124,11 @@ export function resolutionFacts(
     (link) => link.module === module && link.origin === "parse",
   );
   const linkIds = new Set(links.map((link) => link.id));
-  const decider = new LinkDecider(symbols, versionSource);
+  const decider = new LinkDecider(
+    symbols,
+    versionSource,
+    result.missingLinkReason,
+  );
   const symbolsById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
   /** Per file with added links: what validation needs, not the whole record. */
   interface Checked {

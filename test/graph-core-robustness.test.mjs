@@ -34,6 +34,57 @@ async function project(run) {
   }
 }
 
+test("a reason supplied at final resolution is stored and cleared when the link closes", async () => {
+  await project(async ({ store, reopen }) => {
+    store.replaceFile({
+      path: "a.x",
+      text: "x",
+      hash: "hash",
+      module: "x",
+      version: "1",
+      result: {
+        ...clean(),
+        symbols: [
+          {
+            key: "x",
+            name: "x",
+            identity: "x",
+            kind: "constant",
+            range: { start: 0, end: 1 },
+          },
+        ],
+        links: [
+          {
+            sourceKey: null,
+            kind: "references",
+            targetName: "x",
+            range: { start: 0, end: 1 },
+            data: { lexical: true },
+          },
+        ],
+      },
+    });
+    const [link] = store.links();
+    const final = {
+      links: [],
+      resolutions: [],
+      missingLinkReason: "analysis-resolution-disagreement",
+    };
+    store.replaceAnalysis("x", final);
+    store = reopen();
+    assert.deepEqual(store.links()[0].data, {
+      lexical: true,
+      uncertainty: "analysis-resolution-disagreement",
+    });
+    store.replaceAnalysis("x", {
+      ...final,
+      resolutions: [{ linkId: link.id, targetId: store.findSymbols()[0].id }],
+    });
+    assert.equal(store.links()[0].resolution, "resolved");
+    assert.deepEqual(store.links()[0].data, { lexical: true });
+  });
+});
+
 test("module analysis uses row-sized JSON on writes, equality, reads and reopen", async () => {
   await project(async ({ store, reopen, database }) => {
     store.replaceFile({

@@ -1,0 +1,102 @@
+{
+  "paired": [
+    {
+      "id": "cberner/redb",
+      "run": "main-a",
+      "wallSeconds": 187.41,
+      "userSeconds": 77.28,
+      "systemSeconds": 104.8,
+      "peakRssKiB": 1048236
+    },
+    {
+      "id": "cberner/redb",
+      "run": "candidate",
+      "wallSeconds": 173.81,
+      "userSeconds": 78.03,
+      "systemSeconds": 108.26,
+      "peakRssKiB": 1005548
+    },
+    {
+      "id": "cberner/redb",
+      "run": "main-b",
+      "wallSeconds": 181.38,
+      "userSeconds": 79.87,
+      "systemSeconds": 104.73,
+      "peakRssKiB": 1024116
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "run": "main-a",
+      "wallSeconds": 17.9,
+      "userSeconds": 10.42,
+      "systemSeconds": 9.77,
+      "peakRssKiB": 366284
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "run": "candidate",
+      "wallSeconds": 20.54,
+      "userSeconds": 10.45,
+      "systemSeconds": 12.49,
+      "peakRssKiB": 362996
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "run": "main-b",
+      "wallSeconds": 22.66,
+      "userSeconds": 10.36,
+      "systemSeconds": 12.53,
+      "peakRssKiB": 379140
+    }
+  ],
+  "overlappingSweep": [
+    {
+      "id": "cberner/redb",
+      "run": "main-a",
+      "wallSeconds": 225.86,
+      "userSeconds": 70.47,
+      "systemSeconds": 146.75,
+      "peakRssKiB": 1085740
+    },
+    {
+      "id": "cberner/redb",
+      "run": "main-b",
+      "wallSeconds": 204.26,
+      "userSeconds": 73.01,
+      "systemSeconds": 142.73,
+      "peakRssKiB": 1048068
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "run": "main-a",
+      "wallSeconds": 24.19,
+      "userSeconds": 10.55,
+      "systemSeconds": 13.59,
+      "peakRssKiB": 366288
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "run": "main-b",
+      "wallSeconds": 17.69,
+      "userSeconds": 10.57,
+      "systemSeconds": 9.65,
+      "peakRssKiB": 380872
+    },
+    {
+      "id": "cberner/redb",
+      "run": "final-layout",
+      "wallSeconds": 258.85,
+      "userSeconds": 75.95,
+      "systemSeconds": 160.83,
+      "peakRssKiB": 1116604
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "run": "final-layout",
+      "wallSeconds": 19.67,
+      "userSeconds": 11.2,
+      "systemSeconds": 9.47,
+      "peakRssKiB": 358248
+    }
+  ]
+}

@@ -175,6 +175,8 @@ export interface AddedLink {
 export interface ResolutionResult {
   resolutions: readonly LinkResolution[];
   links: readonly AddedLink[];
+  /** Reason for an open parsed link whose analysis stored no explanation. */
+  missingLinkReason?: string;
 }
 export interface ResolutionContext {
   projectId: string;
