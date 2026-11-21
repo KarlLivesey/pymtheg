@@ -1474,7 +1474,14 @@ hash, module and version), `analyze` over the whole snapshot on every run, and
 `resolve` over all symbols and files and this module's parsed links, decoded
 afresh from storage for each module (independent records, nothing kept between
 modules), plus a deep copy of the context files. The store caches no decoded
-file records (C-2). `failedFiles()` reads the failed source
+file records (C-2). `analyze` receives only its own module's records. The
+resolver's links are read as it receives them (unresolved), without their
+previous target, candidate or library rows; after it returns, the module's
+links are read once, validated with `resolutionFacts`, and the store writes
+from that validated result (`replaceAnalysis` given the validated links) instead of reading and deriving
+it again (C-22). Observation-only work counters and stage times
+(`src/graph/work.ts`) record each stage's operations; nothing reads them to
+decide anything. `failedFiles()` reads the failed source
 files back; derived links are compared and written per row. Results are validated before any write;
 module exceptions are reported in `errors`, `analysisErrors` or
 `resolutionErrors` and leave earlier valid facts in place; storage failures
@@ -1620,7 +1627,37 @@ The TypeScript module can read installed declaration and resolution metadata
 files under the checkout's `node_modules` on demand. The dependency inputs
 are recorded as module-owned context, so the version validator accepts an
 installed `package.json` whose text was captured. Installed implementations
-and network access are outside this path.
+and network access are outside this path. Within one run every read of an
+installed file returns the bytes of its first read; the record holds those
+bytes' content hash and the stamp (device, inode, mode, size, mtime, ctime)
+from the reading handle. A change is decided by content: a stamp that moves
+during a read or between runs leads to a re-hash, and the same bytes count
+as unchanged (between runs the record takes the stamp the file now has), so
+a link added by another install sharing the package store never makes a
+present file absent. A file read this run whose bytes on disk differ at the
+end of the run is recorded with a stamp no file can have, so the next run
+analyses it again (C-22).
+
+**Unfinished runs (C-22).** `indexProject` marks the store (`graph_meta`
+`index-run`) in the same commit as its first write, together with removing
+the completion record, and clears the mark in its last commit; a run that
+writes nothing writes no mark. The mark holds the run's identifier: a run
+chooses the journal first, then reads its data-version baseline and the
+mark in one read transaction, and takes over a mark it finds; every
+check-and-write is one `BEGIN IMMEDIATE` transaction in which its first
+write proves the version is still the baseline, each later commit that the
+mark is still its own, or it stops with `GraphIndexTakenOver` without
+writing, and the version is re-read before the commit; it clears only its
+own mark. The completion record is written only when it would differ and
+only if, under its write lock, no other connection committed since the
+run's last commit; otherwise the same transaction marks the store
+unfinished. A no-edit `graph index` writes no row; choosing the journal
+advances only SQLite's file change counter (header bytes 24-27, 92-95). Commits survive a
+crash only as a prefix, so any surviving write of a run has the mark with
+it. A run that finds the mark parses and writes every claimed file again
+and counts every context file as changed, so no module reuses stored
+analysis and every row is rewritten. `graphCommandState()` returns nothing while the
+mark is set, so `graph status` does not report complete.
 
 Queries: `pymtheg graph uses UNIT [SYMBOL]` and MCP `code_graph` action `uses`
 (`query`, optional `symbol`). Every link answer shows certainty `library` and

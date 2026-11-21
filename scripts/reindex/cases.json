@@ -1,0 +1,53 @@
+{
+  "comment": "C-22 one-file edit cases. Each pin has one widely imported file; the three edits are applied to it in turn, each to a fresh copy of the cold-indexed checkout. `comment` appends a comment line; `body` inserts a no-op statement after `anchor` (a function's opening line); `export` appends a new exported declaration.",
+  "pins": [
+    {
+      "id": "restic/restic",
+      "file": "internal/errors/errors.go",
+      "comment": "\n// c22: comment-only edit\n",
+      "anchor": "func Unwrap(err error) error {",
+      "body": " _ = 0;",
+      "export": "\nfunc C22Probe() int { return 1 }\n"
+    },
+    {
+      "id": "cli/cli",
+      "file": "pkg/cmdutil/errors.go",
+      "comment": "\n// c22: comment-only edit\n",
+      "anchor": "func FlagErrorf(format string, args ...any) error {",
+      "body": "\n\t_ = 0",
+      "export": "\nfunc C22Probe() int { return 1 }\n"
+    },
+    {
+      "id": "honojs/hono",
+      "file": "src/utils/url.ts",
+      "comment": "\n// c22: comment-only edit\n",
+      "anchor": "export const splitPath = (path: string): string[] => {",
+      "body": "\n  void 0",
+      "export": "\nexport function c22Probe(): number {\n  return 1\n}\n"
+    },
+    {
+      "id": "trpc/trpc",
+      "file": "packages/server/src/unstable-core-do-not-import/utils.ts",
+      "comment": "\n// c22: comment-only edit\n",
+      "anchor": "export function isObject(value: unknown): value is Record<string, unknown> {",
+      "body": "\n  void 0;",
+      "export": "\nexport function c22Probe(): number {\n  return 1;\n}\n"
+    },
+    {
+      "id": "BurntSushi/ripgrep",
+      "file": "crates/matcher/src/lib.rs",
+      "comment": "\n// c22: comment-only edit\n",
+      "anchor": "    pub fn new(start: usize, end: usize) -> Match {",
+      "body": "\n        let _ = 0;",
+      "export": "\npub fn c22_probe() -> u32 {\n    1\n}\n"
+    },
+    {
+      "id": "helix-editor/helix",
+      "file": "helix-core/src/graphemes.rs",
+      "comment": "\n// c22: comment-only edit\n",
+      "anchor": "pub fn tab_width_at(visual_x: usize, tab_width: u16) -> usize {",
+      "body": "\n    let _ = 0;",
+      "export": "\npub fn c22_probe() -> u32 {\n    1\n}\n"
+    }
+  ]
+}

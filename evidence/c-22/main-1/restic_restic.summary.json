@@ -1,0 +1,259 @@
+{
+ "id": "restic/restic",
+ "file": "internal/errors/errors.go",
+ "results": {
+  "cold": {
+   "wallMs": 271598,
+   "cpuMs": 211255,
+   "maxRssKiB": 720692,
+   "complete": true,
+   "report": {
+    "discovered": 1407,
+    "claimed": 559,
+    "indexed": 559,
+    "unchanged": 0,
+    "removed": 0,
+    "symbols": 8092,
+    "links": 64165,
+    "unresolved": 2305,
+    "ambiguous": 1459,
+    "library": 18022,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": null,
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": null
+  },
+  "warm": {
+   "wallMs": 16921,
+   "cpuMs": 21621,
+   "maxRssKiB": 703396,
+   "complete": true,
+   "report": {
+    "discovered": 1407,
+    "claimed": 559,
+    "indexed": 0,
+    "unchanged": 559,
+    "removed": 0,
+    "symbols": 8092,
+    "links": 64165,
+    "unresolved": 2305,
+    "ambiguous": 1459,
+    "library": 18022,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": null,
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": null
+  },
+  "comment": {
+   "wallMs": 16416,
+   "cpuMs": 22286,
+   "maxRssKiB": 726128,
+   "complete": true,
+   "report": {
+    "discovered": 1407,
+    "claimed": 559,
+    "indexed": 1,
+    "unchanged": 558,
+    "removed": 0,
+    "symbols": 8092,
+    "links": 64165,
+    "unresolved": 2305,
+    "ambiguous": 1459,
+    "library": 18022,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": null,
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": null
+  },
+  "comment-revert": {
+   "wallMs": 15941,
+   "cpuMs": 20799,
+   "maxRssKiB": 732964,
+   "complete": true,
+   "report": {
+    "discovered": 1407,
+    "claimed": 559,
+    "indexed": 1,
+    "unchanged": 558,
+    "removed": 0,
+    "symbols": 8092,
+    "links": 64165,
+    "unresolved": 2305,
+    "ambiguous": 1459,
+    "library": 18022,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": null,
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": null
+  },
+  "body": {
+   "wallMs": 16996,
+   "cpuMs": 22013,
+   "maxRssKiB": 794816,
+   "complete": true,
+   "report": {
+    "discovered": 1407,
+    "claimed": 559,
+    "indexed": 1,
+    "unchanged": 558,
+    "removed": 0,
+    "symbols": 8092,
+    "links": 64165,
+    "unresolved": 2305,
+    "ambiguous": 1459,
+    "library": 18022,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": null,
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": null
+  },
+  "body-revert": {
+   "wallMs": 15225,
+   "cpuMs": 20376,
+   "maxRssKiB": 809900,
+   "complete": true,
+   "report": {
+    "discovered": 1407,
+    "claimed": 559,
+    "indexed": 1,
+    "unchanged": 558,
+    "removed": 0,
+    "symbols": 8092,
+    "links": 64165,
+    "unresolved": 2305,
+    "ambiguous": 1459,
+    "library": 18022,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": null,
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": null
+  },
+  "export": {
+   "wallMs": 15750,
+   "cpuMs": 22190,
+   "maxRssKiB": 804528,
+   "complete": true,
+   "report": {
+    "discovered": 1407,
+    "claimed": 559,
+    "indexed": 1,
+    "unchanged": 558,
+    "removed": 0,
+    "symbols": 8093,
+    "links": 64166,
+    "unresolved": 2305,
+    "ambiguous": 1459,
+    "library": 18022,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": null,
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": null
+  },
+  "export-revert": {
+   "wallMs": 15840,
+   "cpuMs": 21548,
+   "maxRssKiB": 799784,
+   "complete": true,
+   "report": {
+    "discovered": 1407,
+    "claimed": 559,
+    "indexed": 1,
+    "unchanged": 558,
+    "removed": 0,
+    "symbols": 8092,
+    "links": 64165,
+    "unresolved": 2305,
+    "ambiguous": 1459,
+    "library": 18022,
+    "failedCount": 0,
+    "errors": 0,
+    "analysisErrors": [],
+    "resolutionErrors": []
+   },
+   "counts": null,
+   "typescript": {
+    "programs": 0,
+    "extracted": 0,
+    "reused": 1,
+    "neutralPrograms": 0,
+    "neutralExtracted": 0
+   },
+   "stages": null
+  }
+ },
+ "equality": {
+  "comment": [],
+  "body": [],
+  "export": []
+ }
+}

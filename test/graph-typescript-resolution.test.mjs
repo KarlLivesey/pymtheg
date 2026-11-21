@@ -3528,9 +3528,19 @@ test("an unchanged index reopens with links resolved and no file re-parsed or pr
       );
       assert.equal(statistics.reused, before.reused + 1);
       assert.equal(graph.link("main.ts", "x", "calls").targetId, xId);
+      // Every byte but SQLite's change counter (24-27, 92-95) and, while
+      // the reopened writer holds the write-ahead log, the journal format
+      // (18-19): an index run chooses the journal before it reads (C-22).
+      const masked = (value) => {
+        const copy = Buffer.from(value);
+        copy.fill(0, 18, 20);
+        copy.fill(0, 24, 28);
+        copy.fill(0, 92, 96);
+        return copy;
+      };
       assert.deepEqual(
-        await readFile(graph.database),
-        bytes,
+        masked(await readFile(graph.database)),
+        masked(bytes),
         "unchanged database bytes",
       );
 

@@ -62,8 +62,13 @@ test("indexing keeps no decoded file alive and deep-copies no file record, at an
     try {
       const root = join(scratch, "project");
       await mkdir(root);
+      // The last file belongs to the second module: a module that owns no
+      // file is not handed the graph at all (C-22).
       for (let i = 0; i < count; i++)
-        await writeFile(join(root, `${i}.syn`), `source ${i}`);
+        await writeFile(
+          join(root, `${i}.${i === count - 1 ? "syn2" : "syn"}`),
+          `source ${i}`,
+        );
       store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "memory");
       let counts;
       // Two modules over the same files: the second must not see the first's
@@ -74,7 +79,7 @@ test("indexing keeps no decoded file alive and deep-copies no file record, at an
         extensions: [".syn2"],
         resolve(context) {
           counts.liveDuringResolve.push(live());
-          // It owns no files: nothing to resolve, but it still gets the graph.
+          // It resolves nothing, but it still gets the graph.
           return synthetic.resolve({ ...context, symbols: [], links: [] });
         },
       };
@@ -90,7 +95,13 @@ test("indexing keeps no decoded file alive and deep-copies no file record, at an
         },
         resolve(context) {
           counts.liveDuringResolve.push(live());
-          return synthetic.resolve(context);
+          // Derived links on its own files only.
+          return synthetic.resolve({
+            ...context,
+            symbols: context.symbols.filter(
+              (symbol) => symbol.module === synthetic.id,
+            ),
+          });
         },
       };
       const registry = new LanguageRegistry([first, second]);
