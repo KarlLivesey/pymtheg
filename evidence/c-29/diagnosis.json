@@ -1,0 +1,752 @@
+{
+  "pins": [
+    {
+      "id": "actix/actix-web",
+      "commit": "3c6ea6acf52d9e6f41207222b672774246be7205",
+      "blank": 10088,
+      "groups": {
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 2690
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 173,
+          "calls": 93,
+          "types": 1
+        },
+        "attribute identity unavailable": {
+          "macros": 730
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 3966,
+          "calls": 11
+        },
+        "blocked binding without an anchor": {
+          "values": 366,
+          "calls": 162,
+          "types": 502
+        },
+        "standard path: import export namespace unavailable": {
+          "imports": 211
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 517
+        },
+        "no binding: no proven library binding": {
+          "values": 9,
+          "imports": 2
+        },
+        "glob import has no single symbol": {
+          "imports": 195
+        },
+        "standard path: associated-owner-unverified": {
+          "values": 16
+        },
+        "crate unit only": {
+          "imports": 13
+        },
+        "Self owner or member unavailable": {
+          "types": 33,
+          "calls": 1,
+          "values": 1
+        },
+        "Cargo path: associated-owner-unverified": {
+          "patterns": 8
+        },
+        "no binding: glob-import-unverified": {
+          "types": 5
+        },
+        "no binding: unverified path": {
+          "types": 1
+        },
+        "no binding: dependency-presence-unverified": {
+          "macros": 1,
+          "types": 2
+        },
+        "no crate placement": {
+          "imports": 64,
+          "types": 75,
+          "calls": 50,
+          "values": 23,
+          "macros": 96,
+          "patterns": 6,
+          "implements": 2
+        },
+        "multiple checkout candidates": {
+          "types": 4,
+          "imports": 1,
+          "calls": 1
+        },
+        "no binding: site or placement unverified": {
+          "calls": 7
+        },
+        "placement or edition unverified": {
+          "imports": 5,
+          "types": 9,
+          "calls": 1,
+          "values": 3,
+          "patterns": 1,
+          "macros": 31
+        }
+      }
+    },
+    {
+      "id": "tokio-rs/axum",
+      "commit": "36d38c4cf2766cd7313dd53d808f30546ee36b1e",
+      "blank": 6279,
+      "groups": {
+        "blocked binding without an anchor": {
+          "types": 257,
+          "calls": 162,
+          "values": 287
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 1597,
+          "calls": 16
+        },
+        "no binding: site or placement unverified": {
+          "calls": 2
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 166
+        },
+        "standard path: import export namespace unavailable": {
+          "imports": 56
+        },
+        "glob import has no single symbol": {
+          "imports": 95
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 1305
+        },
+        "attribute identity unavailable": {
+          "macros": 378
+        },
+        "Self owner or member unavailable": {
+          "types": 72,
+          "calls": 3,
+          "values": 4
+        },
+        "no binding: unverified path": {
+          "types": 1
+        },
+        "crate unit only": {
+          "imports": 5
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 161,
+          "types": 1,
+          "calls": 5
+        },
+        "multiple checkout candidates": {
+          "macros": 13
+        },
+        "no binding: no proven library binding": {
+          "imports": 1,
+          "calls": 2
+        },
+        "Cargo path: associated-owner-unverified": {
+          "patterns": 41
+        },
+        "no crate placement": {
+          "imports": 368,
+          "macros": 312,
+          "types": 761,
+          "implements": 51,
+          "calls": 115,
+          "patterns": 1,
+          "values": 28
+        },
+        "no binding: namespace-binding-unverified": {
+          "types": 12
+        },
+        "no binding: conditional-name-may-be-absent": {
+          "macros": 1
+        }
+      }
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "commit": "b79801ce4884fe46105b562f701a7d2fd5c586c7",
+      "blank": 1051,
+      "groups": {
+        "standard path: import export namespace unavailable": {
+          "imports": 18
+        },
+        "crate unit only": {
+          "imports": 24
+        },
+        "attribute identity unavailable": {
+          "macros": 89
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 22
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 250
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 47
+        },
+        "Cargo path: associated-owner-unverified": {
+          "patterns": 2
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 147,
+          "calls": 1
+        },
+        "no crate placement": {
+          "imports": 199,
+          "macros": 108,
+          "calls": 9,
+          "types": 7,
+          "values": 3
+        },
+        "prelude spelling: no proven library binding": {
+          "types": 31,
+          "calls": 10,
+          "values": 3,
+          "patterns": 5,
+          "macros": 37,
+          "implements": 17
+        },
+        "Self owner or member unavailable": {
+          "types": 4
+        },
+        "glob import has no single symbol": {
+          "imports": 4
+        },
+        "blocked binding without an anchor": {
+          "calls": 2,
+          "values": 5,
+          "types": 4
+        },
+        "multiple checkout candidates": {
+          "types": 3
+        }
+      }
+    },
+    {
+      "id": "crossbeam-rs/crossbeam",
+      "commit": "a28f40fdddb70bea8e5faf0efad9af0be4b9dbea",
+      "blank": 2559,
+      "groups": {
+        "crate unit only": {
+          "imports": 22
+        },
+        "standard path: import export namespace unavailable": {
+          "imports": 100
+        },
+        "glob import has no single symbol": {
+          "imports": 28
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 13
+        },
+        "blocked binding without an anchor": {
+          "calls": 194,
+          "values": 126,
+          "types": 18
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 9
+        },
+        "no binding: no proven library binding": {
+          "imports": 77,
+          "types": 3,
+          "values": 5,
+          "macros": 1
+        },
+        "prelude spelling: no proven library binding": {
+          "patterns": 175,
+          "implements": 165,
+          "types": 595,
+          "values": 101,
+          "macros": 297,
+          "calls": 210
+        },
+        "Self owner or member unavailable": {
+          "types": 16
+        },
+        "multiple checkout candidates": {
+          "types": 70,
+          "values": 2,
+          "imports": 4,
+          "calls": 3,
+          "macros": 1,
+          "modules": 1
+        },
+        "no binding: unverified path": {
+          "values": 2,
+          "calls": 2
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 134
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 140,
+          "calls": 3
+        },
+        "standard path: no proven library binding": {
+          "types": 2,
+          "imports": 2,
+          "macros": 1
+        },
+        "prelude spelling: opaque-item-may-shadow-name; glob-import-unverified": {
+          "macros": 2
+        },
+        "no crate placement": {
+          "imports": 2,
+          "types": 14,
+          "calls": 15
+        },
+        "no binding: dependency-presence-unverified": {
+          "calls": 3
+        },
+        "attribute identity unavailable": {
+          "macros": 1
+        }
+      }
+    },
+    {
+      "id": "fjall-rs/fjall",
+      "commit": "87006048139bfe1b072bbc29a5a92bf1f97628e3",
+      "blank": 1374,
+      "groups": {
+        "Cargo path: import export namespace unavailable": {
+          "imports": 154
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 44
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 498
+        },
+        "blocked binding without an anchor": {
+          "values": 180,
+          "calls": 7
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 345,
+          "calls": 3
+        },
+        "glob import has no single symbol": {
+          "imports": 17
+        },
+        "attribute identity unavailable": {
+          "macros": 17
+        },
+        "Cargo path: macro implementation source unverified": {
+          "macros": 4
+        },
+        "standard path: import export namespace unavailable": {
+          "imports": 30
+        },
+        "no binding: no proven library binding": {
+          "imports": 4,
+          "values": 1
+        },
+        "Cargo path: associated-owner-unverified": {
+          "values": 5,
+          "patterns": 10
+        },
+        "Self owner or member unavailable": {
+          "types": 7
+        },
+        "multiple checkout candidates": {
+          "imports": 3,
+          "calls": 4
+        },
+        "standard path: associated-owner-unverified": {
+          "values": 35,
+          "patterns": 6
+        }
+      }
+    },
+    {
+      "id": "helix-editor/helix",
+      "commit": "872b240251876e56787ad7ec312cefae70e3e28e",
+      "blank": 13727,
+      "groups": {
+        "glob import has no single symbol": {
+          "imports": 156
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 248
+        },
+        "standard path: import export namespace unavailable": {
+          "imports": 127
+        },
+        "no binding: no proven library binding": {
+          "values": 26,
+          "calls": 2,
+          "types": 1
+        },
+        "blocked binding without an anchor": {
+          "calls": 168,
+          "values": 1630,
+          "types": 105
+        },
+        "standard path: associated-owner-unverified": {
+          "values": 21
+        },
+        "Self owner or member unavailable": {
+          "types": 11
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 2961,
+          "types": 1
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 1150,
+          "types": 1,
+          "calls": 5
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 6427,
+          "calls": 124
+        },
+        "Cargo path: associated-owner-unverified": {
+          "values": 9,
+          "patterns": 8
+        },
+        "crate unit only": {
+          "imports": 13
+        },
+        "multiple checkout candidates": {
+          "imports": 5,
+          "calls": 9,
+          "macros": 4,
+          "types": 10,
+          "values": 1
+        },
+        "prelude spelling: competing macro import": {
+          "macros": 127
+        },
+        "no binding: competing macro import": {
+          "macros": 3
+        },
+        "no binding: unverified path": {
+          "types": 1
+        },
+        "attribute identity unavailable": {
+          "macros": 186
+        },
+        "no crate placement": {
+          "imports": 19,
+          "types": 85,
+          "implements": 4,
+          "values": 20,
+          "calls": 34,
+          "patterns": 11,
+          "macros": 14
+        }
+      }
+    },
+    {
+      "id": "cberner/redb",
+      "commit": "357f8bf3f554e85bff1c6c605713ae57c3901006",
+      "blank": 8793,
+      "groups": {
+        "glob import has no single symbol": {
+          "imports": 34
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 3365,
+          "calls": 29
+        },
+        "blocked binding without an anchor": {
+          "calls": 424,
+          "types": 291,
+          "values": 310
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 35
+        },
+        "standard path: import export namespace unavailable": {
+          "imports": 105
+        },
+        "Cargo path: associated-owner-unverified": {
+          "values": 1
+        },
+        "Self owner or member unavailable": {
+          "types": 80,
+          "calls": 1
+        },
+        "no binding: unverified path": {
+          "types": 3,
+          "macros": 9,
+          "values": 1
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "calls": 81,
+          "macros": 66,
+          "types": 23
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 1388
+        },
+        "no binding: site or placement unverified": {
+          "calls": 12,
+          "values": 2
+        },
+        "no binding: no proven library binding": {
+          "types": 7,
+          "imports": 77,
+          "values": 37
+        },
+        "attribute identity unavailable": {
+          "macros": 24
+        },
+        "multiple checkout candidates": {
+          "imports": 23,
+          "types": 196,
+          "calls": 31,
+          "patterns": 10
+        },
+        "prelude spelling: no proven library binding": {
+          "types": 491,
+          "values": 164,
+          "patterns": 210,
+          "macros": 480,
+          "implements": 61,
+          "calls": 711
+        },
+        "standard path: associated-owner-unverified": {
+          "values": 10
+        },
+        "crate unit only": {
+          "imports": 1
+        }
+      }
+    },
+    {
+      "id": "BurntSushi/ripgrep",
+      "commit": "178cc027e283fd965cb72d0a7395b219eada170c",
+      "blank": 1697,
+      "groups": {
+        "standard path: import export namespace unavailable": {
+          "imports": 125
+        },
+        "blocked binding without an anchor": {
+          "values": 569,
+          "calls": 255,
+          "types": 83
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 115
+        },
+        "glob import has no single symbol": {
+          "imports": 49
+        },
+        "standard path: associated-owner-unverified": {
+          "values": 7,
+          "patterns": 10
+        },
+        "no binding: no proven library binding": {
+          "values": 10,
+          "macros": 3
+        },
+        "Cargo path: associated-owner-unverified": {
+          "values": 10,
+          "patterns": 7
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 177
+        },
+        "crate unit only": {
+          "imports": 3
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 165
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 14
+        },
+        "multiple checkout candidates": {
+          "imports": 2,
+          "macros": 2,
+          "calls": 8
+        },
+        "Self owner or member unavailable": {
+          "types": 81,
+          "calls": 2
+        }
+      }
+    },
+    {
+      "id": "rustls/rustls",
+      "commit": "53db4d1398f16d5bac98eacf02f0dff4b242fd92",
+      "blank": 9765,
+      "groups": {
+        "no crate placement": {
+          "imports": 6,
+          "types": 5,
+          "calls": 10,
+          "macros": 2
+        },
+        "blocked binding without an anchor": {
+          "calls": 57,
+          "values": 597,
+          "types": 72
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 4552,
+          "calls": 23
+        },
+        "standard path: import export namespace unavailable": {
+          "imports": 89
+        },
+        "placement or edition unverified": {
+          "macros": 180,
+          "calls": 184,
+          "imports": 69,
+          "types": 344,
+          "implements": 67,
+          "values": 33,
+          "patterns": 56
+        },
+        "no binding: opaque-item-may-shadow-name; conditional-name-may-be-absent; opaque-item-may-shadow-name": {
+          "imports": 1
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 199
+        },
+        "glob import has no single symbol": {
+          "imports": 66
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 32
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 645
+        },
+        "attribute identity unavailable": {
+          "macros": 9
+        },
+        "crate unit only": {
+          "imports": 18
+        },
+        "no binding: conditional-name-may-be-absent": {
+          "imports": 33
+        },
+        "no binding: no proven library binding": {
+          "imports": 125,
+          "types": 23,
+          "values": 17,
+          "macros": 1
+        },
+        "prelude spelling: no proven library binding": {
+          "macros": 732,
+          "types": 528,
+          "patterns": 173,
+          "calls": 647,
+          "implements": 41,
+          "values": 108
+        },
+        "Cargo path: associated-owner-unverified": {
+          "values": 2,
+          "patterns": 1
+        },
+        "prelude spelling: no library lookup": {
+          "macros": 6
+        },
+        "Self owner or member unavailable": {
+          "types": 12
+        }
+      }
+    },
+    {
+      "id": "serde-rs/serde",
+      "commit": "e306b0c7c40ad21d5bdf52bcd20da513904682ae",
+      "blank": 4403,
+      "groups": {
+        "standard path: import export namespace unavailable": {
+          "imports": 7
+        },
+        "crate unit only": {
+          "imports": 9
+        },
+        "glob import has no single symbol": {
+          "imports": 47
+        },
+        "blocked binding without an anchor": {
+          "types": 548,
+          "values": 326,
+          "calls": 18
+        },
+        "local candidate failed binding or owner proof": {
+          "values": 1595,
+          "calls": 223
+        },
+        "placement or edition unverified": {
+          "macros": 28,
+          "types": 58,
+          "imports": 24,
+          "patterns": 18,
+          "calls": 17,
+          "values": 10,
+          "implements": 11
+        },
+        "no crate placement": {
+          "imports": 147,
+          "types": 78,
+          "calls": 17,
+          "implements": 1,
+          "values": 10,
+          "macros": 187
+        },
+        "Self owner or member unavailable": {
+          "types": 14,
+          "calls": 4
+        },
+        "Cargo path: import export namespace unavailable": {
+          "imports": 52
+        },
+        "Cargo path: associated-owner-unverified": {
+          "patterns": 44
+        },
+        "no binding: site or placement unverified": {
+          "calls": 6
+        },
+        "prelude spelling: opaque-item-may-shadow-name": {
+          "macros": 397
+        },
+        "prelude spelling: glob-import-unverified": {
+          "macros": 3
+        },
+        "no binding: opaque-item-may-shadow-name": {
+          "macros": 476,
+          "calls": 3
+        },
+        "no binding: dependency-presence-unverified": {
+          "macros": 21
+        },
+        "prelude spelling: no library lookup": {
+          "macros": 2
+        },
+        "no binding: cfg-condition-unverified": {
+          "macros": 2
+        }
+      }
+    }
+  ],
+  "overview": {
+    "Opaque or built-in attribute identity": 1434,
+    "Blocked lexical or generic head": 7725,
+    "Glob import": 691,
+    "Local binding proof stopped": 22744,
+    "Cargo import with unknown export namespace": 1546,
+    "Opaque scope": 12797,
+    "Crate placement absent": 2959,
+    "Standard import with unknown export namespace": 868,
+    "Placement or edition uncertain": 1149,
+    "Whole crate import": 108,
+    "Multiple checkout candidates": 411,
+    "Other standard path blocker": 110,
+    "Self owner or associated target": 346,
+    "Other unverified binding": 566,
+    "Other Cargo path blocker": 152,
+    "Prelude spelling, no available binding": 5992,
+    "Prelude lookup blocked": 138
+  }
+}
