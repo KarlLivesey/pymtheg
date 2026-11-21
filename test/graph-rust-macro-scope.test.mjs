@@ -90,6 +90,31 @@ async function projectObservations(sources, manifest, manifests = []) {
 const proved = (target) => ({ target, assumes: [] });
 const assumed = (target) => ({ target, assumes: ["rust-external-macro-name"] });
 
+test("Rust macro impls with fixed item boundaries cannot introduce a sibling name", async () => {
+  const at = await observations(
+    await readFile(
+      new URL("fixtures/graph-rust-c34/src/lib.rs", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// generic impls"),
+    proved("option::Option"),
+  );
+  assert.deepEqual(
+    at("types", "Option", "// tuple impl"),
+    proved("option::Option"),
+  );
+  for (const marker of [
+    "// named sibling",
+    "// injected sibling",
+    "// opaque separator",
+    "// nested export",
+    "// exported macro",
+  ])
+    assert.deepEqual(at("types", "Option", marker), proved(null), marker);
+});
+
 test("Rust derive identity follows the macro namespace and its imports", async () => {
   const at = await observations(
     `

@@ -27,6 +27,7 @@ import {
   fromVirtual,
   LIB_ROOT,
   matchesPathAlias,
+  relativeSpecifier,
   toVirtual,
 } from "./project.js";
 import type { entryProvenance, UnbuiltEntry } from "./workspace-entries.js";
@@ -66,7 +67,11 @@ export interface RenameContext {
   /** Present when this file's compiler text was renamed. */
   renamed?: Renamed | undefined;
   /** Resolves a module specifier from a file to a captured path, if any. */
-  resolveModule: (specifier: string, from: string) => string | undefined;
+  resolveModule: (
+    specifier: ts.StringLiteralLike,
+  ) =>
+    | { path?: string; reason?: "directory-import-not-allowed-in-esm" }
+    | undefined;
   hasDenoImports: boolean;
   selectSpecifier: (specifier: string, from: string) => string | undefined;
   workspaceReason: (
@@ -279,7 +284,6 @@ const isEntityChain = (node: ts.Expression): boolean =>
     ts.isStringLiteralLike(node.argumentExpression) &&
     isEntityChain(node.expression));
 
-const relativeSpecifier = (value: string) => /^\.\.?(\/|$)/.test(value);
 const requiredProperty = (element: ts.BindingElement) =>
   element.dotDotDotToken || element.initializer
     ? undefined
@@ -1000,6 +1004,11 @@ export function extractFile(
         );
         if (filtered.length) declarations = filtered;
       }
+      if (globals.hasInstalledTypes && declarations.length > 1)
+        declarations = importer.preferOriginalDeclarations(
+          declarations,
+          checker,
+        );
       if (
         meaning === "type" &&
         declarations.length > 1 &&
@@ -1291,7 +1300,7 @@ export function extractFile(
         program,
         checker,
         captured,
-        resolveModule: context.resolveModule,
+        resolveModule: (specifier) => specifierResolution(specifier).path,
         invalid: (at) => context.moduleKind(at) === "invalid",
         failedNames: context.failedNames,
       },
@@ -1430,8 +1439,7 @@ export function extractFile(
       failedNames: context.failedNames,
       failedModule: (specifier) => {
         if (!ts.isStringLiteralLike(specifier)) return undefined;
-        const from = fromVirtual(specifier.getSourceFile().fileName);
-        const module = from && context.resolveModule(specifier.text, from);
+        const module = specifierResolution(specifier).path;
         return module && context.moduleKind(module) === "invalid"
           ? module
           : undefined;
@@ -2263,6 +2271,7 @@ export function extractFile(
       path: string | undefined;
       lookups: readonly string[];
       extensionFallback: boolean;
+      reason?: "directory-import-not-allowed-in-esm";
     }
   >();
   function specifierResolution(specifier: ts.StringLiteralLike) {
@@ -2286,20 +2295,20 @@ export function extractFile(
       specifier.getSourceFile(),
     );
     const resolved = resolution?.resolvedModule?.resolvedFileName;
-    const from = fromVirtual(specifier.getSourceFile().fileName) ?? path;
     const selected = selectedSpecifier(specifier);
     const fallback =
       selected !== undefined &&
       !resolved &&
       (!resolution || relativeSpecifier(selected))
-        ? context.resolveModule(specifier.text, from)
+        ? context.resolveModule(specifier)
         : undefined;
     const result = {
       path: resolved
         ? fromVirtual(program.getSourceFile(resolved)?.fileName ?? resolved)
-        : fallback,
+        : fallback?.path,
       lookups: resolution?.failedLookupLocations ?? [],
-      extensionFallback: !!(resolution && fallback),
+      extensionFallback: !!(resolution && fallback?.path),
+      ...(fallback?.reason && { reason: fallback.reason }),
     };
     specifierResolutions.set(specifier, result);
     return result;
@@ -2326,8 +2335,9 @@ export function extractFile(
     if (checker.getSymbolAtLocation(specifier)) return undefined;
     // A captured file the compiler did not type here (a script, or a require
     // form the compiler does not recognise): the edge to that file is known.
-    const { path: resolved, lookups } = specifierResolution(specifier);
+    const { path: resolved, lookups, reason } = specifierResolution(specifier);
     if (resolved !== undefined && captured.has(resolved)) return CAPTURED;
+    if (reason) return reason;
     if (relativeSpecifier(text) || text.startsWith("/"))
       return "missing-module";
     const aliased =
@@ -2836,6 +2846,15 @@ export function extractFile(
       !symbol.declarations!.includes(declaration)
     )
       return undefined;
+    // A same-package augmentation of an original declaration shares the
+    // original's identity (preferOriginalDeclarations); never narrow to it.
+    if (
+      globals.hasInstalledTypes &&
+      !importer
+        .preferOriginalDeclarations([...symbol.declarations!], checker)
+        .includes(declaration)
+    )
+      return undefined;
     const type = checker.getApparentType(
       checker.getNonNullableType(checker.getTypeAtLocation(found.receiver)),
     );
@@ -3125,7 +3144,7 @@ export function extractFile(
           argument &&
           ts.isStringLiteralLike(argument)
         ) {
-          const target = context.resolveModule(argument.text, path);
+          const target = context.resolveModule(argument)?.path;
           link(
             owner,
             "imports",

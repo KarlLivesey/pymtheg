@@ -1,0 +1,164 @@
+Class	Other blockers on prior head	Pin	Before	Still opaque	Reached Level 2	Different blocker	New opacity
+attribute identity open	several	actix/actix-web	759	759	0	0	0
+attribute identity open	several	cberner/redb	283	283	0	0	0
+attribute identity open	several	fjall-rs/fjall	2	2	0	0	0
+attribute identity open	several	rustls/rustls	40	40	0	0	0
+attribute identity open	several	tokio-rs/axum	547	547	0	0	0
+attribute identity open	sole	actix/actix-web	852	852	0	0	0
+attribute identity open	sole	cberner/redb	850	850	0	0	0
+attribute identity open	sole	fjall-rs/fjall	24	24	0	0	0
+attribute identity open	sole	rust-embedded/cortex-m	4	4	0	0	0
+attribute identity open	sole	rustls/rustls	95	95	0	0	0
+attribute identity open	sole	tokio-rs/axum	1501	1501	0	0	0
+block statement macro identity open or external	several	actix/actix-web	37	37	0	0	0
+block statement macro identity open or external	several	BurntSushi/ripgrep	19	19	0	0	0
+block statement macro identity open or external	several	cberner/redb	7	7	0	0	0
+block statement macro identity open or external	several	crossbeam-rs/crossbeam	136	136	0	0	0
+block statement macro identity open or external	several	helix-editor/helix	3	3	0	0	0
+block statement macro identity open or external	several	rust-embedded/cortex-m	3	3	0	0	0
+block statement macro identity open or external	several	rustls/rustls	205	205	0	0	0
+block statement macro identity open or external	several	serde-rs/serde	21	21	0	0	0
+block statement macro identity open or external	several	tokio-rs/axum	38	38	0	0	0
+block statement macro identity open or external	sole	actix/actix-web	38	38	0	0	0
+block statement macro identity open or external	sole	BurntSushi/ripgrep	11	11	0	0	0
+block statement macro identity open or external	sole	cberner/redb	36	36	0	0	0
+block statement macro identity open or external	sole	crossbeam-rs/crossbeam	122	122	0	0	0
+block statement macro identity open or external	sole	fjall-rs/fjall	6	6	0	0	0
+block statement macro identity open or external	sole	helix-editor/helix	5	5	0	0	0
+block statement macro identity open or external	sole	rust-embedded/cortex-m	6	6	0	0	0
+block statement macro identity open or external	sole	rustls/rustls	353	353	0	0	0
+block statement macro identity open or external	sole	serde-rs/serde	72	72	0	0	0
+block statement macro identity open or external	sole	tokio-rs/axum	109	109	0	0	0
+block-local macro_rules expansion	several	crossbeam-rs/crossbeam	51	51	0	0	0
+block-local macro_rules expansion	several	helix-editor/helix	39	39	0	0	0
+block-local macro_rules expansion	several	tokio-rs/axum	20	20	0	0	0
+block-local macro_rules expansion	sole	helix-editor/helix	32	32	0	0	0
+block-local macro_rules expansion	sole	tokio-rs/axum	2	2	0	0	0
+built-in derive spelling	several	cberner/redb	72	72	0	0	0
+built-in derive spelling	several	helix-editor/helix	1904	1904	0	0	0
+built-in derive spelling	several	rustls/rustls	1085	1085	0	0	0
+built-in derive spelling	several	serde-rs/serde	28	28	0	0	0
+built-in derive spelling	sole	cberner/redb	196	196	0	0	0
+built-in derive spelling	sole	helix-editor/helix	8497	8497	0	0	0
+built-in derive spelling	sole	rustls/rustls	500	500	0	0	0
+built-in derive spelling	sole	serde-rs/serde	17	17	0	0	0
+external derive identified	several	actix/actix-web	14	14	0	0	0
+external derive identified	several	helix-editor/helix	39	39	0	0	0
+external derive identified	several	rustls/rustls	16	16	0	0	0
+external derive identified	sole	actix/actix-web	68	68	0	0	0
+external derive identified	sole	helix-editor/helix	174	174	0	0	0
+external derive identified	sole	rustls/rustls	45	45	0	0	0
+external derive identified	sole	tokio-rs/axum	25	25	0	0	0
+external item macro	several	actix/actix-web	390	390	0	0	0
+external item macro	several	helix-editor/helix	71	71	0	0	0
+external item macro	several	tokio-rs/axum	62	62	0	0	0
+external item macro	sole	actix/actix-web	1116	1116	0	0	0
+external item macro	sole	cberner/redb	1	1	0	0	0
+external item macro	sole	helix-editor/helix	329	329	0	0	0
+external item macro	sole	tokio-rs/axum	196	196	0	0	0
+include or layout invocation	sole	serde-rs/serde	1	1	0	0	0
+module item macro identity open	several	actix/actix-web	520	520	0	0	0
+module item macro identity open	several	cberner/redb	177	177	0	0	0
+module item macro identity open	several	crossbeam-rs/crossbeam	63	63	0	0	0
+module item macro identity open	several	helix-editor/helix	200	200	0	0	0
+module item macro identity open	several	rust-embedded/cortex-m	16	16	0	0	0
+module item macro identity open	several	rustls/rustls	12	12	0	0	0
+module item macro identity open	several	serde-rs/serde	2	2	0	0	0
+module item macro identity open	sole	actix/actix-web	704	704	0	0	0
+module item macro identity open	sole	cberner/redb	552	552	0	0	0
+module item macro identity open	sole	crossbeam-rs/crossbeam	189	189	0	0	0
+module item macro identity open	sole	helix-editor/helix	568	568	0	0	0
+module item macro identity open	sole	rust-embedded/cortex-m	98	98	0	0	0
+module item macro identity open	sole	rustls/rustls	77	77	0	0	0
+module item macro identity open	sole	serde-rs/serde	5	5	0	0	0
+module item macro identity open	sole	tokio-rs/axum	31	31	0	0	0
+module macro_rules expansion	several	actix/actix-web	759	759	0	0	0
+module macro_rules expansion	several	BurntSushi/ripgrep	151	151	0	0	0
+module macro_rules expansion	several	cberner/redb	147	147	0	0	0
+module macro_rules expansion	several	crossbeam-rs/crossbeam	110	110	0	0	0
+module macro_rules expansion	several	helix-editor/helix	137	137	0	0	0
+module macro_rules expansion	several	rust-embedded/cortex-m	2	2	0	0	0
+module macro_rules expansion	several	rustls/rustls	986	986	0	0	0
+module macro_rules expansion	several	tokio-rs/axum	605	605	0	0	0
+module macro_rules expansion	sole	actix/actix-web	1146	1146	0	0	0
+module macro_rules expansion	sole	BurntSushi/ripgrep	253	253	0	0	0
+module macro_rules expansion	sole	cberner/redb	1102	1092	0	10	0
+module macro_rules expansion	sole	crossbeam-rs/crossbeam	114	114	0	0	0
+module macro_rules expansion	sole	helix-editor/helix	414	414	0	0	0
+module macro_rules expansion	sole	rust-embedded/cortex-m	79	79	0	0	0
+module macro_rules expansion	sole	rustls/rustls	2857	2857	0	0	0
+module macro_rules expansion	sole	tokio-rs/axum	1889	1885	0	4	0
+multiple origin classes	several	actix/actix-web	2338	2338	0	0	0
+multiple origin classes	several	cberner/redb	67	67	0	0	0
+multiple origin classes	several	crossbeam-rs/crossbeam	10	10	0	0	0
+multiple origin classes	several	fjall-rs/fjall	121	121	0	0	0
+multiple origin classes	several	helix-editor/helix	432	432	0	0	0
+multiple origin classes	several	rust-embedded/cortex-m	160	160	0	0	0
+multiple origin classes	several	rustls/rustls	6326	6326	0	0	0
+multiple origin classes	several	serde-rs/serde	6035	6035	0	0	0
+multiple origin classes	several	tokio-rs/axum	1464	1464	0	0	0
+multiple origin classes	sole	actix/actix-web	2716	2716	0	0	0
+multiple origin classes	sole	BurntSushi/ripgrep	65	65	0	0	0
+multiple origin classes	sole	cberner/redb	526	526	0	0	0
+multiple origin classes	sole	crossbeam-rs/crossbeam	20	20	0	0	0
+multiple origin classes	sole	fjall-rs/fjall	326	326	0	0	0
+multiple origin classes	sole	helix-editor/helix	4733	4733	0	0	0
+multiple origin classes	sole	rust-embedded/cortex-m	120	120	0	0	0
+multiple origin classes	sole	rustls/rustls	3002	3002	0	0	0
+multiple origin classes	sole	serde-rs/serde	5031	5031	0	0	0
+multiple origin classes	sole	tokio-rs/axum	2359	2359	0	0	0
+other derive identity open	several	actix/actix-web	198	198	0	0	0
+other derive identity open	several	BurntSushi/ripgrep	90	90	0	0	0
+other derive identity open	several	cberner/redb	7	7	0	0	0
+other derive identity open	several	fjall-rs/fjall	29	29	0	0	0
+other derive identity open	several	helix-editor/helix	136	136	0	0	0
+other derive identity open	several	rust-embedded/cortex-m	25	25	0	0	0
+other derive identity open	several	rustls/rustls	30	30	0	0	0
+other derive identity open	several	serde-rs/serde	1288	1288	0	0	0
+other derive identity open	several	tokio-rs/axum	15	15	0	0	0
+other derive identity open	sole	actix/actix-web	639	639	0	0	0
+other derive identity open	sole	BurntSushi/ripgrep	337	337	0	0	0
+other derive identity open	sole	cberner/redb	160	160	0	0	0
+other derive identity open	sole	fjall-rs/fjall	129	129	0	0	0
+other derive identity open	sole	helix-editor/helix	2834	2834	0	0	0
+other derive identity open	sole	rust-embedded/cortex-m	144	144	0	0	0
+other derive identity open	sole	rustls/rustls	123	123	0	0	0
+other derive identity open	sole	serde-rs/serde	2071	2071	0	0	0
+other derive identity open	sole	tokio-rs/axum	202	202	0	0	0
+prelude or tool attribute spelling	several	fjall-rs/fjall	353	353	0	0	0
+prelude or tool attribute spelling	several	helix-editor/helix	24	24	0	0	0
+prelude or tool attribute spelling	several	rustls/rustls	2739	2739	0	0	0
+prelude or tool attribute spelling	sole	actix/actix-web	15	15	0	0	0
+prelude or tool attribute spelling	sole	fjall-rs/fjall	1178	1178	0	0	0
+prelude or tool attribute spelling	sole	helix-editor/helix	13	13	0	0	0
+prelude or tool attribute spelling	sole	rustls/rustls	1554	1554	0	0	0
+procedural attribute	several	actix/actix-web	2515	2515	0	0	0
+procedural attribute	several	fjall-rs/fjall	63	63	0	0	0
+procedural attribute	several	helix-editor/helix	292	292	0	0	0
+procedural attribute	several	rust-embedded/cortex-m	81	81	0	0	0
+procedural attribute	several	rustls/rustls	62	62	0	0	0
+procedural attribute	several	serde-rs/serde	1	1	0	0	0
+procedural attribute	several	tokio-rs/axum	904	904	0	0	0
+procedural attribute	sole	actix/actix-web	4747	4747	0	0	0
+procedural attribute	sole	fjall-rs/fjall	115	115	0	0	0
+procedural attribute	sole	helix-editor/helix	1632	1632	0	0	0
+procedural attribute	sole	rust-embedded/cortex-m	108	108	0	0	0
+procedural attribute	sole	rustls/rustls	92	92	0	0	0
+procedural attribute	sole	tokio-rs/axum	1393	1393	0	0	0
+traced guard already bounded by main	several	actix/actix-web	1686	1686	0	0	0
+traced guard already bounded by main	several	BurntSushi/ripgrep	357	357	0	0	0
+traced guard already bounded by main	several	cberner/redb	1968	1968	0	0	0
+traced guard already bounded by main	several	crossbeam-rs/crossbeam	104	104	0	0	0
+traced guard already bounded by main	several	helix-editor/helix	1991	1991	0	0	0
+traced guard already bounded by main	several	rust-embedded/cortex-m	3	3	0	0	0
+traced guard already bounded by main	several	rustls/rustls	943	943	0	0	0
+traced guard already bounded by main	several	tokio-rs/axum	558	558	0	0	0
+traced guard already bounded by main	sole	actix/actix-web	2966	2938	0	28	0
+traced guard already bounded by main	sole	BurntSushi/ripgrep	5	5	0	0	0
+traced guard already bounded by main	sole	cberner/redb	2735	2406	0	329	0
+traced guard already bounded by main	sole	crossbeam-rs/crossbeam	76	75	0	1	0
+traced guard already bounded by main	sole	helix-editor/helix	2593	2573	0	20	0
+traced guard already bounded by main	sole	rust-embedded/cortex-m	13	13	0	0	0
+traced guard already bounded by main	sole	rustls/rustls	1085	976	0	109	0
+traced guard already bounded by main	sole	serde-rs/serde	409	409	0	0	0
+traced guard already bounded by main	sole	tokio-rs/axum	819	796	0	23	0

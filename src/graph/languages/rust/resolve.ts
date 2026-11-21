@@ -7037,6 +7037,8 @@ export function resolveRust(
         if (standardScopeMacro(name, site, at, scope)) continue;
         const local = definiteMacro(name, site, at, scope);
         if (local) {
+          if (input.identifierList && profileOf(local)?.scope.implOnly)
+            continue;
           const introduced = localMacroScope(local, site, at, scope, lookups);
           if (!introduced) return;
           for (const binding of introduced.names) names.add(binding);
