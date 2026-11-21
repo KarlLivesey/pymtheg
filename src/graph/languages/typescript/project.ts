@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { readFileSync } from "node:fs";
+import { entryBuildContext } from "./entry-build.js";
 import { createRequire } from "node:module";
 import { dirname, posix } from "node:path";
 import ts from "typescript";
@@ -12,6 +13,11 @@ import {
   type Manifest,
   type WorkspaceCatalogs,
 } from "./workspace.js";
+import {
+  workspaceEntries,
+  type OutputProof,
+  type UnbuiltEntry,
+} from "./workspace-entries.js";
 import {
   freshNames,
   renameShadowed,
@@ -55,6 +61,16 @@ export const fromVirtual = (path: string): string | undefined =>
   path.startsWith(LIB_ROOT + "/") || !path.startsWith("/")
     ? undefined
     : path.slice(1);
+
+export const matchesPathAlias = (text: string, patterns: readonly string[]) =>
+  patterns.some((pattern) => {
+    const star = pattern.indexOf("*");
+    return star < 0
+      ? pattern === text
+      : text.length >= pattern.length - 1 &&
+          text.startsWith(pattern.slice(0, star)) &&
+          text.endsWith(pattern.slice(star + 1));
+  });
 
 export interface ProjectGroup {
   /** Owning config path, or null for the inferred project (no config includes the file). */
@@ -128,6 +144,9 @@ export interface ProjectModel {
   requested: (host: ts.CompilerHost) => ReadonlySet<string>;
   /** A compiler host over the snapshot; a variant replaces some files' text. */
   host: (group: ProjectGroup, variant?: HostVariant) => ts.CompilerHost;
+  unbuiltEntries: (
+    host: ts.CompilerHost,
+  ) => ReadonlyMap<ts.ResolvedModuleFull, UnbuiltEntry> | undefined;
   workspaceReason: (
     specifier: string,
     from: string,
@@ -376,6 +395,7 @@ export interface HostVariant {
   base?: ts.CompilerHost;
   /** Where parser failures of this variant are recorded (not the model's). */
   failures: Map<string, string>;
+  plainWorkspaceEntries?: boolean;
 }
 
 function forced(options: ts.CompilerOptions): ts.CompilerOptions {
@@ -418,6 +438,50 @@ const isRelativeReference = (value: string) =>
   value === "." ||
   value === ".." ||
   value.startsWith("/");
+
+/** Virtual paths must not turn a host path outside the checkout into a
+ * captured input or output by normalizing it against the virtual `/`. */
+function scopedConfigPath(config: string, from: string, value: unknown) {
+  if (
+    typeof value !== "string" ||
+    posix.isAbsolute(value) ||
+    value.includes("\\") ||
+    /^[A-Za-z]:/.test(value)
+  )
+    return false;
+  const checkout = "/__checkout__";
+  const token = "${configDir}";
+  const path =
+    value === token || value.startsWith(token + "/")
+      ? posix.resolve(
+          checkout,
+          posix.dirname(config),
+          "." + value.slice(token.length),
+        )
+      : posix.resolve(checkout, posix.dirname(from), value);
+  return path === checkout || path.startsWith(checkout + "/");
+}
+
+function scopedEmitOptions(
+  config: string,
+  from: string,
+  object: Record<string, unknown>,
+) {
+  const options = object.compilerOptions as Record<string, unknown> | undefined;
+  const inputs = [object.files, object.include].flatMap((field) =>
+    Array.isArray(field) ? field : [],
+  );
+  const values = [
+    options?.outDir,
+    options?.outFile,
+    options?.rootDir,
+    options?.declarationDir,
+    ...inputs,
+  ];
+  return values.every(
+    (value) => value === undefined || scopedConfigPath(config, from, value),
+  );
+}
 
 class VirtualFileSystem {
   readonly files = new Map<string, string>();
@@ -471,10 +535,9 @@ class VirtualFileSystem {
   readFile = (path: string) => this.files.get(this.real(path));
   directoryExists = (path: string) =>
     this.directories.has(this.real(path)) || this.linkDirectories.has(path);
-  workspaceReason(
+  workspaceRoute(
     specifier: string,
     from: string,
-    lookups: readonly string[],
     physicalWorkspace: (link: string) => string | false | undefined,
   ) {
     const name = /^(@[^/]+\/[^/]+|[^/@#.][^/]*)/.exec(specifier)?.[1];
@@ -488,30 +551,8 @@ class VirtualFileSystem {
       const physical = physicalWorkspace(link);
       if (physical === false) return undefined;
       const target = physical ?? this.links.get(link);
-      if (target !== undefined) {
-        const built = lookups.some((lookup) => {
-          if (
-            !lookup.startsWith(link + "/") &&
-            !lookup.startsWith(target + "/")
-          )
-            return false;
-          const resolved =
-            physical && lookup.startsWith(link + "/")
-              ? target + lookup.slice(link.length)
-              : this.real(lookup);
-          if (this.files.has(resolved)) return false;
-          for (
-            let dir = posix.dirname(resolved);
-            dir !== target && dir !== "/";
-            dir = posix.dirname(dir)
-          )
-            if (this.outputs.has(dir)) return true;
-          return false;
-        });
-        return built
-          ? "workspace-build-output-missing"
-          : "workspace-entry-unavailable";
-      }
+      if (target !== undefined)
+        return { link, target, installed: physical !== undefined };
       if (directory === "/") return undefined;
     }
   }
@@ -541,6 +582,7 @@ export const CONTEXT_PATTERNS = [
   "*jsconfig*.json",
   "package.json",
   "pnpm-workspace.yaml",
+  ...entryBuildContext,
   ...denoConfigPatterns,
   ...importMapNames,
 ] as const;
@@ -726,6 +768,7 @@ export function projectModel(
   const groups: ProjectGroup[] = [];
   // Reference redirects reuse the parsed snapshot config across programs.
   const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
+  const emitConfigs = new Map<string, ts.ParsedCommandLine>();
   const claimed = new Map<string, ProjectGroup[]>();
   const claim = (path: string, group: ProjectGroup) => {
     const list = claimed.get(path) ?? [];
@@ -769,6 +812,7 @@ export function projectModel(
     const object = (
       raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}
     ) as Record<string, unknown>;
+    let emitPathsScoped = scopedEmitOptions(config.path, config.path, object);
     // `files`, `include` and `exclude` must be arrays of strings.
     const badSelection = (["files", "include", "exclude"] as const).find(
       (key) =>
@@ -805,9 +849,11 @@ export function projectModel(
             `${from} extends "${base}" ${detail}; node_modules is never captured, so those settings are missing`,
           );
         if (!isRelativeReference(base)) {
+          emitPathsScoped = false;
           outside("from an external package");
           continue;
         }
+        emitPathsScoped &&= scopedConfigPath(config.path, from, base);
         let target = posix.normalize(
           posix.join(posix.dirname(toVirtual(from)), base),
         );
@@ -857,10 +903,13 @@ export function projectModel(
           );
           break;
         }
-        pending.push([
+        const baseConfig = parsed as Record<string, unknown>;
+        emitPathsScoped &&= scopedEmitOptions(
+          config.path,
           context.path,
-          (parsed as Record<string, unknown>).extends,
-        ]);
+          baseConfig,
+        );
+        pending.push([context.path, baseConfig.extends]);
       }
     }
     // Missing references are recorded without adding roots outside the snapshot.
@@ -875,6 +924,7 @@ export function projectModel(
         group.notes.push(`${config.path}: invalid project reference (ignored)`);
         continue;
       }
+      emitPathsScoped &&= scopedConfigPath(config.path, config.path, value);
       const target = posix.normalize(
         posix.join(posix.dirname(toVirtual(config.path)), value),
       );
@@ -913,8 +963,10 @@ export function projectModel(
                 "node_modules is never captured, so those settings are missing",
               ),
           );
-        if (!group.limitations.length)
+        if (!group.limitations.length) {
           parsedConfigs.set(toVirtual(config.path), parsed);
+          if (emitPathsScoped) emitConfigs.set(toVirtual(config.path), parsed);
+        }
         group.notes.push(
           ...parsed.errors
             // 18003: "No inputs were found" is a normal state for solution-style configs.
@@ -1081,6 +1133,28 @@ export function projectModel(
   const syntaxFailures = new Map<string, SyntaxFailure>();
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
   const asked = new WeakMap<ts.CompilerHost, Set<string>>();
+  const entries = workspaceEntries(manifests, emitConfigs, fs.files, originals);
+  const redirects = new WeakMap<
+    ts.CompilerHost,
+    Map<ts.ResolvedModuleFull, UnbuiltEntry>
+  >();
+  const physicalWorkspace = (link: string): string | false | undefined => {
+    const physical = dependencies?.realpath(dependencyPath(link));
+    if (physical === undefined) return undefined;
+    if (hasNodeModulesSegment(physical)) return false;
+    const path = toVirtual(physical);
+    return fs.files.has(posix.join(path, "package.json")) ? path : false;
+  };
+  function workspaceOutput(
+    lookup: string,
+    route: { link: string; target: string },
+  ) {
+    if (lookup.startsWith(route.link + "/"))
+      return posix.join(route.target, lookup.slice(route.link.length));
+    if (lookup.startsWith(route.target === "/" ? "/" : route.target + "/"))
+      return lookup;
+    return undefined;
+  }
   /** Checkout source each program has loaded, and the files it refused. */
   const loads = new Map<
     ProjectGroup,
@@ -1239,10 +1313,20 @@ export function projectModel(
           : captured;
       },
       readDirectory: (...args) => [...parseHost.readDirectory(...args)],
-      getParsedCommandLine: (name) => parsedConfigs.get(fs.real(name)),
+      getParsedCommandLine(name) {
+        const parsed = parsedConfigs.get(fs.real(name));
+        return parsed && entries.forReference(parsed);
+      },
       realpath: real,
     };
-    if (deno.active) {
+    const workspaceRecovery = entries.available && !group.limitations.length;
+    if (deno.active || workspaceRecovery) {
+      const cache = ts.createModuleResolutionCache(
+        created.getCurrentDirectory(),
+        (name) => name,
+        group.options,
+      );
+      if (!deno.active) created.getModuleResolutionCache = () => cache;
       created.resolveModuleNameLiterals = (
         literals,
         containingFile,
@@ -1256,14 +1340,20 @@ export function projectModel(
             fromVirtual(containingFile) ?? ".",
           );
           if (selected === undefined) return { resolvedModule: undefined };
+          const importingOptions = redirected?.commandLine.options ?? options;
+          const mode = ts.getModeForUsageLocation(
+            source,
+            literal,
+            deno.active ? options : importingOptions,
+          );
           const result = ts.resolveModuleName(
             selected,
             containingFile,
             options,
             created,
-            undefined,
+            deno.active ? undefined : cache,
             redirected,
-            ts.getModeForUsageLocation(source, literal, options),
+            mode,
           );
           // The checker uses this flag to diagnose a TypeScript extension in
           // the written literal. A map can supply an extension the literal lacks.
@@ -1272,7 +1362,131 @@ export function projectModel(
             result.resolvedModule?.resolvedUsingTsExtension
           )
             result.resolvedModule.resolvedUsingTsExtension = false;
-          return result;
+          if (!workspaceRecovery || selected !== literal.text) return result;
+          const resolved = result.resolvedModule;
+          if (
+            resolved &&
+            (fileExists(resolved.resolvedFileName) || !group.references?.length)
+          )
+            return result;
+          const from = fromVirtual(containingFile);
+          if (from === undefined) return result;
+          const route = fs.workspaceRoute(selected, from, physicalWorkspace);
+          if (!route) return result;
+          const lookups = (
+            result as ts.ResolvedModuleWithFailedLookupLocations & {
+              failedLookupLocations?: readonly string[];
+            }
+          ).failedLookupLocations;
+          const redirect = (proof: UnbuiltEntry): ts.ResolvedModuleFull => {
+            const target: ts.ResolvedModuleFull = {
+              resolvedFileName: toVirtual(proof.source),
+              isExternalLibraryImport: false,
+              extension: posix.extname(proof.source),
+            };
+            let notes = redirects.get(created);
+            if (!notes) redirects.set(created, (notes = new Map()));
+            notes.set(target, proof);
+            return target;
+          };
+          if (resolved) {
+            const output = workspaceOutput(resolved.resolvedFileName, route);
+            if (!output) return result;
+            const proof = entries.proof(route.target, output, true);
+            if (proof === "conflicting")
+              return {
+                ...result,
+                resolvedModule: undefined,
+                failedLookupLocations: [
+                  resolved.resolvedFileName,
+                  ...(lookups ?? []),
+                ],
+              };
+            // Native references already give the checker its source program.
+            // Only the plain-build proof earns new unbuilt-entry provenance.
+            if (!proof) return result;
+            return {
+              ...result,
+              resolvedModule: redirect({
+                ...proof,
+                proof: "project-reference",
+              }),
+            };
+          }
+          if (
+            matchesPathAlias(
+              selected,
+              Object.keys(importingOptions.paths ?? {}),
+            )
+          )
+            return result;
+          const candidates = new Map<string, OutputProof>();
+          const missingOutput = (lookup: string) => {
+            // Only failed probes through the selected package link, never a
+            // missing paths alias or an unrelated relative import.
+            if (!lookup.startsWith(route.link + "/")) return undefined;
+            if (
+              route.installed &&
+              dependencies?.realpath(dependencyPath(lookup)) !== undefined
+            )
+              return undefined;
+            return workspaceOutput(lookup, route);
+          };
+          for (const lookup of lookups ?? []) {
+            const output = missingOutput(lookup);
+            if (!output) continue;
+            const proof = entries.proof(
+              route.target,
+              output,
+              variant?.plainWorkspaceEntries === true,
+            );
+            if (proof !== undefined) candidates.set(lookup, proof);
+          }
+          if (
+            ![...candidates.values()].some((proof) => typeof proof === "object")
+          )
+            return result;
+          // Expose missing explicit entries to the retry even when we have no
+          // source for them. A later condition cannot displace the selected
+          // declaration entry merely because the latter has no proof.
+          for (const lookup of lookups ?? []) {
+            if (candidates.has(lookup)) continue;
+            const output = missingOutput(lookup);
+            if (output && entries.explicitEntry(route.target, output))
+              candidates.set(lookup, false);
+          }
+          const directories = new Set<string>();
+          for (const lookup of candidates.keys()) {
+            for (
+              let dir = posix.dirname(lookup);
+              dir !== route.link;
+              dir = posix.dirname(dir)
+            )
+              directories.add(dir);
+          }
+          // Let TypeScript choose the entry and condition in the original
+          // mode. The overlay is scoped to this lookup and has no file bodies.
+          const retry = ts.resolveModuleName(
+            selected,
+            containingFile,
+            options,
+            {
+              ...created,
+              fileExists: (name) =>
+                candidates.has(name) || created.fileExists(name),
+              directoryExists: (name) =>
+                directories.has(name) || created.directoryExists!(name),
+              realpath: (name) =>
+                candidates.has(name) ? name : created.realpath!(name),
+            },
+            undefined,
+            redirected,
+            mode,
+          );
+          const chosen = retry.resolvedModule;
+          const proof = chosen && candidates.get(chosen.resolvedFileName);
+          if (!chosen || !proof || typeof proof !== "object") return result;
+          return { ...retry, resolvedModule: redirect(proof) };
         });
     }
     caches.set(created, sources);
@@ -1319,15 +1533,29 @@ export function projectModel(
       return true;
     },
     host,
-    workspaceReason: (specifier, from, lookups, includeInstalled = true) =>
-      fs.workspaceReason(specifier, from, lookups, (link) => {
-        if (!includeInstalled) return undefined;
-        const physical = dependencies?.realpath(dependencyPath(link));
-        if (physical === undefined) return undefined;
-        if (hasNodeModulesSegment(physical)) return false;
-        const path = toVirtual(physical);
-        return fs.files.has(posix.join(path, "package.json")) ? path : false;
-      }),
+    unbuiltEntries: (host) => redirects.get(host),
+    workspaceReason(specifier, from, lookups, includeInstalled = true) {
+      const route = fs.workspaceRoute(
+        specifier,
+        from,
+        includeInstalled ? physicalWorkspace : () => undefined,
+      );
+      if (!route) return undefined;
+      const missingOutput = lookups.some((lookup) => {
+        const output = workspaceOutput(lookup, route);
+        if (!output || fs.files.has(output)) return false;
+        for (
+          let dir = posix.dirname(output);
+          dir !== route.target && dir !== "/";
+          dir = posix.dirname(dir)
+        )
+          if (fs.outputs.has(dir)) return true;
+        return false;
+      });
+      return missingOutput
+        ? "workspace-build-output-missing"
+        : "workspace-entry-unavailable";
+    },
     workspaceBoundaryKnown: (from) => {
       for (const root of workspace.incompleteRoots)
         if (underDirectory(from, root)) return false;

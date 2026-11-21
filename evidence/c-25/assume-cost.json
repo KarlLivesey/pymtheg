@@ -1,0 +1,62 @@
+[
+  {
+    "pin": "honojs/hono",
+    "label": "main",
+    "outcome": "finished",
+    "code": 0,
+    "wallSeconds": 176.763,
+    "peakRssKiB": 1187144,
+    "cpuSeconds": 148.26999999999998,
+    "status": "ok"
+  },
+  {
+    "pin": "mermaid-js/mermaid",
+    "label": "main",
+    "outcome": "finished",
+    "code": 0,
+    "wallSeconds": 367.372,
+    "peakRssKiB": 1430192,
+    "cpuSeconds": 256.69,
+    "status": "ok"
+  },
+  {
+    "pin": "honojs/hono",
+    "label": "final",
+    "outcome": "finished",
+    "code": 0,
+    "wallSeconds": 121.495,
+    "peakRssKiB": 1343464,
+    "cpuSeconds": 119.77000000000001,
+    "status": "ok"
+  },
+  {
+    "pin": "mermaid-js/mermaid",
+    "label": "final",
+    "outcome": "finished",
+    "code": 0,
+    "wallSeconds": 182.479,
+    "peakRssKiB": 1813632,
+    "cpuSeconds": 193.59,
+    "status": "ok"
+  },
+  {
+    "pin": "honojs/hono",
+    "label": "repeat",
+    "outcome": "finished",
+    "code": 0,
+    "wallSeconds": 77.157,
+    "peakRssKiB": 1745232,
+    "cpuSeconds": 99.66,
+    "status": "ok"
+  },
+  {
+    "pin": "mermaid-js/mermaid",
+    "label": "repeat",
+    "outcome": "finished",
+    "code": 0,
+    "wallSeconds": 151.94,
+    "peakRssKiB": 2540356,
+    "cpuSeconds": 172.69,
+    "status": "ok"
+  }
+]
