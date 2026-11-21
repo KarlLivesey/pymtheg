@@ -11,6 +11,7 @@ import type {
   GraphSymbol,
   LinkResolution,
   ResolutionResult,
+  SymbolReference,
 } from "./types.js";
 
 export function decideLink(
@@ -22,9 +23,9 @@ export function decideLink(
 }
 /** Internal per-pass lookup; callers of decideLink retain its original signature. */
 export class LinkDecider {
-  private readonly byId: Map<string, GraphSymbol>;
+  private readonly byId: Map<string, SymbolReference>;
   constructor(
-    symbols: readonly GraphSymbol[],
+    symbols: readonly SymbolReference[],
     /** Whether a path is a clean manifest/lockfile context file in the snapshot. */
     private readonly versionSource: (path: string) => boolean = () => false,
     private readonly missingLinkReason?: string,
@@ -115,7 +116,7 @@ export function resolutionFacts(
   result: ResolutionResult,
   /** A stored file by path. Read only for files that receive added links. */
   fileOf: (path: string) => GraphFile | undefined,
-  symbols: readonly GraphSymbol[],
+  symbols: readonly SymbolReference[],
   existing: readonly GraphLink[],
   /** Whether a path is a clean context file in the snapshot (library versions). */
   versionSource: (path: string) => boolean = () => false,

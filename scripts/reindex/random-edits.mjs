@@ -23,7 +23,7 @@ const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
   process.argv.slice(2);
 if (!outArg)
   throw Error(
-    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N]",
+    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command]",
   );
 const dist = resolve(distArg);
 const expectedSteps = Number(countArg);
@@ -44,6 +44,12 @@ const resume = flags.includes("--resume");
 const storeDirAt = flags.indexOf("--store-dir");
 const storeDir = storeDirAt < 0 ? undefined : resolve(flags[storeDirAt + 1]);
 const temporary = storeDir && join(storeDir, `${name}.${seedArg}.sqlite`);
+// C-33: the incremental side runs `graph index` on the project's own store,
+// the cold side in the store directory, and each step is followed by an
+// unchanged `graph index` that must verify without an index run and leave
+// the store's bytes as they were.
+const command = flags.includes("--command");
+if (command && !temporary) throw Error("--command requires --store-dir");
 const cacheAt = flags.indexOf("--cache-pages");
 const cachePages = cacheAt < 0 ? undefined : Number(flags[cacheAt + 1]);
 if (
@@ -92,9 +98,10 @@ const init = () =>
     ],
     { cwd: root, stdio: ["ignore", "ignore", "inherit"] },
   );
-const graph = temporary
-  ? join(base, "incremental.sqlite")
-  : join(root, ".pymtheg/rebuildable/graph.sqlite");
+const graph =
+  temporary && !command
+    ? join(base, "incremental.sqlite")
+    : join(root, ".pymtheg/rebuildable/graph.sqlite");
 const directId = `random-${name}-${seedArg}`;
 const clearStore = (store) => {
   for (const suffix of ["", "-wal", "-shm"])
@@ -104,7 +111,7 @@ function prepareStore(path) {
   if (cachePages !== undefined) setPageCache(path, cachePages);
 }
 function incremental(metrics) {
-  if (!temporary) return run("index-once.mjs", root, metrics);
+  if (!temporary || command) return run("index-once.mjs", root, metrics);
   clearStore(temporary);
   try {
     if (existsSync(graph)) copyFileSync(graph, temporary);
@@ -117,10 +124,11 @@ function incremental(metrics) {
   }
 }
 if (!existsSync(graph)) {
-  if (!temporary) init();
+  if (!temporary || command) init();
   incremental(join(base, "first.json"));
 }
-const projectId = temporary ? directId : storeRows(graph).project[0];
+const projectId =
+  temporary && !command ? directId : storeRows(graph).project[0];
 // Choose renames from declarations a different file actually called in the
 // initial graph. Keep that list for deterministic replay after an interruption.
 const signatureTargetPath = join(base, "signature-targets.json");
@@ -368,6 +376,22 @@ for (let step = 0; step < expectedSteps; step++) {
   const measured = JSON.parse(
     readFileSync(join(base, `step-${step}.json`), "utf8"),
   );
+  let noEdit;
+  if (command) {
+    const before = readFileSync(graph);
+    run("index-once.mjs", root, join(base, `no-edit-${step}.json`));
+    const again = JSON.parse(
+      readFileSync(join(base, `no-edit-${step}.json`), "utf8"),
+    );
+    noEdit = {
+      complete: again.complete,
+      verified: again.stages["store.beginRun"] === undefined,
+      identical: before.equals(readFileSync(graph)),
+      cpuMs: again.cpuMs,
+    };
+    if (!noEdit.complete || !noEdit.verified || !noEdit.identical)
+      differences.push({ table: "no-edit", noEdit });
+  }
   steps.push({
     step,
     file,
@@ -378,6 +402,7 @@ for (let step = 0; step < expectedSteps; step++) {
     wallMs: measured.wallMs,
     failed: measured.report?.failedCount,
     resolvedFiles: measured.counts?.["resolve.go.decisionFiles"] ?? 0,
+    ...(noEdit ? { noEdit } : {}),
   });
   console.log(
     `${id} step ${step} ${kind} ${file}:${at + 1}: ${differences.length ? "DIFFERENT " + JSON.stringify(differences).slice(0, 1500) : "equal"}`,

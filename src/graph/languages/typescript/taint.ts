@@ -35,7 +35,7 @@ export interface TaintInput {
   program: ts.Program;
   checker: ts.TypeChecker;
   captured: ReadonlySet<string>;
-  resolveModule: (specifier: string, from: string) => string | undefined;
+  resolveModule: (specifier: ts.StringLiteralLike) => string | undefined;
   /** Whether a captured file failed (syntax error). */
   invalid: (path: string) => boolean;
   /**
@@ -527,19 +527,18 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
         statement.moduleSpecifier &&
         ts.isStringLiteralLike(statement.moduleSpecifier)
       ) {
-        const next = resolveModule(statement.moduleSpecifier.text, module);
+        const next = resolveModule(statement.moduleSpecifier);
         if (next !== undefined) found.push(...failedIn(next, seen));
       }
     return found;
   };
-  /** Causes of a module specifier written in `from`. */
+  /** Causes of a module specifier in its own source file and mode. */
   const moduleCauses = (
     specifier: ts.Expression | undefined,
-    from: string,
     resolved: boolean,
   ): string[] => {
     if (!specifier || !ts.isStringLiteralLike(specifier)) return [];
-    const module = resolveModule(specifier.text, from);
+    const module = resolveModule(specifier);
     if (module === undefined) return [];
     if (invalid(module)) return [module];
     // Through `export *`: only when the name was not found elsewhere.
@@ -560,11 +559,7 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
     if (!declaration || path === undefined || !captured.has(path)) return [];
     try {
       if (symbol.flags & ts.SymbolFlags.Alias)
-        return moduleCauses(
-          bindingSpecifier(symbol),
-          path,
-          resolvedAlias(symbol),
-        );
+        return moduleCauses(bindingSpecifier(symbol), resolvedAlias(symbol));
       // `const b = require("./bad")`, `module.exports = require("./bad")`,
       // `const m = await import("./bad")`.
       let value: ts.Expression | undefined = ts.isVariableDeclaration(
@@ -587,7 +582,7 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
           value.expression.kind === ts.SyntaxKind.ImportKeyword) &&
         value.arguments.length >= 1
       )
-        return moduleCauses(value.arguments[0], path, false);
+        return moduleCauses(value.arguments[0], false);
       return [];
     } catch (error) {
       // A stack limit here: not known to bind a failed file, so the link
@@ -620,14 +615,12 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
     // ----- seeds -----
     const declarations: ts.Node[] = [];
     for (const source of sources) {
-      const path = fromVirtual(source.fileName)!;
       const visit = (node: ts.Node): void => {
         step();
         const symbol = aliasDeclared(node, checker);
         if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
           const causes = moduleCauses(
             bindingSpecifier(symbol),
-            path,
             resolvedAlias(symbol),
           );
           if (causes.length) {
@@ -644,7 +637,7 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
             node.expression.kind === ts.SyntaxKind.ImportKeyword) &&
           node.arguments.length >= 1
         ) {
-          const causes = moduleCauses(node.arguments[0], path, false);
+          const causes = moduleCauses(node.arguments[0], false);
           let holder: ts.Node = node.parent;
           while (
             ts.isAwaitExpression(holder) ||
@@ -839,11 +832,7 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
           ts.isLiteralTypeNode(node.argument) &&
           ts.isStringLiteralLike(node.argument.literal)
         ) {
-          const from = fromVirtual(node.getSourceFile().fileName);
-          const causes =
-            from === undefined
-              ? []
-              : moduleCauses(node.argument.literal, from, false);
+          const causes = moduleCauses(node.argument.literal, false);
           if (causes.length) add(inArgument ? weak : all, target, causes);
         }
         if (

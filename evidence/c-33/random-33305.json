@@ -1,0 +1,41 @@
+{
+ "id": "restic/restic",
+ "seed": 33305,
+ "expectedSteps": 3,
+ "steps": [
+  {
+   "step": 0,
+   "file": "internal/archiver/buffer_test.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8258,
+   "failed": 0,
+   "resolvedFiles": 559
+  },
+  {
+   "step": 1,
+   "file": "internal/backend/gs/gs.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3944,
+   "failed": 0,
+   "resolvedFiles": 89
+  },
+  {
+   "step": 2,
+   "file": "internal/archiver/buffer_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8396,
+   "failed": 0,
+   "resolvedFiles": 559
+  }
+ ],
+ "equal": true
+}

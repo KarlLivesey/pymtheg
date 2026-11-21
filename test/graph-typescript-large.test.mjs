@@ -85,6 +85,43 @@ const linkOn = (result, file, marker, text) => {
   );
   return found[0];
 };
+
+test("an invalid analysis range is contained to its file", async () => {
+  const result = await indexFiles(
+    {
+      "bad.ts": "export function damaged() {}\ndamaged();",
+      "use.ts": 'import { damaged } from "./bad";\ndamaged();',
+      "good.ts": "export function healthy() {}\nhealthy(); // unaffected",
+    },
+    {
+      module: typescriptModule({
+        checkerFault(method, node) {
+          if (
+            method === "getSymbolAtLocation" &&
+            node &&
+            ts.isIdentifier(node) &&
+            ts.isCallExpression(node.parent) &&
+            node.getSourceFile().fileName === "/bad.ts"
+          )
+            node.end = 1_000_000;
+        },
+      }),
+    },
+  );
+  assert.deepEqual(result.report.analysisErrors, []);
+  assert.deepEqual(result.report.failed, ["bad.ts"]);
+  assert.match(
+    result.stored.get("bad.ts").result.diagnostics[0].message,
+    /Invalid UTF-16 range/,
+  );
+  const entry = linkOn(result, "use.ts", "import", '"./bad"');
+  assert.equal(entry.resolution, "unresolved");
+  assert.equal(entry.reason, "target-unavailable");
+  assert.equal(
+    linkOn(result, "good.ts", "unaffected", "healthy").target,
+    "good.ts#healthy",
+  );
+});
 /** Each failed file with the first diagnostic of its stored result. */
 const failedReasons = (result) =>
   Object.fromEntries(

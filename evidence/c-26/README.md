@@ -12,7 +12,7 @@ are observations on a shared, loaded machine. The change note is
 
 - [`identity.jsonl`](identity.jsonl): every stored row of the seven pins,
   main against C-26 (`tools/identity-all.mjs`, `tools/identity.mjs`).
-  Symbol and link IDs become stable keys, module version 43 maps to 42,
+  Symbol and link IDs become stable keys, module version 44 maps to 43,
   and main's `data.failedFiles` map is normalised to the digest C-26
   stores.
 - [`compare-summary.json`](compare-summary.json): every link (C-10's

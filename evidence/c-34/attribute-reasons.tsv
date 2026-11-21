@@ -1,0 +1,17 @@
+Pin	Reason after proof	Links
+actix/actix-web	analysis-resolution-disagreement	1
+actix/actix-web	associated-member-lookup-unverified	12
+actix/actix-web	dependency-presence-unverified	1
+actix/actix-web	namespace-binding-unverified	14
+cberner/redb	analysis-resolution-disagreement	39
+cberner/redb	conditional-name-may-be-absent	3
+cberner/redb	conditional-name-may-be-absent; associated-member-lookup-unverified	1
+cberner/redb	namespace-binding-unverified	296
+crossbeam-rs/crossbeam	analysis-resolution-disagreement	1
+helix-editor/helix	analysis-resolution-disagreement	3
+helix-editor/helix	namespace-binding-unverified	17
+rustls/rustls	analysis-resolution-disagreement	5
+rustls/rustls	conditional-name-may-be-absent	8
+rustls/rustls	namespace-binding-unverified	96
+tokio-rs/axum	analysis-resolution-disagreement	2
+tokio-rs/axum	namespace-binding-unverified	25

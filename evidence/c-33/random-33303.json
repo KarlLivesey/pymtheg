@@ -1,0 +1,118 @@
+{
+ "id": "cli/cli",
+ "seed": 33303,
+ "expectedSteps": 10,
+ "steps": [
+  {
+   "step": 0,
+   "file": "script/ghmock/set.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10162,
+   "failed": 0,
+   "resolvedFiles": 1
+  },
+  {
+   "step": 1,
+   "file": "api/query_builder.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30384,
+   "failed": 0,
+   "resolvedFiles": 1127
+  },
+  {
+   "step": 2,
+   "file": "script/ghmock/terminal.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31959,
+   "failed": 0,
+   "resolvedFiles": 1127
+  },
+  {
+   "step": 3,
+   "file": "pkg/cmd/agent-task/shared/c27_random_3.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28500,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 4,
+   "file": "pkg/cmd/pr/shared/commentable_test.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29341,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 5,
+   "file": "pkg/cmd/issue/artifact/client/client_test.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 33724,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 6,
+   "file": "pkg/cmd/auth/shared/gitcredentials/updater.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30290,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 7,
+   "file": "pkg/cmd/repo/read-file/read_file.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9766,
+   "failed": 0,
+   "resolvedFiles": 1
+  },
+  {
+   "step": 8,
+   "file": "pkg/cmd/repo/read-dir/http.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 36984,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 9,
+   "file": "internal/eventstream/sse_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29403,
+   "failed": 0,
+   "resolvedFiles": 1128
+  }
+ ],
+ "equal": true
+}

@@ -1,0 +1,30 @@
+{
+ "id": "cli/cli",
+ "seed": 33306,
+ "expectedSteps": 2,
+ "steps": [
+  {
+   "step": 0,
+   "file": "pkg/cmd/project/close/close_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27447,
+   "failed": 0,
+   "resolvedFiles": 1127
+  },
+  {
+   "step": 1,
+   "file": "pkg/cmd/repo/edit/edit_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30561,
+   "failed": 0,
+   "resolvedFiles": 1127
+  }
+ ],
+ "equal": true
+}

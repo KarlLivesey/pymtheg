@@ -1,0 +1,41 @@
+total sampled 10629 ms
+
+self time:
+   3226  db.prepare.statement.<computed> dist/graph/store.js:1155
+   2632  decodeFile dist/graph/store.js:82
+    912  matchesPattern dist/graph/registry.js:6
+    617  (garbage collector) :0
+    566  (idle) :0
+    294  (anonymous) dist/graph/store.js:452
+    236  detectModuleFormat node:internal/modules/esm/get_format:94
+    166  files dist/graph/store.js:281
+    148  (program) :0
+    133  (anonymous) :0
+    112  (anonymous) dist/graph/command-snapshot.js:9
+     74  parse :0
+
+inclusive time:
+  10629  (root) :0
+   6305  (anonymous) dist/graph/commands.js:210
+   5459  stage dist/graph/work.js:19
+   4637  indexProject dist/graph/indexer.js:18
+   3228  db.prepare.statement.<computed> dist/graph/store.js:1155
+   2751  decodeFile dist/graph/store.js:82
+   2128  (anonymous) dist/graph/indexer.js:266
+   1974  read dist/graph/indexer.js:621
+   1967  fileSummaries dist/graph/store.js:301
+   1679  resolveModule dist/graph/indexer.js:428
+   1498  (anonymous) dist/graph/indexer.js:594
+   1471  (anonymous) dist/graph/indexer.js:589
+   1471  input dist/graph/indexer.js:589
+   1154  filesAt dist/graph/store.js:290
+   1128  previousParse dist/graph/indexer.js:522
+   1128  (anonymous) dist/graph/indexer.js:175
+   1125  getFile dist/graph/store.js:312
+   1039  walk dist/graph/command-snapshot.js:13
+   1029  analyzeModule dist/graph/indexer.js:264
+   1026  (anonymous) dist/graph/indexer.js:600
+   1026  runResolve dist/graph/indexer.js:581
+   1024  files dist/graph/store.js:281
+    996  summaries dist/graph/indexer.js:629
+    992  matchesPattern dist/graph/registry.js:6

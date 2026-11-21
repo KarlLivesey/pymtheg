@@ -5,7 +5,20 @@ import { basename, extname } from "node:path";
 import { compare } from "./identity.js";
 import type { LanguageModule } from "./types.js";
 
+const patterns = new Map<string, RegExp>();
+
 export function matchesPattern(path: string, pattern: string): boolean {
+  let compiled = patterns.get(pattern);
+  if (!compiled) {
+    compiled = compilePattern(pattern);
+    // Built-in claim patterns fit here. Bound memory for library callers that
+    // create registries with arbitrary patterns over the life of a process.
+    if (patterns.size < 128) patterns.set(pattern, compiled);
+  }
+  return compiled.test(pattern.includes("/") ? path : basename(path));
+}
+
+function compilePattern(pattern: string): RegExp {
   let regex = "^";
   for (let i = 0; i < pattern.length; i++) {
     const char = pattern[i]!;
@@ -19,9 +32,7 @@ export function matchesPattern(path: string, pattern: string): boolean {
     else if (char === "?") regex += "[^/]";
     else regex += char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
-  return new RegExp(regex + "$").test(
-    pattern.includes("/") ? path : basename(path),
-  );
+  return new RegExp(regex + "$");
 }
 const validPattern = (value: string) =>
   !!value &&

@@ -2361,6 +2361,17 @@ wrong results in real shapes. Lesson recorded by the manager under D18 (13
 November 2026): measure a cheap, same-class fix on the corpus before asking for
 it.
 
+### D19: coverage is judged with dependencies installed
+
+**Decided (Karl, 21 November 2026):** "we will assume in 99% of cases
+dependencies are installed". The coverage goal for a language is judged on a
+checkout whose dependencies are installed; the bare-checkout figure is still
+reported, as a secondary number. This confirms the manager's earlier choice for
+TypeScript (C-20). **Why:** people index the project they are working in, and a
+working checkout has its dependencies. **Rules out:** ranking work that only
+helps a bare checkout above work that helps an installed one; reporting the
+bare figure as the headline.
+
 ### E4: unseen code does not rebind `derive` or standard macros (Rust)
 
 **Decided (ruling E4, W2-C, 12 November 2026; the build plan names no author, and
@@ -2866,6 +2877,19 @@ facade and its implementation. Unverified implementations leave the
 expansion opaque without a supported output proof. Verified identities feed the C-12 effect rules and its existing
 external effect assumption. [C-18](changes/C-18.md)
 
+### C-34 Fixed impl items in Rust macro transcribers
+
+A resolved `macro_rules!` definition can bound its lexical output to no
+names when every arm consists of fixed `impl` items and the invocation
+passes only identifiers and commas. The written impl bodies delimit the
+associated items. Repetitions cannot supply an item boundary or join tokens
+with a separator other than a comma. Inside a body, `inline`, `allow` and
+`cfg` preserve or remove the annotated item. Other attributes and nested
+macro syntax leave the proof unavailable. A nested definition could export
+a macro to the crate root. The scope retry uses the proof as a lexical name
+bound. Generated impl contents are still opaque for member resolution.
+[C-34](changes/C-34.md)
+
 ### C-14 Go library targets
 
 Go records a library target where the source proves the package and, for a
@@ -2976,7 +3000,9 @@ directory) or test runner config (Vitest `typecheck.tsconfig`, ts-jest
 disables the rule for the checkout. The compiler would select every file
 below it, but no tool compiles it as a project. The editor opens only
 `tsconfig.json` and `jsconfig.json` files and the projects they reference,
-and `tsc --build` builds only referenced projects. A shared base therefore
+and `tsc --build` builds the configs it is given and the projects they
+reference; a shared base is neither discoverable, referenced, nor named by a
+script or runner config. A shared base therefore
 does not compete for a file that a project config also includes. When it
 is the only config that includes a file, it still owns that file. The
 ranking among project configs is unchanged: two project configs that tie
@@ -2986,6 +3012,21 @@ signature the checker selects, when no declaration from another body could
 also accept the arguments; a union or intersection receiver is never
 narrowed.
 [C-30](changes/C-30.md)
+
+### C-32 TypeScript relative directories and checkout file identity
+
+Use TypeScript's directory resolution in the importing file's mode. The
+snapshot host accepts trailing-separator probes. When Node ESM refuses a
+verified directory entry, report the directory restriction. The legacy
+extension fallback remains limited to file edges. A checker symbol merged
+with its own installed package's augmentation keeps its original library
+identity, and members declared by the augmentation remain reachable.
+Compiler package IDs can
+represent identical dependency copies, while distinct files in the
+checkout are identified by their snapshot paths. Package lookup still
+uses the importer's own conditions and workspace route. Invalid extracted
+source ranges fail the affected file through the compiler session's
+containment path. [C-32](changes/C-32.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 
@@ -3085,6 +3126,17 @@ imports for changes confined to ordinary functions that global type facts
 cannot read. Other surface changes use the whole module. Go builds global
 indexes from the saved facts for the affected links. The C-22 cold equality
 rule and run ownership apply to every path. [C-27](changes/C-27.md)
+
+### A verified no-edit command reuses the checkpoint (C-33)
+
+An explicit source-only index can finish after one byte-hashed inventory and
+a matching completed command checkpoint in its response snapshot. The command
+does not begin a write run in that case. Changed inputs, an invalid checkpoint
+and retryable failures use the existing owned path. Source inventories still
+read and hash the bytes of each file. Filesystem timestamps can describe a
+metadata-only change or hide an edit. Scoped Go resolution and validation use
+projections of existing facts. No second copy of the global indexes is kept
+in the store. [C-33](changes/C-33.md)
 
 ### C-26 Non-returning analysis: a deterministic check before any deadline
 

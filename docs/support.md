@@ -691,6 +691,14 @@ crate tracing;` therefore gets no proven standard names, so its argument
   `super::` paths) or carries `#[cfg]` gives unresolved body calls. Body
   calls with no workspace target, sysroot paths, `Self::` paths and method
   calls are not derived.
+- A captured `macro_rules!` invocation with only identifiers and commas as
+  input can clear a lexical name guard when every arm emits only fixed `impl`
+  blocks. Each impl starts with a written keyword and has a written body
+  delimiter. Repetitions must preserve those boundaries and use no separator
+  or a comma. Only the built-in `inline`, `allow` and `cfg` attributes are
+  accepted inside the body. Nested macro syntax leaves the proof unavailable.
+  Generated associated items remain subject to the existing method and
+  associated-path checks.
 - **Derives:** on stable Rust a `#[derive(Name)]` resolves among derive
   macros only, and those come from proc-macro crates (imported by `use`,
   named by path, or brought in by `#[macro_use] extern crate`) or from the
@@ -787,9 +795,15 @@ accept the arguments.
   manifests to the compiler. TypeScript applies its own package export
   conditions, subpath rules, `main`, `types`, `paths` and project reference
   redirects within the snapshot. The selected module file has an entry edge
-  independent of any declaration augmentations. When ESM-mode resolution
-  misses an extensionless relative import, the 0.1.0 extension lookup can
-  still establish its module-file edge. Named bindings use the checker.
+  independent of any declaration augmentations. Directory imports, including
+  `.`, `..` and spellings with a trailing slash, use the importing file's
+  compiler resolution mode. Node16 and NodeNext ESM leave directory imports
+  unresolved with `directory-import-not-allowed-in-esm` when the directory
+  entry can be verified. The legacy extension lookup can establish an extensionless
+  file edge when adding the extension finds the same adjacent file. Named
+  bindings use the checker. Distinct checkout files retain their own
+  declarations even when their containing packages share a package name,
+  version and subpath.
   Calls use the same declaration rule for relative imports, workspace imports
   and local aliases, including when TypeScript selects a `types` export.
 - **Library targets:** checker-proven JavaScript or web declarations, captured
@@ -811,6 +825,8 @@ accept the arguments.
   install exposes to that importer, including overrides and workspace links.
   A module augmentation owns the members it declares. The original package
   owns its default export and named namespace bindings proven by its entry.
+  A symbol merged with an augmentation from its own installed package
+  retains its original library identity.
   A named member written directly in an installed function's explicit return
   type can be linked through that declaration when the function has one
   declaration. Synthesized names for installed members can include the
@@ -874,7 +890,8 @@ accept the arguments.
   outside microsoft/TypeScript comes near it. The program budget counts
   every checkout file a program loads, imported files included; a file past
   it is left out of that program only (installed declarations have their
-  own budget).
+  own budget). Invalid extracted UTF-16 ranges use the same per-file
+  containment and report the file as unavailable.
 - **Files whose analysis would not return (C-26):** a file where the
   compiler's flow analysis would follow a cycle of flow nodes without a
   limit fails, with the line and column, before any query reaches it. The
@@ -919,6 +936,12 @@ the project links whose target, or one of whose candidates, is library unit
 `candidateSet` counts (MCP: action `uses`, `query` the unit, optional `symbol`).
 It finds only stored library targets: unresolved links may hide more uses. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
+
+An explicit source-only index can reuse a verified completion checkpoint
+after one content inventory. It reports zero indexed files and the current
+stored counts. A change to content, settings or dependencies, a missing
+checkpoint, or a retryable failure enters the regular index path.
+[C-33](changes/C-33.md)
 
 Source-only Go can reuse the stored link decisions outside an edit's affected
 files. An edit with the same declaration and import facts re-decides just the

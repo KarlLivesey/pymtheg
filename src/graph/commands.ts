@@ -2,11 +2,12 @@
 import { lstat, realpath } from "node:fs/promises";
 import {
   checkpointSchema,
+  checkpointFrom,
   readCheckpoint,
   readMetadata,
   fingerprint,
 } from "./command-checkpoint.js";
-import { changedDependencyInputs } from "./dependency-inputs.js";
+import { checkDependencyInputs } from "./dependency-inputs.js";
 import { performance } from "node:perf_hooks";
 import { findProjectRoot, storagePath } from "../storage/local.js";
 import {
@@ -16,10 +17,11 @@ import {
 } from "./registry.js";
 import { SqliteGraphStore } from "./store.js";
 import { indexProject, type IndexReport } from "./indexer.js";
-import { stage } from "./work.js";
+import { stage, stageSync } from "./work.js";
 import {
   captureInventory,
   changedFiles,
+  type InventoryListing,
   type StaleFile,
 } from "./command-snapshot.js";
 import { queryGraph, type QueryCommand } from "./command-queries.js";
@@ -154,27 +156,63 @@ export async function executeGraph(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
-  const registry = options.registry ?? (await discoverLanguages());
-  let store = exists
-    ? new SqliteGraphStore(path, undefined, {
-        readOnly:
-          request.command === "status" ||
-          (!!request.noSync && request.command !== "index"),
-      })
-    : null;
+  const registry =
+    options.registry ?? (await stage("command.modules", discoverLanguages));
+  // An explicit index first verifies on a read-only connection, which
+  // writes nothing to the file (C-33). It opens the writable store only if
+  // it has to index.
+  const verifyFirst = request.command === "index" && !options.registry;
+  let store: SqliteGraphStore | null = null;
+  if (exists)
+    try {
+      store = stageSync(
+        "command.sqliteOpen",
+        () =>
+          new SqliteGraphStore(path, undefined, {
+            readOnly:
+              request.command === "status" ||
+              (!!request.noSync && request.command !== "index") ||
+              verifyFirst,
+          }),
+      );
+    } catch (error) {
+      // The writable store reports it, or prepares the file, when indexing.
+      if (!verifyFirst) throw error;
+    }
   try {
+    const listing: InventoryListing = {
+      discovered: 0,
+      unclaimed: [],
+      ignoredSymlinks: [],
+    };
     let inventory = await stage("command.inventory", () =>
-      captureInventory(root, registry, signal),
+      captureInventory(
+        root,
+        registry,
+        signal,
+        request.command === "index" ? listing : undefined,
+      ),
     );
-    const previousState = readCheckpoint(store);
-    let metadata = previousState ?? readMetadata(store);
-    const staleFiles = () => [
-      ...changedFiles(inventory, metadata, registry),
-      ...changedDependencyInputs(root, metadata.contexts).map((path) => ({
-        path,
-        change: "context" as const,
-      })),
-    ];
+    const previousState = stageSync("command.checkpointRead", () =>
+      readCheckpoint(store),
+    );
+    let metadata =
+      previousState ?? stageSync("command.metadata", () => readMetadata(store));
+    // An installed input whose bytes are unchanged but whose stamp moved
+    // (a hard link, a permission change) is no change, but the index records
+    // the new stamp as a cold index would (C-22), so it is not verified.
+    let restamped = false;
+    const staleFiles = () => {
+      const inputs = checkDependencyInputs(root, metadata.contexts);
+      restamped = inputs.restamped;
+      return [
+        ...changedFiles(inventory, metadata, registry),
+        ...inputs.changed.map((path) => ({
+          path,
+          change: "context" as const,
+        })),
+      ];
+    };
     let stale = staleFiles();
     const retryable = metadata.files.some(
       (file) => file.status === "failed" && !file.cacheable,
@@ -214,8 +252,48 @@ export async function executeGraph(
       dirname(storagePath(root, "graph")),
       "toolchain",
     );
+    // The completion and the analysis completion are read again in one
+    // snapshot, which supplies the answer. The analysis completion names
+    // each incremental module that owns a stored file, as an index run
+    // records it (C-27).
+    let verified: ReturnType<typeof checkpointFrom> = null;
+    if (
+      verifyFirst &&
+      store &&
+      !toolchainOn &&
+      complete &&
+      !retryable &&
+      !restamped &&
+      stale.length === 0
+    ) {
+      const reader = store;
+      const snapshot = stageSync("command.checkpointRead", () =>
+        reader.verifiedCommandState(),
+      );
+      const state =
+        snapshot && checkpointFrom(snapshot.state, reader.projectId);
+      const expected = new Map(
+        registry.modules
+          .filter(
+            (module) =>
+              module.incrementalAnalysis &&
+              state?.files.some((file) => file.module === module.id),
+          )
+          .map((module) => [module.id, module.version]),
+      );
+      if (
+        state?.fingerprint === currentFingerprint() &&
+        snapshot!.analysisRecorded === expected.size > 0 &&
+        snapshot!.analysis.size === expected.size &&
+        [...expected].every(
+          ([id, version]) => snapshot!.analysis.get(id) === version,
+        )
+      )
+        verified = state;
+    }
+    const verifiedNoEdit = verified !== null;
     const wouldIndex =
-      request.command === "index" ||
+      (request.command === "index" && !verifiedNoEdit) ||
       (request.command !== "status" &&
         !request.noSync &&
         (!exists || stale.length > 0 || retryable || !complete));
@@ -243,7 +321,14 @@ export async function executeGraph(
     let report: IndexReport | null = null;
     let durationMs: number | null = null;
     if (shouldIndex) {
-      store ??= new SqliteGraphStore(storagePath(root, "graph", true));
+      if (verifyFirst && store) {
+        store.close();
+        store = null;
+      }
+      store ??= stageSync(
+        "command.sqliteOpen",
+        () => new SqliteGraphStore(storagePath(root, "graph", true)),
+      );
       // No completion is removed up front: an index run removes it in the
       // same commit as its first write, so a run that changes nothing
       // writes nothing (C-6, C-22). A run that ends without completing
@@ -344,21 +429,23 @@ export async function executeGraph(
           if (typeof value !== "function") return value;
           return (...args: unknown[]) => {
             signal.throwIfAborted();
-            if (key === "getFile")
-              options.progress?.({
-                phase: "inventory",
-                done: ++captured,
-                total,
-                path: args[0] as string,
-              });
             return value.apply(target, args);
           };
         },
       });
       const started = performance.now();
       options.progress?.({ phase: "inventory", done: 0, total });
-      report = await indexProject(root, tracked, adapter, {
+      const indexed = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
+        onFileCompared: (path) => {
+          signal.throwIfAborted();
+          options.progress?.({
+            phase: "inventory",
+            done: ++captured,
+            total,
+            path,
+          });
+        },
         ...(options.signal || toolchainOn ? { signal } : {}),
         ...(toolchainOn
           ? {
@@ -367,6 +454,7 @@ export async function executeGraph(
             }
           : {}),
       });
+      report = indexed;
       signal.throwIfAborted();
       const dataVersion = store.commandDataVersion();
       durationMs = performance.now() - started;
@@ -387,30 +475,69 @@ export async function executeGraph(
         !report.analysisErrors.length &&
         !report.resolutionErrors.length
       )
-        store.completeGraphCommandState(
-          {
-            schema: checkpointSchema,
-            projectId: store.projectId,
-            configuration,
-            settings,
-            inventory,
-            ...metadata,
-            fingerprint: currentFingerprint(),
-            ...(toolchainOn
-              ? { toolchain: toolchainState(toolchains, report.toolchains) }
-              : {}),
-          },
-          dataVersion,
+        stageSync("command.checkpointWrite", () =>
+          currentStore.completeGraphCommandState(
+            {
+              schema: checkpointSchema,
+              projectId: currentStore.projectId,
+              configuration,
+              settings,
+              inventory,
+              ...metadata,
+              fingerprint: currentFingerprint(),
+              ...(toolchainOn
+                ? { toolchain: toolchainState(toolchains, indexed.toolchains) }
+                : {}),
+            },
+            dataVersion,
+          ),
         );
       else store.invalidateGraphCommandState();
       options.progress?.({ phase: "complete", done: total, total });
     }
     const finish = (): GraphResponse => {
-      const finalState = readCheckpoint(store);
+      const finalState = verifiedNoEdit
+        ? verified
+        : stageSync("command.checkpointRead", () => readCheckpoint(store));
       metadata = finalState ?? readMetadata(store);
       const trusted = finalState?.fingerprint === currentFingerprint();
       const files = metadata.files;
       const contexts = metadata.contexts;
+      if (verifiedNoEdit && trusted) {
+        const { symbols, links, unresolved, ambiguous, library } =
+          metadata.counts;
+        const failed = files
+          .filter((file) => file.status === "failed")
+          .map((file) => file.path);
+        const partial = files
+          .filter((file) => file.status === "partial")
+          .map((file) => file.path);
+        report = {
+          ...listing,
+          unclaimed: listing.unclaimed.sort(),
+          ignoredSymlinks: listing.ignoredSymlinks.sort(),
+          claimed: files.length,
+          indexed: 0,
+          unchanged: files.length,
+          removed: 0,
+          analyzed: 0,
+          symbols,
+          links,
+          unresolved,
+          ambiguous,
+          library,
+          contextFiles: inventory.filter((file) => file.context).length,
+          unclaimedCount: listing.unclaimed.length,
+          failedCount: failed.length,
+          partialCount: partial.length,
+          failed,
+          partial,
+          errors: [],
+          analysisErrors: [],
+          resolutionErrors: [],
+        };
+        durationMs = 0;
+      }
       const failed = new Map<string, GraphResponse["failedFiles"][number]>();
       for (const file of files)
         if (file.status === "failed")
@@ -626,8 +753,13 @@ export async function executeGraph(
       }
       return response;
     };
-    return store ? store.readCommandSnapshot(finish) : finish();
+    const response = store ? store.readCommandSnapshot(finish) : finish();
+    if (verifiedNoEdit && response.sync.report) {
+      const total = response.sync.report.claimed;
+      options.progress?.({ phase: "complete", done: total, total });
+    }
+    return response;
   } finally {
-    store?.close();
+    stageSync("command.sqliteClose", () => store?.close());
   }
 }
