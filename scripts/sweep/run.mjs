@@ -279,7 +279,7 @@ async function corpusSize(root, listing) {
   return { files, lines, samples };
 }
 
-async function runRepository(repo, release, scratch, limitSeconds, installed) {
+async function runRepository(repo, release, scratch, limitSeconds, installed, goToolchain) {
   // A retry gets a distinct directory even if a previous child is winding down.
   const work = join(scratch, "work", ...repo.id.split("/"), repo.commit, randomUUID());
   const root = join(work, "checkout");
@@ -316,7 +316,7 @@ async function runRepository(repo, release, scratch, limitSeconds, installed) {
     const argv = installed
       ? ["--user", "--map-root-user", "--net", "--", process.execPath, release.entry, ...args]
       : [release.entry, ...args];
-    const runResult = await run(label, runner, argv, environment, true);
+    const runResult = await run(label, runner, argv, environment, !goToolchain);
     let body;
     // Exit 2 with a normal graph response means incomplete, so keep its facts.
     if ([0, 2, 3].includes(runResult.process.code)) {
@@ -377,16 +377,36 @@ async function runRepository(repo, release, scratch, limitSeconds, installed) {
       }
       const install = await run("install", setup.command, setup.args, setup.env);
       record.install = { manager: setup.manager, status: install.process.code === 0 ? "installed" : "failed", exitCode: install.process.code };
-      if (install.process.code !== 0) return finalize("install-unavailable");
+      if (install.process.code !== 0) {
+        const stderr = redact(await tail(`${install.log}.err`));
+        const diagnostic = /\b(?:ERESOLVE|EUSAGE|ENOSPC|EAI_AGAIN|ECONNRESET|ETIMEDOUT|ERR_PNPM_[A-Z_]+)\b/.exec(stderr)?.[0];
+        if (diagnostic) record.install.reason = diagnostic;
+        const failure = processFailure(install.process, stderr);
+        const { outcome, ...details } = failure;
+        return finalize(outcome === "wall-limit" ? outcome : "install-unavailable", { ...details, stage });
+      }
     }
     stage = "init";
     // Never use project-supplied Pymtheg settings. init creates default settings.
     if (await exists(join(root, ".pymtheg"))) throw Error("Checkout contains existing Pymtheg settings or storage");
     await cli("init", ["init", ".", "--name", repo.id, "--format", "json"]);
+    if (goToolchain) {
+      const path = join(root, ".pymtheg/settings.json");
+      const settings = JSON.parse(await readFile(path, "utf8"));
+      settings.graph = { ...settings.graph, toolchain: { go: true } };
+      await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
+    }
     const cold = await graph("cold", "index");
     record.cold = { wallSeconds: cold.wallSeconds, cpuSeconds: cold.cpuSeconds, peakRssKiB: cold.peakRssKiB, exitCode: cold.code, status: cold.body.status };
     record.index = await summarizeIndex(cold.body, locate, redact);
-    if (cold.body.toolchain) throw Error("Unexpected toolchain state in a default source-only run");
+    if (goToolchain) {
+      const state = cold.body.toolchain?.go;
+      if (!state) throw Error("Go toolchain run did not report its state");
+      const { version, configuration, packages, universeClean, errors, upgradedLinks, confirmedLinks, verifiedSets, disagreements } = state;
+      record.toolchain = { state: state.state, ...(state.reason && { reason: redact(state.reason) }),
+        version, configuration, packages, universeClean, errorCount: errors?.length,
+        upgradedLinks, confirmedLinks, verifiedSets, disagreements };
+    } else if (cold.body.toolchain) throw Error("Unexpected toolchain state in a default source-only run");
     const warm = await graph("warm", "index");
     record.warm = { wallSeconds: warm.wallSeconds, cpuSeconds: warm.cpuSeconds, peakRssKiB: warm.peakRssKiB, exitCode: warm.code,
       status: warm.body.status, unchanged: warm.body.sync.report.unchanged };
@@ -423,6 +443,8 @@ async function main() {
     "wall-minutes": { type: "string", default: "60" },
     "local-build": { type: "string" },
     installed: { type: "boolean" },
+    "go-toolchain": { type: "boolean" },
+    "serial-pin": { type: "string", multiple: true },
     "retry-unfinished": { type: "boolean" },
     output: { type: "string" },
   } });
@@ -433,12 +455,16 @@ async function main() {
     throw Error("Use --scratch (or PYM_SCRATCH), --parallel 1..12 and a positive --wall-minutes");
   }
   const scratch = resolve(values.scratch);
-  const repos = (await checkedSelection(values.manifest)).filter((repo) => !values.installed || repo.language === "typescript");
+  if (values.installed && values["go-toolchain"]) throw Error("Choose one opt-in mode per run");
+  const mode = values.installed ? "installed" : values["go-toolchain"] ? "go-toolchain" : "source-only (default)";
+  const repos = (await checkedSelection(values.manifest)).filter((repo) =>
+    !values.installed && !values["go-toolchain"] || repo.language === (values.installed ? "typescript" : "go"));
   const release = values["local-build"] ? await localBuild(scratch, values["local-build"]) : await installRelease(scratch);
   const recordsDirectory = values.installed
     ? join(scratch, "installed-records", createHash("sha256").update(await readFile(new URL("./install.mjs", import.meta.url))).digest("hex"), release.sha256 ?? "release")
+    : values["go-toolchain"] ? join(scratch, "go-toolchain-records", release.sha256 ?? "release")
     : join(scratch, release.sha256 ? "build-records" : "records", release.sha256 ?? "");
-  const outputPath = values.output ? resolve(values.output) : join(scratch, `results${values.installed ? "-installed" : ""}${release.sha256 ? `-${release.sha256}` : ""}.json`);
+  const outputPath = values.output ? resolve(values.output) : join(scratch, `results${mode === "source-only (default)" ? "" : `-${mode}`}${release.sha256 ? `-${release.sha256}` : ""}.json`);
   await mkdir(recordsDirectory, { recursive: true });
   const records = new Map();
   const recordPath = (repo) => join(recordsDirectory, ...repo.id.split("/"), `${repo.commit}.json`);
@@ -452,7 +478,7 @@ async function main() {
   }
   const pending = repos.filter((repo) => !records.has(repo.id));
   const saveResults = () => writeAtomic(outputPath, [
-    "{", `  "release": ${JSON.stringify(release.provenance)},`, `  "mode": ${JSON.stringify(values.installed ? "installed" : "source-only (default)")},`, '  "repos": [',
+    "{", `  "release": ${JSON.stringify(release.provenance)},`, `  "mode": ${JSON.stringify(mode)},`, '  "repos": [',
     [...records].sort(([a], [b]) => compare(a, b)).map(([, record]) => `    ${JSON.stringify(record)}`).join(",\n"),
     "  ]", "}", "",
   ].join("\n"));
@@ -460,18 +486,22 @@ async function main() {
   console.error(`${pending.length} pending; ${records.size} recorded; ${parallel} workers`);
   // Serialize writes to the aggregate while each worker uses independent checkouts.
   let output = Promise.resolve();
+  const run = async (repo) => {
+    console.error(`${repo.id} started`);
+    const record = await runRepository(repo, release, scratch, limitSeconds, values.installed, values["go-toolchain"]);
+    await mkdir(join(recordsDirectory, ...repo.id.split("/")), { recursive: true });
+    await writeAtomic(recordPath(repo), `${JSON.stringify(record)}\n`);
+    records.set(repo.id, record);
+    output = output.then(saveResults);
+    await output;
+    console.error(`${repo.id} ${record.outcome} (${record.wallSeconds} s)`);
+  };
+  const serial = new Set(values["serial-pin"]);
+  const ordinary = pending.filter(({ id }) => !serial.has(id));
   await Promise.all(Array.from({ length: parallel }, async () => {
-    for (let repo; (repo = pending.shift()); ) {
-      console.error(`${repo.id} started`);
-      const record = await runRepository(repo, release, scratch, limitSeconds, values.installed);
-      await mkdir(join(recordsDirectory, ...repo.id.split("/")), { recursive: true });
-      await writeAtomic(recordPath(repo), `${JSON.stringify(record)}\n`);
-      records.set(repo.id, record);
-      output = output.then(saveResults);
-      await output;
-      console.error(`${repo.id} ${record.outcome} (${record.wallSeconds} s)`);
-    }
+    for (let repo; (repo = ordinary.shift()); ) await run(repo);
   }));
+  for (const repo of pending.filter(({ id }) => serial.has(id))) await run(repo);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
