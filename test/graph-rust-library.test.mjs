@@ -581,6 +581,27 @@ test("exact library queries include imports and invocations of known macros", as
   }
 });
 
+test("a guessed placement does not put a cfg on a known module declaration", async (t) => {
+  const store = await indexFixture(t, {
+    "Cargo.toml": manifest(),
+    "src/lib.rs": "mod chosen; mod elsewhere; use crate::chosen as kept;",
+    "src/chosen.rs": "pub fn known() {}",
+    "src/elsewhere.rs": '#[path="./alternate/chosen.rs"] mod chosen;',
+    "src/alternate/chosen.rs": "pub fn alternate() {}",
+  });
+  const chosen = store
+    .links()
+    .find(
+      (link) => link.kind === "imports" && link.targetName === "crate::chosen",
+    );
+  assert.equal(chosen.resolution, "resolved");
+  assert.equal(
+    store.findSymbols().find(({ id }) => id === chosen.targetId).identity,
+    "chosen",
+  );
+  assert.equal(chosen.data.uncertainty, undefined);
+});
+
 test("opaque module items cannot replace a known explicit import in its namespace", async () => {
   const lookup = await graph({
     "src/lib.rs": `

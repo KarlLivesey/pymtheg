@@ -1070,8 +1070,12 @@ export function resolveRust(
         )
           moduleIncomplete.add(s.id);
         const targets = possible.filter((f) => files.has(f));
-        const fileConditions = targets.map(
-          (f) => (data(units.get(f) ?? {}).conditions ?? []) as string[],
+        const fileConditions = targets.map((f) =>
+          ((data(units.get(f) ?? {}).conditions ?? []) as string[]).filter(
+            // A previous phase can mark a file that also has a guessed
+            // placement. That marker is not an inner cfg on this declaration.
+            (gate) => gate !== "?module-layout",
+          ),
         );
         if (fileConditions.length) {
           const same = fileConditions.every(
