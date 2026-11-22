@@ -3067,9 +3067,14 @@ test("plain builds prove a declaration entry, and visible rollups and rewrites r
       };
       assert.deepEqual(
         Object.fromEntries(
-          ["bundled", "generated", "rollup", "wrapped", "rewritten", "packed"].map(
-            (name) => [name, outcome(name)],
-          ),
+          [
+            "bundled",
+            "generated",
+            "rollup",
+            "wrapped",
+            "rewritten",
+            "packed",
+          ].map((name) => [name, outcome(name)]),
         ),
         {
           // The trimmed roll-up drops the @internal `open`: withheld.
@@ -3086,7 +3091,11 @@ test("plain builds prove a declaration entry, and visible rollups and rewrites r
             "packages/wrapped/src/index.ts#open",
             ["ts-unbuilt-entry-is-src-twin"],
           ],
-          rewritten: ["unresolved", "workspace-build-output-missing", undefined],
+          rewritten: [
+            "unresolved",
+            "workspace-build-output-missing",
+            undefined,
+          ],
           packed: ["unresolved", "workspace-build-output-missing", undefined],
         },
       );

@@ -33,7 +33,11 @@ async function calls(files) {
       await mkdir(dirname(join(dir, path)), { recursive: true });
       await writeFile(join(dir, path), text);
     }
-    const report = await indexProject(dir, new LanguageRegistry([typescript]), store);
+    const report = await indexProject(
+      dir,
+      new LanguageRegistry([typescript]),
+      store,
+    );
     assert.deepEqual(report.analysisErrors, []);
     const symbols = new Map(
       store.findSymbols().map((s) => [s.id, `${s.file}#${s.identity}`]),
@@ -80,9 +84,21 @@ test("the src/ twin of a missing output: one or two output folders, any source e
       'import { a } from "a"; import { b } from "b"; import { tool } from "b/tool"; a(); b(); tool();',
   });
   assert.deepEqual(got, {
-    a: ["packages/a/src/index.ts#a", ["ts-unbuilt-entry-is-src-twin"], "packages/a/src/index.ts"],
-    b: ["packages/b/src/index.ts#b", ["ts-unbuilt-entry-is-src-twin"], "packages/b/src/index.ts"],
-    tool: ["packages/b/src/tool.mts#tool", ["ts-unbuilt-entry-is-src-twin"], "packages/b/src/tool.mts"],
+    a: [
+      "packages/a/src/index.ts#a",
+      ["ts-unbuilt-entry-is-src-twin"],
+      "packages/a/src/index.ts",
+    ],
+    b: [
+      "packages/b/src/index.ts#b",
+      ["ts-unbuilt-entry-is-src-twin"],
+      "packages/b/src/index.ts",
+    ],
+    tool: [
+      "packages/b/src/tool.mts#tool",
+      ["ts-unbuilt-entry-is-src-twin"],
+      "packages/b/src/tool.mts",
+    ],
   });
 });
 
@@ -113,8 +129,16 @@ test("a bundler config's literal entries name the source, through a top-level co
       'import { run } from "v"; import { serve } from "v/node"; run(); serve();',
   });
   assert.deepEqual(got, {
-    run: ["packages/v/src/public/index.ts#run", ["ts-unbuilt-entry-is-bundler-entry"], "packages/v/src/public/index.ts"],
-    serve: ["packages/v/src/public/node.ts#serve", ["ts-unbuilt-entry-is-bundler-entry"], "packages/v/src/public/node.ts"],
+    run: [
+      "packages/v/src/public/index.ts#run",
+      ["ts-unbuilt-entry-is-bundler-entry"],
+      "packages/v/src/public/index.ts",
+    ],
+    serve: [
+      "packages/v/src/public/node.ts#serve",
+      ["ts-unbuilt-entry-is-bundler-entry"],
+      "packages/v/src/public/node.ts",
+    ],
   });
 });
 
@@ -187,7 +211,10 @@ test("an API Extractor roll-up follows its main entry; trimmed @internal declara
     }),
     "packages/core/tsconfig.json":
       '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"lib/esm"},"include":["src"]}',
-    "packages/core/api-extractor.json": extractor("alphaTrimmedFilePath", "lib/types.d.ts"),
+    "packages/core/api-extractor.json": extractor(
+      "alphaTrimmedFilePath",
+      "lib/types.d.ts",
+    ),
     "packages/core/src/core.ts":
       "export function launch() {}\n/** @internal */\nexport function secret() {}\n",
     // Public trimming drops @beta declarations, which cannot be withheld one by one.
@@ -197,7 +224,10 @@ test("an API Extractor roll-up follows its main entry; trimmed @internal declara
     }),
     "packages/beta/tsconfig.json":
       '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"lib/esm"},"include":["src"]}',
-    "packages/beta/api-extractor.json": extractor("publicTrimmedFilePath", "lib/types.d.ts"),
+    "packages/beta/api-extractor.json": extractor(
+      "publicTrimmedFilePath",
+      "lib/types.d.ts",
+    ),
     "packages/beta/src/core.ts":
       "export function open() {}\n/** @beta */\nexport function preview() {}\n",
     "app.ts": [
@@ -213,4 +243,53 @@ test("an API Extractor roll-up follows its main entry; trimmed @internal declara
   ]);
   assert.match(String(got.secret), /^unresolved:/);
   assert.match(String(got.open), /^unresolved:workspace-/);
+});
+
+test("a config a script names with -c, and the compiler emit under Wireit or beside a roll-up", async () => {
+  const got = await calls({
+    // React Hook Form's shape: `rollup -c ./scripts/rollup/rollup.config.js`.
+    "packages/named/package.json": pkg("named", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "rollup -c ./scripts/rollup/rollup.config.js" },
+    }),
+    "packages/named/scripts/rollup/rollup.config.js":
+      'export default { input: { index: "src/main.ts" }, output: { dir: "dist" } };',
+    "packages/named/src/main.ts": "export function named() {}",
+    // Puppeteer's shape: `./internal/*` is per-file tsc output beside an
+    // API Extractor roll-up of another entry, built under Wireit.
+    "packages/core/package.json": pkg("core", {
+      types: "./lib/types.d.ts",
+      exports: {
+        ".": { types: "./lib/types.d.ts" },
+        "./internal/*": { import: "./lib/out/*" },
+      },
+      scripts: { build: "wireit" },
+      wireit: { build: { command: "tsc -b && api-extractor run" } },
+    }),
+    "packages/core/tsconfig.json":
+      '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"lib/out"},"include":["src"]}',
+    "packages/core/api-extractor.json": JSON.stringify({
+      mainEntryPointFilePath: "<projectFolder>/lib/out/index.d.ts",
+      dtsRollup: { enabled: true, untrimmedFilePath: "lib/types.d.ts" },
+    }),
+    "packages/core/src/index.ts": 'export { Page } from "./api/Page.js";',
+    "packages/core/src/api/Page.ts": "export class Page { goto() {} }",
+    "app.ts": [
+      'import { named } from "named";',
+      'import { Page } from "core/internal/api/Page.js";',
+      "named();",
+      "new Page().goto();",
+    ].join("\n"),
+  });
+  assert.deepEqual(got.named, [
+    "packages/named/src/main.ts#named",
+    ["ts-unbuilt-entry-is-bundler-entry"],
+    "packages/named/src/main.ts",
+  ]);
+  const goto = got["(expression).goto"];
+  assert.deepEqual(goto, [
+    "packages/core/src/api/Page.ts#Page.goto",
+    ["ts-unbuilt-entry-is-wrapped-compiler-emit"],
+    "packages/core/src/api/Page.ts",
+  ]);
 });

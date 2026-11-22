@@ -368,8 +368,11 @@ test("a dependency linked to the checkout root reports the missing workspace ent
       .find(
         (link) => link.kind === "imports" && link.targetName === "fixture-root",
       );
-    assert.equal(link.resolution, "unresolved");
-    assert.equal(link.data.reason, "workspace-entry-unavailable");
+    // C-46: no compiler proof, but `dist/index.d.ts` has the src/ twin
+    // `src/index.ts`: followed, assumption-marked.
+    assert.equal(link.resolution, "resolved");
+    assert.deepEqual(link.data.assumes, ["ts-unbuilt-entry-is-src-twin"]);
+    assert.equal(link.data.unbuiltEntry.source, "src/index.ts");
   });
 });
 

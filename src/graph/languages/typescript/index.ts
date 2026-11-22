@@ -28,10 +28,7 @@ import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
 import { neutralizeAssumed } from "./untrusted.js";
 import { entryProvenance } from "./workspace-entries.js";
 import { unbuiltEntryAssumption } from "./entry-build.js";
-import {
-  type Convention,
-  conventionAssumptions,
-} from "./entry-convention.js";
+import { type Convention, conventionAssumptions } from "./entry-convention.js";
 
 /** Every assumption an unbuilt workspace entry can rest on (C-25, C-46). */
 const unbuiltAssumptions = new Set([

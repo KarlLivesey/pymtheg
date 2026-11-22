@@ -2,7 +2,11 @@
 import { posix } from "node:path";
 import ts from "typescript";
 import { entryBuildGuards } from "./entry-build.js";
-import { type Convention, entryConventions } from "./entry-convention.js";
+import {
+  type Convention,
+  entryConventions,
+  namedConfigs,
+} from "./entry-convention.js";
 import type { Manifest } from "./workspace.js";
 
 export interface UnbuiltEntry {
@@ -191,9 +195,20 @@ export function workspaceEntries(
     configs.set(root, list);
   }
   const excluded = entryBuildGuards(files, packageOf);
-  const conventions = entryConventions(files, captured, packageOf);
-  /** Outputs whose tsc mapping a build guard refused for another producer. */
-  const refusedFor = new Set<string>();
+  const conventions = entryConventions(
+    files,
+    captured,
+    packageOf,
+    new Map(
+      [...packages].map(([root, manifest]) => [
+        root,
+        namedConfigs(root, scriptsOf(manifest)),
+      ]),
+    ),
+  );
+  /** Outputs whose tsc mapping a build guard refused for another producer,
+   * with the guard. */
+  const refusedFor = new Map<string, string>();
   const otherProducer = new Set([
     "declaration-rollup",
     "wireit-wrapper",
@@ -371,7 +386,9 @@ export function workspaceEntries(
       )
     )
       return true;
-    const named = JSON.stringify(scripts ?? {}) + JSON.stringify(manifest.json.wireit ?? {});
+    const named =
+      JSON.stringify(scripts ?? {}) +
+      JSON.stringify(manifest.json.wireit ?? {});
     const bundler =
       conventions.hasConfig(root) ||
       /\b(?:tsup|tsdown|unbuild|rollup|rolldown|vite|esbuild|webpack|api-extractor|dts-bundle-generator|zshy)\b/.test(
@@ -381,7 +398,12 @@ export function workspaceEntries(
     for (const [path, parsed] of parsedConfigs) {
       if (packageOf(path) !== root || parsed.options.noEmit) continue;
       const folder = parsed.options.declarationDir ?? parsed.options.outDir;
-      if (folder && below(output, folder) && !parsed.options.declaration && !parsed.options.composite)
+      if (
+        folder &&
+        below(output, folder) &&
+        !parsed.options.declaration &&
+        !parsed.options.composite
+      )
         return true;
     }
     return false;
@@ -392,7 +414,26 @@ export function workspaceEntries(
     const manifest = packages.get(root);
     if (!manifest) return undefined;
     if (compilerDecides(root, manifest, output)) return undefined;
-    const route = conventions(root, output, "/" + manifest.path);
+    let route = conventions(root, output, "/" + manifest.path);
+    // The package's own compiler configuration under a Wireit wrapper, or
+    // beside a declaration roll-up of other entries (the roll-up reads these
+    // per-file outputs; this one is not a roll-up output, or the roll-up
+    // route above would have answered): that configuration's mapping,
+    // under its own assumption.
+    if (
+      !route &&
+      ["wireit-wrapper", "declaration-rollup"].includes(
+        refusedFor.get(`${root}\0${output}`) ?? "",
+      )
+    ) {
+      const emitted = find(root, output, false, true);
+      if (emitted && typeof emitted === "object")
+        route = {
+          convention: "wrapped-compiler-emit",
+          source: "/" + emitted.source,
+          config: "/" + emitted.config,
+        };
+    }
     if (!route || route === "conflicting") return undefined;
     let source = route.source;
     if (route.convention === "rollup-entry") {
@@ -480,14 +521,18 @@ export function workspaceEntries(
           ? (options.rootDir ??
             (options.composite ? posix.dirname(config.path) : "/"))
           : "/";
-        if (options.stripInternal && mayStrip(sourceRoot)) return false;
+        // Without the build guards (a convention route), stripped declarations
+        // are withheld one by one instead (stripInternal on the entry).
+        if (options.stripInternal && mayStrip(sourceRoot) && !withoutGuards)
+          return false;
         const guard =
           config.assumed && !withoutGuards
             ? excluded(root, manifest, file, output)
             : undefined;
         if (guard) {
           // C-46: another producer than tsc writes this output.
-          if (otherProducer.has(guard)) refusedFor.add(`${root}\0${output}`);
+          if (otherProducer.has(guard))
+            refusedFor.set(`${root}\0${output}`, guard);
           return false;
         }
         matches.push({

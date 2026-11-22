@@ -20,11 +20,21 @@ export const rollupEntryAssumption = "ts-unbuilt-entry-is-rollup-entry";
 export const rollupEntryAssumptionText =
   "This entry is the declaration roll-up its API Extractor configuration names, built from the configured main entry, and it exports what that entry exports (less declarations its release tags trim).";
 
-export type Convention = "bundler-entry" | "src-twin" | "rollup-entry";
+export const wrappedEmitAssumption =
+  "ts-unbuilt-entry-is-wrapped-compiler-emit";
+export const wrappedEmitAssumptionText =
+  "The package's build runs its own TypeScript configuration, under a wrapper (Wireit) or before a declaration roll-up of other entries, and leaves at this entry path the declarations the compiler emits for the mapped source file.";
+
+export type Convention =
+  | "bundler-entry"
+  | "src-twin"
+  | "rollup-entry"
+  | "wrapped-compiler-emit";
 export const conventionAssumptions: Record<Convention, string> = {
   "bundler-entry": bundlerEntryAssumption,
   "src-twin": srcTwinAssumption,
   "rollup-entry": rollupEntryAssumption,
+  "wrapped-compiler-emit": wrappedEmitAssumption,
 };
 
 export interface ConventionRoute {
@@ -74,14 +84,21 @@ function entryData(
   depth = 0,
 ): EntryList | undefined {
   if (depth > 4) return undefined;
-  if (ts.isParenthesizedExpression(value) || ts.isAsExpression(value) || ts.isSatisfiesExpression(value))
+  if (
+    ts.isParenthesizedExpression(value) ||
+    ts.isAsExpression(value) ||
+    ts.isSatisfiesExpression(value)
+  )
     return entryData(value.expression, constants, depth + 1);
   if (ts.isStringLiteralLike(value))
-    return literalPath.test(value.text) ? { entries: [{ path: value.text }] } : undefined;
+    return literalPath.test(value.text)
+      ? { entries: [{ path: value.text }] }
+      : undefined;
   if (ts.isArrayLiteralExpression(value)) {
     const entries = [];
     for (const item of value.elements) {
-      if (!ts.isStringLiteralLike(item) || !literalPath.test(item.text)) return undefined;
+      if (!ts.isStringLiteralLike(item) || !literalPath.test(item.text))
+        return undefined;
       entries.push({ path: item.text });
     }
     return entries.length ? { entries } : undefined;
@@ -151,7 +168,8 @@ function readBundlerConfig(path: string, text: string): ConfigData {
   return { path, lists: opaque ? undefined : lists, dirs: [...dirs] };
 }
 
-const stemOf = (path: string) => path.replace(/^\.\//, "").replace(inputExtension, "");
+const stemOf = (path: string) =>
+  path.replace(/^\.\//, "").replace(inputExtension, "");
 
 function commonBase(paths: readonly string[]) {
   if (!paths.length) return "";
@@ -162,15 +180,49 @@ function commonBase(paths: readonly string[]) {
   return base === "." ? "" : base;
 }
 
+/** The bundler configs a package's scripts name with `-c` or `--config`. */
+export function namedConfigs(
+  root: string,
+  scripts: Record<string, unknown> | undefined,
+) {
+  const paths: string[] = [];
+  for (const command of Object.values(scripts ?? {})) {
+    if (typeof command !== "string") continue;
+    for (const match of command.matchAll(
+      /\b(?:tsup|tsdown|unbuild|rollup|rolldown|vite|esbuild)\b[^;&|]*?(?:\s-c|\s--config)(?:\s+|=)([\w./-]+)/g,
+    )) {
+      const path = posix.join(root, match[1]!);
+      if (path === root || path.startsWith(root === "/" ? "/" : root + "/"))
+        paths.push(path);
+    }
+  }
+  return paths;
+}
+
 export function entryConventions(
   files: ReadonlyMap<string, string>,
   captured: ReadonlyMap<string, string>,
   packageOf: (file: string) => string | undefined,
+  /** Per package root, the config files its scripts name (namedConfigs). */
+  named: ReadonlyMap<string, readonly string[]> = new Map(),
 ) {
   const bundlers = new Map<string, ConfigData[]>();
-  const extractors = new Map<string, { path: string; json: Record<string, unknown> }[]>();
+  const extractors = new Map<
+    string,
+    { path: string; json: Record<string, unknown> }[]
+  >();
+  const namedBy = new Map<string, string>();
+  for (const [root, paths] of named)
+    for (const path of paths) namedBy.set(path, root);
   for (const [path, text] of files) {
     const name = posix.basename(path);
+    const byScript = namedBy.get(path);
+    if (byScript !== undefined) {
+      const list = bundlers.get(byScript) ?? [];
+      list.push(readBundlerConfig(path, text));
+      bundlers.set(byScript, list);
+      continue;
+    }
     const owner = packageOf(path);
     if (owner === undefined || posix.dirname(path) !== owner) continue;
     if (bundlerConfig.test(name)) {
@@ -179,28 +231,36 @@ export function entryConventions(
       bundlers.set(owner, list);
     } else if (extractorConfig.test(name)) {
       const parsed = ts.parseConfigFileTextToJson(path, text);
-      if (parsed.error || !parsed.config || typeof parsed.config !== "object") continue;
+      if (parsed.error || !parsed.config || typeof parsed.config !== "object")
+        continue;
       const list = extractors.get(owner) ?? [];
       list.push({ path, json: parsed.config });
       extractors.set(owner, list);
     }
   }
   const isSource = (file: string, root: string) =>
-    captured.has(file.slice(1)) && packageOf(file) === root &&
-    sourceExtensions.some((ext) => file.endsWith(ext)) && !/\.d\.[cm]?ts$/.test(file);
+    captured.has(file.slice(1)) &&
+    packageOf(file) === root &&
+    sourceExtensions.some((ext) => file.endsWith(ext)) &&
+    !/\.d\.[cm]?ts$/.test(file);
   /** The one source file a source path names, trying source extensions. */
   const sourceAt = (root: string, path: string) => {
     const base = posix.join(root, path.replace(/^\.\//, ""));
     const hits = sourceExtensions.some((ext) => base.endsWith(ext))
       ? [base].filter((file) => isSource(file, root))
-      : sourceExtensions.map((ext) => stemOf(base) + ext).filter((file) => isSource(file, root));
+      : sourceExtensions
+          .map((ext) => stemOf(base) + ext)
+          .filter((file) => isSource(file, root));
     return hits.length === 1 ? hits[0] : undefined;
   };
 
-  function bundlerEntry(root: string, output: string): ConventionRoute | "conflicting" | "none" | undefined {
+  function bundlerEntry(
+    root: string,
+    output: string,
+  ): ConventionRoute | "conflicting" | "none" | undefined {
     const configs = bundlers.get(root);
     if (!configs?.length) return undefined;
-    const relative = output.slice(root.length + 1);
+    const relative = posix.relative(root, output);
     const sources = new Set<string>();
     let readable = false;
     let config = "";
@@ -210,7 +270,9 @@ export function entryConventions(
       readable = true;
       for (const dir of data.dirs.length ? data.dirs : ["dist"]) {
         if (!relative.startsWith(dir + "/")) continue;
-        const stem = relative.slice(dir.length + 1).replace(outputExtension, "");
+        const stem = relative
+          .slice(dir.length + 1)
+          .replace(outputExtension, "");
         for (const list of data.lists) {
           const base = commonBase(list.entries.map(({ path }) => stemOf(path)));
           for (const { key, path } of list.entries) {
@@ -231,11 +293,17 @@ export function entryConventions(
     return readable ? "none" : undefined;
   }
 
-  function srcTwin(root: string, output: string, manifest: string): ConventionRoute | undefined {
-    const parts = output.slice(root.length + 1).split("/");
+  function srcTwin(
+    root: string,
+    output: string,
+    manifest: string,
+  ): ConventionRoute | undefined {
+    const parts = posix.relative(root, output).split("/");
     if (parts.length < 2 || !outputFolders.has(parts[0]!)) return undefined;
     const skip = parts.length > 2 && secondFolders.has(parts[1]!) ? 2 : 1;
-    const stem = ["src", ...parts.slice(skip)].join("/").replace(outputExtension, "");
+    const stem = ["src", ...parts.slice(skip)]
+      .join("/")
+      .replace(outputExtension, "");
     const hits = sourceExtensions
       .map((ext) => posix.join(root, stem + ext))
       .filter((file) => isSource(file, root));
@@ -244,14 +312,18 @@ export function entryConventions(
       : undefined;
   }
 
-  function rollupEntry(root: string, output: string): ConventionRoute | "conflicting" | undefined {
+  function rollupEntry(
+    root: string,
+    output: string,
+  ): ConventionRoute | "conflicting" | undefined {
     const routes = new Set<string>();
     let config = "";
     const trims = new Set<"internal" | "alpha" | "beta">();
     for (const { path, json } of extractors.get(root) ?? []) {
       const rollup = json.dtsRollup as Record<string, unknown> | undefined;
       const main = json.mainEntryPointFilePath;
-      if (!rollup || rollup.enabled !== true || typeof main !== "string") continue;
+      if (!rollup || rollup.enabled !== true || typeof main !== "string")
+        continue;
       const at = (field: string) => {
         const value = rollup[field];
         return typeof value === "string" && value
@@ -269,18 +341,28 @@ export function entryConventions(
       if (!level) continue;
       for (const tag of level[1]) trims.add(tag);
       const entry = posix.join(root, main.replace("<projectFolder>/", ""));
-      if (!below(entry, root) || !/\.d\.[cm]?ts$/.test(entry)) return "conflicting";
+      if (!below(entry, root) || !/\.d\.[cm]?ts$/.test(entry))
+        return "conflicting";
       routes.add(entry);
       config = path;
     }
     if (routes.size > 1) return "conflicting";
     return routes.size
-      ? { convention: "rollup-entry", entry: [...routes][0]!, config, trims: [...trims] }
+      ? {
+          convention: "rollup-entry",
+          entry: [...routes][0]!,
+          config,
+          trims: [...trims],
+        }
       : undefined;
   }
 
   /** The route for a missing output, or why there is none. */
-  const route = (root: string, output: string, manifest: string): ConventionRoute | "conflicting" | undefined => {
+  const route = (
+    root: string,
+    output: string,
+    manifest: string,
+  ): ConventionRoute | "conflicting" | undefined => {
     const rollup = rollupEntry(root, output);
     if (rollup) return rollup;
     const bundled = bundlerEntry(root, output);
@@ -291,6 +373,7 @@ export function entryConventions(
   };
   return Object.assign(route, {
     /** Whether the package has a visible bundler or roll-up config. */
-    hasConfig: (root: string) => !!bundlers.get(root)?.length || !!extractors.get(root)?.length,
+    hasConfig: (root: string) =>
+      !!bundlers.get(root)?.length || !!extractors.get(root)?.length,
   });
 }

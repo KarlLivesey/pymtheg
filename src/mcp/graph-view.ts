@@ -16,6 +16,8 @@ import {
   rollupEntryAssumptionText,
   srcTwinAssumption,
   srcTwinAssumptionText,
+  wrappedEmitAssumption,
+  wrappedEmitAssumptionText,
 } from "../graph/languages/typescript/entry-convention.js";
 import { textPage } from "./text-pages.js";
 
@@ -25,6 +27,7 @@ const assumptionDescriptions = new Map([
   [bundlerEntryAssumption, bundlerEntryAssumptionText],
   [srcTwinAssumption, srcTwinAssumptionText],
   [rollupEntryAssumption, rollupEntryAssumptionText],
+  [wrappedEmitAssumption, wrappedEmitAssumptionText],
 ]);
 
 const record = (v: unknown): Record<string, any> =>

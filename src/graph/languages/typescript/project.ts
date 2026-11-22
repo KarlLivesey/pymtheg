@@ -1597,8 +1597,25 @@ export function projectModel(
           // Expose missing explicit entries to the retry even when we have no
           // source for them. A later condition cannot displace the selected
           // declaration entry merely because the latter has no proof.
+          // A source-extension probe (`.ts`, `.tsx`) of a proven declaration
+          // candidate's own stem is the compiler trying extensions on one
+          // pattern target (`./dist/*` with `api/Page.js`), not another
+          // entry (C-46): it must not take that candidate's place.
+          const stem = (path: string) =>
+            path.replace(/\.(?:d\.)?[cm]?[jt]sx?$/, "");
+          const proven = new Set(
+            [...candidates]
+              .filter(([, proof]) => typeof proof === "object")
+              .map(([lookup]) => stem(lookup)),
+          );
           for (const lookup of lookups ?? []) {
             if (candidates.has(lookup)) continue;
+            if (
+              proven.has(stem(lookup)) &&
+              /\.[cm]?tsx?$/.test(lookup) &&
+              !/\.d\.[cm]?ts$/.test(lookup)
+            )
+              continue;
             const output = missingOutput(lookup);
             if (output && entries.explicitEntry(route.target, output))
               candidates.set(lookup, false);
