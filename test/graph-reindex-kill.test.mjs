@@ -156,6 +156,20 @@ test("Go: a killed scoped re-index is repaired by the next one", async (t) => {
   t.diagnostic(`write boundaries: ${tried}`);
 });
 
+test("Go: a killed body edit with promoted method facts is repaired by one index", async (t) => {
+  const body = "package p\nfunc Call(c Carrier) int { return c.M() }\n";
+  const tried = await everyKillPoint(
+    {
+      "a.go": body,
+      "b.go":
+        "package p\ntype I interface{ M() int }\ntype Base struct{}\nfunc (Base) M() int { return 1 }\ntype Carrier struct { Base }\ntype Empty struct{}\n",
+    },
+    { "a.go": body.replace("return c.M()", "return c.M() + 1") },
+  );
+  assert.ok(tried >= 3, `write boundaries tried: ${tried}`);
+  t.diagnostic(`write boundaries: ${tried}`);
+});
+
 test("Rust: a re-index killed after any write is repaired by the next one", async (t) => {
   const tried = await everyKillPoint(
     {

@@ -63,6 +63,8 @@ export interface IndexOptions {
   /** The environment a toolchain is located from (default process.env). */
   environment?: Readonly<Record<string, string | undefined>>;
   signal?: AbortSignal;
+  /** Progress through the captured files when comparing them with storage. */
+  onFileCompared?: (path: string) => void;
 }
 const message = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -135,10 +137,14 @@ export async function indexProject(
   // belongs to a run that did not finish or is still running: it may have
   // replaced some files' records and not others, while each still matches
   // its source hash, so nothing it touched can be trusted as unchanged.
-  const unfinished = (await store.beginIndexRun?.()) === true;
-  const completed = await store.completedAnalysis?.();
+  const unfinished =
+    (await stage("store.beginRun", () => store.beginIndexRun?.())) === true;
+  const completed = await stage("store.beginRun", () =>
+    store.completedAnalysis?.(),
+  );
   // Storage reads are deliberately outside all source/module error catches, before any writes.
   const oldFiles = await stage("index.previous", () => summaries(store));
+  const oldFileByPath = new Map(oldFiles.map((file) => [file.path, file]));
   const oldContexts = await stage("index.previous", () => store.contexts());
   const claims = new Map<string, LanguageModule>();
   for (const path of paths) {
@@ -243,6 +249,7 @@ export async function indexProject(
   const incompatible = new Set<string>();
   for (const [path, module] of claims) {
     const source = captures.get(path)!;
+    options.onFileCompared?.(path);
     const trusted = completed?.get(module.id) === module.version;
     const reuse =
       canReuse === true && module.incrementalAnalysis === true && trusted;
@@ -251,7 +258,11 @@ export async function indexProject(
     const rebuild =
       !!completed && module.incrementalAnalysis === true && !trusted;
     const previous = await stage("index.previous", () =>
-      previousParse(store, source, module, { unfinished, rebuild, reuse }),
+      previousParse(store, source, module, oldFileByPath.get(path), {
+        unfinished,
+        rebuild,
+        reuse,
+      }),
     );
     if (previous.unchanged) {
       report.unchanged++;
@@ -345,9 +356,9 @@ export async function indexProject(
     const files = await stage(`analyze.${module.id}.input`, async () =>
       store.filesAt && store.fileSummaries
         ? await store.filesAt(
-            (await store.fileSummaries())
-              .filter((file) => file.module === module.id)
-              .map((file) => file.path),
+            [...claims]
+              .filter(([, owner]) => owner.id === module.id)
+              .map(([path]) => path),
           )
         : (await store.files()).filter((file) => file.module === module.id),
     );
@@ -580,16 +591,26 @@ export async function indexProject(
       if (wanted.size)
         for (const file of await read(() => filesAt(store, [...wanted])))
           needed.set(file.path, file);
-      const symbols = owns ? await read(() => store.findSymbols()) : [];
+      const ids =
+        scope && store.symbolReferences ? referencedSymbols(result) : undefined;
+      const symbols = owns
+        ? await stage(`resolve.${module.id}.validationInput`, () =>
+            ids
+              ? read(() => store.symbolReferences!(ids))
+              : read(() => store.findSymbols()),
+          )
+        : [];
       // Every link of the module when the store can take a validated
       // result; resolutionFacts reads only the parsed ones.
       const validated = !!scope || !!store.analysisLinks;
-      const current = await read(() =>
-        scope
-          ? store.analysisLinksAt!(module.id, scope)
-          : validated
-            ? store.analysisLinks!(module.id)
-            : parsedLinks(store, module.id),
+      const current = await stage(`resolve.${module.id}.validationInput`, () =>
+        read(() =>
+          scope
+            ? store.analysisLinksAt!(module.id, scope)
+            : validated
+              ? store.analysisLinks!(module.id)
+              : parsedLinks(store, module.id),
+        ),
       );
       const desired = await stage(`resolve.${module.id}.validate`, () =>
         resolutionFacts(
@@ -628,14 +649,16 @@ export async function indexProject(
   const incremental = registry.modules.filter(
     (module) => module.incrementalAnalysis,
   );
-  await store.finishIndexRun?.(
-    [...report.analysisErrors, ...report.resolutionErrors].some((error) =>
-      incremental.some((module) => module.id === error.module),
-    ),
-    new Map(
-      incremental
-        .filter((module) => modules.has(module.id))
-        .map((module) => [module.id, module.version]),
+  await stage("store.finishRun", () =>
+    store.finishIndexRun?.(
+      [...report.analysisErrors, ...report.resolutionErrors].some((error) =>
+        incremental.some((module) => module.id === error.module),
+      ),
+      new Map(
+        incremental
+          .filter((module) => modules.has(module.id))
+          .map((module) => [module.id, module.version]),
+      ),
     ),
   );
   return await stage("index.report", () =>
@@ -643,13 +666,41 @@ export async function indexProject(
   );
 }
 
+function referencedSymbols(result: ResolutionResult): Set<string> {
+  const ids = new Set<string>();
+  for (const decision of [...result.resolutions, ...result.links]) {
+    if (decision.targetId) ids.add(decision.targetId);
+    for (const id of decision.candidateIds ?? []) ids.add(id);
+  }
+  for (const link of result.links) if (link.sourceId) ids.add(link.sourceId);
+  return ids;
+}
+
 /** Keep decoded old facts only for edits that might use scoped analysis. */
 async function previousParse(
   store: GraphStorage,
   source: ContextFile,
   module: LanguageModule,
+  summary:
+    | {
+        module: string;
+        version?: string;
+        hash?: string;
+        status: GraphFile["result"]["status"];
+      }
+    | undefined,
   options: { unfinished: boolean; rebuild: boolean; reuse: boolean },
 ): Promise<{ unchanged: boolean; file?: GraphFile }> {
+  if (
+    !options.unfinished &&
+    !options.rebuild &&
+    source.status === "clean" &&
+    summary?.module === module.id &&
+    summary.version === module.version &&
+    summary.hash === source.hash &&
+    summary.status !== "failed"
+  )
+    return { unchanged: true };
   const old = await store.getFile(source.path);
   const compatible =
     old?.module === module.id && old.version === module.version;
@@ -743,9 +794,20 @@ async function runResolve(
         ...(resolutionFiles
           ? { resolutionFiles: new Set(resolutionFiles) }
           : {}),
-        files: await input("Files", async () =>
-          own(await read(() => store.files())),
-        ),
+        files:
+          module.resolutionNeedsFiles === false
+            ? []
+            : await input("Files", async () =>
+                own(
+                  await read(() =>
+                    resolutionFiles &&
+                    module.scopedFileLinkKinds &&
+                    store.resolutionFiles
+                      ? store.resolutionFiles(module.scopedFileLinkKinds)
+                      : store.files(),
+                  ),
+                ),
+              ),
         contextFiles: structuredClone(contexts),
         symbols: await input("Symbols", async () =>
           own(await read(() => store.findSymbols())),

@@ -178,11 +178,14 @@ export interface ResolutionResult {
   /** Reason for an open parsed link whose analysis stored no explanation. */
   missingLinkReason?: string;
 }
+export type ResolutionFile = Pick<GraphFile, "path" | "module"> & {
+  result: Pick<ParseResult, "status" | "diagnostics" | "data" | "links">;
+};
 export interface ResolutionContext {
   projectId: string;
   signal?: AbortSignal;
   /** Entire captured graph. Resolve from facts or the program constructed by analyze, never disk. */
-  files: readonly GraphFile[];
+  files: readonly ResolutionFile[];
   contextFiles: readonly ContextFile[];
   symbols: readonly GraphSymbol[];
   /** Parsed links to decide, presented unresolved. Other files' parse facts remain available in files. */
@@ -253,6 +256,10 @@ export interface LanguageModule {
   dependencyInputs?: true;
   /** Accepts previousFiles and can prove that some files' decisions still hold. */
   incrementalAnalysis?: true;
+  /** For scoped resolution only, the file-level parsed link kinds read across files. */
+  scopedFileLinkKinds?: readonly string[];
+  /** This resolver uses symbol and link facts without reading file records. */
+  resolutionNeedsFiles?: false;
   parse?: (source: SourceInput) => ParseResult | Promise<ParseResult>;
   /** Explicit whole-program phase. May construct a compiler program from the supplied snapshot. */
   analyze?: (
@@ -273,6 +280,11 @@ export interface SymbolQuery {
   kind?: string;
   file?: string;
 }
+/** The stored origin and validity of a symbol, used to validate decisions. */
+export type SymbolReference = Pick<
+  GraphSymbol,
+  "id" | "file" | "key" | "status"
+>;
 export interface Neighbourhood {
   symbols: GraphSymbol[];
   links: GraphLink[];
@@ -308,12 +320,22 @@ export interface GraphStorage {
   getFile(path: string): StorageResult<GraphFile | undefined>;
   /** Optional: the stored files at these paths (absent paths are skipped), decoding no others. */
   filesAt?(paths: readonly string[]): StorageResult<GraphFile[]>;
+  /** Compact resolution input, with only the requested parsed link kinds. */
+  resolutionFiles?(
+    linkKinds: readonly string[],
+  ): StorageResult<ResolutionFile[]>;
   /**
    * Optional light listing (path, module, status) that decodes no records.
    * The indexer otherwise derives it from files().
    */
   fileSummaries?(): StorageResult<
-    { path: string; module: string; status: ParseStatus }[]
+    {
+      path: string;
+      module: string;
+      status: ParseStatus;
+      hash?: string;
+      version?: string;
+    }[]
   >;
   /** Optional: one module's parsed links, as links() reports them. */
   moduleLinks?(module: string): StorageResult<GraphLink[]>;
@@ -375,6 +397,7 @@ export interface GraphStorage {
   replaceFile(file: GraphFile, parseFailure?: boolean): StorageResult<void>;
   removeFile(path: string): StorageResult<void>;
   findSymbols(query?: SymbolQuery): StorageResult<GraphSymbol[]>;
+  symbolReferences?(ids: ReadonlySet<string>): StorageResult<SymbolReference[]>;
   links(): StorageResult<GraphLink[]>;
   outgoing(id: string, kind?: string): StorageResult<GraphLink[]>;
   /** Includes candidate mentions, explicitly marked ambiguous. */

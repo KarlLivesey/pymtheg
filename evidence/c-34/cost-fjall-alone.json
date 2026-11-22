@@ -1,0 +1,26 @@
+[
+  {
+    "id": "fjall-rs/fjall",
+    "run": "main-a",
+    "wallSeconds": 36.48,
+    "userSeconds": 18.22,
+    "systemSeconds": 11.37,
+    "peakRssKiB": 573204
+  },
+  {
+    "id": "fjall-rs/fjall",
+    "run": "candidate",
+    "wallSeconds": 31.69,
+    "userSeconds": 17.44,
+    "systemSeconds": 9.76,
+    "peakRssKiB": 584408
+  },
+  {
+    "id": "fjall-rs/fjall",
+    "run": "main-b",
+    "wallSeconds": 35.29,
+    "userSeconds": 17.82,
+    "systemSeconds": 9.69,
+    "peakRssKiB": 591620
+  }
+]

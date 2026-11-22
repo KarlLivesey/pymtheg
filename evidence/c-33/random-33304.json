@@ -1,0 +1,118 @@
+{
+ "id": "cli/cli",
+ "seed": 33304,
+ "expectedSteps": 10,
+ "steps": [
+  {
+   "step": 0,
+   "file": "pkg/cmd/repo/deploy-key/list/list_test.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10308,
+   "failed": 0,
+   "resolvedFiles": 1
+  },
+  {
+   "step": 1,
+   "file": "utils/utils.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28057,
+   "failed": 0,
+   "resolvedFiles": 1127
+  },
+  {
+   "step": 2,
+   "file": "pkg/cmd/cache/delete/delete_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 33446,
+   "failed": 0,
+   "resolvedFiles": 1127
+  },
+  {
+   "step": 3,
+   "file": "pkg/cmd/event/subscription/list/list_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28036,
+   "failed": 0,
+   "resolvedFiles": 1127
+  },
+  {
+   "step": 4,
+   "file": "pkg/cmd/pr/shared/worktree_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28953,
+   "failed": 0,
+   "resolvedFiles": 1127
+  },
+  {
+   "step": 5,
+   "file": "pkg/cmd/discussion/view/c27_random_5_test.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30815,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 6,
+   "file": "pkg/cmd/repo/autolink/create/http_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31237,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 7,
+   "file": "pkg/cmd/auth/shared/git_credential.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 32085,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 8,
+   "file": "script/ghmock/report.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 32653,
+   "failed": 0,
+   "resolvedFiles": 1128
+  },
+  {
+   "step": 9,
+   "file": "pkg/cmd/repo/setdefault/setdefault.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27938,
+   "failed": 0,
+   "resolvedFiles": 1128
+  }
+ ],
+ "equal": true
+}

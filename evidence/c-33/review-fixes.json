@@ -1,0 +1,350 @@
+{
+ "testedTree": "5ffec70",
+ "previousHead": "9db7abe",
+ "main": "c6b77dc",
+ "buildExit": 0,
+ "typeCheckExit": 0,
+ "formatCheckExit": 0,
+ "focusedSuites": {
+  "files": [
+   "graph-reindex-equality",
+   "graph-reindex-kill",
+   "graph-index-race",
+   "graph-index-runs",
+   "graph-command*",
+   "graph-dependency-inputs",
+   "graph-review",
+   "graph-index-memory"
+  ],
+  "passed": 86,
+  "failed": 0
+ },
+ "npmTest": {
+  "exit": 0,
+  "passed": 3233,
+  "failed": 0,
+  "skipped": 0
+ },
+ "newTestsOnPreviousHead": {
+  "hard link to an installed declaration": "fails: graph_contexts stamp differs from cold",
+  "permission-only change to an installed declaration": "fails: graph_contexts stamp differs from cold",
+  "verified no-edit writes nothing beside another writer": "fails: database header changed (journal mode 2 to 1, change counter 0x25 to 0x26)",
+  "no-edit without the analysis completion record": "fails: the run was verified instead of re-running recovery"
+ },
+ "seededCommandRun": {
+  "id": "restic/restic",
+  "seed": 33307,
+  "expectedSteps": 20,
+  "equal": true,
+  "steps": [
+   {
+    "step": 0,
+    "file": "internal/archiver/tree.go",
+    "kind": "signature",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 817
+    }
+   },
+   {
+    "step": 1,
+    "file": "internal/repository/repack_test.go",
+    "kind": "signature",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 759
+    }
+   },
+   {
+    "step": 2,
+    "file": "internal/migrations/list.go",
+    "kind": "embed",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 778
+    }
+   },
+   {
+    "step": 3,
+    "file": "internal/backend/rclone/c27_random_3_test.go",
+    "kind": "file-add",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 789
+    }
+   },
+   {
+    "step": 4,
+    "file": "internal/repository/repository_test.go",
+    "kind": "comment",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 824
+    }
+   },
+   {
+    "step": 5,
+    "file": "internal/backend/rclone/c27_random_3_test.go",
+    "kind": "file-delete",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 841
+    }
+   },
+   {
+    "step": 6,
+    "file": "cmd/restic/cmd_cache.go",
+    "kind": "embed",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 837
+    }
+   },
+   {
+    "step": 7,
+    "file": "internal/fs/fs_local_vss.go",
+    "kind": "body",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 896
+    }
+   },
+   {
+    "step": 8,
+    "file": "internal/repository/fuzz_test.go",
+    "kind": "add-export",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 740
+    }
+   },
+   {
+    "step": 9,
+    "file": "internal/ui/signals/signals_bsd.go",
+    "kind": "dot",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 751
+    }
+   },
+   {
+    "step": 10,
+    "file": "internal/backend/s3/config.go",
+    "kind": "interface",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 784
+    }
+   },
+   {
+    "step": 11,
+    "file": "internal/archiver/exclude_test.go",
+    "kind": "body",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 868
+    }
+   },
+   {
+    "step": 12,
+    "file": "internal/filter/filter.go",
+    "kind": "signature",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 798
+    }
+   },
+   {
+    "step": 13,
+    "file": "internal/backend/cache/c27_random_13_test.go",
+    "kind": "file-add",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 854
+    }
+   },
+   {
+    "step": 14,
+    "file": "c27_random_14.go",
+    "kind": "file-add",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 852
+    }
+   },
+   {
+    "step": 15,
+    "file": "internal/backend/shell_split_test.go",
+    "kind": "interface",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 824
+    }
+   },
+   {
+    "step": 16,
+    "file": "internal/repository/repack_test.go",
+    "kind": "embed",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 989
+    }
+   },
+   {
+    "step": 17,
+    "file": "cmd/restic/cmd_snapshots_test.go",
+    "kind": "build",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 829
+    }
+   },
+   {
+    "step": 18,
+    "file": "internal/archiver/c27_random_18_test.go",
+    "kind": "file-add",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 864
+    }
+   },
+   {
+    "step": 19,
+    "file": "internal/backend/azure/config.go",
+    "kind": "comment",
+    "equal": true,
+    "noEdit": {
+     "complete": true,
+     "verified": true,
+     "identical": true,
+     "cpuMs": 844
+    }
+   }
+  ]
+ },
+ "noEditCpu": {
+  "restic": [
+   {
+    "run": 1,
+    "totalCpuMs": 875,
+    "startupCpuMs": 52,
+    "moduleLoadCpuMs": 37,
+    "commandCpuMs": 786,
+    "complete": true,
+    "indexRun": false,
+    "sqlStatements": 14
+   },
+   {
+    "run": 2,
+    "totalCpuMs": 809,
+    "startupCpuMs": 37,
+    "moduleLoadCpuMs": 32,
+    "commandCpuMs": 740,
+    "complete": true,
+    "indexRun": false,
+    "sqlStatements": 14
+   },
+   {
+    "run": 3,
+    "totalCpuMs": 831,
+    "startupCpuMs": 42,
+    "moduleLoadCpuMs": 35,
+    "commandCpuMs": 754,
+    "complete": true,
+    "indexRun": false,
+    "sqlStatements": 14
+   }
+  ],
+  "resticEqualToCold": true,
+  "cli": [
+   {
+    "run": 1,
+    "totalCpuMs": 1182,
+    "startupCpuMs": 53,
+    "moduleLoadCpuMs": 37,
+    "commandCpuMs": 1092,
+    "complete": true,
+    "indexRun": false,
+    "sqlStatements": 14
+   },
+   {
+    "run": 2,
+    "totalCpuMs": 1433,
+    "startupCpuMs": 60,
+    "moduleLoadCpuMs": 62,
+    "commandCpuMs": 1311,
+    "complete": true,
+    "indexRun": false,
+    "sqlStatements": 14
+   },
+   {
+    "run": 3,
+    "totalCpuMs": 1076,
+    "startupCpuMs": 40,
+    "moduleLoadCpuMs": 31,
+    "commandCpuMs": 1005,
+    "complete": true,
+    "indexRun": false,
+    "sqlStatements": 14
+   }
+  ],
+  "cliEqualToCold": true
+ }
+}

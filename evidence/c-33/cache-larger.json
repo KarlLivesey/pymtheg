@@ -1,0 +1,20 @@
+[
+ {
+  "pin": "restic_restic",
+  "round": 0,
+  "build": "cache128",
+  "cachePages": 32768,
+  "wallS": 185.5,
+  "cpuS": 149.2,
+  "peakMiB": 804
+ },
+ {
+  "pin": "restic_restic",
+  "round": 0,
+  "build": "cache256",
+  "cachePages": 65536,
+  "wallS": 162.79,
+  "cpuS": 121.3,
+  "peakMiB": 870
+ }
+]

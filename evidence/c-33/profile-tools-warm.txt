@@ -1,0 +1,41 @@
+total sampled 12548 ms
+
+self time:
+   4305  db.prepare.statement.<computed> dist/graph/store.js:1155
+   2494  decodeFile dist/graph/store.js:82
+   1321  matchesPattern dist/graph/registry.js:6
+    867  (idle) :0
+    627  (garbage collector) :0
+    291  (anonymous) dist/graph/store.js:452
+    240  detectModuleFormat node:internal/modules/esm/get_format:94
+    223  (program) :0
+    145  (anonymous) dist/graph/command-snapshot.js:9
+    142  files dist/graph/store.js:281
+    109  (anonymous) :0
+     95  RegExp: [.*+?^${}()|[\]\\] :0
+
+inclusive time:
+  12548  (root) :0
+   6981  (anonymous) dist/graph/commands.js:210
+   6189  stage dist/graph/work.js:19
+   6134  indexProject dist/graph/indexer.js:18
+   4305  db.prepare.statement.<computed> dist/graph/store.js:1155
+   2600  decodeFile dist/graph/store.js:82
+   1982  (anonymous) dist/graph/indexer.js:266
+   1956  fileSummaries dist/graph/store.js:301
+   1580  read dist/graph/indexer.js:621
+   1463  switchJournal dist/storage/local.js:199
+   1445  matchesPattern dist/graph/registry.js:6
+   1442  walk dist/graph/command-snapshot.js:13
+   1368  resolveModule dist/graph/indexer.js:428
+   1285  (anonymous) dist/graph/indexer.js:594
+   1283  beginIndexRun dist/graph/store.js:780
+   1283  (anonymous) dist/graph/indexer.js:75
+   1281  beforeWrite dist/graph/store.js:33
+   1280  openWriteAheadLog dist/storage/local.js:154
+   1274  (anonymous) dist/graph/indexer.js:589
+   1274  input dist/graph/indexer.js:589
+   1099  previousParse dist/graph/indexer.js:522
+   1093  (anonymous) dist/graph/indexer.js:175
+   1088  getFile dist/graph/store.js:312
+   1040  needsContext dist/graph/command-snapshot.js:9

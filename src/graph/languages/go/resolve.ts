@@ -12,7 +12,7 @@ import type {
   ResolutionContext,
   ResolutionResult,
 } from "../../types.js";
-import { stageSync } from "../../work.js";
+import { count, stageSync } from "../../work.js";
 import {
   directoryOf,
   directoryOfImport,
@@ -518,6 +518,7 @@ class GoResolver {
   private decls = new Map<string, Map<string, GraphSymbol[]>>();
   private members = new Map<string, GraphSymbol[]>();
   private methodsByName = new Map<string, GraphSymbol[]>();
+  private memberMethodNames = new Map<string, Set<string>>();
   private embedsBySource = new Map<
     string,
     Pick<GraphLink, "file" | "range" | "data">[]
@@ -1386,20 +1387,12 @@ class GoResolver {
         push2(this.methodsByName, symbol.name, symbol);
       } else if (data.owner !== undefined)
         // Fields and interface methods.
-        push2(
-          this.members,
-          `${pkg.key}\u0000${data.owner}\u0000${symbol.name}`,
-          symbol,
-        );
+        this.addMember(pkg, data.owner, symbol);
     }
     for (const { pkg, receiver, symbol } of receiverMethods) {
       const base = this.receiverBase(pkg, receiver);
       if (base === undefined) this.uncertainMethodSets.add(pkg.key);
-      push2(
-        this.members,
-        `${pkg.key}\u0000${base ?? receiver}\u0000${symbol.name}`,
-        symbol,
-      );
+      this.addMember(pkg, base ?? receiver, symbol);
     }
     if (this.context.resolutionFiles) {
       // All embedding facts participate in method sets, including the ones
@@ -3335,8 +3328,11 @@ class GoResolver {
     const interfaces: {
       iface: GraphSymbol;
       methods: Map<string, InterfaceMethod>;
+      firstName: string;
     }[] = [];
-    const types: GraphSymbol[] = [];
+    const types: { type: GraphSymbol; receiverNames?: ReadonlySet<string> }[] =
+      [];
+    const noMethods = new Set<string>();
     for (const symbol of this.symbolsById.values()) {
       if (!TYPE_KINDS.has(symbol.kind)) continue;
       // A failure on one declaration (pathological input) leaves it out: an
@@ -3358,17 +3354,50 @@ class GoResolver {
           methods = undefined;
         }
         if (methods?.size) {
-          interfaces.push({ iface: symbol, methods });
+          interfaces.push({
+            iface: symbol,
+            methods,
+            firstName: methods.values().next().value!.name,
+          });
           this.complete.add(symbol.id);
         }
       } else if (
         symbol.kind !== "alias" ||
         (symbol.data as { shape?: string } | undefined)?.shape
-      )
-        types.push(symbol);
+      ) {
+        const pkg = this.pkgOf(symbol);
+        const flatStruct =
+          symbol.kind === "struct" &&
+          !view.unknown &&
+          !view.uncertain &&
+          view.embedded.length === 0;
+        const receiverNames = flatStruct
+          ? ((pkg &&
+              this.memberMethodNames.get(`${pkg.key}\u0000${symbol.name}`)) ??
+            noMethods)
+          : undefined;
+        types.push({
+          type: symbol,
+          ...(receiverNames ? { receiverNames } : {}),
+        });
+      }
     }
-    for (const type of types)
-      for (const { iface, methods } of interfaces) {
+    let skipped = 0;
+    for (const { type, receiverNames } of types) {
+      if (receiverNames?.size === 0) {
+        skipped += interfaces.length;
+        continue;
+      }
+      for (const { iface, methods, firstName } of interfaces) {
+        // A known struct with no embeddings cannot promote any methods. If
+        // the first required name is absent from its declared receivers, the
+        // first method check would refute the pair. The name index includes
+        // all build variants and aliases of the receiver, so presence alone
+        // still requires the normal selector and signature checks below.
+        if (receiverNames && !receiverNames.has(firstName)) {
+          skipped++;
+          continue;
+        }
         let byValue = true;
         let byPointer = true;
         let refuted = false;
@@ -3440,6 +3469,19 @@ class GoResolver {
           },
         });
       }
+    }
+    count("go.typeInterfacePairs", types.length * interfaces.length);
+    count("go.typeInterfacePairsSkipped", skipped);
+  }
+
+  private addMember(pkg: Pkg, name: string, symbol: GraphSymbol): void {
+    const owner = `${pkg.key}\u0000${name}`;
+    push2(this.members, `${owner}\u0000${symbol.name}`, symbol);
+    if (symbol.kind === "method") {
+      let names = this.memberMethodNames.get(owner);
+      if (!names) this.memberMethodNames.set(owner, (names = new Set()));
+      names.add(symbol.name);
+    }
   }
 
   // ---- the opt-in toolchain route (W3-L) ----------------------------------

@@ -553,6 +553,61 @@ test("an augmentation contributes its members, not the installed module's identi
   });
 });
 
+test("an installed directory augmentation keeps the original type identity", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "tsconfig.json",
+    '{"compilerOptions":{"module":"CommonJS","moduleResolution":"Node10","esModuleInterop":true},"files":["main.ts"]}',
+  );
+  await write(
+    "main.ts",
+    [
+      'import CodeMirror from "codemirror";',
+      'import "codemirror/addon/edit/closebrackets";',
+      "export type Options = CodeMirror.EditorConfiguration;",
+      "export type Extra = CodeMirror.EmptyOptions;",
+      "declare const options: Options;",
+      "options.closeBrackets();",
+    ].join("\n"),
+  );
+  const types = "node_modules/@types/codemirror";
+  await write(`${types}/package.json`, manifest("@types/codemirror", "1.0.0"));
+  await write(
+    `${types}/index.d.ts`,
+    "declare namespace CodeMirror { interface EditorConfiguration { lineNumbers?: boolean } interface EmptyOptions {} } export = CodeMirror;",
+  );
+  await write(
+    `${types}/addon/edit/closebrackets.d.ts`,
+    'import "../../"; declare module "../../" { interface EditorConfiguration { closeBrackets(): void } interface EmptyOptions { enabled: boolean } }',
+  );
+  await request("index");
+  read((store, call) => {
+    const type = store
+      .links()
+      .find(
+        ({ kind, targetName }) =>
+          kind === "references" &&
+          targetName === "CodeMirror.EditorConfiguration",
+      );
+    assert.deepEqual(target(type), {
+      ecosystem: "npm",
+      unit: "codemirror",
+      symbol: "CodeMirror.EditorConfiguration",
+      version: "1.0.0",
+      versionSource: `${types}/package.json`,
+      evidence: "declaring-owner",
+    });
+    const empty = store
+      .links()
+      .find(({ targetName }) => targetName === "CodeMirror.EmptyOptions");
+    assert.equal(target(empty).symbol, "CodeMirror.EmptyOptions");
+    assert.equal(
+      target(call("main.ts", "options.closeBrackets")).symbol,
+      "EditorConfiguration.prototype.closeBrackets",
+    );
+  });
+});
+
 test("a qualified installed type uses its declaration without a runtime receiver", async () => {
   const { request, read, write } = await project();
   await write(
@@ -865,4 +920,568 @@ export declare const exportedApi: ExportedApi;
     "ReturnType<typeof register>.onDidChange",
   ]);
   assert.deepEqual(data.links, []);
+});
+
+// Shared test-global declarations: Vitest's `vitest/globals` and Jest's
+// `@types/jest`, each declaring a global `expect`.
+async function testGlobals(write) {
+  await write("node_modules/vitest/package.json", manifest("vitest", "1.0.0"));
+  await write(
+    "node_modules/vitest/globals.d.ts",
+    "declare global { function expect(value: unknown): void; }\nexport {};\n",
+  );
+  await write(
+    "node_modules/@types/jest/package.json",
+    manifest("@types/jest", "1.0.0"),
+  );
+  await write(
+    "node_modules/@types/jest/index.d.ts",
+    "declare function expect(value: unknown): void;\n",
+  );
+}
+const ownerOf = (store, path) => store.getFile(path).result.data;
+
+test("a base config that projects only extend does not compete for their files (solution with build and spec configs)", async () => {
+  // The shape of a solution config referencing a build config that excludes
+  // tests and a spec config with Vitest globals, both extending one base
+  // that selects nothing of its own.
+  const { request, read, write } = await project();
+  await testGlobals(write);
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      files: [],
+      references: [
+        { path: "./tsconfig.build.json" },
+        { path: "./tsconfig.spec.json" },
+      ],
+    }),
+  );
+  await write(
+    "tsconfig.base.json",
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        types: [],
+        moduleResolution: "Bundler",
+        module: "ESNext",
+      },
+    }),
+  );
+  await write(
+    "tsconfig.build.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts"],
+    }),
+  );
+  await write(
+    "tsconfig.spec.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      compilerOptions: { types: ["vitest/globals"] },
+      include: ["src"],
+    }),
+  );
+  await write("src/app.ts", "export function app() {}\n");
+  await write(
+    "src/app.test.ts",
+    'import { app } from "./app";\nexpect(app());\n',
+  );
+  await request("index");
+  read((store, call) => {
+    assert.equal(
+      ownerOf(store, "src/app.test.ts").project,
+      "tsconfig.spec.json",
+    );
+    assert.equal(ownerOf(store, "src/app.test.ts").projects, undefined);
+    const expect = target(call("src/app.test.ts", "expect"));
+    assert.equal(expect.unit, "vitest");
+    assert.equal(expect.symbol, "expect");
+    // A file both project configs include is still analysed under both.
+    assert.deepEqual(ownerOf(store, "src/app.ts").projects, [
+      "tsconfig.build.json",
+      "tsconfig.spec.json",
+    ]);
+    assert.equal(call("src/app.test.ts", "app").resolution, "resolved");
+  });
+});
+
+test("spec files that every tsconfig.json excludes belong to the spec config, not to the base the build configs extend", async () => {
+  // A monorepo shape: package build configs extend `packages/tsconfig.build.json`,
+  // which names no files; the root `tsconfig.json` excludes spec files; the
+  // root `tsconfig.spec.json` includes them with Vitest globals.
+  const { request, read, write } = await project();
+  await testGlobals(write);
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: { types: [] },
+      include: ["packages/**/*"],
+      exclude: ["node_modules", "**/*.spec.ts"],
+    }),
+  );
+  await write(
+    "tsconfig.spec.json",
+    JSON.stringify({
+      extends: "./tsconfig.json",
+      compilerOptions: { types: ["vitest/globals"] },
+      include: ["packages/**/*.spec.ts"],
+      exclude: ["node_modules"],
+    }),
+  );
+  await write(
+    "packages/tsconfig.build.json",
+    JSON.stringify({ compilerOptions: { strict: true, types: [] } }),
+  );
+  await write(
+    "packages/tsconfig.json",
+    JSON.stringify({
+      files: [],
+      references: [{ path: "./p/tsconfig.build.json" }],
+    }),
+  );
+  await write(
+    "packages/p/tsconfig.build.json",
+    JSON.stringify({
+      extends: "../tsconfig.build.json",
+      include: ["*.ts"],
+      exclude: ["test/**/*", "*.spec.ts"],
+    }),
+  );
+  // A sample's own script compiles its own `tsconfig.build.json`, not the
+  // packages' base of the same name.
+  await write(
+    "sample/app/package.json",
+    JSON.stringify({
+      name: "app",
+      scripts: { build: "tsc -p tsconfig.build.json" },
+    }),
+  );
+  await write("packages/p/index.ts", "export function run() {}\n");
+  await write(
+    "packages/p/test/run.spec.ts",
+    'import { run } from "../index";\nexpect(run());\n',
+  );
+  await request("index");
+  read((store, call) => {
+    assert.equal(
+      ownerOf(store, "packages/p/test/run.spec.ts").project,
+      "tsconfig.spec.json",
+    );
+    assert.equal(
+      target(call("packages/p/test/run.spec.ts", "expect")).unit,
+      "vitest",
+    );
+    assert.equal(
+      call("packages/p/test/run.spec.ts", "run").resolution,
+      "resolved",
+    );
+    // The package's own source keeps its build config.
+    assert.equal(
+      ownerOf(store, "packages/p/index.ts").project,
+      "packages/p/tsconfig.build.json",
+    );
+  });
+});
+
+test("two project configs that bind different test globals stay undecided, even beside a shared base", async () => {
+  const { request, read, write } = await project();
+  await testGlobals(write);
+  await write(
+    "tsconfig.base.json",
+    JSON.stringify({ compilerOptions: { strict: true } }),
+  );
+  await write(
+    "tsconfig.jest.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      compilerOptions: { types: ["jest"] },
+      include: ["src"],
+    }),
+  );
+  await write(
+    "tsconfig.vitest.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      compilerOptions: { types: ["vitest/globals"] },
+      include: ["src"],
+    }),
+  );
+  await write("src/a.test.ts", "expect(1);\n");
+  await request("index");
+  read((store, call) => {
+    assert.deepEqual(ownerOf(store, "src/a.test.ts").projects, [
+      "tsconfig.jest.json",
+      "tsconfig.vitest.json",
+    ]);
+    const expect = call("src/a.test.ts", "expect");
+    assert.notEqual(expect.resolution, "resolved");
+    assert.ok(
+      expect.resolution !== "library" || expect.libraries.length > 1,
+      JSON.stringify(expect),
+    );
+  });
+});
+
+test("a base config that a package script compiles, or that a solution references, still competes", async () => {
+  for (const variant of ["script", "reference"]) {
+    const { request, read, write } = await project();
+    await testGlobals(write);
+    await write(
+      "package.json",
+      JSON.stringify({
+        name: "fixture",
+        private: true,
+        ...(variant === "script"
+          ? { scripts: { check: "tsc -p tsconfig.base.json" } }
+          : {}),
+      }),
+    );
+    if (variant === "reference")
+      await write(
+        "tsconfig.json",
+        JSON.stringify({
+          files: [],
+          references: [{ path: "./tsconfig.base.json" }],
+        }),
+      );
+    await write(
+      "tsconfig.base.json",
+      JSON.stringify({ compilerOptions: { types: [] } }),
+    );
+    await write(
+      "tsconfig.spec.json",
+      JSON.stringify({
+        extends: "./tsconfig.base.json",
+        compilerOptions: { types: ["vitest/globals"] },
+        include: ["src"],
+      }),
+    );
+    await write("src/a.test.ts", "expect(1);\n");
+    await request("index");
+    read((store, call) => {
+      assert.deepEqual(
+        ownerOf(store, "src/a.test.ts").projects,
+        ["tsconfig.base.json", "tsconfig.spec.json"],
+        variant,
+      );
+      assert.equal(
+        call("src/a.test.ts", "expect").data.reason,
+        "ambiguous-project",
+        variant,
+      );
+    });
+  }
+});
+
+// Two configs that both select `consumer.test-d.ts` and map `pick` to
+// different declarations; one of them is a base the other extends.
+async function pickLayout(write) {
+  await write(
+    "tsconfig.base.json",
+    JSON.stringify({
+      compilerOptions: {
+        baseUrl: ".",
+        types: [],
+        paths: { pick: ["./one.ts"] },
+      },
+    }),
+  );
+  await write(
+    "tsconfig.spec.json",
+    JSON.stringify({
+      extends: "./tsconfig.base.json",
+      compilerOptions: { paths: { pick: ["./two.ts"] } },
+      include: ["consumer.test-d.ts", "one.ts", "two.ts"],
+    }),
+  );
+  await write("one.ts", "export function pick() {}\n");
+  await write("two.ts", "export function pick() {}\n");
+  await write("consumer.test-d.ts", 'import { pick } from "pick";\npick();\n');
+}
+
+test("a base config that a test runner type-checks with is a project, not a shared base", async () => {
+  const runners = {
+    "vitest literal": [
+      "vitest.config.ts",
+      "export default { test: { typecheck: { enabled: true, tsconfig: './tsconfig.base.json' } } };\n",
+    ],
+    "ts-jest literal": [
+      "jest.config.js",
+      "module.exports = { transform: { '^.+\\\\.tsx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.base.json' }] } };\n",
+    ],
+    "package.json jest": [
+      "package.json",
+      JSON.stringify({
+        name: "fixture",
+        jest: {
+          transform: {
+            "^.+\\.tsx?$": ["ts-jest", { tsconfig: "tsconfig.base.json" }],
+          },
+        },
+      }),
+    ],
+    "vitest non-literal": [
+      "vitest.config.ts",
+      "const project = './tsconfig.base.json';\nexport default { test: { typecheck: { tsconfig: project } } };\n",
+    ],
+  };
+  for (const [variant, [path, text]] of Object.entries(runners)) {
+    const { request, read, write } = await project();
+    await pickLayout(write);
+    await write(path, text);
+    await request("index");
+    read((store, call) => {
+      assert.deepEqual(
+        ownerOf(store, "consumer.test-d.ts").projects,
+        ["tsconfig.base.json", "tsconfig.spec.json"],
+        variant,
+      );
+      assert.notEqual(
+        call("consumer.test-d.ts", "pick").resolution,
+        "resolved",
+        variant,
+      );
+    });
+  }
+  // Without a runner naming it, the base does not compete.
+  const { request, read, write } = await project();
+  await pickLayout(write);
+  await write(
+    "vitest.config.ts",
+    "export default { test: { globals: true } };\n",
+  );
+  await request("index");
+  read((store, call) => {
+    assert.equal(
+      ownerOf(store, "consumer.test-d.ts").project,
+      "tsconfig.spec.json",
+    );
+    const pick = call("consumer.test-d.ts", "pick");
+    assert.equal(pick.resolution, "resolved");
+    assert.equal(
+      store.findSymbols().find(({ id }) => id === pick.targetId)?.file,
+      "two.ts",
+    );
+  });
+});
+
+test("the shared-base rule's guards keep project configs competing", async () => {
+  // Each case: a config that is not a shared base still owns or ties.
+  const cases = {
+    // A root tsconfig.json with compiler options only, extended by another
+    // config, is the editor's project for the files it selects by default.
+    "tsconfig.json name": {
+      files: {
+        "tsconfig.json": JSON.stringify({
+          compilerOptions: { types: ["vitest/globals"] },
+        }),
+        "tsconfig.other.json": JSON.stringify({
+          extends: "./tsconfig.json",
+          compilerOptions: { types: ["jest"] },
+          include: ["src"],
+        }),
+      },
+      expected: { project: "tsconfig.json" },
+    },
+    // A config with its own `include` is a project even when extended.
+    "own selection": {
+      files: {
+        "tsconfig.a.json": JSON.stringify({
+          compilerOptions: { types: ["vitest/globals"] },
+          include: ["src"],
+        }),
+        "tsconfig.b.json": JSON.stringify({
+          extends: "./tsconfig.a.json",
+          compilerOptions: { types: ["jest"] },
+          include: ["src"],
+        }),
+      },
+      expected: { projects: ["tsconfig.a.json", "tsconfig.b.json"] },
+    },
+    // A config nothing extends is a standalone project, not a base.
+    "not extended": {
+      files: {
+        "tsconfig.standalone.json": JSON.stringify({
+          compilerOptions: { types: ["vitest/globals"] },
+        }),
+        "tsconfig.x.json": JSON.stringify({
+          compilerOptions: { types: ["jest"] },
+          include: ["src"],
+        }),
+      },
+      expected: { projects: ["tsconfig.standalone.json", "tsconfig.x.json"] },
+    },
+    // A script that changes directory first still names the base.
+    "script after cd": {
+      files: {
+        "package.json": JSON.stringify({
+          name: "fixture",
+          scripts: { check: "cd packages && tsc -p ../tsconfig.base.json" },
+        }),
+        "tsconfig.base.json": JSON.stringify({
+          compilerOptions: { types: [] },
+        }),
+        "tsconfig.spec.json": JSON.stringify({
+          extends: "./tsconfig.base.json",
+          compilerOptions: { types: ["vitest/globals"] },
+          include: ["src"],
+        }),
+      },
+      expected: { projects: ["tsconfig.base.json", "tsconfig.spec.json"] },
+    },
+  };
+  for (const [variant, { files, expected }] of Object.entries(cases)) {
+    const { request, read, write } = await project();
+    await testGlobals(write);
+    for (const [path, text] of Object.entries(files)) await write(path, text);
+    await write("src/a.test.ts", "expect(1);\n");
+    await request("index");
+    read((store) => {
+      const data = ownerOf(store, "src/a.test.ts");
+      assert.deepEqual(
+        { project: data.project, projects: data.projects },
+        { project: expected.project, projects: expected.projects },
+        variant,
+      );
+    });
+  }
+});
+
+test("a call on a member merged from several declarations links the declaration its signature selects", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "node_modules/stream-kit/package.json",
+    manifest("stream-kit", "1.0.0"),
+  );
+  await write(
+    "node_modules/stream-kit/index.d.ts",
+    "export interface Readable { once(event: 'end', listener: () => void): this; }\nexport declare const source: Readable;\nexport interface Logger { log(message: string): void; }\nexport declare const logger: Logger;\n",
+  );
+  await write(
+    "node_modules/busy-kit/package.json",
+    manifest("busy-kit", "1.0.0"),
+  );
+  await write(
+    "node_modules/busy-kit/index.d.ts",
+    "import 'stream-kit';\ndeclare module 'stream-kit' { interface Readable { once(event: 'limit', listener: () => void): this; } interface Logger { log(message: string, ...rest: unknown[]): void; } }\nexport {};\n",
+  );
+  await write(
+    "node_modules/union-kit/package.json",
+    manifest("union-kit", "1.0.0"),
+  );
+  await write(
+    "node_modules/union-kit/index.d.ts",
+    "export interface A { run(): void } export interface B { run(): void }\nexport declare const either: A | B;\n",
+  );
+  await write(
+    "main.ts",
+    [
+      'import "busy-kit";',
+      'import { logger, source } from "stream-kit";',
+      'import { either } from "union-kit";',
+      "source.once('end', () => {});",
+      "either.run();",
+      "logger.log('x');",
+      "",
+    ].join("\n"),
+  );
+  await request("index");
+  read((store) => {
+    const calls = (name) =>
+      store
+        .links()
+        .filter(
+          (link) =>
+            link.file === "main.ts" &&
+            link.kind === "calls" &&
+            link.targetName === name,
+        );
+    const [end] = calls("source.once");
+    assert.equal(end.resolution, "library", JSON.stringify(end.data));
+    assert.deepEqual(
+      end.libraries.map(({ unit, symbol }) => [unit, symbol]),
+      [["stream-kit", "Readable.prototype.once"]],
+    );
+    // Both merged declarations accept the arguments: the checker's choice is
+    // declaration order, so it stays a candidate set.
+    const [log] = calls("logger.log");
+    assert.ok(
+      log.resolution !== "library" || log.libraries.length !== 1,
+      JSON.stringify(log),
+    );
+    // A union receiver is dispatch: never narrowed to one arm.
+    const [run] = calls("either.run");
+    assert.ok(
+      run.resolution !== "library" || run.libraries.length !== 1,
+      JSON.stringify(run),
+    );
+  });
+});
+
+test("a merged-member call keeps one identity for a same-package directory augmentation", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "tsconfig.json",
+    '{"compilerOptions":{"module":"CommonJS","moduleResolution":"Node10","esModuleInterop":true},"files":["main.ts"]}',
+  );
+  const types = "node_modules/@types/codemirror";
+  await write(`${types}/package.json`, manifest("@types/codemirror", "1.0.0"));
+  await write(
+    `${types}/index.d.ts`,
+    "declare namespace CodeMirror { interface Editor { setOption(name: 'a'): void } } export = CodeMirror;",
+  );
+  await write(
+    `${types}/addon/edit/closebrackets.d.ts`,
+    'import "../../"; declare module "../../" { interface Editor { setOption(name: \'b\'): void } }',
+  );
+  await write(
+    "node_modules/cm-extra/package.json",
+    manifest("cm-extra", "1.0.0"),
+  );
+  await write(
+    "node_modules/cm-extra/index.d.ts",
+    "import 'codemirror'; declare module 'codemirror' { interface Editor { setOption(name: 'c'): void } }\nexport {};\n",
+  );
+  await write(
+    "main.ts",
+    [
+      'import CodeMirror from "codemirror";',
+      'import "codemirror/addon/edit/closebrackets";',
+      'import "cm-extra";',
+      "declare const a: CodeMirror.Editor;",
+      "declare const b: CodeMirror.Editor;",
+      "declare const c: CodeMirror.Editor;",
+      "a.setOption('a');",
+      "b.setOption('b');",
+      "c.setOption('c');",
+    ].join("\n"),
+  );
+  await request("index");
+  read((_, call) => {
+    // The original's overload: its own identity.
+    assert.deepEqual(
+      [target(call("main.ts", "a.setOption"))].map(({ unit, symbol }) => [
+        unit,
+        symbol,
+      ]),
+      [["codemirror", "CodeMirror.Editor.prototype.setOption"]],
+    );
+    // The same-package augmentation's overload never gets an identity of its
+    // own: it is not narrowed away from the original's.
+    const own = call("main.ts", "b.setOption");
+    assert.ok(
+      own.resolution !== "library" ||
+        own.libraries.every(({ unit, symbol }) =>
+          unit === "codemirror"
+            ? symbol === "CodeMirror.Editor.prototype.setOption"
+            : true,
+        ),
+      JSON.stringify(own),
+    );
+    // Another package's overload: that package's declaration.
+    assert.equal(target(call("main.ts", "c.setOption")).unit, "cm-extra");
+  });
 });

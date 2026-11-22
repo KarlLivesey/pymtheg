@@ -4,7 +4,7 @@
 // reverted and re-indexed again. After every revert the store must equal the
 // cold store row for row (a free equality check of the incremental path).
 // Each index runs in a fresh process (index-once.mjs), as the CLI does.
-//   node scripts/reindex/measure.mjs <dist> <scratch> <repo id> <out dir> [--profile edit,...] [--cold-store FILE]
+//   node scripts/reindex/measure.mjs <dist> <scratch> <repo id> <out dir> [--profile edit,...] [--cold-store FILE | --store-dir DIR] [--edits edit,...] [--seed-checkpoint]
 import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
@@ -12,6 +12,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -22,6 +23,14 @@ const profileAt = args.indexOf("--profile");
 const profile = profileAt >= 0 ? args.splice(profileAt, 2)[1].split(",") : [];
 const coldAt = args.indexOf("--cold-store");
 const coldStore = coldAt < 0 ? undefined : resolve(args.splice(coldAt, 2)[1]);
+const storeAt = args.indexOf("--store-dir");
+const storeDir = storeAt < 0 ? undefined : resolve(args.splice(storeAt, 2)[1]);
+if (storeDir && coldStore) throw Error("Choose one cold store option");
+const editsAt = args.indexOf("--edits");
+const selectedEdits =
+  editsAt < 0 ? null : args.splice(editsAt, 2)[1].split(",");
+const seedCheckpoint = args.includes("--seed-checkpoint");
+if (seedCheckpoint) args.splice(args.indexOf("--seed-checkpoint"), 1);
 const [distArg, scratch, id, outArg] = args;
 if (!distArg || !scratch || !id || !outArg)
   throw Error("usage: measure.mjs <dist> <scratch> <repo id> <out dir>");
@@ -35,6 +44,7 @@ const name = id.replace(/[^A-Za-z0-9._-]/g, "_");
 const label = out.split("/").pop();
 const root = join(scratch, "work", label, name);
 mkdirSync(out, { recursive: true });
+if (profile.length) mkdirSync(join(out, "profiles"), { recursive: true });
 if (existsSync(root)) throw Error(`work copy exists: ${root}`);
 mkdirSync(join(scratch, "work", label), { recursive: true });
 cpSync(join(scratch, "pins", name), root, { recursive: true });
@@ -73,9 +83,25 @@ function index(step) {
     }, complete ${r.complete}`,
   );
 }
-if (coldStore) {
+if (storeDir) {
+  const temporary = join(storeDir, `measure-${process.pid}.sqlite`);
+  try {
+    execFileSync(
+      process.execPath,
+      [join(here, "cold-once.mjs"), dist, root, temporary, `measure-${name}`],
+      { stdio: ["ignore", "ignore", "inherit"] },
+    );
+    mkdirSync(dirname(graph), { recursive: true });
+    copyFileSync(temporary, graph);
+  } finally {
+    for (const suffix of ["", "-wal", "-shm"])
+      if (existsSync(temporary + suffix)) rmSync(temporary + suffix);
+  }
+  index("seed");
+} else if (coldStore) {
   mkdirSync(dirname(graph), { recursive: true });
   copyFileSync(coldStore, graph);
+  if (seedCheckpoint) index("seed");
 } else index("cold");
 const cold = storeRows(graph);
 index("warm");
@@ -94,6 +120,7 @@ const edits = {
 };
 const equality = {};
 for (const [edit, text] of Object.entries(edits)) {
+  if (selectedEdits && !selectedEdits.includes(edit)) continue;
   writeFileSync(path, text);
   index(edit);
   writeFileSync(path, original);

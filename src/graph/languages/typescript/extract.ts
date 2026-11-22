@@ -27,6 +27,7 @@ import {
   fromVirtual,
   LIB_ROOT,
   matchesPathAlias,
+  relativeSpecifier,
   toVirtual,
 } from "./project.js";
 import type { entryProvenance, UnbuiltEntry } from "./workspace-entries.js";
@@ -66,7 +67,11 @@ export interface RenameContext {
   /** Present when this file's compiler text was renamed. */
   renamed?: Renamed | undefined;
   /** Resolves a module specifier from a file to a captured path, if any. */
-  resolveModule: (specifier: string, from: string) => string | undefined;
+  resolveModule: (
+    specifier: ts.StringLiteralLike,
+  ) =>
+    | { path?: string; reason?: "directory-import-not-allowed-in-esm" }
+    | undefined;
   hasDenoImports: boolean;
   selectSpecifier: (specifier: string, from: string) => string | undefined;
   workspaceReason: (
@@ -260,6 +265,8 @@ interface Lookup {
   memberCall?: boolean;
   typeQuery?: boolean;
   recoveredMember?: boolean;
+  /** The one merged declaration of `symbol` that the call's signature selects. */
+  selected?: ts.Declaration;
 }
 const clip = (text: string) => {
   const flat = text
@@ -277,7 +284,6 @@ const isEntityChain = (node: ts.Expression): boolean =>
     ts.isStringLiteralLike(node.argumentExpression) &&
     isEntityChain(node.expression));
 
-const relativeSpecifier = (value: string) => /^\.\.?(\/|$)/.test(value);
 const requiredProperty = (element: ts.BindingElement) =>
   element.dotDotDotToken || element.initializer
     ? undefined
@@ -953,6 +959,10 @@ export function extractFile(
         current = checker.getAliasedSymbol(current);
       }
       let declarations = current.declarations ?? [];
+      if (found.selected && depth === 0 && current === found.symbol)
+        declarations = declarations.filter(
+          (declaration) => declaration === found.selected,
+        );
       if (globals.hasInstalledTypes && firstAlias && declarations.length > 1) {
         const isAugmentation = (declaration: ts.Declaration) =>
           ts.isModuleDeclaration(declaration) &&
@@ -994,6 +1004,11 @@ export function extractFile(
         );
         if (filtered.length) declarations = filtered;
       }
+      if (globals.hasInstalledTypes && declarations.length > 1)
+        declarations = importer.preferOriginalDeclarations(
+          declarations,
+          checker,
+        );
       if (
         meaning === "type" &&
         declarations.length > 1 &&
@@ -1285,7 +1300,7 @@ export function extractFile(
         program,
         checker,
         captured,
-        resolveModule: context.resolveModule,
+        resolveModule: (specifier) => specifierResolution(specifier).path,
         invalid: (at) => context.moduleKind(at) === "invalid",
         failedNames: context.failedNames,
       },
@@ -1424,8 +1439,7 @@ export function extractFile(
       failedNames: context.failedNames,
       failedModule: (specifier) => {
         if (!ts.isStringLiteralLike(specifier)) return undefined;
-        const from = fromVirtual(specifier.getSourceFile().fileName);
-        const module = from && context.resolveModule(specifier.text, from);
+        const module = specifierResolution(specifier).path;
         return module && context.moduleKind(module) === "invalid"
           ? module
           : undefined;
@@ -2257,6 +2271,7 @@ export function extractFile(
       path: string | undefined;
       lookups: readonly string[];
       extensionFallback: boolean;
+      reason?: "directory-import-not-allowed-in-esm";
     }
   >();
   function specifierResolution(specifier: ts.StringLiteralLike) {
@@ -2280,20 +2295,20 @@ export function extractFile(
       specifier.getSourceFile(),
     );
     const resolved = resolution?.resolvedModule?.resolvedFileName;
-    const from = fromVirtual(specifier.getSourceFile().fileName) ?? path;
     const selected = selectedSpecifier(specifier);
     const fallback =
       selected !== undefined &&
       !resolved &&
       (!resolution || relativeSpecifier(selected))
-        ? context.resolveModule(specifier.text, from)
+        ? context.resolveModule(specifier)
         : undefined;
     const result = {
       path: resolved
         ? fromVirtual(program.getSourceFile(resolved)?.fileName ?? resolved)
-        : fallback,
+        : fallback?.path,
       lookups: resolution?.failedLookupLocations ?? [],
-      extensionFallback: !!(resolution && fallback),
+      extensionFallback: !!(resolution && fallback?.path),
+      ...(fallback?.reason && { reason: fallback.reason }),
     };
     specifierResolutions.set(specifier, result);
     return result;
@@ -2320,8 +2335,9 @@ export function extractFile(
     if (checker.getSymbolAtLocation(specifier)) return undefined;
     // A captured file the compiler did not type here (a script, or a require
     // form the compiler does not recognise): the edge to that file is known.
-    const { path: resolved, lookups } = specifierResolution(specifier);
+    const { path: resolved, lookups, reason } = specifierResolution(specifier);
     if (resolved !== undefined && captured.has(resolved)) return CAPTURED;
+    if (reason) return reason;
     if (relativeSpecifier(text) || text.startsWith("/"))
       return "missing-module";
     const aliased =
@@ -2785,7 +2801,107 @@ export function extractFile(
           );
       }
     }
+    // A member merged from several declarations (interface merging, module
+    // augmentation) of one receiver type: the checker's selected signature
+    // names the declaration the call binds. A union or intersection receiver
+    // is dispatch or a synthesized member, never narrowed.
+    if (
+      call &&
+      !found.reason &&
+      found.targets.length + (found.libraryFacts?.length ?? 0) > 1
+    ) {
+      const selected = selectedMergedDeclaration(symbol, call);
+      if (selected) {
+        const narrowed = targetsOf(
+          { ...symbol, at, construct: extra.construct === true, selected },
+          "call",
+        );
+        if (
+          !narrowed.reason &&
+          narrowed.targets.length + (narrowed.libraryFacts?.length ?? 0) === 1
+        )
+          found = narrowed;
+      }
+    }
     link(owner, "calls", name, at, found, extra);
+  }
+  function selectedMergedDeclaration(
+    found: Lookup,
+    call: ts.CallExpression | ts.NewExpression,
+  ): ts.Declaration | undefined {
+    const symbol = found.symbol;
+    if (
+      !symbol ||
+      symbol === LIMIT ||
+      symbol.flags & ts.SymbolFlags.Alias ||
+      !found.receiver ||
+      found.name === undefined ||
+      (symbol.declarations?.length ?? 0) < 2
+    )
+      return undefined;
+    const declaration = checker.getResolvedSignature(call)?.declaration;
+    if (
+      !declaration ||
+      ts.isJSDocSignature(declaration) ||
+      !symbol.declarations!.includes(declaration)
+    )
+      return undefined;
+    // A same-package augmentation of an original declaration shares the
+    // original's identity (preferOriginalDeclarations); never narrow to it.
+    if (
+      globals.hasInstalledTypes &&
+      !importer
+        .preferOriginalDeclarations([...symbol.declarations!], checker)
+        .includes(declaration)
+    )
+      return undefined;
+    const type = checker.getApparentType(
+      checker.getNonNullableType(checker.getTypeAtLocation(found.receiver)),
+    );
+    if (type.isUnionOrIntersection()) return undefined;
+    if (checker.getPropertyOfType(type, found.name) !== symbol)
+      return undefined;
+    // The selection proves the declaration only when no declaration from
+    // another body (another interface, augmentation or library) could also
+    // accept these arguments; otherwise it is declaration order.
+    const others = symbol.declarations!.filter(
+      (other) => other.parent !== declaration.parent,
+    );
+    return others.some((other) => mayAccept(other, call))
+      ? undefined
+      : declaration;
+  }
+  /** Whether a declaration's signature could accept the call's arguments. */
+  function mayAccept(
+    declaration: ts.Declaration,
+    call: ts.CallExpression | ts.NewExpression,
+  ): boolean {
+    if (!ts.isFunctionLike(declaration) || declaration.typeParameters?.length)
+      return true;
+    const signature = checker.getSignatureFromDeclaration(
+      declaration as ts.SignatureDeclaration,
+    );
+    if (!signature || signature.typeParameters?.length) return true;
+    const parameters = declaration.parameters.filter(
+      (parameter) =>
+        !(ts.isIdentifier(parameter.name) && parameter.name.text === "this"),
+    );
+    if (parameters.some((parameter) => parameter.dotDotDotToken)) return true;
+    const args = call.arguments ?? [];
+    if (args.some(ts.isSpreadElement)) return true;
+    const required = parameters.filter(
+      (parameter) => !parameter.questionToken && !parameter.initializer,
+    ).length;
+    if (args.length < required || args.length > parameters.length) return false;
+    return args.every((argument, index) => {
+      const parameter = parameters[index]!;
+      const symbol = checker.getSymbolAtLocation(parameter.name);
+      if (!symbol || !ts.isIdentifier(parameter.name)) return true;
+      return checker.isTypeAssignableTo(
+        checker.getTypeAtLocation(argument),
+        checker.getTypeOfSymbolAtLocation(symbol, parameter),
+      );
+    });
   }
   function binding(
     owner: string,
@@ -3028,7 +3144,7 @@ export function extractFile(
           argument &&
           ts.isStringLiteralLike(argument)
         ) {
-          const target = context.resolveModule(argument.text, path);
+          const target = context.resolveModule(argument)?.path;
           link(
             owner,
             "imports",

@@ -1,0 +1,36 @@
+[
+ {
+  "pin": "restic_restic",
+  "round": 0,
+  "build": "default-1",
+  "wallS": 203.01,
+  "cpuS": 158,
+  "peakMiB": 733
+ },
+ {
+  "pin": "restic_restic",
+  "round": 0,
+  "build": "cache16",
+  "cachePages": 4096,
+  "wallS": 172.23,
+  "cpuS": 136.8,
+  "peakMiB": 781
+ },
+ {
+  "pin": "restic_restic",
+  "round": 0,
+  "build": "cache64",
+  "cachePages": 16384,
+  "wallS": 164.02,
+  "cpuS": 105.3,
+  "peakMiB": 752
+ },
+ {
+  "pin": "restic_restic",
+  "round": 0,
+  "build": "default-2",
+  "wallS": 179.46,
+  "cpuS": 125.1,
+  "peakMiB": 691
+ }
+]
