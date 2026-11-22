@@ -249,6 +249,12 @@ type AttributeOrigin = {
 };
 type AttributeGate = AttributeOrigin & { condition: string; explicit: boolean };
 interface Place {
+  /**
+   * C-24: the accessors a lookup passed through globs on the way here. A
+   * glob-imported name is only as visible as the more restricted of the glob
+   * and the item, so an item must be visible from each of them too.
+   */
+  viaGlobs?: Place[];
   crate: Crate;
   local: string;
   scope: string;
@@ -1895,6 +1901,13 @@ export function resolveRust(
   };
   const isDescendant = (scope: string, parent: string) =>
     !parent || scope === parent || scope.startsWith(parent + "::");
+  const visibleThroughGlobs = (
+    visibility: string,
+    owner: Place,
+    importer: Place,
+  ): boolean =>
+    visible(visibility, owner, importer) &&
+    (importer.viaGlobs ?? []).every((via) => visible(visibility, owner, via));
   function visible(visibility: string, owner: Place, importer: Place): boolean {
     visibility = compact(visibility);
     if (visibility === "pub") return true;
@@ -2136,7 +2149,8 @@ export function resolveRust(
             ) &&
             macroIdentityAccepts(s, headNs) &&
             possible([...(loc.conditions ?? []), ...conditionsFor(s)]) &&
-            (!accessFrom || visible(str(data(s).visibility), loc, accessFrom)),
+            (!accessFrom ||
+              visibleThroughGlobs(str(data(s).visibility), loc, accessFrom)),
         );
     // First-segment presence is independent of member-lookup completeness.
     // A present local/explicit binding shadows globs even when its member is
@@ -2309,7 +2323,8 @@ export function resolveRust(
           ...(loc.conditions ?? []),
           ...((data(l).conditions ?? []) as string[]),
         ]) &&
-        (!accessFrom || visible(str(data(l).visibility), loc, accessFrom)),
+        (!accessFrom ||
+          visibleThroughGlobs(str(data(l).visibility), loc, accessFrom)),
     );
     if (opaqueLibraryScope) {
       // A generated item in this module cannot replace a present explicit
@@ -2491,7 +2506,8 @@ export function resolveRust(
     const globs = allowGlobs
       ? (uses?.globs ?? []).filter(
           (l) =>
-            !accessFrom || visible(str(data(l).visibility), loc, accessFrom),
+            !accessFrom ||
+            visibleThroughGlobs(str(data(l).visibility), loc, accessFrom),
         )
       : [];
     if (
@@ -2511,11 +2527,17 @@ export function resolveRust(
       };
       const suppliers: GraphLink[] = [];
       // C-24: a glob imports only what its own module can see (a private
-      // `use` in the target module is not glob-imported into the parent), so
-      // visibility through it is checked from here; the accessor's cfg
-      // conditions still apply.
+      // `use` in the target module is not glob-imported into the parent), and
+      // the name it imports is no more visible than the item, so an item
+      // behind it must be visible from here and from every accessor on the
+      // way (rustc takes the more restricted of the glob and the item). The
+      // accessor's cfg conditions still apply.
       const globAccess: Place = accessFrom
-        ? { ...loc, conditions: accessFrom.conditions ?? [] }
+        ? {
+            ...loc,
+            conditions: accessFrom.conditions ?? [],
+            viaGlobs: [...(accessFrom.viaGlobs ?? []), accessFrom],
+          }
         : loc;
       const perGlob = globs.map((l) => {
         const imported = throughGlob(
@@ -2902,6 +2924,7 @@ export function resolveRust(
       allowGlobs,
       accessFrom?.crate.root,
       accessFrom?.scope,
+      accessFrom?.viaGlobs?.map((via) => `${via.crate.root}|${via.scope}`),
       loc.conditions,
     ]);
     const guard = baselineGuard;

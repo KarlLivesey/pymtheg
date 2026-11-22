@@ -324,3 +324,72 @@ test("cfg-alternative sibling files get one symmetric answer whatever the input 
       "src/ppi/mod.rs#Event",
     );
 });
+
+/** Every `types` link named `name` in `file` of a fixture: target or library. */
+async function typeTargets(fixture, paths, file, name) {
+  const directory = new URL(
+    `fixtures/graph-rust-c24/${fixture}/`,
+    import.meta.url,
+  );
+  const files = {};
+  for (const path of ["Cargo.toml", ...paths])
+    files[path] = await readFile(new URL(path, directory), "utf8");
+  const g = await index(files);
+  return g.links
+    .filter(
+      (l) => l.file === file && l.kind === "types" && l.targetName === name,
+    )
+    .map((l) =>
+      l.targetId
+        ? `${g.symbols.get(l.targetId).file}#${g.symbols.get(l.targetId).identity}`
+        : l.libraries?.length
+          ? `library ${l.libraries[0].unit}::${l.libraries[0].symbol}`
+          : null,
+    );
+}
+
+test("a glob re-export never makes an item more visible than it is", async () => {
+  // Checked with `cargo check`: rustc imports a name through a glob only as
+  // visible as the more restricted of the glob and the item.
+  const std = "library std::result::Result";
+  const alias = ["src/lib.rs"];
+  assert.deepEqual(
+    await typeTargets("glob-alias", alias, "src/lib.rs", "Result"),
+    [std],
+  );
+  assert.deepEqual(
+    await typeTargets("glob-alias", alias, "src/lib.rs", "Error"),
+    ["src/lib.rs#api::error::Error", "src/lib.rs#api::error::Error"],
+  );
+  // `pub(super) use super::Real7 as String` behind `pub use child::*`.
+  assert.deepEqual(
+    await typeTargets("glob-use-as", alias, "src/lib.rs", "String"),
+    ["library std::string::String"],
+  );
+  assert.deepEqual(
+    await typeTargets("glob-use-as", alias, "src/lib.rs", "Real7"),
+    ["src/lib.rs#outer::Real7"],
+  );
+  // Two globs in a chain, across three files.
+  const chain = ["src/lib.rs", "src/store/mod.rs", "src/store/error.rs"];
+  assert.deepEqual(
+    await typeTargets("glob-chain", chain, "src/lib.rs", "Result"),
+    [std],
+  );
+  assert.deepEqual(
+    await typeTargets("glob-chain", chain, "src/lib.rs", "Error"),
+    ["src/store/error.rs#Error"],
+  );
+  // A private `use` in the globbed child is still never glob-imported, and
+  // the public item another glob supplies still resolves (rule 4).
+  const retry = [
+    "src/main.rs",
+    "src/serve/mod.rs",
+    "src/serve/runner.rs",
+    "src/serve/server.rs",
+  ];
+  assert.deepEqual(
+    await typeTargets("glob-retry", retry, "src/serve/server.rs", "AppServer"),
+    ["src/serve/runner.rs#AppServer", "src/serve/runner.rs#AppServer"],
+  );
+});
