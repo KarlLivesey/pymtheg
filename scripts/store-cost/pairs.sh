@@ -5,6 +5,10 @@
 # row comparison of each pair.
 #   scripts/store-cost/pairs.sh <main dist> <after dist> <scratch> <out dir> <memory dir> <pin>...
 set -eu
+# The user's Pymtheg configuration and cache go to fresh folders in the
+# scratch, never the account's real ones (scripts/isolated-home.mjs).
+export PYMTHEG_CONFIG_HOME="${PYMTHEG_CONFIG_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-config-XXXXXX")}"
+export PYMTHEG_CACHE_HOME="${PYMTHEG_CACHE_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-cache-XXXXXX")}"
 main=$1 after=$2 scratch=$3 out=$4 memory=$5
 shift 5
 here=$(dirname "$0")

@@ -3,6 +3,7 @@
 // project id (ids hash it), with the options `graph index` uses, so the store
 // can be compared row for row with an incremental one (dump.mjs).
 //   node scripts/reindex/cold-once.mjs <dist> <root> <graph.sqlite> <project id>
+import "../isolated-home.mjs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 

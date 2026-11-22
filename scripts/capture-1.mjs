@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-home.mjs";
 import {spawnSync} from 'node:child_process';
 import {readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {Ajv} from 'ajv';

@@ -42,6 +42,7 @@
 // it pulls; images it did not pull are never removed. A recorded image is
 // removed by the last run to finish, once no container (of any run) uses it.
 // The list is shared in ~/.cache/pymtheg-acceptance.
+import "../isolated-home.mjs";
 import { spawnSync, spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, existsSync, copyFileSync, rmSync, statSync } from "node:fs";
 import { join, resolve, basename } from "node:path";

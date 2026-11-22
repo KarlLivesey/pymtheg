@@ -12,6 +12,7 @@
 //   unresolved / failed       no target; the written name is kept in `to.symbol`
 // Source ranges in the store are UTF-16 offsets, converted to lines here.
 
+import "../../isolated-home.mjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";

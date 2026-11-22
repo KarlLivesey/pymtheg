@@ -187,7 +187,7 @@ export function registerGraphTools(
             .enum(["trusted", "source-only"])
             .optional()
             .describe(
-              'An initialised project with no trust answer on this machine (summary.trust "unanswered"): the answer to "Do you trust this repository?". Trusted lets the languages\' official build tools run on it, as building it would; source-only means Pymtheg starts no program on its behalf, neither a build tool nor Git, and only reads files. Recorded for this checkout only; an existing answer is never changed.',
+              'An initialised project with no trust answer on this machine (summary.trust "unanswered"): the answer to "Do you trust this repository?". Trusted lets the languages\' official build tools run on it, as building it would; source-only means Pymtheg starts no program on its behalf, neither a build tool nor Git, and only reads the repository\'s files and writes its own .pymtheg/ files. Recorded for this checkout only; an existing answer is never changed.',
             ),
         })
         .strict(),

@@ -117,7 +117,8 @@ export function ProjectSetup({
                 onChange={() => setTrust("source-only")}
               />{" "}
               Source only: Pymtheg starts no program on this repository's
-              behalf, neither a build tool nor Git; it only reads files.
+              behalf, neither a build tool nor Git; it only reads the
+              repository's files and writes its own .pymtheg/ files.
             </label>
           </fieldset>
         )}
@@ -125,7 +126,7 @@ export function ProjectSetup({
           <p>
             {result.trust === "trusted"
               ? "Trusted: the languages' official tools may run on this project."
-              : "Source only: Pymtheg starts no program on this project's behalf; it only reads files."}{" "}
+              : "Source only: Pymtheg starts no program on this project's behalf; it only reads the repository's files and writes its own .pymtheg/ files."}{" "}
             Kept for this checkout in your own Pymtheg configuration, never in
             the repository; run pymtheg trust --revoke to answer again.
           </p>

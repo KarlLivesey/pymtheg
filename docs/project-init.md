@@ -52,7 +52,7 @@ repository.
   runs its build scripts and macros, as building it would. Today this turns on
   the Go toolchain route, with its existing policy: offline by default and cgo
   off.
-- **Source only** means Pymtheg starts no program on this repository's behalf, neither a build tool nor Git; it only reads files.
+- **Source only** means Pymtheg starts no program on this repository's behalf, neither a build tool nor Git; it only reads the repository's files and writes its own .pymtheg/ files.
 
 **The answer belongs to you, never to the repository.** It is kept outside
 every checkout, in the user's own configuration (`$PYMTHEG_CONFIG_HOME`, else `$XDG_CONFIG_HOME/pymtheg/`, `~/.config/pymtheg/`, `~/Library/Application Support/pymtheg/` on macOS or `%APPDATA%\pymtheg\` on Windows; file `trust.json`, user-only), keyed by the checkout's real path with the

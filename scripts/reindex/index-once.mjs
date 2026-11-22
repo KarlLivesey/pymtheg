@@ -3,6 +3,7 @@
 // entry point, an abort signal, progress on), recording the C-22 work
 // counters, per-stage times, CPU time and peak memory.
 //   node scripts/reindex/index-once.mjs <dist dir> <project root> <out.json>
+import "../isolated-home.mjs";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";

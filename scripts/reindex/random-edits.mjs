@@ -4,6 +4,7 @@
 // a cold index of the same tree into a new store with the same project id;
 // the two stores must be identical row for row (dump.mjs).
 //   node scripts/reindex/random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json>
+import "../isolated-home.mjs";
 import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
