@@ -944,210 +944,6 @@ export function mergeTied(
  * tests pass `options` (see TypeScriptModuleOptions) to inject limits and
  * faults without changing any global state.
  */
-/** A module specifier of an unread file and the resolution modes to check. */
-export interface UnreadSpecifier {
-  specifier: string;
-  /**
-   * The modes the compiler would resolve it with, from the file's own parse
-   * (`ts.getModeForUsageLocation`); both modes when the parse gives none
-   * (the text is in a comment or after the error).
-   */
-  modes: readonly ts.ResolutionMode[];
-}
-
-/**
- * What an unread file's raw text could contribute to a program if it were
- * read (C-39). `specifiers` is absent when the text could add or merge a
- * declaration that no spelled name reveals:
- * - the file is not provably a module (`provablyModule`): every top-level
- *   declaration of a script is global, and a global interface merge
- *   (`interface HTMLElementTagNameMap`, `interface Document`) changes types
- *   without spelling the reference's names;
- * - any `declare`, `global`, `namespace` or `module` token (a module reaches
- *   the global scope or another module only through these);
- * - any triple-slash directive (`/// <reference>`, `/// <amd-dependency>`);
- * - a JSX runtime pragma (`@jsxImportSource`, `@jsxRuntime`), which imports
- *   a runtime module without import text;
- * - any `\\u` escape, which a word scan cannot read;
- * - an `import`/`require` without a literal specifier.
- * Otherwise it lists every literal module specifier, with the modes to
- * resolve it in, and the runtime modules the options import implicitly
- * (the JSX runtime for a `.tsx`/`.jsx` file, `tslib` under `importHelpers`).
- */
-export function unreadFacts(
-  text: string,
-  path = "unread.ts",
-  options: ts.CompilerOptions = {},
-  impliedNodeFormat?: ts.ResolutionMode,
-): {
-  tokens: ReadonlySet<string>;
-  specifiers?: readonly UnreadSpecifier[];
-} {
-  const tokens = new Set(text.match(/[A-Za-z_$][\w$]*/g) ?? []);
-  if (
-    text.includes("\\u") ||
-    /\/\/\/\s*</.test(text) ||
-    /@jsx(?:ImportSource|Runtime)\b/i.test(text) ||
-    ["declare", "global", "namespace", "module"].some((name) =>
-      tokens.has(name),
-    )
-  )
-    return { tokens };
-  const source = unreadSource(text, path, options, impliedNodeFormat);
-  if (!provablyModule(source, text, options)) return { tokens };
-  const written = [
-    ...text.matchAll(
-      /(?:\bfrom|\bimport|\brequire\s*\(|\bimport\s*\()\s*(['"])([^'"\n]*)\1/g,
-    ),
-  ].map((match) => match[2]!);
-  const uses = (text.match(/\b(?:import|require)\b/g) ?? []).length;
-  if (written.length < uses) return { tokens };
-  const parsed = specifierModes(source, options);
-  const both: readonly ts.ResolutionMode[] = [
-    ts.ModuleKind.ESNext,
-    ts.ModuleKind.CommonJS,
-  ];
-  const specifiers: UnreadSpecifier[] = written.map((specifier) => ({
-    specifier,
-    modes: parsed.get(specifier) ?? both,
-  }));
-  // Imports the compiler adds from the options, with no text in the file.
-  if (
-    /\.[jt]sx$/.test(path) &&
-    (options.jsx === ts.JsxEmit.ReactJSX ||
-      options.jsx === ts.JsxEmit.ReactJSXDev ||
-      options.jsxImportSource !== undefined)
-  )
-    specifiers.push({
-      specifier: `${options.jsxImportSource ?? "react"}/${
-        options.jsx === ts.JsxEmit.ReactJSXDev
-          ? "jsx-dev-runtime"
-          : "jsx-runtime"
-      }`,
-      modes: both,
-    });
-  if (options.importHelpers)
-    specifiers.push({ specifier: "tslib", modes: both });
-  return { tokens, specifiers };
-}
-
-/**
- * The unread text as the compiler parses it for this program: with the
- * file's implied module format and the options' module detection.
- */
-function unreadSource(
-  text: string,
-  path: string,
-  options: ts.CompilerOptions,
-  impliedNodeFormat: ts.ResolutionMode,
-): ts.SourceFile {
-  const detect = (
-    ts as unknown as {
-      getSetExternalModuleIndicator(
-        options: ts.CompilerOptions,
-      ): (file: ts.SourceFile) => void;
-    }
-  ).getSetExternalModuleIndicator;
-  // Parent pointers: `ts.getModeForUsageLocation` walks up from the literal.
-  return ts.createSourceFile(
-    path,
-    text,
-    {
-      languageVersion: ts.ScriptTarget.Latest,
-      impliedNodeFormat,
-      setExternalModuleIndicator: detect(options),
-    },
-    true,
-  );
-}
-
-/** The resolution modes of each literal module specifier the parse found. */
-function specifierModes(
-  source: ts.SourceFile,
-  options: ts.CompilerOptions,
-): Map<string, ts.ResolutionMode[]> {
-  const modes = new Map<string, ts.ResolutionMode[]>();
-  const add = (literal: ts.Node | undefined) => {
-    if (!literal || !ts.isStringLiteralLike(literal)) return;
-    const mode = ts.getModeForUsageLocation(source, literal, options);
-    const list = modes.get(literal.text) ?? [];
-    if (!list.includes(mode)) list.push(mode);
-    modes.set(literal.text, list);
-  };
-  const visit = (node: ts.Node) => {
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node))
-      add(node.moduleSpecifier);
-    else if (ts.isExternalModuleReference(node)) add(node.expression);
-    else if (
-      ts.isCallExpression(node) &&
-      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
-        (ts.isIdentifier(node.expression) &&
-          node.expression.text === "require"))
-    )
-      add(node.arguments[0]);
-    else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument))
-      add(node.argument.literal);
-    ts.forEachChild(node, visit);
-  };
-  visit(source);
-  return modes;
-}
-
-/**
- * Whether a file is a module, not a script, as written (C-39), as the
- * compiler decides for this program. True when the options make the file a
- * module whatever its text (`moduleDetection: "force"`, or under `"auto"` a
- * format the extension or `package.json` `type` implies): a parse of empty
- * text with the same options and format is then a module. Under `"legacy"`
- * only syntax counts. Otherwise true when the parse of the text has a
- * top-level `import` or `export` statement that ends before the first parse
- * diagnostic: error recovery after that point cannot remove it, and any
- * `import` or `export` makes the whole file a module. A file whose module
- * syntax appears only after an error, or not at all, is not provably a
- * module. (A file that is a module only because it uses JSX under
- * `react-jsx` counts as a script: conservative.)
- */
-export function provablyModule(
-  source: ts.SourceFile,
-  text: string,
-  options: ts.CompilerOptions,
-): boolean {
-  const empty = ts.createSourceFile(source.fileName, "", {
-    languageVersion: ts.ScriptTarget.Latest,
-    impliedNodeFormat: source.impliedNodeFormat,
-    setExternalModuleIndicator: (
-      ts as unknown as {
-        getSetExternalModuleIndicator(
-          options: ts.CompilerOptions,
-        ): (file: ts.SourceFile) => void;
-      }
-    ).getSetExternalModuleIndicator(options),
-  });
-  if (ts.isExternalModule(empty)) return true;
-  const parsed = (
-    source as unknown as { parseDiagnostics?: readonly ts.Diagnostic[] }
-  ).parseDiagnostics;
-  const firstError = Math.min(
-    text.length,
-    ...(parsed ?? []).map((diagnostic) => diagnostic.start ?? 0),
-  );
-  return source.statements.some(
-    (statement) =>
-      statement.end <= firstError &&
-      (ts.isImportDeclaration(statement) ||
-        ts.isExportDeclaration(statement) ||
-        ts.isExportAssignment(statement) ||
-        (ts.isImportEqualsDeclaration(statement) &&
-          ts.isExternalModuleReference(statement.moduleReference)) ||
-        (ts.canHaveModifiers(statement) &&
-          !!ts
-            .getModifiers(statement)
-            ?.some(
-              (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
-            ))),
-  );
-}
-
 export function typescriptModule(
   hooks: TypeScriptModuleOptions = {},
 ): LanguageModule {
@@ -1160,7 +956,6 @@ export function typescriptModule(
     dependencyInputs: true,
     analyze(context) {
       const files = context.files.filter(readable);
-      const sourceTexts = new Map(files.map((file) => [file.path, file.text]));
       // Unchanged snapshot: stored facts came from a complete analysis of these
       // exact sources and contexts by this module version, so they are reused
       // without building a program. The core retries a failed file whose content
@@ -1550,7 +1345,6 @@ export function typescriptModule(
                 moduleKind: (target) => moduleKind(session, target),
                 anyFailed: unseen.size > 0,
                 failedNames,
-                unseenInert: (names) => unseenInert(session, names),
               },
               libraries,
             );
@@ -1671,65 +1465,6 @@ export function typescriptModule(
         for (const path of [...unseen].sort())
           for (const name of namesOf(path))
             failedNames.set(name, [...(failedNames.get(name) ?? []), path]);
-        // Whether the program's unread files are inert for a library target
-        // named by `names` (C-39, extract.ts `unseenInert`).
-        const inertFacts = new Map<
-          string,
-          {
-            tokens: ReadonlySet<string>;
-            specifiers?: readonly UnreadSpecifier[];
-          }
-        >();
-        const unseenInert = (
-          session: Session,
-          names: readonly string[],
-        ): boolean => {
-          for (const path of unseen) {
-            let facts = inertFacts.get(path);
-            if (!facts) {
-              try {
-                // The file's module format as the compiler determines it.
-                const format =
-                  session.program.getSourceFile(toVirtual(path))
-                    ?.impliedNodeFormat ??
-                  ts.getImpliedNodeFormatForFile(
-                    toVirtual(path),
-                    undefined,
-                    session.host,
-                    group.options,
-                  );
-                facts = unreadFacts(
-                  sourceTexts.get(path) ?? "",
-                  path,
-                  group.options,
-                  format,
-                );
-              } catch {
-                // What the text could contribute is unknown: withhold.
-                facts = { tokens: new Set() };
-              }
-              inertFacts.set(path, facts);
-            }
-            if (!facts.specifiers) return false;
-            if (names.some((name) => facts!.tokens.has(name))) return false;
-            const program = session.program;
-            for (const { specifier, modes } of facts.specifiers)
-              for (const mode of modes) {
-                const resolved = ts.resolveModuleName(
-                  specifier,
-                  toVirtual(path),
-                  group.options,
-                  session.host,
-                  undefined,
-                  undefined,
-                  mode,
-                ).resolvedModule?.resolvedFileName;
-                if (resolved !== undefined && !program.getSourceFile(resolved))
-                  return false;
-              }
-          }
-          return true;
-        };
         /** A file the compiler threw on while extracting: unseen from now on. */
         const markUnseen = (path: string) => {
           if (unseen.has(path)) return;
@@ -1908,7 +1643,6 @@ export function typescriptModule(
                   | undefined;
                 if (
                   data.reason === "invalid-code" ||
-                  data.unreadChecked === true ||
                   (outside?.length &&
                     outside.every(
                       (fact) =>

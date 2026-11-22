@@ -1,9 +1,8 @@
 {
  "counts": {
-  "library: same package, declaration name instead of binding spelling": 507,
-  "library: declaring package named instead of the importing package": 18,
+  "library: same package, declaration name instead of binding spelling": 181,
+  "library: declaring package named instead of the importing package": 6,
   "site removed": 18,
-  "now a candidate set": 5,
   "now unresolved (external-package)": 46
  },
  "examples": {
@@ -21,11 +20,6 @@
    "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:23 @repo/eslint-config: null => undefined",
    "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:9 config: null => undefined",
    "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:62 default: null => undefined"
-  ],
-  "now a candidate set": [
-   "vitest-dev/vitest test/unit/test/mock-internals.test.ts:745 timers.clearInterval: node:timers:clearInterval => dom:dom:clearInterval,node:globals:clearInterval",
-   "vitest-dev/vitest test/unit/test/timers-node-builtins.test.ts:61 setTimeout: node:timers:setTimeout => dom:dom:setTimeout,node:globals:setTimeout",
-   "vitest-dev/vitest test/unit/test/timers-node-builtins.test.ts:1903 timers.setTimeout: node:timers:setTimeout => dom:dom:setTimeout,node:globals:setTimeout"
   ],
   "now unresolved (external-package)": [
    "withastro/astro examples/blog/src/pages/rss.xml.js:9 getCollection: null => ",

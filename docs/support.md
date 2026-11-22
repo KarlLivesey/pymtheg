@@ -775,19 +775,11 @@ ts-jest `tsconfig`) names. A call on a member merged from several
 declarations of one receiver type links the declaration of the signature
 the checker selects, when no declaration from another body could also
 accept the arguments. A const assertion (`as const`, `<const>x`) stores no link.
-In a program that contains an unread (failed) file, an installed library
-target is kept when no unread file could change it (C-39). Every unread file
-must be provably a module as the compiler decides under the program's
-options: the options and the file's format make it one with no syntax
-(never under `"moduleDetection": "legacy"`), or its top-level `import` or
-`export` statement ends before its first parse error. It must also not
-spell a name of the reference, its receiver chain or the target's path, and
-must contain no `declare`, `global`, `namespace` or `module` token,
-triple-slash directive, JSX runtime pragma or `\u` escape. Finally, it must
-not import a module the program lacks. Each specifier, and each runtime
-module the options import implicitly, is resolved in the mode the compiler
-would use, or in both modes. An unread script or `.d.ts` without such
-module syntax withholds as before.
+A package-name `extends` whose base is reached through an installed
+workspace link is read (C-39). A base whose JSON has a syntax error keeps
+the missing-settings marker. A manifest range that the compiler's semver
+parser throws on is an unknown range: it identifies the registry dependency
+and never yields a version pin.
 
 - **Definite:** module imports; import and export bindings to the original
   declaration through barrels, `export *`, renames and default exports; CommonJS

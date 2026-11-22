@@ -310,16 +310,6 @@ const links = [
     target(API, "start", "method"),
     nth(API, "start", 1),
   ),
-  // A call to a name no program declares stays unresolved.
-  link(
-    API,
-    "calls",
-    "undeclaredControl",
-    { name: "format", kind: "function" },
-    null,
-    "undeclaredControl",
-  ),
-  // The unread src/broken.ts cannot change the standard String (C-39).
   link(
     API,
     "calls",
@@ -327,16 +317,6 @@ const links = [
     { name: "format", kind: "function" },
     null,
     "String",
-    {
-      libraries: [
-        {
-          ecosystem: "typescript-lib",
-          unit: "es",
-          symbol: "String",
-          evidence: "declared-builtin",
-        },
-      ],
-    },
   ),
   link(
     API,

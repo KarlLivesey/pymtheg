@@ -695,13 +695,13 @@
   ],
   "level2": [
    95780,
-   99377
+   95780
   ],
-  "likeForLikeLevel2": 99377,
+  "likeForLikeLevel2": 95780,
   "onlyMain": 124,
   "onlyCand": 0,
-  "changedDefinite": 343,
-  "newlyDefinite": 3602,
+  "changedDefinite": 0,
+  "newlyDefinite": 0,
   "symbolsOnlyMain": 0,
   "symbolsOnlyCand": 0,
   "ownerChanges": {},

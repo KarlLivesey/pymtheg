@@ -3111,42 +3111,17 @@ uses the importer's own conditions and workspace route. Invalid extracted
 source ranges fail the affected file through the compiler session's
 containment path. [C-32](changes/C-32.md)
 
-### C-39 Library targets beside an unread file; const assertions
+### C-39 Configs extended by package name; const assertions
 
-C-13 withheld every installed library target in a program that contains a
-failed file, because an unread file might declare something that changes the
-checker's answer. A script's top-level declarations are global, and a global
-interface merge (`interface HTMLElementTagNameMap`, `interface Document`)
-retypes values without spelling any name at the reference. A module's
-declarations are its own: it reaches the global scope or another module only
-through `declare global`, `declare module` or `export as namespace`. So the
-library target is kept only when every unread file in the program:
-
-- is provably a module as the compiler decides for this program: either the
-  options and the file's implied format make it one with no syntax (an
-  empty parse with `ts.getSetExternalModuleIndicator(options)` is a module;
-  never under `"moduleDetection": "legacy"`), or its parsed text has a
-  top-level `import` or `export` statement ending before the first parse
-  error;
-- spells none of the names involved (the reference, its receiver chain, the
-  target's path);
-- has no `declare`, `global`, `namespace` or `module` token, no triple-slash
-  directive, no JSX runtime pragma (`@jsxImportSource`, `@jsxRuntime`) and
-  no `\u` escape;
-- imports only modules the program already loads, each resolved in the mode
-  the compiler would use (both modes where the parse shows none), including
-  the runtime modules the options import with no text (the JSX runtime for
-  `.tsx`/`.jsx`, `tslib` under `importHelpers`).
-
-The existing taint checks still decide bindings and receivers that reach the
-unread file. Such a kept link carries no `no-unseen-declarations`
-assumption, because it has been checked. Not covered: a failed file that is
-a script or a `.d.ts` without module syntax before its error withholds as
-before, and so does a CommonJS file (`module.exports` spells `module`). A
-file whose text is not valid UTF-8 never joins the unread set (a known
-limit, as on main). A const assertion is not a reference and stores no link. A manifest range the
-compiler's semver parser throws on is an unknown range: it identifies the
-registry dependency and never yields a version pin.
+A package-name `extends` whose base is installed as a workspace link into
+the checkout is read like any other base: its settings are complete unless
+it is unreadable (6053/5083) or its JSON has syntax errors. A const
+assertion (`as const`, `<const>x`) is not a reference and stores no link. A
+manifest range the compiler's semver parser throws on is an unknown range:
+it identifies the registry dependency and never yields a version pin.
+Keeping a library target beside an unread file (item 4 of the change) was
+split out to C-51. Here, a program with an unread file withholds library
+targets as before (C-13).
 [C-39](changes/C-39.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
