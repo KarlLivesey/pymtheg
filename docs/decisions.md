@@ -2361,6 +2361,21 @@ wrong results in real shapes. Lesson recorded by the manager under D18 (13
 November 2026): measure a cheap, same-class fix on the corpus before asking for
 it.
 
+### D20: an import of a library module counts when it names the module
+
+**Decided (manager, 22 November 2026):** a link whose referent is a library
+module or package is complete when the graph names that module or package:
+a TypeScript `import … from "pkg"` module link or whole-module binding, a Go
+`import "pkg"`, a Rust whole-crate `use x;` or `extern crate x;`. Such
+library module links count at Level 2, as a separately counted part that
+every scoreboard shows beside proven and assumption-marked links. Headlines
+are given with and without them. **Why:** the owner's rule is that a link
+from project code into a library counts when the graph names the library and
+the symbol. For an import of a module, the module is the whole target, and
+there is no further symbol to name. **Rules out:** crediting a member link
+that names only its package (`vi.fn`, `screen.getByRole`): it has a symbol
+to name, and it stays Level 1.
+
 ### D19: coverage is judged with dependencies installed
 
 **Decided (Karl, 21 November 2026):** "we will assume in 99% of cases

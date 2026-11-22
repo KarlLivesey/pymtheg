@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { modules } from "./coverage-rules.mjs";
+import { libraryModuleLinks, modules } from "./coverage-rules.mjs";
 import { auditRange, baselineScore, compare, firstBlocker, itemRange, missGroups, pairedRepos, sampleSize, schema, score, seed, verifyModes, verifyReview } from "./coverage-refresh-data.mjs";
 
 const languageNames = { go: "Go", rust: "Rust", typescript: "TypeScript / JavaScript" };
@@ -29,8 +29,13 @@ export function scoreTable(modes, base, own = false) {
     const then = baselineScore(base.repos, module, own);
     const proven = { ...now, level2: now.level2 - now.assumed };
     const assumed = { ...now, level2: now.assumed };
+    // D20: library module links count at Level 2, shown as their own part.
+    const unit = { ...now, level2: libraryModuleLinks(repos, module, own) };
+    const withModules = { ...now, level2: now.level2 + unit.level2 };
     const split = now.assumed ? `<br>${number(proven.level2)} proven (${rate(proven)})<br>${number(assumed.level2)} assumption-marked (${rate(assumed)})` : "";
-    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gap(now)} |`;
+    const moduleCell = unit.level2 ? `<br>${number(unit.level2)} library module links (${rate(unit)})<br>**${number(withModules.level2)} (${rate(withModules)}) with library module links**` : "";
+    const gapCell = unit.level2 ? `${gap(now)}<br>${gap(withModules)} with library module links` : gap(now);
+    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split}${moduleCell} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gapCell} |`;
   };
   return [
     "| Language | Mode | Links now | Level 2 now | Level 2 at 0.1.0 | Links to 90% |",
@@ -153,7 +158,7 @@ export function runTables(modes) {
     ]), ""].join("\n");
 }
 
-export function renderPlan(input, base, pins, catalog, legacy) {
+export function renderPlan(input, base, pins, catalog, legacy, archiveName) {
   if (input.schema !== schema || !/^[a-f0-9]{40}$/.test(input.measuredCommit) || input.seed !== seed || input.sampleSize !== sampleSize) {
     throw Error("Invalid refresh archive");
   }
@@ -176,7 +181,7 @@ export function renderPlan(input, base, pins, catalog, legacy) {
   const replays = Map.groupBy(installed.filter(({ measuredCommit }) => measuredCommit), ({ measuredCommit }) => measuredCommit);
   const replayNotes = [...replays].map(([commit, rows]) =>
     `Installed attempts for ${rows.map(({ id }) => id).join(", ")} were measured later at ${inline(commit)}. The installed totals use these attempts where usable and keep the original measurements for the other pins.`);
-  const archive = replays.size ? "sw-5" : "sw-4";
+  const archive = archiveName ?? (replays.size ? "sw-5" : "sw-4");
   const changes = catalogChanges(input.modes, catalog, legacy);
   const typescriptPins = bare.filter(({ language }) => language === "typescript");
   const allFailed = typescriptPins.filter((repo) => repo.counts?.typescript.links === 0 && repo.failedModules?.typescript);
@@ -192,7 +197,8 @@ export function renderPlan(input, base, pins, catalog, legacy) {
     "# Coverage plan for 0.2.0", "", scoreTable(input.modes, base), "",
     ...zeroTypeScriptNote, "",
     "Each stored link counts under its source language in a finished graph, so Go files in a TypeScript pin count under Go and JavaScript counts with TypeScript.",
-    "Level 2 credits a resolved checkout target or a library unit with a named symbol. The gap is the number of additional Level 2 links required at the current link count.", "",
+    "Level 2 credits a resolved checkout target or a library unit with a named symbol. The gap is the number of additional Level 2 links required at the current link count.",
+    "Under D20, a link whose referent is a library module or package (an import of the module) is complete when it names the library unit. These library module links count at Level 2 and are shown as a separate part. Each figure is given with and without them. A member link that names only the package stays below Level 2.", "",
     `Measured main commit ${inline(input.measuredCommit)}. Each 0.1.0 entry uses the release's finished bare graphs. The earlier exporter inferred named library targets from the stored facts where it could.`,
     ...replayNotes,
     `[Current sweep and source audit](../evidence/${archive}/coverage-plan-input.json.gz) · [0.1.0 breakdown](../evidence/sw-3/breakdown.json.gz)`, "",

@@ -1,0 +1,3693 @@
+{
+ "seed": "pymtheg-sw6-2026",
+ "limit": 10,
+ "groups": [
+  {
+   "reason": "local",
+   "links": 43168,
+   "pins": {
+    "changesets/changesets": 132,
+    "colinhacks/zod": 1292,
+    "dexie/Dexie.js": 3229,
+    "excalidraw/excalidraw": 2112,
+    "honojs/hono": 2400,
+    "mermaid-js/mermaid": 772,
+    "nestjs/nest": 2336,
+    "oclif/core": 115,
+    "pingdotgg/t3code": 3317,
+    "pmndrs/zustand": 882,
+    "puppeteer/puppeteer": 467,
+    "react-hook-form/react-hook-form": 5249,
+    "reduxjs/redux-toolkit": 6503,
+    "trpc/trpc": 4004,
+    "vercel/turborepo": 1431,
+    "vitejs/vite": 735,
+    "vitest-dev/vitest": 4292,
+    "withastro/astro": 3605,
+    "yargs/yargs": 295
+   },
+   "kinds": {
+    "calls": 39205,
+    "references": 3854,
+    "extends": 13,
+    "imports": 63,
+    "exports": 33
+   },
+   "sites": [
+    {
+     "rank": "00000447b45274496e4244f46dd93f676f041254f52ed0a88c8ac6aa768a2766",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-codemod/__tests__/get-turbo-upgrade-command.test.ts",
+     "line": 722,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "useFixture",
+     "code": "const { root } = useFixture({ fixture: \"pnpm-catalog-default\" });"
+    },
+    {
+     "rank": "0001a595a4fd22bed9a33355106134342015071048b637286f16a7c51c2b64df",
+     "pin": "pingdotgg/t3code",
+     "file": "apps/web/src/localApi.test.ts",
+     "line": 714,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "api.persistence.removeSavedEnvironmentSecret",
+     "code": "await api.persistence.removeSavedEnvironmentSecret(EnvironmentId.make(\"environment-local\"));"
+    },
+    {
+     "rank": "000264aa986c1d6416939a622722e939462a39c18c42f3ab11460ae07ca9f988",
+     "pin": "withastro/astro",
+     "file": "packages/integrations/cloudflare/test/astro-env.test.ts",
+     "line": 101,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "$",
+     "code": "assert.equal($('#server').text().includes('4322'), true);"
+    },
+    {
+     "rank": "000366a5a038a9a3d3a8d221fe7f13a46eb53f73e799e5b5b0fcd90e515e98a3",
+     "pin": "trpc/trpc",
+     "file": "packages/tests/server/regression/issue-5034-input-with-index-signature.test.ts",
+     "line": 65,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "AppRouterInputs",
+     "code": "type Input = AppRouterInputs['inputWithIndexSignatureAndMiddleware'];"
+    },
+    {
+     "rank": "0005a6fe5bb81d53c06138b39f3cdc85033605ce53fb1edce600891d72f13b22",
+     "pin": "dexie/Dexie.js",
+     "file": "test/tests-live-query.js",
+     "line": 170,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "signal1.resolve",
+     "code": "signal1.resolve(result);"
+    },
+    {
+     "rank": "0006e484eab65b1ed9695a3c7fb8a3597b49bb1041972fddc22150f19b9b84b6",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-codemod/__tests__/migrate.test.ts",
+     "line": 653,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "useFixture",
+     "code": "const { root, readJson, readJsonOptional } = useFixture({"
+    },
+    {
+     "rank": "000788bf19296d89581e6b65e9fefbd442a227414fa055be4fdc885ea0011c56",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/client/client-mqtt.spec.ts",
+     "line": 567,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "subscription",
+     "code": "subscription('channel', Buffer.from(JSON.stringify(responseMessage)));"
+    },
+    {
+     "rank": "0008aad5110b2f2fa2aaad6dccf14a2269d9a98c9c7175f5fd1ea80609addecb",
+     "pin": "excalidraw/excalidraw",
+     "file": "packages/excalidraw/wysiwyg/textWysiwyg.tsx",
+     "line": 1000,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "actionDecreaseFontSize.keyTest",
+     "code": "} else if (actionDecreaseFontSize.keyTest(event)) {"
+    },
+    {
+     "rank": "000a70553a3b3268dd2c37eacf95dd31583bcd4976019d1088a8b335eae26dc5",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "packages/toolkit/src/query/tests/runtimeRecord.fuzz.test.ts",
+     "line": 216,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "api.util.invalidateTags",
+     "code": "store.dispatch(api.util.invalidateTags([{ type: 'T', id: arg }]))"
+    },
+    {
+     "rank": "000c35fa15c9dd28f8bd4d1f4871948676347b34b4f96618ca2330afe7b353ba",
+     "pin": "pingdotgg/t3code",
+     "file": "apps/web/src/components/ComposerPromptEditor.tsx",
+     "line": 1019,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "local"
+     ],
+     "target": "unregisterRight",
+     "code": "unregisterRight();"
+    }
+   ]
+  },
+  {
+   "reason": "(unit only)",
+   "links": 32617,
+   "pins": {
+    "changesets/changesets": 355,
+    "colinhacks/zod": 438,
+    "dexie/Dexie.js": 324,
+    "excalidraw/excalidraw": 958,
+    "honojs/hono": 202,
+    "mermaid-js/mermaid": 2378,
+    "nestjs/nest": 1863,
+    "oclif/core": 232,
+    "pingdotgg/t3code": 6016,
+    "pmndrs/zustand": 167,
+    "puppeteer/puppeteer": 749,
+    "react-hook-form/react-hook-form": 5103,
+    "reduxjs/redux-toolkit": 1119,
+    "trpc/trpc": 1975,
+    "vercel/turborepo": 2561,
+    "vitejs/vite": 1524,
+    "vitest-dev/vitest": 1611,
+    "withastro/astro": 4975,
+    "yargs/yargs": 67
+   },
+   "kinds": {
+    "imports": 24303,
+    "calls": 8266,
+    "references": 33,
+    "extends": 2,
+    "exports": 13
+   },
+   "sites": [
+    {
+     "rank": "00006788528ab0aa82399a8926d1a19a7fc08b6a4be486d21255817438caacbc",
+     "pin": "react-hook-form/react-hook-form",
+     "file": "src/__tests__/useForm/register.test.tsx",
+     "line": 1232,
+     "kind": "calls",
+     "outcome": "library",
+     "reasons": [],
+     "target": "screen.getByRole",
+     "unit": "@testing-library/react",
+     "code": "fireEvent.click(screen.getByRole('button'));"
+    },
+    {
+     "rank": "000851ececf31331a610b06a2280277c567d39ff0188d7c9f09e27a9ec33aeaf",
+     "pin": "pingdotgg/t3code",
+     "file": "apps/server/src/provider/Layers/CursorProvider.ts",
+     "line": 23,
+     "kind": "imports",
+     "outcome": "library",
+     "reasons": [],
+     "target": "effect/unstable/process",
+     "unit": "effect",
+     "code": "import { ChildProcess, ChildProcessSpawner } from \"effect/unstable/process\";"
+    },
+    {
+     "rank": "000874dd132f81627fd165a9fb082879740ce87514e350da354e25ffd91af98f",
+     "pin": "vercel/turborepo",
+     "file": "examples/with-mcp-servers/packages/mcp-file-reader/src/server.test.ts",
+     "line": 66,
+     "kind": "calls",
+     "outcome": "library",
+     "reasons": [],
+     "target": "assert.equal",
+     "unit": "assert/strict",
+     "code": "assert.equal(firstText(result), \"hello\");"
+    },
+    {
+     "rank": "0008f621334a6201516b3f2627818eae19624fac946e1271cd717a7970213a7f",
+     "pin": "excalidraw/excalidraw",
+     "file": "packages/excalidraw/components/TTDDialog/TTDDialogPanel.tsx",
+     "line": 3,
+     "kind": "imports",
+     "outcome": "library",
+     "reasons": [],
+     "target": "react",
+     "unit": "react",
+     "code": "import { Fragment } from \"react\";"
+    },
+    {
+     "rank": "000c09a24cfe8ee1210cf8506ec487572014a8f203a9962a95d32713e5e4ff5f",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/rendering-util/layout-algorithms/grid/edgeLabels.spec.ts",
+     "line": 928,
+     "kind": "calls",
+     "outcome": "library",
+     "reasons": [],
+     "target": "it.each",
+     "unit": "vitest",
+     "code": "it.each(['horizontal', 'vertical'] as const)("
+    },
+    {
+     "rank": "000cca4226e53d5feb2ef12191ac66c74e26fe567bb8b33483ce720bd159e2c5",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/fixtures/custom-pool-sync-transport/pool/sync-transport-pool.ts",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "library",
+     "reasons": [],
+     "target": "node:url",
+     "unit": "url",
+     "code": "import { fileURLToPath } from 'node:url'"
+    },
+    {
+     "rank": "000d5ba3f718dc8aa943f8aaa98aa9fdb4f49345137ab4b724c962c8e87f3163",
+     "pin": "react-hook-form/react-hook-form",
+     "file": "src/__tests__/useWatch.test.tsx",
+     "line": 808,
+     "kind": "calls",
+     "outcome": "library",
+     "reasons": [],
+     "target": "fireEvent.submit",
+     "unit": "@testing-library/react",
+     "code": "fireEvent.submit(screen.getByRole('button', { name: /submit/i }));"
+    },
+    {
+     "rank": "00109687142a5e8a647f6438ab187d581e10fd79a7bd52390157524a0db5e551",
+     "pin": "react-hook-form/react-hook-form",
+     "file": "src/__tests__/useWatch.test.tsx",
+     "line": 857,
+     "kind": "calls",
+     "outcome": "library",
+     "reasons": [],
+     "target": "screen.getAllByRole",
+     "unit": "@testing-library/react",
+     "code": "fireEvent.change(screen.getAllByRole('textbox')[1], {"
+    },
+    {
+     "rank": "0014eb5a0dfbad598b98f4393a0e7b47b9fdb991bb09d6164665ccc062f80bd5",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "packages/toolkit/src/query/tests/buildHooks.test.tsx",
+     "line": 1961,
+     "kind": "calls",
+     "outcome": "library",
+     "reasons": [],
+     "target": "fireEvent.click",
+     "unit": "@testing-library/react",
+     "code": "fireEvent.click(fetchButton)"
+    },
+    {
+     "rank": "001b8d744df85aaab1e3c1f0d546ae2ccc2fb61722ea2cc11b8d87753558f6f7",
+     "pin": "react-hook-form/react-hook-form",
+     "file": "src/__tests__/performance.test.tsx",
+     "line": 805,
+     "kind": "calls",
+     "outcome": "library",
+     "reasons": [],
+     "target": "screen.getByTestId",
+     "unit": "@testing-library/react",
+     "code": "expect(screen.getByTestId('watched')).toHaveTextContent('{\"b\":\"b\"}');"
+    }
+   ]
+  },
+  {
+   "reason": "no-symbol",
+   "links": 29609,
+   "pins": {
+    "changesets/changesets": 161,
+    "colinhacks/zod": 102,
+    "dexie/Dexie.js": 5495,
+    "excalidraw/excalidraw": 193,
+    "honojs/hono": 711,
+    "mermaid-js/mermaid": 3110,
+    "nestjs/nest": 2342,
+    "oclif/core": 100,
+    "pingdotgg/t3code": 1535,
+    "pmndrs/zustand": 93,
+    "puppeteer/puppeteer": 7532,
+    "react-hook-form/react-hook-form": 249,
+    "reduxjs/redux-toolkit": 702,
+    "trpc/trpc": 1000,
+    "vercel/turborepo": 1139,
+    "vitejs/vite": 841,
+    "vitest-dev/vitest": 723,
+    "withastro/astro": 238,
+    "yargs/yargs": 3343
+   },
+   "kinds": {
+    "calls": 29264,
+    "extends": 319,
+    "references": 19,
+    "exports": 7
+   },
+   "sites": [
+    {
+     "rank": "0005fa29f74f2edf88b1c9680592e9a4b6c0b80e86c8925b0170ebb7b41fd130",
+     "pin": "nestjs/nest",
+     "file": "integration/query-method/e2e/query-method-fastify.spec.ts",
+     "line": 92,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "(expression).toEqual",
+     "code": "expect(response.json()).toEqual({ handledBy: 'RejectFilter' });"
+    },
+    {
+     "rank": "00073838a0be6559128ea0bd725398dbbc743948ee8d9e97bb61adb7a16d7761",
+     "pin": "yargs/yargs",
+     "file": "test/usage.mjs",
+     "line": 3635,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "(expression).group",
+     "code": ".group('batman', 'Heroes:')"
+    },
+    {
+     "rank": "000947fc31a6698bc3c0c3966c15fe7f3613672ef3514d7268e90ee673a10993",
+     "pin": "puppeteer/puppeteer",
+     "file": "test/src/page.test.ts",
+     "line": 2359,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "page.evaluate",
+     "code": "const intervalCounter = await page.evaluate(() => {"
+    },
+    {
+     "rank": "000baf3cd83a11b64ef4681d7276d729ae701eacce8acc0722cf7cf1da63acd1",
+     "pin": "puppeteer/puppeteer",
+     "file": "test/src/autofill.test.ts",
+     "line": 41,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "page.waitForSelector",
+     "code": "using name = await page.waitForSelector('#name');"
+    },
+    {
+     "rank": "000cf2ef1726d3e62df5e834d7dd478af7f7199f35e583f407cfad32c983e27c",
+     "pin": "puppeteer/puppeteer",
+     "file": "test/src/acceptInsecureCerts.test.ts",
+     "line": 61,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "page.goto",
+     "code": "page.goto(httpsServer.PREFIX + '/plzredirect'),"
+    },
+    {
+     "rank": "000f155874e655f1ede18906dbb7f15e6066e7caf61579bc6d0f8d35e8bc9dee",
+     "pin": "puppeteer/puppeteer",
+     "file": "test/src/network.test.ts",
+     "line": 1089,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "page.goto",
+     "code": "await page.goto(server.EMPTY_PAGE);"
+    },
+    {
+     "rank": "00105ab300f915048b33119c08d2ec4a40c5eb4c0dce1772b684683eedf8cb0d",
+     "pin": "dexie/Dexie.js",
+     "file": "test/typings-test/test-typings.ts",
+     "line": 134,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "db.friends.get",
+     "code": "db.friends.get(1).then(friend => friend && friend.address.city);"
+    },
+    {
+     "rank": "001131a2f089d49b007c5feac16139414077cb7f22bc6cd49e8f44ef461430b6",
+     "pin": "honojs/hono",
+     "file": "src/utils/mount.test.ts",
+     "line": 27,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "(expression)",
+     "code": "it.each(["
+    },
+    {
+     "rank": "0012518d29efc716eae7f28da7542a510ba6ba97e920f0d780e883a6ba7e5877",
+     "pin": "dexie/Dexie.js",
+     "file": "test/tests-idb30.js",
+     "line": 61,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "db.items.bulkAdd",
+     "code": "const ids = yield db.items.bulkAdd(["
+    },
+    {
+     "rank": "0014345a5332fb3d18cba6cb0f99abc44bdb6fe5255a7098798fce93024e5571",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/test/override.test.ts",
+     "line": 137,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "no-symbol"
+     ],
+     "target": "(expression)",
+     "code": "describe.each(['--inspect', '--inspect-brk'])('correctly parses %s flags', (inspectFlagName) => {"
+    }
+   ]
+  },
+  {
+   "reason": "external",
+   "links": 20954,
+   "pins": {
+    "changesets/changesets": 157,
+    "colinhacks/zod": 174,
+    "dexie/Dexie.js": 35,
+    "excalidraw/excalidraw": 917,
+    "honojs/hono": 301,
+    "mermaid-js/mermaid": 953,
+    "nestjs/nest": 605,
+    "oclif/core": 11,
+    "pingdotgg/t3code": 1218,
+    "pmndrs/zustand": 9,
+    "puppeteer/puppeteer": 1062,
+    "react-hook-form/react-hook-form": 297,
+    "reduxjs/redux-toolkit": 323,
+    "trpc/trpc": 671,
+    "vercel/turborepo": 4026,
+    "vitejs/vite": 3826,
+    "vitest-dev/vitest": 5006,
+    "withastro/astro": 1343,
+    "yargs/yargs": 20
+   },
+   "kinds": {
+    "imports": 1546,
+    "references": 3858,
+    "calls": 15511,
+    "exports": 19,
+    "extends": 20
+   },
+   "sites": [
+    {
+     "rank": "000041b0ee002b144b8b25104ea28429b60f82cd77821d50db3a5a5fbd6a6edd",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-gen/scripts/embed-templates.mjs",
+     "line": 76,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "lines.push",
+     "code": "lines.push(\"      {\");"
+    },
+    {
+     "rank": "0004d8f1ddec7b696e89a106b056c2614e0418b55a36db37a17c0041b2f49b25",
+     "pin": "vitest-dev/vitest",
+     "file": "test/unit/test/happy-dom.test.ts",
+     "line": 79,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "Object.defineProperty",
+     "code": "Object.defineProperty(window, '__property_dom', {"
+    },
+    {
+     "rank": "000984fb805166ac006a96ad7fc372bb5a92d8bea04b662296519b123986ce93",
+     "pin": "vercel/turborepo",
+     "file": "scripts/package-standalone-archives.mjs",
+     "line": 92,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "process.argv.slice",
+     "code": "] = process.argv.slice(2);"
+    },
+    {
+     "rank": "000c5aec02b3e808f38b5110d6c7c3b4881db215d9cb8e0b9f2c7c3aec5fa8d9",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/fixtures/vm-threads/import-external-css-assets.test.js",
+     "line": 19,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "window.getComputedStyle",
+     "code": "expect(window.getComputedStyle(el).color).toBe('rgb(0, 0, 0)')"
+    },
+    {
+     "rank": "00100f7e2dcba3e96db7cd291c0967599c959a8174996af20b495f93423d2e37",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/test/related-deps.test.ts",
+     "line": 1567,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "modules.map",
+     "code": ".map((testModule) => [testModule.relativeModuleId, testModule.state()])"
+    },
+    {
+     "rank": "0010d2491936dbb5a7dd2efe561ae23f29dec4d1570e4c3a544a09efb8d7e815",
+     "pin": "vercel/turborepo",
+     "file": "apps/factory/tests/factory-image-ledger.test.mjs",
+     "line": 72,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "(expression).map",
+     "code": "activeFactoryImageBuilds(second.state).map((build) => build.id),"
+    },
+    {
+     "rank": "00112b12e293b12aedf786bb3b8afb353054389a57efd71767a6eaf5df74d248",
+     "pin": "vitejs/vite",
+     "file": "packages/vite/src/node/__tests__/http.spec.ts",
+     "line": 147,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "(expression).toStrictEqual",
+     "code": "expect(address).toStrictEqual("
+    },
+    {
+     "rank": "00150e94ae48c82393507f4eb3e71089627969105c4bc1e2f7d8d251f88dd100",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/expect/rollup.config.js",
+     "line": 53,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "(expression).includes",
+     "code": "if (['EMPTY_BUNDLE', 'CIRCULAR_DEPENDENCY'].includes(message.code)) {"
+    },
+    {
+     "rank": "00167454f9e0deb30c407c4a76261d85656313d137e035530da65ba5b71f22d2",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/frameworks/next-invoke/lib/api/typed/url.ts",
+     "line": 13,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "String",
+     "code": "const value = String(params[key] ?? '');"
+    },
+    {
+     "rank": "001b58aa64598fbd3c6feee1f9999ec5e91e7686ae532fd32e41e049802c805a",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-frameworks/tests/mock_oracle/oracle.mjs",
+     "line": 827,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external"
+     ],
+     "target": "cases.map",
+     "code": "const slots = Math.max(...cases.map((c) => c.sources.length));"
+    }
+   ]
+  },
+  {
+   "reason": "(candidate set)",
+   "links": 19157,
+   "pins": {
+    "changesets/changesets": 2,
+    "colinhacks/zod": 1813,
+    "dexie/Dexie.js": 789,
+    "excalidraw/excalidraw": 1369,
+    "honojs/hono": 2146,
+    "mermaid-js/mermaid": 489,
+    "nestjs/nest": 661,
+    "oclif/core": 215,
+    "pingdotgg/t3code": 1654,
+    "pmndrs/zustand": 19,
+    "puppeteer/puppeteer": 742,
+    "react-hook-form/react-hook-form": 134,
+    "reduxjs/redux-toolkit": 522,
+    "trpc/trpc": 1715,
+    "vercel/turborepo": 285,
+    "vitejs/vite": 398,
+    "vitest-dev/vitest": 879,
+    "withastro/astro": 5221,
+    "yargs/yargs": 104
+   },
+   "kinds": {
+    "calls": 11520,
+    "references": 5559,
+    "imports": 1783,
+    "exports": 45,
+    "extends": 247,
+    "implements": 3
+   },
+   "sites": [
+    {
+     "rank": "0001151882ee67d74071fff9be21cfc1bbb21c359decd92b4864221a783a3558",
+     "pin": "vitejs/vite",
+     "file": "packages/vite/src/shared/moduleRunnerTransport.ts",
+     "line": 267,
+     "kind": "references",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "WebSocket",
+     "code": "createConnection: () => WebSocket"
+    },
+    {
+     "rank": "00029c7b9c60ba0506d8db2bcd758092308165510f1cb745a50d4bdc63d36a39",
+     "pin": "withastro/astro",
+     "file": "packages/astro/astro-jsx.d.ts",
+     "line": 1465,
+     "kind": "references",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "HTMLAttributes",
+     "code": "noscript: HTMLAttributes;"
+    },
+    {
+     "rank": "00038510389d47f954a2cccb1ffc13130926087c0d5855fbf137a3f89721b355",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/docs/.vitepress/siteUrl.ts",
+     "line": 25,
+     "kind": "calls",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "URL",
+     "code": "env.DOCS_HOSTNAME?.length ? env.DOCS_HOSTNAME : new URL(getSiteUrl(env)).hostname;"
+    },
+    {
+     "rank": "000669a334479441b6f707fdff479da6f02ff2019588bbccd1251447c76b3706",
+     "pin": "pingdotgg/t3code",
+     "file": "apps/server/src/provider/Layers/ProviderService.test.ts",
+     "line": 14,
+     "kind": "imports",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "ApprovalRequestId",
+     "code": "ApprovalRequestId,"
+    },
+    {
+     "rank": "000892e82a83785514b7f96e04f33655529af3e14b364e76c802c1ad4da73164",
+     "pin": "puppeteer/puppeteer",
+     "file": "test/src/cdp/webmcp.test.ts",
+     "line": 750,
+     "kind": "calls",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "AbortController",
+     "code": "const controller = new AbortController();"
+    },
+    {
+     "rank": "0008a5b0f6f0eb7ad5c87dbcaf77da0e04958d43f69479487904f39e30a90107",
+     "pin": "colinhacks/zod",
+     "file": "packages/zod/src/v4/core/schemas.ts",
+     "line": 4624,
+     "kind": "references",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "$ZodType",
+     "code": "export interface $ZodReadonlyDef<T extends SomeType = $ZodType> extends $ZodTypeDef {"
+    },
+    {
+     "rank": "000a0f306c0a6eaaf4f62838fee6c003cc8637eb9373b72abee36d2004458fa5",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/rendering-util/layout-algorithms/swimlanes/16-intake-cycle-lr.ddlt.spec.ts",
+     "line": 33,
+     "kind": "calls",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "console.log",
+     "code": "console.log("
+    },
+    {
+     "rank": "000c35ce027389ec7527a31f2ff76db52656c4749dff182bf5550608f3d580c3",
+     "pin": "honojs/hono",
+     "file": "src/middleware/body-limit/index.ts",
+     "line": 12,
+     "kind": "references",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "Response",
+     "code": "type OnError = (c: Context) => Response | Promise<Response>"
+    },
+    {
+     "rank": "0010926c1a68e59ef58fc4ebf180cf1ec32030c49a38bb024a69ebe3ed594677",
+     "pin": "withastro/astro",
+     "file": "scripts/turbo-run-affected.js",
+     "line": 68,
+     "kind": "calls",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "console.info",
+     "code": "console.info('[turbo-run-affected] command:', pnpmCommand, commandArgs.join(' '));"
+    },
+    {
+     "rank": "00113628f889fa47532370dfdfd9a648dd8e903da304085befa441fbd211c17d",
+     "pin": "withastro/astro",
+     "file": "packages/astro/src/core/i18n/handler.ts",
+     "line": 88,
+     "kind": "references",
+     "outcome": "ambiguous",
+     "reasons": [],
+     "target": "Response",
+     "code": "): Promise<Response> {"
+    }
+   ]
+  },
+  {
+   "reason": "incomplete-config",
+   "links": 17225,
+   "pins": {
+    "excalidraw/excalidraw": 34,
+    "reduxjs/redux-toolkit": 1167,
+    "trpc/trpc": 62,
+    "vercel/turborepo": 14626,
+    "vitejs/vite": 15,
+    "withastro/astro": 1321
+   },
+   "kinds": {
+    "imports": 4766,
+    "references": 1789,
+    "calls": 10441,
+    "exports": 204,
+    "extends": 25
+   },
+   "sites": [
+    {
+     "rank": "000ddeed77b20056a46a550d61a8599d376b93b3da9046400d7c5fb362ce3dd8",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-workspaces/__tests__/index.test.ts",
+     "line": 286,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config",
+      "external"
+     ],
+     "target": "(expression).toHaveBeenCalled",
+     "code": "expect(mockedGetAvailablePackageManagers).toHaveBeenCalled();"
+    },
+    {
+     "rank": "0012b0df6ae4d188d3d4dbb5bfbf8231c4be606d400cd485fb3b7bd3474836aa",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-utils/src/create-project.ts",
+     "line": 12,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config"
+     ],
+     "target": "RepoInfo",
+     "code": "type RepoInfo"
+    },
+    {
+     "rank": "0012c3e29a5047ebbaf75b60fa63032e1311f572c1d3d353ca1fca11517c4ef1",
+     "pin": "vercel/turborepo",
+     "file": "packages/create-turbo/__tests__/index.test.ts",
+     "line": 362,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config",
+      "external"
+     ],
+     "target": "Buffer.from",
+     "code": "stderr: Buffer.from(\"\"),"
+    },
+    {
+     "rank": "00160f511692ed8cba68b3c2da0ccc50e5b9d92dbb64e1b9f0580fbcd83c9499",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-utils/__tests__/examples.test.ts",
+     "line": 506,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config",
+      "external"
+     ],
+     "target": "jest.mocked",
+     "code": "const callArgs = jest.mocked(global.fetch).mock.calls[0] as ["
+    },
+    {
+     "rank": "001bec06a8002f3a59328cc8828df817082f3cc9b6d44b4d43ce138cd8afae6b",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-workspaces/src/managers/pnpm.ts",
+     "line": 249,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config",
+      "external"
+     ],
+     "target": "execa",
+     "code": "await execa(PACKAGE_MANAGER_DETAILS.name, [\"import\"], {"
+    },
+    {
+     "rank": "001c899c563e0beff14b84739c47e36efa130d21d74a813a874b808f554d93a6",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-telemetry/src/events/create-turbo.ts",
+     "line": 48,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config"
+     ],
+     "target": "this.trackCliOption",
+     "code": "return this.trackCliOption({"
+    },
+    {
+     "rank": "001d8ef1de0355f2bffecdf7e2bc6e41a987f6fe870d411e90aef97c6321a674",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-ignore/__tests__/get-workspace.test.ts",
+     "line": 21,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config",
+      "external"
+     ],
+     "target": "it",
+     "code": "it(\"getWorkspace returns workspace from package.json\", () => {"
+    },
+    {
+     "rank": "001f3e61b5c1508027df90a23991edcf301dfe9d40ce4ff5862c84ca58b90947",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-codemod/src/commands/migrate/index.ts",
+     "line": 7,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config"
+     ],
+     "target": "../../utils/check-git-status",
+     "code": "import { checkGitStatus } from \"../../utils/check-git-status\";"
+    },
+    {
+     "rank": "001f90f4c5ce43584485aa30b8e68a1ea6e7a11d5480e219dd399f47589490ad",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-utils/__tests__/examples.test.ts",
+     "line": 611,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config",
+      "external"
+     ],
+     "target": "Date.now",
+     "code": "const root = join(tmpdir(), `turbo-test-download-${Date.now()}`);"
+    },
+    {
+     "rank": "0024d4e1322f975f045c11058daa25c84ca16f7be672c91f94fba3f2825deb96",
+     "pin": "vercel/turborepo",
+     "file": "packages/turbo-utils/__tests__/examples.test.ts",
+     "line": 1199,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "incomplete-config",
+      "external"
+     ],
+     "target": "Uint8Array",
+     "code": "const body = new ReadableStream<Uint8Array>({"
+    }
+   ]
+  },
+  {
+   "reason": "any-receiver",
+   "links": 15999,
+   "pins": {
+    "changesets/changesets": 35,
+    "colinhacks/zod": 226,
+    "dexie/Dexie.js": 1863,
+    "excalidraw/excalidraw": 278,
+    "honojs/hono": 217,
+    "mermaid-js/mermaid": 3807,
+    "nestjs/nest": 1548,
+    "oclif/core": 20,
+    "pingdotgg/t3code": 30,
+    "pmndrs/zustand": 24,
+    "puppeteer/puppeteer": 922,
+    "react-hook-form/react-hook-form": 66,
+    "reduxjs/redux-toolkit": 415,
+    "trpc/trpc": 85,
+    "vercel/turborepo": 2678,
+    "vitejs/vite": 459,
+    "vitest-dev/vitest": 474,
+    "withastro/astro": 1021,
+    "yargs/yargs": 1831
+   },
+   "kinds": {
+    "calls": 15999
+   },
+   "sites": [
+    {
+     "rank": "000ed69016309c00949357ba1a100b26537089545996886a94c3d66738b8e298",
+     "pin": "yargs/yargs",
+     "file": "test/command.mjs",
+     "line": 1718,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "argv.foo.should.equal",
+     "code": "argv.foo.should.equal('bar');"
+    },
+    {
+     "rank": "0010acf89e0228fc846c7a2ae9b7b8ceb0d5a0fc8a5ee4a78e92ab747dbd439f",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/next-build/lab/dot-next/server/chunks/ssr/[root-of-the-server]__0bd35xs_0iwia._.js",
+     "line": 1,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "k.toLowerCase",
+     "code": ")]||(k=f>=d.pb?\"PB\":f>=d.tb?\"TB\":f>=d.gb?\"GB\":f>=d.mb?\"MB\":f>=d.kb?\"KB\":\"B\");var l=(a/d[k.toLowerCase()]).toFixed(i);return j||(l=l.replace(c,\"$1\")),g&&(l=l.split(\".\").map(function(a,c){return 0===c?a"
+    },
+    {
+     "rank": "001b061373abf8aa5607cbdd498585b97cb3b03daa09ffbd0842a25c83e31c32",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "packages/rtk-codemods/transforms/createSliceBuilder/__testfixtures__/basic.output.js",
+     "line": 49,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "builder.addCase",
+     "code": "builder.addCase(todoAdded1d, (state, action) => {"
+    },
+    {
+     "rank": "002576c95f3a328c5dae3dd663542398631d0e7c536fa56d58d0964bf5569874",
+     "pin": "yargs/yargs",
+     "file": "example/nested.mjs",
+     "line": 6,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "yargs.command",
+     "code": ".command("
+    },
+    {
+     "rank": "00343c28d1df35cd86d5c01b66460b93d5711336f3563619f0dd0c60a05e0dc5",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/diagrams/sequence/svgDraw.js",
+     "line": 962,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "(expression).attr",
+     "code": ".attr('y2', 2000)"
+    },
+    {
+     "rank": "0040acb5dcd5f05f60835e4346b9b87b327b930dfc475f83e4567d4d5a6c3934",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/next-build/lab/dot-next/server/chunks/ssr/[root-of-the-server]__1wqnrhdhi76_9._.js",
+     "line": 1,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "a.n",
+     "code": "ldren:d.report})]})}a.s([\"default\",0,d,\"dynamic\",0,\"force-dynamic\"])},48772,function(a){a.n(a.i(65223))},14465,(a,b,c)=>{(()=>{\"use strict\";var a={86:a=>{a.exports=function(a,b){return\"string\"==typeof"
+    },
+    {
+     "rank": "0040b249dfed9cdd2c137b684257ccee941fea5600812eba3163264d1823fd6c",
+     "pin": "yargs/yargs",
+     "file": "test/usage.mjs",
+     "line": 847,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "r.should.have.property",
+     "code": "r.should.have.property('result');"
+    },
+    {
+     "rank": "00476c6929a841439ae22396ad4e9bc263b7cb5eca0ce687eb0be0732c46be7c",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/xfile_oracle/gen.mjs",
+     "line": 998,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "p.pick",
+     "code": "s.fn('touch', 'o', p.pick([`o.name = ${V(c)};`, `Object.assign(o, { name: ${V(c)} });`, \"o.name += '2';\"]));"
+    },
+    {
+     "rank": "00495a6de2931657463f7581069727ef545fd724371c17d033bf6355f2f7b57f",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/xfile_oracle/gen.mjs",
+     "line": 1318,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "h.fn",
+     "code": "h.fn('boot', 'name', [\"const m = require('./plugins/' + name);\", `return ${call('m', \"'./mods/c'\")};`]);"
+    },
+    {
+     "rank": "004baf7ab38a0fd7f0519024d208a86f4fe105777d6341b706181b6fea225fb5",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "examples/publish-ci/vite/tests/playwright/rtkq.test.ts",
+     "line": 13,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "any-receiver"
+     ],
+     "target": "page.getByTestId",
+     "code": "const counterStatus = page.getByTestId('counter-status')"
+    }
+   ]
+  },
+  {
+   "reason": "workspace-entry-unavailable",
+   "links": 10380,
+   "pins": {
+    "changesets/changesets": 792,
+    "colinhacks/zod": 259,
+    "dexie/Dexie.js": 871,
+    "excalidraw/excalidraw": 3,
+    "nestjs/nest": 29,
+    "trpc/trpc": 818,
+    "vercel/turborepo": 43,
+    "vitejs/vite": 700,
+    "vitest-dev/vitest": 6865
+   },
+   "kinds": {
+    "imports": 2928,
+    "calls": 6820,
+    "references": 611,
+    "exports": 10,
+    "extends": 10,
+    "implements": 1
+   },
+   "sites": [
+    {
+     "rank": "0001405acd1e5eb6ece92c0319c67a953cc47a96043752f5df0a88d77da064f8",
+     "pin": "vitest-dev/vitest",
+     "file": "test/browser/fixtures/expect-dom/toHaveStyle.test.ts",
+     "line": 208,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "expect",
+     "code": "expect(container.querySelector('.label')).not.toHaveStyle({"
+    },
+    {
+     "rank": "00049914f12886dc8f909001a2d3fc9e62ae8f3bf43d675e347662b69e0d4621",
+     "pin": "vitest-dev/vitest",
+     "file": "test/browser/fixtures/expect-dom/toHaveTextContent.test.ts",
+     "line": 101,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "(expression).toHaveTextContent",
+     "code": "expect(container.querySelector('span')).not.toHaveTextContent()"
+    },
+    {
+     "rank": "0007fe8e7a99cd37154a3847d93c678842de501de826ddddcd66147ef666ffa0",
+     "pin": "changesets/changesets",
+     "file": "packages/pre/src/index.ts",
+     "line": 61,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "PreState",
+     "code": "const preState: PreState | undefined = await readPreState(packages.rootDir);"
+    },
+    {
+     "rank": "001b84521d10fd54ce8fb3fd9035726556cb91ec9e06c61921070e80dd1e72f3",
+     "pin": "vitest-dev/vitest",
+     "file": "test/browser/specs/prewarm.test.ts",
+     "line": 125,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "expect",
+     "code": "expect(result.stderr).toBe('')"
+    },
+    {
+     "rank": "002bf98c13c4c51866b4769722f7a2c8887b797c45cf0ec8a94858c21c7f134e",
+     "pin": "vitest-dev/vitest",
+     "file": "test/browser/specs/heartbeat.test.ts",
+     "line": 112,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "test",
+     "code": "test('warns when VITEST_BROWSER_HEARTBEAT_INTERVAL is not a number and uses the default', async () => {"
+    },
+    {
+     "rank": "0030f10d7913acc92ed39f3394ef90453022862c9917b0ecf28d086b56eef823",
+     "pin": "vitest-dev/vitest",
+     "file": "test/browser/test/iframe.test.ts",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "expect",
+     "code": "import { expect, test } from 'vitest'"
+    },
+    {
+     "rank": "0032315ebce8338dd752ff5a773b65a400c4963fd187dcc430e0423e8ec3cff7",
+     "pin": "changesets/changesets",
+     "file": "packages/parse/src/index.ts",
+     "line": 8,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "VersionType",
+     "code": "const validVersionTypes: readonly VersionType[] = ["
+    },
+    {
+     "rank": "0044d7bd64fdc58a4d1aeb2a9a5b512a540aae8c5847317eb2b787c6219d226b",
+     "pin": "changesets/changesets",
+     "file": "packages/cli/src/commands/publish-plan/__tests__/getPublishPlan.test.ts",
+     "line": 61,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "readConfig",
+     "code": "const config = await readConfig(cwd);"
+    },
+    {
+     "rank": "00453c8f384bf8612f66f562a3cf69ec3292aa8c796ab154639f874146cc10e5",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/snapshots/fixtures/test-update/inline-concurrent.test.js",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "it",
+     "code": "import { it } from 'vitest'"
+    },
+    {
+     "rank": "004c6cb7d6cfa4657c3da7f362d17f8a54cd39ef1ef6e00c143f82c1719256de",
+     "pin": "vitest-dev/vitest",
+     "file": "test/browser/fixtures/expect-dom/toHaveRole.test.ts",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-entry-unavailable"
+     ],
+     "target": "expect",
+     "code": "import { describe, expect, it } from 'vitest'"
+    }
+   ]
+  },
+  {
+   "reason": "external-package",
+   "links": 6332,
+   "pins": {
+    "colinhacks/zod": 13,
+    "dexie/Dexie.js": 3149,
+    "excalidraw/excalidraw": 33,
+    "honojs/hono": 12,
+    "mermaid-js/mermaid": 278,
+    "nestjs/nest": 58,
+    "pingdotgg/t3code": 1,
+    "pmndrs/zustand": 13,
+    "puppeteer/puppeteer": 55,
+    "react-hook-form/react-hook-form": 516,
+    "reduxjs/redux-toolkit": 341,
+    "trpc/trpc": 258,
+    "vercel/turborepo": 984,
+    "vitejs/vite": 247,
+    "vitest-dev/vitest": 175,
+    "withastro/astro": 199
+   },
+   "kinds": {
+    "imports": 2342,
+    "calls": 3874,
+    "references": 82,
+    "extends": 1,
+    "exports": 33
+   },
+   "sites": [
+    {
+     "rank": "000dd6d438e5c6a6f1fc310462988885a79397efc0dbc08b537ac4b1778dc9ac",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/fixtures/conditions-projects/project-a/basic.test.js",
+     "line": 8,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "test-dep-conditions/indirect",
+     "code": "import indirect from \"test-dep-conditions/indirect\";"
+    },
+    {
+     "rank": "001004bad0ff8bf13e570fb7473eb6ddc30a6d52ab34cf293baa96f3dc9005f2",
+     "pin": "trpc/trpc",
+     "file": "examples/next-prisma-starter/src/pages/index.tsx",
+     "line": 24,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "@shared/ui/components/field",
+     "code": "} from '@shared/ui/components/field';"
+    },
+    {
+     "rank": "001608b5783db2186f332a3ced4a215f49ea9800565b0ac68f264c51788e63c9",
+     "pin": "dexie/Dexie.js",
+     "file": "test/tests-whereclause.js",
+     "line": 142,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "ok",
+     "code": "ok(result.some(function(x) { return x.path == '/usr/local/bin'; }), '/usr/local/bin');"
+    },
+    {
+     "rank": "001efa7d1c274796937adc849b15e5be02614ec63ee077091b44ef4f74b1170e",
+     "pin": "dexie/Dexie.js",
+     "file": "test/tests-live-query.js",
+     "line": 161,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "ok",
+     "code": "ok(true, \"Skipping this test for IE - too shaky for the CI\");"
+    },
+    {
+     "rank": "003f16dd647c16c2b588d4d9cbf4ba4571c2f739a7ca5aca8e865b003f4da6a4",
+     "pin": "dexie/Dexie.js",
+     "file": "test/tests-promise.js",
+     "line": 215,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "(expression).then",
+     "code": "Dexie.Promise.resolve().then(function () {"
+    },
+    {
+     "rank": "0042f9205c4a4af7f1ba45eaa0425e1c712cb2dc704b979f87f51bba846d336f",
+     "pin": "vercel/turborepo",
+     "file": "examples/with-yarn/packages/eslint-config/library.js",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "globalIgnores",
+     "code": "const { defineConfig, globalIgnores } = require(\"eslint/config\");"
+    },
+    {
+     "rank": "00473ba21ec0499fe7119d1530a6cdef5b23653bae7f1d8d1296ee4c69954f8d",
+     "pin": "dexie/Dexie.js",
+     "file": "test/tests-whereclause.js",
+     "line": 805,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "ok",
+     "code": "ok(!!ullaBella2, \"Should be able to query multiple columns. This time utilizing compound index.\");"
+    },
+    {
+     "rank": "00547dc3361694634370b7e540815e5ccc7d3459bbd624df894d9cdc8bba764a",
+     "pin": "vitest-dev/vitest",
+     "file": "test/unit/test/dual-package-hazard.test.ts",
+     "line": 7,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "@vitest/test-dep1",
+     "code": "import * as dep1 from '@vitest/test-dep1'"
+    },
+    {
+     "rank": "00846cc67028d87541143008b3f9fa8e48f491816966d251ea98816e2b6acc5e",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/impact/lockfile/repo/test/c.test.js",
+     "line": 2,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "depC",
+     "code": "test('c', () => expect(depC()).toBe('c'));"
+    },
+    {
+     "rank": "009a68eab6290db65b2e2f1b24172421a9e040074c0edecc04c566cf937b2c02",
+     "pin": "dexie/Dexie.js",
+     "file": "test/tests-live-query.js",
+     "line": 977,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "external-package"
+     ],
+     "target": "equal",
+     "code": "equal(await valueSignal.promise, 0, 'Initial run emitted 0');"
+    }
+   ]
+  },
+  {
+   "reason": "workspace-build-output-missing",
+   "links": 4632,
+   "pins": {
+    "excalidraw/excalidraw": 12,
+    "honojs/hono": 308,
+    "mermaid-js/mermaid": 248,
+    "puppeteer/puppeteer": 1202,
+    "react-hook-form/react-hook-form": 216,
+    "reduxjs/redux-toolkit": 219,
+    "vercel/turborepo": 11,
+    "vitejs/vite": 24,
+    "withastro/astro": 2392
+   },
+   "kinds": {
+    "imports": 2344,
+    "references": 904,
+    "calls": 1382,
+    "exports": 2
+   },
+   "sites": [
+    {
+     "rank": "002071fb16fade217ac65e7fdda304161ca59e1764bd6f69c7f1f2e95fa2f515",
+     "pin": "puppeteer/puppeteer",
+     "file": "test-d/ElementHandle.test-d.ts",
+     "line": 698,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "ElementHandle",
+     "code": "expectType<Array<ElementHandle<Element>>>("
+    },
+    {
+     "rank": "00256fb79952d38de9b60cc12b37f205dfa336c72c48b2190385e384910e5513",
+     "pin": "withastro/astro",
+     "file": "packages/integrations/cloudflare/test/fixtures/sessions/src/actions/index.ts",
+     "line": 28,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "(expression).url",
+     "code": "input: z.object({ favoriteUrl: z.string().url() }),"
+    },
+    {
+     "rank": "0028e61e6605118835de7dc6db9472084f38c85addaad6fedb8a2c9fa1b47d3b",
+     "pin": "withastro/astro",
+     "file": "packages/astro/test/fixtures/0-css/svelte.config.mjs",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "vitePreprocess",
+     "code": "import { vitePreprocess } from '@astrojs/svelte';"
+    },
+    {
+     "rank": "003db759bc427cdc91fd8ac0d7c79cc6e9fba900d5825c2ed3434ecd2dbb94b5",
+     "pin": "withastro/astro",
+     "file": "packages/astro/test/fixtures/content-layer/src/content.config.ts",
+     "line": 308,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "z.object",
+     "code": "schema: z.object({"
+    },
+    {
+     "rank": "004450c33ef7b22f38d165f2f3f892059cefb88eea7d62b21022b7176f352a6e",
+     "pin": "puppeteer/puppeteer",
+     "file": "test-d/ElementHandle.test-d.ts",
+     "line": 534,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "ElementHandle",
+     "code": "expectNotType<Array<ElementHandle<Element>>>("
+    },
+    {
+     "rank": "005770b2c1e8f0fe1a91b1d1d4c39a73615503511e8a1c4e48e22a739ecc413a",
+     "pin": "puppeteer/puppeteer",
+     "file": "packages/puppeteer/src/getConfiguration.ts",
+     "line": 85,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "FirefoxSettings",
+     "code": "ChromeSettings | ChromeHeadlessShellSettings | FirefoxSettings = {};"
+    },
+    {
+     "rank": "005aa13742e2bd9b9247b78f5b673d6b44dd415792bfe8c7dbe7f45f1b9b621f",
+     "pin": "withastro/astro",
+     "file": "packages/integrations/alpinejs/test/fixtures/plugin-script-import/astro.config.mjs",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "astro/config",
+     "code": "import { defineConfig } from 'astro/config';"
+    },
+    {
+     "rank": "00896f222c42eef329c42caee465f5adc0038d2582102ec93fa5770e01724f45",
+     "pin": "withastro/astro",
+     "file": "packages/astro/test/fixtures/content-layer/src/content.config.ts",
+     "line": 184,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "z.object",
+     "code": "schema: z.object({"
+    },
+    {
+     "rank": "00a5cdceb2f79a1cde18c225f01025282546fd53859e196a2dd7e491f1e6c028",
+     "pin": "withastro/astro",
+     "file": "packages/astro/e2e/fixtures/nested-in-solid/astro.config.mjs",
+     "line": 6,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "defineConfig",
+     "code": "import { defineConfig } from 'astro/config';"
+    },
+    {
+     "rank": "00b35aa2431e83b4ab38295c89e49463b7a39cb8549838ae50eb2c8cd4c2bfe4",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "examples/type-portability/nodenext-esm/src/app/services/api.ts",
+     "line": 22,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "workspace-build-output-missing"
+     ],
+     "target": "retry",
+     "code": "export const baseQueryWithRetry = retry(baseQuery, { maxRetries: 6 })"
+    }
+   ]
+  },
+  {
+   "reason": "missing-module",
+   "links": 2943,
+   "pins": {
+    "colinhacks/zod": 1,
+    "dexie/Dexie.js": 101,
+    "excalidraw/excalidraw": 12,
+    "honojs/hono": 6,
+    "mermaid-js/mermaid": 1351,
+    "nestjs/nest": 15,
+    "pingdotgg/t3code": 4,
+    "pmndrs/zustand": 17,
+    "puppeteer/puppeteer": 32,
+    "react-hook-form/react-hook-form": 19,
+    "reduxjs/redux-toolkit": 21,
+    "trpc/trpc": 43,
+    "vercel/turborepo": 280,
+    "vitejs/vite": 398,
+    "vitest-dev/vitest": 123,
+    "withastro/astro": 452,
+    "yargs/yargs": 68
+   },
+   "kinds": {
+    "imports": 1366,
+    "calls": 1251,
+    "references": 165,
+    "extends": 4,
+    "exports": 157
+   },
+   "sites": [
+    {
+     "rank": "00035e00a627aa43e8175699e1702b82a99741a2f8ba2a03a101d8ee888d728e",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/parser/tests/eventmodeling.test.ts",
+     "line": 8,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "EmTimeFrame",
+     "code": "import type { EmModelEntityType, EmTimeFrame } from '../src/language/generated/ast.js';"
+    },
+    {
+     "rank": "00206347790792f9d1d2e213f27d4f3d2cec0ea68ec5248c03a64d324f54fc51",
+     "pin": "vitest-dev/vitest",
+     "file": "docs/.vitepress/theme/index.ts",
+     "line": 10,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "../components/CRoot.vue",
+     "code": "import CRoot from '../components/CRoot.vue'"
+    },
+    {
+     "rank": "002fb5c177b574a4472d01f56fdd15cfb194c5b0220f0ea9d33fcbc6ee159b41",
+     "pin": "react-hook-form/react-hook-form",
+     "file": "examples/V7/initalFormState.tsx",
+     "line": 5,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "./styles.css",
+     "code": "import './styles.css';"
+    },
+    {
+     "rank": "005e8f3002d302bdae059875a1ddd82d05dbd28be508707164f5d86d16e31a6d",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/diagrams/kanban/kanban.spec.ts",
+     "line": 471,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "kanban.yy.getSections",
+     "code": "const sections = kanban.yy.getSections();"
+    },
+    {
+     "rank": "00688c5468da1427155715d92ee6c1f0a2d012805172b3cfe2b14271c5e39656",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/docs/.vitepress/theme/index.ts",
+     "line": 11,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "./Tooltip.vue",
+     "code": "import Tooltip from './Tooltip.vue';"
+    },
+    {
+     "rank": "0070b53da44fc52161409fb5844536364a3395144d7fee87ee809cc3ba145199",
+     "pin": "vitejs/vite",
+     "file": "playground/chunk-importmap/static.js",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "./static.css",
+     "code": "import './static.css'"
+    },
+    {
+     "rank": "0077f0e277a6e68494c484a15a39583cca3755e4eb0cd87a65360908fcc96398",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/diagrams/state/stateDiagram-v2.spec.js",
+     "line": 288,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "parser.parse",
+     "code": "parser.parse(str);"
+    },
+    {
+     "rank": "009bf85726333fc3e756a9543c0fbf7035512b5851930772f8355b8c254bfe34",
+     "pin": "dexie/Dexie.js",
+     "file": "test/typings-test/test-typings.ts",
+     "line": 367,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "Table",
+     "code": "items: Table<{ id: number; name: string }, number>;"
+    },
+    {
+     "rank": "00a296955d3e0f1b06137a6ff27528799e97154c30bc6675ec7241e50c18d00a",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "examples/query/react/basic/src/App.tsx",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "./styles.css",
+     "code": "import './styles.css'"
+    },
+    {
+     "rank": "00adf734d6dc06180dd5db3298b4c5bd99bc0358310f8d13b092355e8255c149",
+     "pin": "withastro/astro",
+     "file": "packages/astro/test/types/define-action-accept.ts",
+     "line": 22,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "missing-module"
+     ],
+     "target": "defineAction",
+     "code": "const action = defineAction({"
+    }
+   ]
+  },
+  {
+   "reason": "object-producer-unverified",
+   "links": 880,
+   "pins": {
+    "changesets/changesets": 5,
+    "dexie/Dexie.js": 7,
+    "excalidraw/excalidraw": 17,
+    "honojs/hono": 13,
+    "mermaid-js/mermaid": 25,
+    "oclif/core": 1,
+    "pmndrs/zustand": 2,
+    "puppeteer/puppeteer": 11,
+    "reduxjs/redux-toolkit": 3,
+    "trpc/trpc": 533,
+    "vercel/turborepo": 11,
+    "vitejs/vite": 2,
+    "vitest-dev/vitest": 212,
+    "withastro/astro": 38
+   },
+   "kinds": {
+    "calls": 863,
+    "references": 2,
+    "imports": 15
+   },
+   "sites": [
+    {
+     "rank": "000498a70005f4bfd2dcd983021d4d7cfd9e033790d39f6d1792f381707cc4dd",
+     "pin": "withastro/astro",
+     "file": "packages/vite-plugin-astro/test/render.test.ts",
+     "line": 59,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "hmr.stop",
+     "code": "hmr.stop();"
+    },
+    {
+     "rank": "000b5d3e3efb20602a07ca49d56417b9b3e7c7a871c305fdcb6d2137535da72a",
+     "pin": "trpc/trpc",
+     "file": "packages/tests/server/websockets.test.ts",
+     "line": 3106,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "ctx.wssHandler.broadcastReconnectNotification",
+     "code": "ctx.wssHandler.broadcastReconnectNotification();"
+    },
+    {
+     "rank": "0017eeebf0bb9265cda560dc1ef2b14012877865427698369530d353db852dc7",
+     "pin": "trpc/trpc",
+     "file": "packages/tests/server/websocketsLifecycle.test.ts",
+     "line": 158,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "entered.resolve",
+     "code": "entered.resolve(signal);"
+    },
+    {
+     "rank": "001a0abef5d6d9f80b7089c49097a387137f311e085d35ad9dbcbd3bc4688836",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/test/concurrent.test.ts",
+     "line": 1441,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "result.errorTree",
+     "code": "expect(result.errorTree()).toMatchInlineSnapshot(`"
+    },
+    {
+     "rank": "00879f6e6a37ab256094c8de45b2bbb0c6ac2989d4e162856e3aa5728235e7f3",
+     "pin": "trpc/trpc",
+     "file": "packages/tests/server/websocketsLifecycle.test.ts",
+     "line": 849,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "entered.resolve",
+     "code": "entered.resolve();"
+    },
+    {
+     "rank": "00d9aeca8c0df5afcfe4bb46c178cdd5382344502eb35cbe173429e36345ef72",
+     "pin": "trpc/trpc",
+     "file": "packages/tests/server/subscriptionAsyncIterable.test.ts",
+     "line": 674,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "ctx.emit",
+     "code": "ctx.emit(1);"
+    },
+    {
+     "rank": "015cf3a9b40eefdb0d45469293811bdd967af43cc9ea1c7642a96dff2e56622b",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/test/watch/file-watching.test.ts",
+     "line": 109,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "fs.editFile",
+     "code": "fs.editFile('force-watch/trigger.js', modifyContent)"
+    },
+    {
+     "rank": "017edb2dc8046c16d8a7a8a94b6c765e3cbd62b130ccb16e1f8739bebc85b033",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/test/benchmarking.test.ts",
+     "line": 532,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "fs.readFile",
+     "code": "expect(typeof JSON.parse(fs.readFile('out/x.two.json')).latency.mean).toBe('number')"
+    },
+    {
+     "rank": "01f7fc299df8cbf392118c2e5a5ae3530fa981735ac3aaf0db472b73f8ed9d92",
+     "pin": "trpc/trpc",
+     "file": "packages/tanstack-react-query/test/streamedQuery.test.tsx",
+     "line": 135,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "t.data",
+     "code": "await vi.waitFor(() => expect(t.data()).toEqual(['a1']));"
+    },
+    {
+     "rank": "02134acfbc5734715aa06e69f38895bf8e5e9eb40bcad72153b837788a5a2d80",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/vitest/src/node/pools/workers/typecheckWorker.ts",
+     "line": 89,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "object-producer-unverified"
+     ],
+     "target": "runner.collectTests",
+     "code": "runPromise = runner.collectTests(message.context.files, project).catch((error) => error)"
+    }
+   ]
+  },
+  {
+   "reason": "computed-specifier",
+   "links": 419,
+   "pins": {
+    "changesets/changesets": 2,
+    "colinhacks/zod": 2,
+    "dexie/Dexie.js": 3,
+    "excalidraw/excalidraw": 6,
+    "honojs/hono": 3,
+    "nestjs/nest": 5,
+    "oclif/core": 4,
+    "puppeteer/puppeteer": 3,
+    "trpc/trpc": 2,
+    "vercel/turborepo": 220,
+    "vitejs/vite": 62,
+    "vitest-dev/vitest": 44,
+    "withastro/astro": 63
+   },
+   "kinds": {
+    "imports": 419
+   },
+   "sites": [
+    {
+     "rank": "00eb093bdda6194fc8f318152abf36cf4429f9548417823190064651810e1080",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/xfile_oracle/cases/guard_string/pkgs/p1/lib/h/inverted.js",
+     "line": 4,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(dynamic import)",
+     "code": "if (negated(spec)) return import(spec).catch(() => null);"
+    },
+    {
+     "rank": "0118d8fab2f5996e5fca2905fa7a016aea91394e51c768be44c7ccf3623d61fd",
+     "pin": "withastro/astro",
+     "file": "packages/renderers/preact/test/renderer.test.ts",
+     "line": 103,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(dynamic import)",
+     "code": "const mod: RenderModule = await import(new URL('./dist/server/render.js', root).href);"
+    },
+    {
+     "rank": "021210d8f181e1c5b2137522b8f33c4df8f10467ec208cd04f68f26ae043c82d",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/xfile_oracle/cases/guard_string/pkgs/p1/lib/h/load.js",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(dynamic import)",
+     "code": "const get = (spec) => import(spec).catch(() => null);"
+    },
+    {
+     "rank": "02ab3dee3fdec2efbf9b87a2016b691a5e545669ca2c98bfccffc41fa017c1a0",
+     "pin": "vitest-dev/vitest",
+     "file": "test/unit/src/dynamic-import.ts",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(dynamic import)",
+     "code": "const pkg = await import(name)"
+    },
+    {
+     "rank": "0365f7f38633b46a33bb765ff234554ed47b6b0851669c4457c98db9cc028005",
+     "pin": "honojs/hono",
+     "file": "benchmarks/fetch/bench.mts",
+     "line": 27,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(dynamic import)",
+     "code": "const { Hono } = await import(pathToFileURL(`${src}/index.ts`).href)"
+    },
+    {
+     "rank": "0424cb5e4bce52b21809c43c822efc8232b42751047a2be0d292398caba082ee",
+     "pin": "withastro/astro",
+     "file": "scripts/cmd/test.js",
+     "line": 105,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(dynamic import)",
+     "code": "? await import(pathToFileURL(path.resolve(args.values.teardown)).toString())"
+    },
+    {
+     "rank": "051691ff34abacf48fa469a1fa1c46156684424167fbbe4257e810753b1a17d2",
+     "pin": "excalidraw/excalidraw",
+     "file": "scripts/buildWasm.js",
+     "line": 33,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(computed require)",
+     "code": "} = require(packagePath);"
+    },
+    {
+     "rank": "06a2d4e5b37ede8d9f027dbc0bcdc87a12b9eb75e4bbea3e216881156c021e00",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/xfile_oracle/cases/follow_mutated/pkgs/p1/lib/helper.js",
+     "line": 5,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(computed require)",
+     "code": "for (const r of m.routes) require(r.handler);"
+    },
+    {
+     "rank": "08069573495713eda8d6d94ea9ef95f47641d5673132eb508fd7fcead0c6d0ce",
+     "pin": "vitejs/vite",
+     "file": "playground/ssr-noexternal/__tests__/serve.ts",
+     "line": 26,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(dynamic import)",
+     "code": "const { createServer } = await import(path.resolve(rootDir, 'server.js'))"
+    },
+    {
+     "rank": "081dc39a0e53a4b0d6246a0f47df444c2309a256d8c566aa7d136ebd722e4574",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/browser/src/client/utils.ts",
+     "line": 15,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "computed-specifier"
+     ],
+     "target": "(dynamic import)",
+     "code": "return getBrowserState().wrapModule(() => import(/* @vite-ignore */ name))"
+    }
+   ]
+  },
+  {
+   "reason": "library-member-written",
+   "links": 373,
+   "pins": {
+    "changesets/changesets": 3,
+    "colinhacks/zod": 4,
+    "dexie/Dexie.js": 18,
+    "excalidraw/excalidraw": 58,
+    "honojs/hono": 17,
+    "mermaid-js/mermaid": 105,
+    "nestjs/nest": 6,
+    "oclif/core": 1,
+    "pingdotgg/t3code": 24,
+    "pmndrs/zustand": 2,
+    "puppeteer/puppeteer": 17,
+    "react-hook-form/react-hook-form": 9,
+    "reduxjs/redux-toolkit": 3,
+    "trpc/trpc": 17,
+    "vercel/turborepo": 4,
+    "vitejs/vite": 8,
+    "vitest-dev/vitest": 21,
+    "withastro/astro": 43,
+    "yargs/yargs": 13
+   },
+   "kinds": {
+    "calls": 355,
+    "references": 18
+   },
+   "sites": [
+    {
+     "rank": "01603ba6b13ac87234a25710d91f96494bd26953ca517249967a760fb988c828",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/utils/src/diff/joinAlignedDiffs.ts",
+     "line": 274,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "lines.join",
+     "code": "return lines.join('\\n')"
+    },
+    {
+     "rank": "01b81f6287e6c1b5316a272975cefa14d1a995ef40147d3ca4b93b22d36c7ce3",
+     "pin": "trpc/trpc",
+     "file": "packages/react-query/test/polymorphism.factory.tsx",
+     "line": 64,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "dataProvider.push",
+     "code": "dataProvider.push(exportInstance);"
+    },
+    {
+     "rank": "026e62f259b4268a26f0ef973233853fe13b78995a11c3a27eecf01ae8b9970b",
+     "pin": "vitejs/vite",
+     "file": "packages/vite/src/node/plugins/importAnalysis.ts",
+     "line": 769,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "orderedImportedUrls.filter",
+     "code": "const _orderedImportedUrls = orderedImportedUrls.filter(isDefined)"
+    },
+    {
+     "rank": "02fab07805805bbd2210a084a646f1a2f80a1b47ed49f66cde433fa227547966",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/utils/src/diff/joinAlignedDiffs.ts",
+     "line": 188,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "lines.push",
+     "code": "lines.push(printDeleteLine(line, j === 0 || j === jLast, options))"
+    },
+    {
+     "rank": "03c8d1d794e9c42a2187b2fea8cce60f96ad9f0f79526d9072f09bfc94dd29ef",
+     "pin": "vitejs/vite",
+     "file": "packages/vite/src/node/server/pluginContainer.ts",
+     "line": 814,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "skipCallsTemp.push",
+     "code": "skipCallsTemp.push({ id, importer, plugin: this._plugin })"
+    },
+    {
+     "rank": "0499ed2db75438bfbfaecf9552787c2cc29cae21bf5cd5723db6c5184f1d2c9a",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/diagrams/agentflow/agentflowDb.ts",
+     "line": 955,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "argList.push",
+     "code": "argList.push(id);"
+    },
+    {
+     "rank": "04eb7e7d6c49054ded5e387a6db73fac4570d7770a208c34b516886c5292d114",
+     "pin": "trpc/trpc",
+     "file": "packages/tanstack-react-query/src/internals/subscriptionOptions.ts",
+     "line": 402,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "currentSubscriptionRef.current",
+     "code": "currentSubscriptionRef.current?.();"
+    },
+    {
+     "rank": "052a5f17b43d1aa5ae7a61566c14f015b9747e8bb75ae82dd4bcdce8ddd00637",
+     "pin": "withastro/astro",
+     "file": "packages/astro/src/core/routing/create-manifest.ts",
+     "line": 1023,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "segments.indexOf",
+     "code": "const index = segments.indexOf(from);"
+    },
+    {
+     "rank": "06a0af38c111e5d229d14a3fee89c0dc94f96dc0a2eb8ff99c869ac118ad12a9",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/mermaid/src/rendering-util/layout-algorithms/layered/layered.ts",
+     "line": 1572,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "track.push",
+     "code": "track.push(-1);"
+    },
+    {
+     "rank": "0803a901a5cfd9f62cfa2a37d8d61da5486d3dc21b7c7677cb8d725d9e48b43b",
+     "pin": "pingdotgg/t3code",
+     "file": "packages/shared/src/qrCode.ts",
+     "line": 585,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "library-member-written"
+     ],
+     "target": "result.push",
+     "code": "result.push(1); // Start off with the monomial x^0"
+    }
+   ]
+  },
+  {
+   "reason": "untyped-require",
+   "links": 249,
+   "pins": {
+    "mermaid-js/mermaid": 4,
+    "nestjs/nest": 223,
+    "pingdotgg/t3code": 1,
+    "vercel/turborepo": 21
+   },
+   "kinds": {
+    "imports": 59,
+    "references": 37,
+    "calls": 149,
+    "extends": 1,
+    "exports": 3
+   },
+   "sites": [
+    {
+     "rank": "0343cac11bc9b9045725bcd5a6abf31162a70d50eff3446e78619648dc0a1449",
+     "pin": "pingdotgg/t3code",
+     "file": "apps/web/vitest.browser.config.ts",
+     "line": 5,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "default",
+     "code": "import viteConfig from \"./vite.config\";"
+    },
+    {
+     "rank": "04ce3d11554857a6add8aa9b32eaa0486997273cc1b36527e016bc4c40bd39a9",
+     "pin": "nestjs/nest",
+     "file": "sample/11-swagger/src/cats/cats.controller.spec.ts",
+     "line": 4,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "Cat",
+     "code": "import { Cat } from './entities/cat.entity';"
+    },
+    {
+     "rank": "0592800ad3955a402336ce9590bbf50f5ae7457eb926ff91a2c82ffe05c11610",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 234,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "NestContainer",
+     "code": "const container: any = new NestContainer();"
+    },
+    {
+     "rank": "05f1f156c840d143d443173b3a310db9b5daf4867ca5d29db9d5ad7c82acd979",
+     "pin": "nestjs/nest",
+     "file": "packages/core/test/injector/module-ref.spec.ts",
+     "line": 585,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "GraphInspector",
+     "code": "new GraphInspector(container),"
+    },
+    {
+     "rank": "071402173e6e4f400cd8361085455a06200bb4495e61e8a51e09554666fbe9dc",
+     "pin": "vercel/turborepo",
+     "file": "turborepo-tests/integration/fixtures/trace_vitest/packages/core/test/clamp.test.ts",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "clamp",
+     "code": "import { clamp } from \"../src/clamp\";"
+    },
+    {
+     "rank": "084c8b8938e55b6101cc716308150b5461fe86acf58c0f988773bfc5de41b721",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 8,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "NestContainer",
+     "code": "import { NestContainer } from '../../../core/injector/container';"
+    },
+    {
+     "rank": "08dcf17d362f844637ce9ee432d15c00dc6a07d06bd25e945fe891adbdaeeb24",
+     "pin": "nestjs/nest",
+     "file": "packages/core/test/injector/module-ref.spec.ts",
+     "line": 582,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "InstanceLoader",
+     "code": "instanceLoader = new InstanceLoader("
+    },
+    {
+     "rank": "09200e310baf6363dea349d7b035efb45352d7736ea485d000721d6bc42c3bc0",
+     "pin": "nestjs/nest",
+     "file": "packages/platform-fastify/test/adapters/fastify-adapter.spec.ts",
+     "line": 1460,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "FastifyAdapter",
+     "code": "adapter = new FastifyAdapter({ skipMiddie: true });"
+    },
+    {
+     "rank": "0ac14c2f01e11a0ee5fb767ab4060579f458609fcb27c9f8aceca3b29c7e9403",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 697,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "NestContainer",
+     "code": "new InterceptorsContextCreator(new NestContainer() as any) as any,"
+    },
+    {
+     "rank": "0dddabd436337c025e087457770ce5e1e14d276434c9fd504a477e153cac4d92",
+     "pin": "vercel/turborepo",
+     "file": "examples/with-vitest/packages/math/tests/math.test.ts",
+     "line": 3,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "untyped-require"
+     ],
+     "target": "subtract",
+     "code": "import { subtract } from \"../src/subtract\";"
+    }
+   ]
+  },
+  {
+   "reason": "unresolved-alias",
+   "links": 96,
+   "pins": {
+    "colinhacks/zod": 8,
+    "puppeteer/puppeteer": 13,
+    "reduxjs/redux-toolkit": 18,
+    "trpc/trpc": 14,
+    "vercel/turborepo": 23,
+    "vitejs/vite": 8,
+    "withastro/astro": 12
+   },
+   "kinds": {
+    "imports": 74,
+    "calls": 12,
+    "references": 9,
+    "exports": 1
+   },
+   "sites": [
+    {
+     "rank": "02d75be9ff9eb445fa18138516899f70d9b6dc7e1fe1263df253633fb85b9d80",
+     "pin": "puppeteer/puppeteer",
+     "file": "packages/puppeteer/src/puppeteer.docs.ts",
+     "line": 11,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "puppeteer-core/internal/puppeteer-core.js",
+     "code": "export * from 'puppeteer-core/internal/puppeteer-core.js';"
+    },
+    {
+     "rank": "05d2e11b5fff3d167c71f68685a0cb8045818ad2f2db41e2e6781d3c3e33a4a4",
+     "pin": "vercel/turborepo",
+     "file": "apps/docs/lib/geistdocs/source.ts",
+     "line": 16,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "extraMeta",
+     "code": "extraMeta,"
+    },
+    {
+     "rank": "06d14d1f0358d5b713b0948db68dee712aae115da46261600c5f0880e15216d1",
+     "pin": "colinhacks/zod",
+     "file": "packages/docs/app/layout.config.tsx",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "@/public/logo/logo-white.png",
+     "code": "import LogoWhite from \"@/public/logo/logo-white.png\";"
+    },
+    {
+     "rank": "074e08e01f17d9c2a0bec984bb5215f61bc4c13431ae209e20b0a68cd5e175fc",
+     "pin": "puppeteer/puppeteer",
+     "file": "packages/puppeteer/src/node/cli.ts",
+     "line": 16,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "PuppeteerNode",
+     "code": "const config = await (puppeteer as unknown as PuppeteerNode).configuration();"
+    },
+    {
+     "rank": "0967031f94bd7a534de7a5ba1468679c5dda8f6e693483307a55d0d66b0db448",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "docs/virtual/matchers/index.ts",
+     "line": 21,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "PayloadAction",
+     "code": "action: PayloadAction<Data>,"
+    },
+    {
+     "rank": "0f09e28d6a5eaefa53e6d50ac08222e0df1d6b953abc48f215d8b0f6526b1ab0",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "docs/virtual/matchers/index.ts",
+     "line": 42,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "createAsyncThunk",
+     "code": "export const isSpecialAndInterestingThunk = createAsyncThunk("
+    },
+    {
+     "rank": "10a36f7ba88532d715f172280ffb4f51b6d976fe6efc010611d3a97eaca3642c",
+     "pin": "withastro/astro",
+     "file": "packages/internal-helpers/src/shiki.ts",
+     "line": 171,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "loadShikiEngine",
+     "code": "shikiEngine = await loadShikiEngine();"
+    },
+    {
+     "rank": "13986521d2ea2b8ad6525fd648b53cc16bb3bd36ead1fce12fe6d30bef0e7812",
+     "pin": "puppeteer/puppeteer",
+     "file": "packages/puppeteer/src/node/cli.ts",
+     "line": 10,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "puppeteer-core/internal/node/PuppeteerNode.js",
+     "code": "import type {PuppeteerNode} from 'puppeteer-core/internal/node/PuppeteerNode.js';"
+    },
+    {
+     "rank": "17037825b2a09e2989139fa5c931dbf38edd9d9f66971454241e2ce5431bd6d5",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "docs/virtual/matchers/index.ts",
+     "line": 54,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "createAsyncThunk",
+     "code": "export const requestThunk2 = createAsyncThunk('requestThunk2', () => ({}))"
+    },
+    {
+     "rank": "1825128c5b70588f43555a95bc21c9205a9a0ce7fdb3abdff25eaa0b8fe775ac",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/nft/imports/input.js",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "unresolved-alias"
+     ],
+     "target": "x",
+     "code": "import { x } from '#x';"
+    }
+   ]
+  },
+  {
+   "reason": "deno-import-unverified",
+   "links": 77,
+   "pins": {
+    "honojs/hono": 6,
+    "trpc/trpc": 25,
+    "vitejs/vite": 4,
+    "vitest-dev/vitest": 4,
+    "yargs/yargs": 38
+   },
+   "kinds": {
+    "imports": 48,
+    "calls": 28,
+    "exports": 1
+   },
+   "sites": [
+    {
+     "rank": "00ccdeaa4840dc8e373455328ce86c8af1a3666dbba4c6e6870bd12308b4e6a6",
+     "pin": "yargs/yargs",
+     "file": "lib/platform-shims/browser.mjs",
+     "line": 4,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "default",
+     "code": "import cliui from 'https://[host]/cliui@8.0.1/index.mjs'; // eslint-disable-line"
+    },
+    {
+     "rank": "00f78dc416473a959174b209f3c9ed23dc76c7669621b4e70b23c53bb4ce8454",
+     "pin": "yargs/yargs",
+     "file": "lib/platform-shims/deno.ts",
+     "line": 18,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "https://[host]/x/y18n@v5.0.0-deno/deno.ts",
+     "code": "import y18n from 'https://[host]/x/y18n@v5.0.0-deno/deno.ts';"
+    },
+    {
+     "rank": "01912c71fc69235b8e6bf84c89edd6c6c86aa6b2710233841df87730bfe22a84",
+     "pin": "honojs/hono",
+     "file": "adapters/deno/vite.config.ts",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "defineConfig",
+     "code": "import { defineConfig } from 'vite-plus'"
+    },
+    {
+     "rank": "0636bf1ca2a98775ed23a42d1be58b1d0f8956f258f58895a0ea86167377d196",
+     "pin": "yargs/yargs",
+     "file": "test/deno/platform-shim.test.ts",
+     "line": 3,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "https://[host]/std/testing/asserts.ts",
+     "code": "import {assertEquals} from 'https://[host]/std/testing/asserts.ts';"
+    },
+    {
+     "rank": "09bbdf6659f65735cd76c3b58db2d6f02e80630cd029b8b8143faf934a9b479c",
+     "pin": "yargs/yargs",
+     "file": "lib/platform-shims/browser.mjs",
+     "line": 4,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "https://[host]/cliui@8.0.1/index.mjs",
+     "code": "import cliui from 'https://[host]/cliui@8.0.1/index.mjs'; // eslint-disable-line"
+    },
+    {
+     "rank": "0c8135bcd8b34322a49cfc07543bfc9aa5f3cffbe204f11b1f9589a75446b3b4",
+     "pin": "yargs/yargs",
+     "file": "lib/platform-shims/deno.ts",
+     "line": 5,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "assertStrictEquals",
+     "code": "assertStrictEquals,"
+    },
+    {
+     "rank": "0fc7a118043b679ea78b49420863128dd9fe92257b4d0d010f5ec6e5161b6ae7",
+     "pin": "vitest-dev/vitest",
+     "file": "test/e2e/fixtures/network-imports/basic.test.ts",
+     "line": 15,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "http://[host]/",
+     "code": "await expect(() => import('http://[host]/')).rejects.toThrow("
+    },
+    {
+     "rank": "10f6ffd3c28aa5e7f4664232fc1c5ff0ada0ac7fbdbc106c11dc14821015ba1a",
+     "pin": "honojs/hono",
+     "file": "adapters/netlify/vite.config.ts",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "defineConfig",
+     "code": "import { defineConfig } from 'vite-plus'"
+    },
+    {
+     "rank": "1323cf8bb531ab81e67b5254f1835f80bf6e1aabfe8184b11c9f6ec442057936",
+     "pin": "trpc/trpc",
+     "file": "examples/deno-deploy/src/client.ts",
+     "line": 30,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "delay",
+     "code": "await delay(100);"
+    },
+    {
+     "rank": "15e5c99160d35d9529afc4a0024359ec4d40d69d0cce33e396fb33c1aa4f5e16",
+     "pin": "yargs/yargs",
+     "file": "lib/platform-shims/deno.ts",
+     "line": 16,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "deno-import-unverified"
+     ],
+     "target": "https://[host]/x/escalade@v3.0.3/sync.ts",
+     "code": "import escalade from 'https://[host]/x/escalade@v3.0.3/sync.ts';"
+    }
+   ]
+  },
+  {
+   "reason": "index-signature",
+   "links": 34,
+   "pins": {
+    "nestjs/nest": 17,
+    "react-hook-form/react-hook-form": 3,
+    "reduxjs/redux-toolkit": 1,
+    "trpc/trpc": 4,
+    "vitejs/vite": 1,
+    "withastro/astro": 8
+   },
+   "kinds": {
+    "calls": 34
+   },
+   "sites": [
+    {
+     "rank": "0052bb851291ffd8fbd9bb6392235350fad80138c42055a289e2094647711a26",
+     "pin": "withastro/astro",
+     "file": "packages/astro/test/units/actions/actions-proxy.test.ts",
+     "line": 40,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "proxy.subscribe",
+     "code": "await proxy.subscribe({ channel: 'test' });"
+    },
+    {
+     "rank": "0491e9274142f67fce5e15fe7a7ebc142d12255ef2c21d6469c5be099e98ec22",
+     "pin": "reduxjs/redux-toolkit",
+     "file": "packages/toolkit/src/entities/tests/entity_slice_enhancer.test.ts",
+     "line": 30,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "slice.actions.oneAdded",
+     "code": "const action = slice.actions.oneAdded(book)"
+    },
+    {
+     "rank": "0d0c1265b73f153e1ab60418d0665f4ceaaa41d1dba01d2105dcb1cbc3f7eb63",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/client/client-nats.ts",
+     "line": 378,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "(expression).publish",
+     "code": "this.natsClient!.publish(pattern, serializedPacket.data, {"
+    },
+    {
+     "rank": "12c4423412a9a3a7d9323441d86db3d3e1f8bbc34a616c9a901153edcb84a1ee",
+     "pin": "vitejs/vite",
+     "file": "packages/vite/src/node/ssr/__tests__/ssrStacktrace.spec.ts",
+     "line": 37,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "mod.main",
+     "code": "mod.main()"
+    },
+    {
+     "rank": "154e429ff47203874746d4f44ec2fef5156fbdd5ff750e222f7366494c0627ca",
+     "pin": "withastro/astro",
+     "file": "packages/astro/test/units/build/vite-build-config.test.ts",
+     "line": 64,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "output.assetFileNames",
+     "code": "const result = output.assetFileNames({ names: ['style.css'] });"
+    },
+    {
+     "rank": "1975421193466b6febdba0a1ed9e037107fac18042b030b9f682687d6aa01442",
+     "pin": "withastro/astro",
+     "file": "packages/astro/test/units/build/vite-build-config.test.ts",
+     "line": 90,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "output.assetFileNames",
+     "code": "const result = output.assetFileNames({ names: ['style.css'] });"
+    },
+    {
+     "rank": "219b8e8c5968af294a632a2fa4df82a0a7e575f13738ed29cac39d08a308ea49",
+     "pin": "withastro/astro",
+     "file": "packages/vite-plugin-astro/test/plugin.test.ts",
+     "line": 247,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "mod.render",
+     "code": "assert.equal(await mod.render(), '<p>true</p>');"
+    },
+    {
+     "rank": "236eeb7bb5f88c032e262bec6e8f1c1421b297e7b601d16d6069f2a308c5a098",
+     "pin": "nestjs/nest",
+     "file": "packages/platform-fastify/test/adapters/middie.spec.ts",
+     "line": 46,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "hooks.onRegister",
+     "code": "hooks.onRegister(child);"
+    },
+    {
+     "rank": "3c4e995e9ae68b64d300eaa82b61cbe1c498c24007f868a29b60777fd1704846",
+     "pin": "withastro/astro",
+     "file": "packages/astro/test/units/actions/actions-proxy.test.ts",
+     "line": 54,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "proxy['my.action']",
+     "code": "await proxy['my.action']('param');"
+    },
+    {
+     "rank": "3e042f3970e9d43cb3d798fffda5cafb39e9bd8ed85f6fd640723a88252da41a",
+     "pin": "react-hook-form/react-hook-form",
+     "file": "src/__tests__/useForm.test.tsx",
+     "line": 3579,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "index-signature"
+     ],
+     "target": "resolvers.ab",
+     "code": "resolvers.ab(true);"
+    }
+   ]
+  },
+  {
+   "reason": "unknown-receiver",
+   "links": 23,
+   "pins": {
+    "changesets/changesets": 1,
+    "colinhacks/zod": 1,
+    "dexie/Dexie.js": 1,
+    "honojs/hono": 2,
+    "nestjs/nest": 12,
+    "trpc/trpc": 3,
+    "vitest-dev/vitest": 2,
+    "withastro/astro": 1
+   },
+   "kinds": {
+    "calls": 23
+   },
+   "sites": [
+    {
+     "rank": "0d36932767ab7349cdd2e248f9f712f6a617f0c19e61f06cc4eee8a2e80fc6ee",
+     "pin": "trpc/trpc",
+     "file": "examples/tanstack-start-sse-chat/src/routes/index.tsx",
+     "line": 163,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "channelsQuery.data.map",
+     "code": "{channelsQuery.data.map((channel) => ("
+    },
+    {
+     "rank": "20fdf34e7b3f344c07627c99b62e33341e78ca26986812656d27528298c55519",
+     "pin": "nestjs/nest",
+     "file": "packages/common/test/pipes/validation.pipe.spec.ts",
+     "line": 162,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "exception.getResponse",
+     "code": "expect(exception.getResponse().message).toEqual(grouped);"
+    },
+    {
+     "rank": "28befef7ae098937cd096b426c2ba52449e2e0cefaec9a4fe8359f693db31bc5",
+     "pin": "withastro/astro",
+     "file": "packages/integrations/mdx/test/fixtures/mdx-get-headings/src/pages/pages.json.js",
+     "line": 5,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "v?.getHeadings",
+     "code": "headingsByPage: Object.fromEntries(entries.map(([k, v]) => [k, v?.getHeadings()])),"
+    },
+    {
+     "rank": "2b3448652e088514f9877077427ec7f4cbf06cd164273ce05aa141de3dce680f",
+     "pin": "nestjs/nest",
+     "file": "packages/common/test/pipes/validation.pipe.spec.ts",
+     "line": 193,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "(expression).getResponse",
+     "code": ".getResponse().message,"
+    },
+    {
+     "rank": "3cd96fd157ad5bc69e5a45b7fb8ad7c77417a1bef4a4bb2ea439dee8b86a60a9",
+     "pin": "vitest-dev/vitest",
+     "file": "test/browser/specs/runner.test.ts",
+     "line": 82,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "f.endsWith",
+     "code": "const runtimeTestFiles = testFiles.filter((f) => !f.endsWith('.test-d.ts'))"
+    },
+    {
+     "rank": "4bccc2a045aee4912bf3766a80c5c6ee350a26d52db464cbdf39722738386db5",
+     "pin": "trpc/trpc",
+     "file": "examples/tanstack-start-sse-chat/src/routes/channels/$channelId.tsx",
+     "line": 153,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "channelsQuery.data.map",
+     "code": "return channelsQuery.data.map((channel) => ("
+    },
+    {
+     "rank": "50e3d777cec64a36075135e784af65fde9125a29c0b9d8d2e7329a22caab4d24",
+     "pin": "nestjs/nest",
+     "file": "packages/common/test/pipes/validation.pipe.spec.ts",
+     "line": 153,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "exception.getResponse",
+     "code": "expect(exception.getResponse().message).toEqual(list);"
+    },
+    {
+     "rank": "585067b610debfff718edf18b5ff0705b84f9919c04619d94575d549c659f3c3",
+     "pin": "vitest-dev/vitest",
+     "file": "test/ui/test/helper.ts",
+     "line": 44,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "vitest.close",
+     "code": "await vitest.close()"
+    },
+    {
+     "rank": "5d2399e9292704caa68d036c01189bb392c32234eaa129181a082aed9a1eaea3",
+     "pin": "nestjs/nest",
+     "file": "packages/common/test/pipes/validation.pipe.spec.ts",
+     "line": 261,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "(expression).getResponse",
+     "code": "pipe.createExceptionFactory()(errors).getResponse().message,"
+    },
+    {
+     "rank": "5db5ea8f9bc5b1b6aa4844a74bb1bf89f6285ffa535a06d0a954968407bcd681",
+     "pin": "nestjs/nest",
+     "file": "packages/common/test/pipes/validation.pipe.spec.ts",
+     "line": 309,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "unknown-receiver"
+     ],
+     "target": "(expression).getResponse",
+     "code": ".getResponse().message,"
+    }
+   ]
+  },
+  {
+   "reason": "directory-import-not-allowed-in-esm",
+   "links": 16,
+   "pins": {
+    "nestjs/nest": 16
+   },
+   "kinds": {
+    "imports": 9,
+    "calls": 6,
+    "references": 1
+   },
+   "sites": [
+    {
+     "rank": "0132595ab047764b15a6cc0bb4a6b62a349d126ad619581da1bfb4a9bd6d0b39",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 3,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "Injectable",
+     "code": "import { CallHandler, Injectable, UseGuards, UsePipes } from '../../../common';"
+    },
+    {
+     "rank": "1317182f6c02e7eb78f26f251a631411939343578f8c549c7960ad34aee2db4a",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 3,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "UsePipes",
+     "code": "import { CallHandler, Injectable, UseGuards, UsePipes } from '../../../common';"
+    },
+    {
+     "rank": "3466c9a5fe9ddec5a0015e252ddeb8e7db11e19cc4a126bb8693caf5ffafec40",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 177,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "UseGuards",
+     "code": "@UseGuards({ canActivate: () => false })"
+    },
+    {
+     "rank": "36cb8dcdcd119d4151e0464c790a73f4ab3bcf53aa118aeb8e1937c4bb5f95b8",
+     "pin": "nestjs/nest",
+     "file": "packages/common/test/utils/http-error-by-code.util.spec.ts",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "HttpStatus",
+     "code": "import { HttpStatus } from '../../enums';"
+    },
+    {
+     "rank": "4482e6cd9eea7432e8464eeca112b2b06972f55935d43c6f0617b4a9666f8850",
+     "pin": "nestjs/nest",
+     "file": "packages/common/test/utils/http-error-by-code.util.spec.ts",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "../../enums",
+     "code": "import { HttpStatus } from '../../enums';"
+    },
+    {
+     "rank": "5eabbaf44a75824b0271d1269d89402fb21edd5e8961dab8af94f5a539257116",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 226,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "CallHandler",
+     "code": "intercept: (_context: unknown, next: CallHandler) => next.handle(),"
+    },
+    {
+     "rank": "6054cc672bf33bbee8699b0aa4cbf91828ba2e67b7ee7ad20ed2870abfdbfdff",
+     "pin": "nestjs/nest",
+     "file": "packages/core/test/injector/module-ref.spec.ts",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "RuntimeException",
+     "code": "import { RuntimeException } from '../../errors/exceptions';"
+    },
+    {
+     "rank": "616f634af1e1f83bd5105054664301ce98ab74f5a51911afdb16abaa9130ab52",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 30,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "Injectable",
+     "code": "@Injectable()"
+    },
+    {
+     "rank": "822a7184eebb62213bd0f61dfc94f68f46522485cf0ba00164b2ea21703dde40",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 3,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "CallHandler",
+     "code": "import { CallHandler, Injectable, UseGuards, UsePipes } from '../../../common';"
+    },
+    {
+     "rank": "8b262f5fbb10aba358683e8bd3e2ed1f1a5e943b6f1009f819049568984f2a33",
+     "pin": "nestjs/nest",
+     "file": "packages/microservices/test/context/rpc-context-creator.spec.ts",
+     "line": 48,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "directory-import-not-allowed-in-esm"
+     ],
+     "target": "UseGuards",
+     "code": "@UseGuards(TestGuard)"
+    }
+   ]
+  },
+  {
+   "reason": "not-a-module",
+   "links": 11,
+   "pins": {
+    "vercel/turborepo": 2,
+    "vitest-dev/vitest": 9
+   },
+   "kinds": {
+    "imports": 6,
+    "references": 5
+   },
+   "sites": [
+    {
+     "rank": "4b9c19b6ecf49a2636a455feeffe4f98e3cec608b3fbc6d970fdc98b69321e11",
+     "pin": "vitest-dev/vitest",
+     "file": "test/unit/test/module.test.ts",
+     "line": 12,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "b",
+     "code": "import cjs, { a, b } from '../src/cjs/module-cjs'"
+    },
+    {
+     "rank": "7cb1c23805b1c99980dbbf0d1ed2805b2dd5dea5566d3e812a7199d5848231c1",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/nft/import-assertions/input.js",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "default",
+     "code": "import foo from \"./foo\""
+    },
+    {
+     "rank": "a1f642cfae326e4aac41c76668fdec31145f13efcf7d8652a5565054daa35ed4",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/browser/context.d.ts",
+     "line": 1078,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "__ivyaAriaTypes.matchAriaTree",
+     "code": "matchAriaTree: typeof __ivyaAriaTypes.matchAriaTree"
+    },
+    {
+     "rank": "c15eef05a7ef2ad39b9e2fdac4d013b8bcfdb8115e2711396ffbc0cbd8f50cae",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/browser/context.d.ts",
+     "line": 1076,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "__ivyaAriaTypes.parseAriaTemplate",
+     "code": "parseAriaTemplate: typeof __ivyaAriaTypes.parseAriaTemplate"
+    },
+    {
+     "rank": "c5ef5ef610f57ea005418babd1bb55d392afa6266abddc7e5939e21b9b9ee162",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/nft/import-attributes/input.js",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "default",
+     "code": "import foo from \"./foo\""
+    },
+    {
+     "rank": "c6f8d7d153cbdcf1ad84a43f82b18542e4c2c942002fbb86822131a6e9150ced",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/browser/context.d.ts",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "__ivyaAriaTypes",
+     "code": "import { __ivyaAriaTypes } from '@vitest/browser/internal/vendor-types'"
+    },
+    {
+     "rank": "d8a9b709938efc3acd45f0b3afd158ebf36c0c265f069869300986f0b78ff210",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/browser/context.d.ts",
+     "line": 1072,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "__ivyaAriaTypes.renderAriaTree",
+     "code": "renderAriaTree: typeof __ivyaAriaTypes.renderAriaTree"
+    },
+    {
+     "rank": "da874d6391ae54bf204d603e09c1f38b3dbe6b8efdc66d69e6b82fa285a43d69",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/browser/context.d.ts",
+     "line": 1074,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "__ivyaAriaTypes.renderAriaTemplate",
+     "code": "renderAriaTemplate: typeof __ivyaAriaTypes.renderAriaTemplate"
+    },
+    {
+     "rank": "f79f35bc018e434fb2eb80e94159794a4612d948e484d8c0ef794f64ef7e0929",
+     "pin": "vitest-dev/vitest",
+     "file": "packages/browser/context.d.ts",
+     "line": 1070,
+     "kind": "references",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "__ivyaAriaTypes.generateAriaTree",
+     "code": "generateAriaTree: typeof __ivyaAriaTypes.generateAriaTree"
+    },
+    {
+     "rank": "fb257e86072fff0c22ed8b0bf16274c1b52d034995927b5204f708ed5c41b6c3",
+     "pin": "vitest-dev/vitest",
+     "file": "test/unit/test/module.test.ts",
+     "line": 12,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "not-a-module"
+     ],
+     "target": "a",
+     "code": "import cjs, { a, b } from '../src/cjs/module-cjs'"
+    }
+   ]
+  },
+  {
+   "reason": "createrequire-base",
+   "links": 9,
+   "pins": {
+    "vercel/turborepo": 9
+   },
+   "kinds": {
+    "imports": 4,
+    "calls": 5
+   },
+   "sites": [
+    {
+     "rank": "03a08cf7f82d69ad7c5ddc89123a9d8742fc35785d5dfa1657d25897e1a5d779",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/located.cjs",
+     "line": 35,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "./x.js",
+     "code": "onst require = createRequire(path.join(__dirname, '../../other/noop.js')); return require('./x.js'); }"
+    },
+    {
+     "rank": "2f08cffe6ab7fd0bc30ba19cd9b8983b8538f3e93b87a33f549e9a7d874f3957",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/nft/module-create-require-named-require/input.mjs",
+     "line": 5,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "./lib.node",
+     "code": "const lib = require('./lib.node');"
+    },
+    {
+     "rank": "41cd925ff43e8d9a2d83b09a47122a39e840117ff17e833821f6e1710de1c26f",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/located.cjs",
+     "line": 37,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "fo-dep",
+     "code": "onst require = createRequire(path.join(__dirname, '../../other/noop.js')); return require('fo-dep'); }"
+    },
+    {
+     "rank": "55730e7855e7648ba8cdf1978a65b123905726528ac6cded7d86f951106898b8",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/located.cjs",
+     "line": 37,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "require",
+     "code": "re() { const require = createRequire(path.join(__dirname, '../../other/noop.js')); return require('fo-dep'); }"
+    },
+    {
+     "rank": "60280674bdcf1656bdd30c7ad46d26a2f87b38bb2181d7072957cb371ffad252",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/nft/module-create-require-named-require/input.mjs",
+     "line": 5,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "require",
+     "code": "const lib = require('./lib.node');"
+    },
+    {
+     "rank": "b4d551ca2fa92fd204a3b0e1145669e18770b114b58801d2510733e0169f734c",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/located.cjs",
+     "line": 35,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "require",
+     "code": "ed() { const require = createRequire(path.join(__dirname, '../../other/noop.js')); return require('./x.js'); }"
+    },
+    {
+     "rank": "d6eda46422fb24989d55981cb48a8207b2937bf6160db16b08380a4dbbfbaeac",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/located.cjs",
+     "line": 71,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "fs",
+     "code": "() { const require = createRequire(path.join(__dirname, dir, 'z.js')); const fs = require('fs'); return fs.readFileSync(path.join(__dirname, 'fx/a.json')); }"
+    },
+    {
+     "rank": "e36e16ee9c8766353646d7b67fc67c535e9f95b1ca52e749a6de2c52ceb261e8",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/located.cjs",
+     "line": 71,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "fs.readFileSync",
+     "code": "e = createRequire(path.join(__dirname, dir, 'z.js')); const fs = require('fs'); return fs.readFileSync(path.join(__dirname, 'fx/a.json')); }"
+    },
+    {
+     "rank": "f8d2d4faf76decf2bf8ad7264daf6d5ca2bd83fe518b8ded77b70b6420da863a",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/located.cjs",
+     "line": 71,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "createrequire-base"
+     ],
+     "target": "require",
+     "code": "builtins() { const require = createRequire(path.join(__dirname, dir, 'z.js')); const fs = require('fs'); return fs.readFileSync(path.join(__dirname, 'fx/a.json')); }"
+    }
+   ]
+  },
+  {
+   "reason": "ambiguous-project",
+   "links": 6,
+   "pins": {
+    "honojs/hono": 5,
+    "vitejs/vite": 1
+   },
+   "kinds": {
+    "calls": 5,
+    "imports": 1
+   },
+   "sites": [
+    {
+     "rank": "2db31dd598a58a837c8541e925e1e4d4b6844e65da53ef763bbb3c35dc698e76",
+     "pin": "honojs/hono",
+     "file": "src/middleware/timing/timing.ts",
+     "line": 219,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "ambiguous-project"
+     ],
+     "target": "metrics.timers.get",
+     "code": "const timer = metrics.timers.get(name)"
+    },
+    {
+     "rank": "8ffb8043d1050e1a0dc7a0904bfdd8e01d595bbe46e4e180594537bfae52660a",
+     "pin": "honojs/hono",
+     "file": "src/middleware/timing/timing.ts",
+     "line": 171,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "ambiguous-project"
+     ],
+     "target": "metrics.headers.push",
+     "code": "metrics.headers.push(metric)"
+    },
+    {
+     "rank": "adb029af815b5966d080cbf655d7bebc5c5ac499d4bc4335c856fd1f29b7e657",
+     "pin": "honojs/hono",
+     "file": "src/middleware/timing/timing.ts",
+     "line": 176,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "ambiguous-project"
+     ],
+     "target": "metrics.headers.push",
+     "code": "metrics.headers.push(metric)"
+    },
+    {
+     "rank": "b12d0f1e336411bc147ecc1097c4bcdf706167169316179bca376badf3a715a4",
+     "pin": "vitejs/vite",
+     "file": "packages/vite/src/types/alias.d.ts",
+     "line": 30,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "ambiguous-project"
+     ],
+     "target": "rolldown",
+     "code": "import type { FunctionPluginHooks } from 'rolldown'"
+    },
+    {
+     "rank": "b43981265996aad0d1d4a2d4fd8f0d60ef4edba0350ae5f2284e4a4bab998fec",
+     "pin": "honojs/hono",
+     "file": "src/middleware/timing/timing.ts",
+     "line": 229,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "ambiguous-project"
+     ],
+     "target": "metrics.timers.delete",
+     "code": "metrics.timers.delete(name)"
+    },
+    {
+     "rank": "c69c73a1a3465c2851f641827c2a13552ce2140a6c31dd345009eadf4f66a64e",
+     "pin": "honojs/hono",
+     "file": "src/middleware/timing/timing.ts",
+     "line": 198,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "ambiguous-project"
+     ],
+     "target": "metrics.timers.set",
+     "code": "metrics.timers.set(name, { description, start: getTime() })"
+    }
+   ]
+  },
+  {
+   "reason": "(no reason)",
+   "links": 6,
+   "pins": {
+    "mermaid-js/mermaid": 1,
+    "vercel/turborepo": 3,
+    "withastro/astro": 2
+   },
+   "kinds": {
+    "calls": 4,
+    "imports": 2
+   },
+   "sites": [
+    {
+     "rank": "56d3d37c48eb530ebe5eee9588a31a54eecfd95478dd038b5088a7ba53a7451f",
+     "pin": "withastro/astro",
+     "file": "packages/integrations/markdoc/test/fixtures/render-this-context/markdoc.config.ts",
+     "line": 13,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [],
+     "target": "Markdoc.Tag",
+     "code": "return new Markdoc.Tag(this.render, {"
+    },
+    {
+     "rank": "5cb7863085fba57a539069b6f86ed665266779ca671e8ec5c645b6146467990c",
+     "pin": "vercel/turborepo",
+     "file": "examples/kitchen-sink/packages/config-eslint/remix.js",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [],
+     "target": "resolve",
+     "code": "const { resolve } = require(\"node:path\");"
+    },
+    {
+     "rank": "872165a22abca96e5c667210fb5a28b55cf9451555be2acecc5f76906bee72a1",
+     "pin": "mermaid-js/mermaid",
+     "file": "packages/examples/src/example.spec.ts",
+     "line": 59,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [],
+     "target": "(expression).filter",
+     "code": ".filter((d) => !skippedDiagrams.includes(d.id));"
+    },
+    {
+     "rank": "a16e89083d218c9451440a5e0880b596f873c746984d956d2f7194fad146f443",
+     "pin": "vercel/turborepo",
+     "file": "examples/kitchen-sink/packages/config-eslint/remix.js",
+     "line": 3,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [],
+     "target": "resolve",
+     "code": "const project = resolve(process.cwd(), \"tsconfig.json\");"
+    },
+    {
+     "rank": "b6168c9cfe963bc967083eb80e5e8a3ff4124a2f6942c9f16010b2726f01a0f3",
+     "pin": "vercel/turborepo",
+     "file": "examples/kitchen-sink/packages/config-eslint/remix.js",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [],
+     "target": "node:path",
+     "code": "const { resolve } = require(\"node:path\");"
+    },
+    {
+     "rank": "bc179738c197e70eabce1ceadd75429d5aa8abc9438146b301ce6c23d5026d80",
+     "pin": "withastro/astro",
+     "file": "packages/integrations/markdoc/test/fixtures/render-partials/markdoc.config.ts",
+     "line": 5,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [],
+     "target": "Markdoc.parse",
+     "code": "configured: Markdoc.parse('# Configured partial {% #configured %}'),"
+    }
+   ]
+  },
+  {
+   "reason": "dynamic-scope",
+   "links": 4,
+   "pins": {
+    "vercel/turborepo": 4
+   },
+   "kinds": {
+    "imports": 2,
+    "calls": 2
+   },
+   "sites": [
+    {
+     "rank": "01fb8daf6a1c5ccc4ff728fa9bb9db5437faddcaa52f322382e127a11c0ee09f",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/extract/loaders.js",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "dynamic-scope"
+     ],
+     "target": "module",
+     "code": "const { createRequire } = require('module');"
+    },
+    {
+     "rank": "3a94644f736cb0b1a2de7dcf1f5341ce8bd3f6e4508b88c577c6ccd20c000c87",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/extract/loaders.js",
+     "line": 18,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "dynamic-scope"
+     ],
+     "target": "./after-bundle",
+     "code": "require('./after-bundle');"
+    },
+    {
+     "rank": "613c9075462337d22a5a6a0c26929e31c31b5e69c259b9798512e6b661264155",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/extract/loaders.js",
+     "line": 18,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "dynamic-scope"
+     ],
+     "target": "require",
+     "code": "require('./after-bundle');"
+    },
+    {
+     "rank": "fd886b15865391b8196ac972df52cf423feaa9287202e85fc0abd4dd1e5b437f",
+     "pin": "vercel/turborepo",
+     "file": "crates/turborepo-trace-testkit/fixtures/js/extract/loaders.js",
+     "line": 2,
+     "kind": "calls",
+     "outcome": "unresolved",
+     "reasons": [
+      "dynamic-scope"
+     ],
+     "target": "require",
+     "code": "const { createRequire } = require('module');"
+    }
+   ]
+  },
+  {
+   "reason": "invalid-code",
+   "links": 2,
+   "pins": {
+    "vitejs/vite": 2
+   },
+   "kinds": {
+    "imports": 2
+   },
+   "sites": [
+    {
+     "rank": "15acf387b79ccb3dd563579013cd4cca9524f783b003b48d8e4693b264c55f6e",
+     "pin": "vitejs/vite",
+     "file": "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error-dep.js",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "invalid-code"
+     ],
+     "target": "./syntax-error.js",
+     "code": "import './syntax-error.js'"
+    },
+    {
+     "rank": "389e14db6c22c2792823f044d96b8bd76865b614350dcb126ee6484a618fc2c2",
+     "pin": "vitejs/vite",
+     "file": "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error-dep.ts",
+     "line": 1,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "invalid-code"
+     ],
+     "target": "./syntax-error.ts",
+     "code": "import './syntax-error.ts'"
+    }
+   ]
+  },
+  {
+   "reason": "target-unavailable",
+   "links": 2,
+   "pins": {
+    "vitejs/vite": 2
+   },
+   "kinds": {
+    "imports": 2
+   },
+   "sites": [
+    {
+     "rank": "2a1126cbce4f4e552d3495a95c2192368cac85de53cf979ca636bc835d4bc751",
+     "pin": "vitejs/vite",
+     "file": "playground/test-utils.ts",
+     "line": 11,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "target-unavailable"
+     ],
+     "target": "default",
+     "code": "import colors from 'css-color-names'"
+    },
+    {
+     "rank": "5444a56ad375df314b4e1cda313e2efa711ee099ab25e9f082fa1c119bb3a14a",
+     "pin": "vitejs/vite",
+     "file": "playground/tsconfig-json-load-error/src/main.ts",
+     "line": 2,
+     "kind": "imports",
+     "outcome": "unresolved",
+     "reasons": [
+      "target-unavailable"
+     ],
+     "target": "../has-error/main",
+     "code": "import '../has-error/main'"
+    }
+   ]
+  }
+ ]
+}
