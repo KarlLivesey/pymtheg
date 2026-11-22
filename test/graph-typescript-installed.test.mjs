@@ -1692,6 +1692,110 @@ test("a failed file that may be a script withholds library targets, though it sp
   }
 });
 
+test("module detection, JSX runtimes and resolution modes decide whether an unread file can change a target", async () => {
+  const canvas =
+    'const c = document.createElement("canvas");\nc.getContext("2d");\nexport {};\n';
+  const config = (extra) =>
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        types: [],
+        lib: ["es2022", "dom"],
+        ...extra,
+      },
+      include: ["src"],
+    });
+  const overload =
+    'interface Document { createElement(tagName: "canvas"): OffscreenCanvas }\n';
+  const cases = {
+    // Under legacy detection a .cts without import/export is a script.
+    "a legacy-detected .cts script": {
+      files: {
+        "tsconfig.json": config({ moduleDetection: "legacy" }),
+        "src/glob.cts": `${overload}let = ;\n`,
+        "src/main.ts": canvas,
+      },
+      broken: "src/glob.cts",
+      site: "c.getContext",
+      expected: "not definite",
+    },
+    // Under the default detection the same .cts is a module.
+    "a .cts under default detection": {
+      files: {
+        "tsconfig.json": config({}),
+        "src/glob.cts": "const local = 1;\nlet = ;\n",
+        "src/main.ts": canvas,
+      },
+      broken: "src/glob.cts",
+      site: "c.getContext",
+      expected: "HTMLCanvasElement.prototype.getContext",
+    },
+    // The pragma imports pkg/jsx-runtime, whose typings merge into Document.
+    "an unread .tsx with @jsxImportSource": {
+      files: {
+        "tsconfig.json": config({ jsx: "react-jsx" }),
+        "node_modules/pkg/package.json": JSON.stringify({
+          name: "pkg",
+          version: "1.0.0",
+          exports: { "./jsx-runtime": { types: "./jsx-runtime.d.ts" } },
+        }),
+        "node_modules/pkg/jsx-runtime.d.ts": `export {};\ndeclare global { ${overload} }\nexport declare function jsx(...args: any[]): any;\n`,
+        "src/view.tsx":
+          "/** @jsxImportSource pkg */\nexport const v = 1;\nlet = ;\n",
+        "src/main.ts": canvas,
+      },
+      broken: "src/view.tsx",
+      site: "c.getContext",
+      expected: "not definite",
+    },
+    // A dual-format package: the program loads the require typings, the
+    // unread ES module would load the import typings.
+    "an unread ES module importing the other format of a dual package": {
+      files: {
+        "tsconfig.json": config({
+          module: "node16",
+          moduleResolution: "node16",
+        }),
+        "node_modules/dual/package.json": JSON.stringify({
+          name: "dual",
+          version: "1.0.0",
+          exports: {
+            ".": {
+              import: { types: "./index.d.mts" },
+              require: { types: "./index.d.cts" },
+            },
+          },
+        }),
+        "node_modules/dual/index.d.cts":
+          "export declare const value: number;\n",
+        "node_modules/dual/index.d.mts": `export declare const value: number;\ndeclare global { ${overload} }\n`,
+        "src/main.cts": `import dual = require("dual");\nexport const n = dual.value;\n${canvas.replace("export {};\n", "")}`,
+        "src/other.mts": 'import "dual";\nexport const z = 1;\nlet = ;\n',
+      },
+      broken: "src/other.mts",
+      file: "src/main.cts",
+      site: "c.getContext",
+      expected: "not definite",
+    },
+  };
+  for (const [
+    variant,
+    { files, broken, file, site, expected },
+  ] of Object.entries(cases)) {
+    const { request, read, write } = await project();
+    await domLayout(write, files);
+    await request("index");
+    read((store, call) => {
+      assert.equal(store.getFile(broken).result.status, "failed", variant);
+      assert.equal(
+        definiteSymbol(call(file ?? "src/main.ts", site)),
+        expected,
+        variant,
+      );
+    });
+  }
+});
+
 test("a failed module unrelated to the reference keeps the library target", async () => {
   const { request, read, write } = await project();
   await domLayout(write, {

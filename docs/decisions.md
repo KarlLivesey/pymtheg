@@ -3075,21 +3075,29 @@ declarations are its own: it reaches the global scope or another module only
 through `declare global`, `declare module` or `export as namespace`. So the
 library target is kept only when every unread file in the program:
 
-- is provably a module: a non-declaration `.mts`, `.cts`, `.mjs` or `.cjs`
-  file, or a file whose parsed text has a top-level `import` or `export`
-  statement ending before the first parse error;
+- is provably a module as the compiler decides for this program: either the
+  options and the file's implied format make it one with no syntax (an
+  empty parse with `ts.getSetExternalModuleIndicator(options)` is a module;
+  never under `"moduleDetection": "legacy"`), or its parsed text has a
+  top-level `import` or `export` statement ending before the first parse
+  error;
 - spells none of the names involved (the reference, its receiver chain, the
   target's path);
 - has no `declare`, `global`, `namespace` or `module` token, no triple-slash
-  reference and no `\u` escape;
-- imports only modules the program already loads.
+  directive, no JSX runtime pragma (`@jsxImportSource`, `@jsxRuntime`) and
+  no `\u` escape;
+- imports only modules the program already loads, each resolved in the mode
+  the compiler would use (both modes where the parse shows none), including
+  the runtime modules the options import with no text (the JSX runtime for
+  `.tsx`/`.jsx`, `tslib` under `importHelpers`).
 
 The existing taint checks still decide bindings and receivers that reach the
 unread file. Such a kept link carries no `no-unseen-declarations`
 assumption, because it has been checked. Not covered: a failed file that is
 a script or a `.d.ts` without module syntax before its error withholds as
 before, and so does a CommonJS file (`module.exports` spells `module`). A
-const assertion is not a reference and stores no link. A manifest range the
+file whose text is not valid UTF-8 never joins the unread set (a known
+limit, as on main). A const assertion is not a reference and stores no link. A manifest range the
 compiler's semver parser throws on is an unknown range: it identifies the
 registry dependency and never yields a version pin.
 [C-39](changes/C-39.md)
