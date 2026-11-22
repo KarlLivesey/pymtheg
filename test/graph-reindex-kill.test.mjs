@@ -44,7 +44,7 @@ const killAt = (root, n) =>
  * after its nth write on a fresh copy, then checks one normal re-index
  * against a cold index. Returns the number of write boundaries tried.
  */
-async function everyKillPoint(files, edit) {
+async function everyKillPoint(files, edit, { scoped } = {}) {
   const base = mkdtempSync(join(tmpdir(), "c22-kill-"));
   try {
     const start = join(base, "start");
@@ -71,6 +71,12 @@ async function everyKillPoint(files, edit) {
     const unkilled = await killAt(whole, 0);
     const writes = Number(/^not killed (\d+)/.exec(unkilled.out)?.[1]);
     assert.ok(writes > 0, unkilled.out);
+    if (scoped !== undefined)
+      assert.equal(
+        Number(/ scoped (\d+)/.exec(unkilled.out)?.[1]),
+        scoped,
+        `Rust files re-decided alone: ${unkilled.out}`,
+      );
     assert.deepEqual(compareRows(storeRows(graph(whole)), cold), []);
     for (let n = 1; n <= writes; n++) {
       const root = join(base, `kill-${n}`);
@@ -191,20 +197,25 @@ test("Rust: a re-index killed after any write is repaired by the next one", asyn
   t.diagnostic(`write boundaries: ${tried}`);
 });
 
-test("Rust: a killed scoped re-index is repaired by the next one", async (t) => {
-  const a = "pub fn hello() -> u32 {\n    1\n}\n";
-  const tried = await everyKillPoint(
-    {
-      "Cargo.toml":
-        '[package]\nname = "fixture"\nversion = "0.1.0"\nedition = "2021"\n',
-      "src/lib.rs": "pub mod a;\npub mod b;\n",
-      "src/a.rs": a,
-      "src/b.rs":
-        "use crate::a::hello;\n\npub fn b() -> u32 {\n    hello()\n}\n",
-    },
-    // A comment keeps a.rs's surface: only a.rs is re-decided.
-    { "src/a.rs": "// moved\n" + a },
-  );
-  assert.ok(tried >= 3, `write boundaries tried: ${tried}`);
-  t.diagnostic(`write boundaries: ${tried}`);
-});
+for (const [name, edit] of [
+  ["leading", (a) => "// moved\n" + a],
+  ["trailing", (a) => a + "// trailing\n"],
+])
+  test(`Rust: a killed scoped re-index with a ${name} comment is repaired by the next one`, async (t) => {
+    const a = "pub fn hello() -> u32 {\n    1\n}\n";
+    const tried = await everyKillPoint(
+      {
+        "Cargo.toml":
+          '[package]\nname = "fixture"\nversion = "0.1.0"\nedition = "2021"\n',
+        "src/lib.rs": "pub mod a;\npub mod b;\n",
+        "src/a.rs": a,
+        "src/b.rs":
+          "use crate::a::hello;\n\npub fn b() -> u32 {\n    hello()\n}\n",
+      },
+      // A comment keeps a.rs's surface: only a.rs is re-decided.
+      { "src/a.rs": edit(a) },
+      { scoped: 1 },
+    );
+    assert.ok(tried >= 3, `write boundaries tried: ${tried}`);
+    t.diagnostic(`write boundaries: ${tried}`);
+  });

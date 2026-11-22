@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { contentHash } from "../../identity.js";
 import type { Json, ParseResult } from "../../types.js";
+import { linkOrder, symbolOrder } from "./order.js";
 
 /**
  * C-36: link kinds the Rust resolver only decides. No other file's lookup,
@@ -34,10 +35,12 @@ const record = (value: unknown): Fields =>
  * written, so an unlisted offset can only make two fingerprints differ.
  *
  * `surface` keeps what another file's resolution can read: the file data,
- * every symbol, and the links of other than file-local kinds. Each kept link
- * keeps its index in the file's link list, which fixes its store id and so
- * the order in which the resolver meets it. `all` keeps every link, for a
- * file whose lookups are the same before and after an edit.
+ * every symbol, and the links of other than file-local kinds. Symbols and
+ * links are listed in the order the resolver meets them (C-24's position
+ * order, computed from the written values), so an edit that changes that
+ * order changes the fingerprint. A link's index in the file's list fixes only
+ * its store id, which no other file's decision reads. `all` keeps every
+ * link, for a file whose lookups are the same before and after an edit.
  */
 export function rustFingerprint(
   result: ParseResult,
@@ -53,9 +56,15 @@ export function fingerprintText(
   facts: "surface" | "all",
 ): string | undefined {
   if (result.status !== "clean") return undefined;
-  const links = result.links
-    .map((link, index) => ({ link, index }))
-    .filter(({ link }) => facts === "all" || !FILE_LOCAL_LINKS.has(link.kind));
+  // In the order the resolver meets them, computed from the written values.
+  const links = linkOrder(
+    result.links
+      .filter((link) => facts === "all" || !FILE_LOCAL_LINKS.has(link.kind))
+      .map((link) => ({ ...link, file: "", origin: "parse" })),
+  ).map((link) => ({ link }));
+  const symbols = symbolOrder(
+    result.symbols.map((symbol) => ({ ...symbol, file: "" })),
+  );
   const data = record(result.data);
   const offsets = new Set<number>();
   const keep = (value: unknown) => {
@@ -65,7 +74,13 @@ export function fingerprintText(
     keep(record(value).start);
     keep(record(value).end);
   };
-  for (const symbol of result.symbols) {
+  // The file symbol always spans the whole text, from 0 to its length, and
+  // serves only as the file's own scope. Ranking its range with the items
+  // would tie its start to a first item at offset 0 until a leading comment
+  // moves that item.
+  const whole = (symbol: { key: string }) => symbol.key === "file";
+  for (const symbol of symbols) {
+    if (whole(symbol)) continue;
     keepSpan(symbol.range);
     keep(itemOffset(symbol.key));
   }
@@ -152,17 +167,17 @@ export function fingerprintText(
       opaqueAttributes: rankStarts("opaqueAttributes"),
       standardMacroScopes: rankStarts("standardMacroScopes"),
     },
-    result.symbols.map((symbol) => [
+    symbols.map((symbol) => [
       rankKey(symbol.key),
       symbol.name,
       symbol.kind,
       symbol.identity,
-      rank(symbol.range.start),
-      rank(symbol.range.end),
+      ...(whole(symbol)
+        ? ["whole-file", "whole-file"]
+        : [rank(symbol.range.start), rank(symbol.range.end)]),
       symbol.data ?? null,
     ]),
-    links.map(({ link, index }) => [
-      index,
+    links.map(({ link }) => [
       link.kind,
       link.targetName,
       rankKey(link.sourceKey),

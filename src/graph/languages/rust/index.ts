@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT
 import type { ContextFile, GraphFile, LanguageModule } from "../../types.js";
 import { crates } from "./cargo.js";
-import type { AddedLink, GraphLink, GraphSymbol, Json } from "../../types.js";
+import type { AddedLink, Json } from "../../types.js";
 import { parseRust } from "./parse.js";
-import { compare, fileFacts } from "../../identity.js";
+import { fileFacts } from "../../identity.js";
 import { resolveRust, type RustDecisionScope } from "./resolve.js";
 import { count } from "../../work.js";
 import { macroScopeAssumption } from "./macro-scope.js";
 import { runRustPhase } from "./phase-runner.js";
 import { rustFingerprint } from "./incremental.js";
+import { linkOrder, pathOrder, symbolOrder } from "./order.js";
 
 const TARGET_HINT_LIMIT = 16;
 
@@ -22,41 +23,6 @@ type RustAnalysisInput = {
 
 const cargoInputs = (files: readonly ContextFile[]) =>
   files.map(({ path, status, text }) => ({ path, status, text }));
-
-// C-24: stores list rows by id, and every id includes the project's random
-// id, so two indexes of one snapshot list the same rows in different orders.
-// Lookups through glob cycles can depend on which lookup ran first, so the
-// Rust phases take their inputs in an order the snapshot alone fixes: path,
-// then position, then what is written there.
-const pathOrder = <T extends { path: string }>(items: readonly T[]): T[] =>
-  [...items].sort((a, b) => compare(a.path, b.path));
-const bySite = <
-  T extends {
-    file: string;
-    range: { start: number; end: number };
-    kind: string;
-    data?: Json | undefined;
-  },
->(
-  items: readonly T[],
-  written: (item: T) => string[],
-): T[] =>
-  [...items].sort(
-    (a, b) =>
-      compare(a.file, b.file) ||
-      a.range.start - b.range.start ||
-      a.range.end - b.range.end ||
-      compare(a.kind, b.kind) ||
-      written(a).reduce(
-        (order, part, i) => order || compare(part, written(b)[i]!),
-        0,
-      ) ||
-      compare(JSON.stringify(a.data ?? null), JSON.stringify(b.data ?? null)),
-  );
-const symbolOrder = (symbols: readonly GraphSymbol[]) =>
-  bySite(symbols, (s) => [s.key, s.identity, s.name]);
-const linkOrder = (links: readonly GraphLink[]) =>
-  bySite(links, (l) => [l.origin, l.targetName, l.sourceKey ?? ""]);
 
 type Crates = ReadonlyMap<string, ReturnType<typeof crates>[number]>;
 export const crateRoots = (

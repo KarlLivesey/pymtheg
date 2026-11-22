@@ -1234,8 +1234,105 @@ test("Rust: an unparseable file is repaired by the next index", async () => {
   ]);
 });
 
+// C-36 review: a method call through a three-module glob chain. The trait
+// risk of `prelude` once depended on which file's call computed it first.
+function preludeCrate(others) {
+  const files = {
+    "Cargo.toml":
+      '[package]\nname = "preludeprobe"\nversion = "0.1.0"\nedition = "2021"\n',
+    "src/prelude.rs": "pub use crate::shapes::*;\n",
+    "src/util.rs": "pub fn helper() -> u32 {\n    1\n}\n",
+    "src/shapes.rs":
+      "use crate::util::*;\n\npub struct Rect {\n    pub w: u32,\n}\n\nimpl Rect {\n    pub fn area(&self) -> u32 {\n        self.w * helper()\n    }\n}\n",
+    "src/widget.rs":
+      "use crate::prelude::*;\n\npub fn draw(r: Rect) -> u32 {\n    r.area()\n}\n",
+  };
+  const modules = ["prelude", "util", "shapes", "widget"];
+  for (let i = 0; i < others; i++) {
+    files[`src/other${i}.rs`] =
+      `use crate::prelude::*;\n\npub fn make${i}() -> Rect {\n    Rect { w: ${i} }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    fn check(r: Rect) -> u32 {\n        r.area()\n    }\n}\n`;
+    modules.push(`other${i}`);
+  }
+  files["src/lib.rs"] = modules.map((m) => `pub mod ${m};\n`).join("");
+  return files;
+}
+/** File and identity of the target of the call named `name` in `file`. */
+function callTarget(store, file, name) {
+  const [link] = store
+    .links()
+    .filter((l) => l.file === file && l.targetName === name);
+  const target = link?.targetId ? store.getSymbol(link.targetId) : undefined;
+  return target ? `${target.file}:${target.identity}` : null;
+}
+
+test("Rust: a glob-chain method call re-decided alone equals cold", async () => {
+  await equalAfterEveryStep(preludeCrate(6), [
+    {
+      name: "doc comment in widget",
+      edit: (t) =>
+        t.write(
+          "src/widget.rs",
+          preludeCrate(0)["src/widget.rs"].replace(
+            "pub fn draw",
+            "/// Draws.\npub fn draw",
+          ),
+        ),
+      check: (store, work) => {
+        assert.equal(work["analyze.rust.scopedFiles"], 1);
+        assert.equal(
+          callTarget(store, "src/widget.rs", "r.area"),
+          "src/shapes.rs:impl Rect::area",
+        );
+      },
+    },
+  ]);
+});
+
+test("Rust: removing a glob-chain call leaves other files' decisions as cold", async () => {
+  await equalAfterEveryStep(preludeCrate(1), [
+    {
+      name: "remove the call in widget",
+      edit: (t) =>
+        t.write(
+          "src/widget.rs",
+          preludeCrate(0)["src/widget.rs"].replace("r.area()", "0"),
+        ),
+      check: (store, work) =>
+        assert.equal(work["analyze.rust.scopedFiles"], 1),
+    },
+  ]);
+});
+
+test("Rust: a glob-chain method call has one cold answer whatever other files call it", async () => {
+  const answers = [];
+  for (const others of [0, 6]) {
+    const root = mkdtempSync(join(tmpdir(), "c36-prelude-"));
+    try {
+      for (const [path, text] of Object.entries(preludeCrate(others))) {
+        mkdirSync(dirname(join(root, path)), { recursive: true });
+        writeFileSync(join(root, path), text);
+      }
+      const store = new SqliteGraphStore(join(root, "graph.sqlite"));
+      try {
+        await indexProject(root, registry, store);
+        answers.push(callTarget(store, "src/widget.rs", "r.area"));
+      } finally {
+        store.close();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  // rustc: `r.area()` on an owned `Rect` with no trait in scope calls the
+  // inherent `Rect::area`.
+  assert.deepEqual(answers, [
+    "src/shapes.rs:impl Rect::area",
+    "src/shapes.rs:impl Rect::area",
+  ]);
+});
+
 test("Rust: a body edit inside a glob cycle uses the full pass", async () => {
-  const runner = `use super::*;
+  const runner = `pub use super::*;
 
 pub fn run(server: &AppServer) -> u32 {
     server.port()
@@ -1248,7 +1345,7 @@ pub fn run(server: &AppServer) -> u32 {
       "src/lib.rs": "mod serve;\npub use serve::*;\n",
       "src/serve/mod.rs":
         "mod runner;\nmod server;\npub use runner::*;\npub use server::*;\n",
-      "src/serve/server.rs": `use super::*;
+      "src/serve/server.rs": `pub use super::*;
 
 pub struct AppServer;
 

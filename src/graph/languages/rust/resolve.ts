@@ -748,8 +748,15 @@ export function resolveRust(
     const key = JSON.stringify(origin),
       cached = helperCache.get(key);
     if (cached !== undefined) return cached;
-    if (helperBusy.has(key)) return true;
+    if (helperBusy.has(key)) {
+      // C-36: the answer of a helper already being decided depends on the
+      // caller's stack, like a lookup cycle cut.
+      cycleCuts++;
+      if (activeLookup) activeLookup.trace.valid = false;
+      return true;
+    }
     helperBusy.add(key);
+    const helperCuts = cycleCuts;
     let shadow = false;
     try {
       for (const own of ownerPlace(origin.file, origin.scope)) {
@@ -802,7 +809,7 @@ export function resolveRust(
           loc = loc.parent;
         }
       }
-      helperCache.set(key, shadow);
+      if (cycleCuts === helperCuts) helperCache.set(key, shadow);
       clearIncompleteLookups();
       return shadow;
     } finally {
@@ -815,6 +822,7 @@ export function resolveRust(
     const key = JSON.stringify(origin),
       cached = attributeShadowCache.get(key);
     if (cached !== undefined) return cached;
+    const shadowCuts = cycleCuts;
     const head = origin.name.split("::")[0]!,
       rule = attributeRules.get(head);
     let result = false;
@@ -853,7 +861,7 @@ export function resolveRust(
           parent = parent.parent;
         }
       }
-    attributeShadowCache.set(key, result);
+    if (cycleCuts === shadowCuts) attributeShadowCache.set(key, result);
     return result;
   }
   let attributeContextReady = false;
@@ -865,6 +873,7 @@ export function resolveRust(
   function itemPresence(item: GraphSymbol | GraphLink): string[] {
     const cached = itemPresenceCache.get(item.id);
     if (cached) return cached;
+    const presenceCuts = cycleCuts;
     const attributes = [
       ...new Set([
         ...((data(item).opaqueItemAttributes ?? []) as string[]),
@@ -886,7 +895,7 @@ export function resolveRust(
         ),
       ]),
     ].sort();
-    itemPresenceCache.set(item.id, attributes);
+    if (cycleCuts === presenceCuts) itemPresenceCache.set(item.id, attributes);
     return attributes;
   }
   const possible = (conditions: readonly string[]): boolean => {
@@ -2469,8 +2478,8 @@ export function resolveRust(
       // With no remaining member path this IS the head-namespace lookup.
       // Reuse its exact result, including uncertainty, rather than recursively
       // repeating incomplete reexport chains while proving the same binding.
-      if (!rest.length)
-        importHeads.set(l.id, { found, cycleFree: cycleCuts === before });
+      if (!rest.length && cycleCuts === before)
+        importHeads.set(l.id, { found, cycleFree: true });
       return found;
     };
     if (declared.length) {
@@ -3076,8 +3085,6 @@ export function resolveRust(
       if (observedIncompleteGuards.has(cacheKey)) clearIncompleteLookups();
       if (scopeMode === "baseline") memo.set(guard, result);
       else {
-        if (retryMemo.size >= 8192)
-          retryMemo.delete(retryMemo.keys().next().value!);
         retryMemo.set(cacheKey, result);
       }
     } else if (trace && stateKey !== undefined) {
@@ -5383,91 +5390,103 @@ export function resolveRust(
    * standard traits by name, any checkout-resolved name (whose traits are
    * known), and anything else as an unknown trait source.
    */
-  function traitRisk(scope: string, place: Place, depth = 0): TraitRisk {
+  function traitRisk(scope: string, place: Place): TraitRisk {
     const key = `${place.file}|${place.crate.root}|${place.local}|${scope}`;
     const cached = riskCache.get(key);
     if (cached) return cached;
+    // C-36: the risk is the union over every scope the glob imports reach.
+    // A union does not depend on where the walk entered a glob chain or
+    // cycle, so the cached answer is the same whichever caller asks first.
+    // An earlier walk stopped at three nested globs and counted a provisional
+    // answer for a scope already being walked, which depended on the caller.
     const risk: TraitRisk = {
       other: false,
       standard: new Set(),
       standardGlob: false,
       glob: false,
     };
-    // A glob cycle is not proved here; the provisional entry says so.
-    riskCache.set(key, { ...risk, other: true });
-    let s = scope;
-    while (true) {
-      if (opaqueScopes.has(`${place.crate.root}|${qualified(place, s)}`))
-        risk.other = true;
-      for (const l of importsInScope.get(`${place.file}|${s}`) ?? []) {
-        const d = data(l);
-        if (d.externCrate) continue;
-        const raw = compact(l.targetName).replace(/::\*$/, "");
-        if (d.glob) risk.glob = true;
-        if (standardPath(raw, place, s)) {
-          if (d.glob) risk.standardGlob = true;
-          else risk.standard.add(lastSegment(raw));
-          continue;
-        }
-        if (d.glob) {
-          const target = find(raw, place, s, "type");
-          if (
-            depth >= 3 ||
-            !target.complete ||
-            !target.symbols.length ||
-            target.failedFiles?.length
-          ) {
-            risk.other = true;
+    const riskCuts = cycleCuts;
+    const visited = new Set<string>();
+    const visit = (scope: string, place: Place) => {
+      const at = `${place.file}|${place.crate.root}|${place.local}|${scope}`;
+      if (visited.has(at)) return;
+      visited.add(at);
+      const known = riskCache.get(at);
+      if (known) {
+        risk.other ||= known.other;
+        risk.standardGlob ||= known.standardGlob;
+        risk.glob ||= known.glob;
+        for (const n of known.standard) risk.standard.add(n);
+        return;
+      }
+      let s = scope;
+      while (true) {
+        if (opaqueScopes.has(`${place.crate.root}|${qualified(place, s)}`))
+          risk.other = true;
+        for (const l of importsInScope.get(`${place.file}|${s}`) ?? []) {
+          const d = data(l);
+          if (d.externCrate) continue;
+          const raw = compact(l.targetName).replace(/::\*$/, "");
+          if (d.glob) risk.glob = true;
+          if (standardPath(raw, place, s)) {
+            if (d.glob) risk.standardGlob = true;
+            else risk.standard.add(lastSegment(raw));
             continue;
           }
-          for (const m of target.symbols) {
-            if (m.kind === "enum") continue;
-            const bodies =
-              m.kind !== "module"
-                ? []
-                : data(m).unit
-                  ? [roots.get(m.file)!].filter(Boolean)
-                  : (modulePlaces.get(m.id) ?? []);
-            if (!bodies.length) risk.other = true;
-            for (const body of bodies) {
-              const inner = traitRisk(body.local, body, depth + 1);
-              risk.other ||= inner.other;
-              risk.standardGlob ||= inner.standardGlob;
-              risk.glob ||= inner.glob;
-              for (const n of inner.standard) risk.standard.add(n);
+          if (d.glob) {
+            const target = find(raw, place, s, "type");
+            if (
+              !target.complete ||
+              !target.symbols.length ||
+              target.failedFiles?.length
+            ) {
+              risk.other = true;
+              continue;
             }
+            for (const m of target.symbols) {
+              if (m.kind === "enum") continue;
+              const bodies =
+                m.kind !== "module"
+                  ? []
+                  : data(m).unit
+                    ? [roots.get(m.file)!].filter(Boolean)
+                    : (modulePlaces.get(m.id) ?? []);
+              if (!bodies.length) risk.other = true;
+              for (const body of bodies) visit(body.local, body);
+            }
+            continue;
           }
-          continue;
+          const name = compact(l.targetName);
+          activeMacroImports.push(l);
+          let r: Found;
+          try {
+            r = findUsePath(
+              name,
+              place,
+              s,
+              "import",
+              new Set(),
+              true,
+              false,
+              !name.includes("::") && d.alias === name,
+            );
+          } finally {
+            activeMacroImports.pop();
+          }
+          if (
+            !r.complete ||
+            !r.symbols.length ||
+            r.failedFiles?.length ||
+            r.possibleImportNames?.length
+          )
+            risk.other = true;
         }
-        const name = compact(l.targetName);
-        activeMacroImports.push(l);
-        let r: Found;
-        try {
-          r = findUsePath(
-            name,
-            place,
-            s,
-            "import",
-            new Set(),
-            true,
-            false,
-            !name.includes("::") && d.alias === name,
-          );
-        } finally {
-          activeMacroImports.pop();
-        }
-        if (
-          !r.complete ||
-          !r.symbols.length ||
-          r.failedFiles?.length ||
-          r.possibleImportNames?.length
-        )
-          risk.other = true;
+        if (!s || s === place.local || !s.startsWith(place.local)) break;
+        s = parentScope(s);
       }
-      if (!s || s === place.local || !s.startsWith(place.local)) break;
-      s = parentScope(s);
-    }
-    riskCache.set(key, risk);
+    };
+    visit(scope, place);
+    if (cycleCuts === riskCuts) riskCache.set(key, risk);
     return risk;
   }
   let checkoutTraitMethodNames: Set<string> | undefined;
@@ -5485,8 +5504,9 @@ export function resolveRust(
   } {
     const cached = outsideCache.get(t.id);
     if (cached) return cached;
+    const outsideCuts = cycleCuts;
     const answer = implementedOutsideUncached(t);
-    outsideCache.set(t.id, answer);
+    if (cycleCuts === outsideCuts) outsideCache.set(t.id, answer);
     return answer;
   }
   function implementedOutsideUncached(t: GraphSymbol): {
@@ -5990,10 +6010,11 @@ export function resolveRust(
       recordReads(scopeTraceOf(cached));
       return cached;
     }
+    const pathCuts = cycleCuts;
     const answer = lookupWithReads(() =>
       pathCallTargetsUncached(name, selfPath, scope, d, targetName, file, loc),
     );
-    pathCallCache.set(key, answer);
+    if (cycleCuts === pathCuts) pathCallCache.set(key, answer);
     return answer;
   }
   function pathCallTargetsUncached(
@@ -6065,7 +6086,6 @@ export function resolveRust(
     r: Data,
     loc: Place,
     site: { file: string; scope: string },
-    depth = 0,
   ): Typing {
     // The call site's scope matters only to an inner method call's autoref
     // check; other recipes carry their own scopes.
@@ -6073,11 +6093,14 @@ export function resolveRust(
     const key = `${site.file}|${text.includes(`"k":"m"`) ? site.scope : ""}|${placeId(loc)}|${text}`;
     const cached = typingCache.get(key);
     if (cached) return cached;
+    const typingCuts = cycleCuts;
     let result: Typing;
+    // C-36: the limit is the length of this recipe's own chain, not the depth
+    // at which it is met, so a cached answer does not depend on its caller.
     const inner = () =>
-      depth > 32
+      chainLength(r) > 33
         ? { gap: "receiver-too-long" }
-        : typing((r.e ?? {}) as Data, loc, site, depth + 1);
+        : typing((r.e ?? {}) as Data, loc, site);
     switch (str(r.k)) {
       case "type": {
         const ref = splitReference(str(r.t));
@@ -6217,8 +6240,15 @@ export function resolveRust(
     }
     if (!isGap(result) && r.im === true && result.borrow === "owned")
       result = { ...result, mutable: false };
-    typingCache.set(key, result);
+    if (cycleCuts === typingCuts) typingCache.set(key, result);
     return result;
+  }
+  /** The number of receiver recipes nested inside . */
+  function chainLength(r: Data): number {
+    let length = 0;
+    for (let e = r.e as Data | undefined; e; e = e.e as Data | undefined)
+      length++;
+    return length;
   }
   /**
    * Calls read from a macro invocation's argument tokens count only when the
