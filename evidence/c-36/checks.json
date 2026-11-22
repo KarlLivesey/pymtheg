@@ -1,0 +1,9 @@
+{
+ "note": "C-36 checks on the dev server, Node 24, on the branch after merging origin/main 2dc05be.",
+ "build": "npm run build: pass",
+ "typeCheck": "tsc --noEmit -p tsconfig.json and -p web/tsconfig.json: pass",
+ "format": "npm run format:check: pass",
+ "sweepTests": "node --test scripts/sweep/*.test.mjs: 30 of 30 pass",
+ "fullSuite": "npm test: 3274 of 3274 pass, after the signal-test change described in the note; the run before it passed 3272 and failed the two analyze-phase signal cases",
+ "focused": "Rust kill tests 2 of 2 and finishing tests 7 of 7 pass on their own; the Rust equality tests pass within the full suite"
+}
