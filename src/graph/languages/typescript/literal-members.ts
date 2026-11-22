@@ -25,7 +25,8 @@ function writtenTypes(
   expression: ts.Expression,
 ): ts.TypeNode[] | undefined {
   const value = unwrap(expression);
-  if (ts.isNonNullExpression(value)) return writtenTypes(checker, value.expression);
+  if (ts.isNonNullExpression(value))
+    return writtenTypes(checker, value.expression);
   if (ts.isCallExpression(value)) {
     const declaration = checker.getResolvedSignature(value)?.declaration;
     return declaration && !ts.isJSDocSignature(declaration) && declaration.type
@@ -65,7 +66,10 @@ function holds(
   if (node === literal) return true;
   if (ts.isParenthesizedTypeNode(node))
     return holds(checker, node.type, literal, depth + 1);
-  if (ts.isTypeOperatorNode(node) && node.operator === ts.SyntaxKind.ReadonlyKeyword)
+  if (
+    ts.isTypeOperatorNode(node) &&
+    node.operator === ts.SyntaxKind.ReadonlyKeyword
+  )
     return holds(checker, node.type, literal, depth + 1);
   // A written union is not reduced: the checker keeps a member of each arm.
   if (ts.isIntersectionTypeNode(node) || ts.isUnionTypeNode(node))
@@ -85,6 +89,100 @@ function holds(
   return false;
 }
 
+/** The single declaration of the value `name` denotes, aliases followed. */
+function declarationOf(
+  checker: ts.TypeChecker,
+  name: ts.Node,
+): ts.Declaration | undefined {
+  let symbol = checker.getSymbolAtLocation(name);
+  if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+    symbol = checker.getAliasedSymbol(symbol);
+  const declarations = symbol?.declarations ?? [];
+  return declarations.length === 1 ? declarations[0] : undefined;
+}
+
+/** Whether `expression` names a module's value: `require(…)`, `import(…)`. */
+function moduleValue(expression: ts.Expression): boolean {
+  const value = unwrap(expression);
+  if (ts.isAwaitExpression(value)) return moduleValue(value.expression);
+  return (
+    ts.isCallExpression(value) &&
+    (value.expression.kind === ts.SyntaxKind.ImportKeyword ||
+      (ts.isIdentifier(value.expression) &&
+        value.expression.text === "require")) &&
+    value.arguments.length === 1 &&
+    ts.isStringLiteralLike(value.arguments[0]!)
+  );
+}
+
+/**
+ * Whether the value of `expression` is one object, never a choice between
+ * several (C-41): a module (an import, `require`, `import()`), an object
+ * literal, a `const` bound to such a value, or a property of such a value
+ * whose single declaration is so. A conditional, a logical operator, an
+ * element access, a `let` or `var`, a parameter, a destructured binding or a
+ * call result can choose, and the checker may have reduced the choice to one
+ * of several identical literal types.
+ */
+export function directValue(
+  checker: ts.TypeChecker,
+  expression: ts.Expression | undefined,
+  depth = 0,
+): boolean {
+  if (!expression || depth > DEPTH) return false;
+  const value = unwrap(expression);
+  if (ts.isNonNullExpression(value))
+    return directValue(checker, value.expression, depth + 1);
+  if (ts.isObjectLiteralExpression(value) || moduleValue(value)) return true;
+  let declaration: ts.Declaration | undefined;
+  if (ts.isIdentifier(value)) declaration = declarationOf(checker, value);
+  else if (ts.isPropertyAccessExpression(value)) {
+    if (!directValue(checker, value.expression, depth + 1)) return false;
+    declaration = declarationOf(checker, value.name);
+  } else return false;
+  return !!declaration && directDeclaration(checker, declaration, depth + 1);
+}
+
+/** Whether the value `declaration` declares is one object (see directValue). */
+function directDeclaration(
+  checker: ts.TypeChecker,
+  declaration: ts.Declaration,
+  depth: number,
+): boolean {
+  if (depth > DEPTH) return false;
+  // A module, namespace, function, class or enum is itself one value.
+  if (
+    ts.isSourceFile(declaration) ||
+    ts.isModuleDeclaration(declaration) ||
+    ts.isFunctionDeclaration(declaration) ||
+    ts.isClassDeclaration(declaration) ||
+    ts.isEnumDeclaration(declaration)
+  )
+    return true;
+  if (ts.isVariableDeclaration(declaration))
+    return (
+      ts.isIdentifier(declaration.name) &&
+      ts.isVariableDeclarationList(declaration.parent) &&
+      !!(declaration.parent.flags & ts.NodeFlags.Const) &&
+      !!declaration.initializer &&
+      directValue(checker, declaration.initializer, depth + 1)
+    );
+  if (ts.isPropertyAssignment(declaration))
+    return directValue(checker, declaration.initializer, depth + 1);
+  if (ts.isShorthandPropertyAssignment(declaration)) {
+    let value = checker.getShorthandAssignmentValueSymbol(declaration);
+    if (value && value.flags & ts.SymbolFlags.Alias)
+      value = checker.getAliasedSymbol(value);
+    const target = value?.declarations ?? [];
+    return (
+      target.length === 1 && directDeclaration(checker, target[0]!, depth + 1)
+    );
+  }
+  if (ts.isExportAssignment(declaration))
+    return directValue(checker, declaration.expression, depth + 1);
+  return false;
+}
+
 /**
  * Whether a call on a member of `literal` through `receiver` may link to it:
  * the receiver's declaration writes a type that holds the literal, or the
@@ -98,7 +196,9 @@ export function declaredLiteral(
   if (!receiver) return false;
   try {
     const types = writtenTypes(checker, receiver);
-    return !!types?.length && types.every((type) => holds(checker, type, literal, 0));
+    return (
+      !!types?.length && types.every((type) => holds(checker, type, literal, 0))
+    );
   } catch (error) {
     if (error instanceof RangeError) return false;
     throw error;

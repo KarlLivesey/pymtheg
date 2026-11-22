@@ -31,7 +31,7 @@ import {
   toVirtual,
 } from "./project.js";
 import type { entryProvenance, UnbuiltEntry } from "./workspace-entries.js";
-import { declaredLiteral } from "./literal-members.js";
+import { declaredLiteral, directValue } from "./literal-members.js";
 import {
   bundledLibraryUnit,
   importedTarget,
@@ -881,6 +881,7 @@ export function extractFile(
     let installedType = false;
     let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
     let verifyObjectProducers = false;
+    let checkObjectProducers = false;
     const declarations: ts.Declaration[] = [];
     const usableLocalCall = (
       anchor: ts.Node,
@@ -915,7 +916,11 @@ export function extractFile(
               // a type computed from expressions can be a union the checker
               // reduced to one of several identical literals.
               (ts.isTypeLiteralNode(declaration.parent) &&
-                declaredLiteral(checker, found.receiver, declaration.parent))) &&
+                declaredLiteral(
+                  checker,
+                  found.receiver,
+                  declaration.parent,
+                ))) &&
             !!found.at &&
             checker.getSignaturesOfType(
               checker.getNonNullableType(checker.getTypeAtLocation(found.at)),
@@ -941,10 +946,17 @@ export function extractFile(
       }
       const key = anchor ? keyOf(anchor) : member!.key;
       if (
-        (!anchor || found.recoveredMember) &&
+        declaration.parent &&
         ts.isObjectLiteralExpression(declaration.parent)
-      )
-        verifyObjectProducers = true;
+      ) {
+        if (!anchor || found.recoveredMember) verifyObjectProducers = true;
+        // An anchored member whose receiver's value can choose (C-41): the
+        // checker may have reduced `pick ? one : two` to one of two
+        // identical literal types, and its declaration list then names one
+        // member of the two. The producers decide when they can be followed.
+        else if (!directValue(checker, found.receiver))
+          checkObjectProducers = true;
+      }
       facts.set(`${target}\0${key}`, { file: target, key });
       declarations.push(declaration);
       return true;
@@ -1218,7 +1230,11 @@ export function extractFile(
         }
       }
     }
-    if (!external && !local && verifyObjectProducers) {
+    if (
+      !external &&
+      !local &&
+      (verifyObjectProducers || checkObjectProducers)
+    ) {
       let producers = producerReaders.get(program);
       if (!producers) {
         producers = objectProducers(
@@ -1232,29 +1248,33 @@ export function extractFile(
         receiver && found.name !== undefined
           ? producers(receiver, found.name)
           : undefined;
-      const verified =
-        members &&
-        declarations.every((declaration) => members.includes(declaration));
-      if (verified) {
-        for (const member of members) {
-          if (declarations.includes(member)) continue;
-          const name = (member as ts.NamedDeclaration).name;
-          const symbol = name && checker.getSymbolAtLocation(name);
-          if (!symbol || !record(member, symbol, true)) {
-            local++;
-            break;
+      // Only anchored members to check, and producers that cannot be
+      // followed: the checker's answer stands, as before C-41.
+      if (members || verifyObjectProducers) {
+        const verified =
+          members &&
+          declarations.every((declaration) => members.includes(declaration));
+        if (verified) {
+          for (const member of members) {
+            if (declarations.includes(member)) continue;
+            const name = (member as ts.NamedDeclaration).name;
+            const symbol = name && checker.getSymbolAtLocation(name);
+            if (!symbol || !record(member, symbol, true)) {
+              local++;
+              break;
+            }
           }
         }
+        if (!verified || local)
+          return {
+            targets: [],
+            reason:
+              members && members.length > 1
+                ? "multiple-object-producers"
+                : "object-producer-unverified",
+            receiver,
+          };
       }
-      if (!verified || local)
-        return {
-          targets: [],
-          reason:
-            members && members.length > 1
-              ? "multiple-object-producers"
-              : "object-producer-unverified",
-          receiver,
-        };
     }
     const targets = [...facts.values()];
     const libraries = libraryFacts && [...libraryFacts.values()];

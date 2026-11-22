@@ -190,6 +190,124 @@ test("members of type literals in parameters and nested type positions are targe
   });
 });
 
+test("object-literal members: equal names stay distinct; spread, computed keys and reduced unions give no wrong definite link", async () => {
+  const got = await outcomes(
+    {
+      "src/objects.ts": [
+        "export const one = { run() {} };",
+        "export const two = { run() {} };",
+        "const base = { start() {} };",
+        "export const spread = { ...base, stop() {} };",
+        "const key = 'dyn';",
+        "export const computed = { [key]() {}, plain() {} };",
+        "declare const pick: boolean;",
+        "export const chosen = pick ? one : two;",
+        "export const nested = { inner: { go() {} } };",
+        "",
+      ].join("\n"),
+      "src/use.ts": [
+        'import { one, two, spread, computed, chosen, nested } from "./objects";',
+        "one.run();",
+        "two.run();",
+        "spread.start();",
+        "spread.stop();",
+        "computed.dyn();",
+        "computed.plain();",
+        "chosen.run();",
+        "nested.inner.go();",
+        "",
+      ].join("\n"),
+    },
+    "src/use.ts",
+  );
+  assert.deepEqual(got, {
+    // Equal member names in two literals: two symbols, never merged.
+    "one.run();": "src/objects.ts#one.run",
+    "two.run();": "src/objects.ts#two.run",
+    // The checker reduces `pick ? one : two` to `one`'s type; the producers
+    // give both members (a wrong definite `one.run` before C-41).
+    "chosen.run();": ["src/objects.ts#one.run", "src/objects.ts#two.run"],
+    // A spread member is the spread object's own declaration.
+    "spread.start();": "src/objects.ts#base.start",
+    "spread.stop();": "src/objects.ts#spread.stop",
+    // A computed key the checker knows as one name ('dyn' from a const).
+    "computed.dyn();": "src/objects.ts#computed.[key]",
+    "computed.plain();": "src/objects.ts#computed.plain",
+    "nested.inner.go();": "src/objects.ts#nested.[object].inner.go",
+  });
+});
+
+test("a member of a literal bound to a name, through a value that can change, is not one definite link", async () => {
+  const got = await outcomes(
+    {
+      "src/use.ts": [
+        "let state = { run() {} };",
+        "export function reset() { state = { run() {} }; }",
+        "state.run();",
+        "declare const pick: boolean;",
+        "const first = { stop() {} };",
+        "const second = { stop() {} };",
+        "(pick ? first : second).stop();",
+        "(first ?? second).stop();",
+        "first.stop();",
+        "",
+      ].join("\n"),
+    },
+    "src/use.ts",
+  );
+  assert.deepEqual(got, {
+    "state.run();": "unresolved:multiple-object-producers",
+    "(pick ? first : second).stop();": [
+      "src/use.ts#first.stop",
+      "src/use.ts#second.stop",
+    ],
+    // `first` is never nullish, so the value is always `first`.
+    "(first ?? second).stop();": "src/use.ts#first.stop",
+    "first.stop();": "src/use.ts#first.stop",
+  });
+});
+
+test("member symbols of literals leave every contains link resolved", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "c41-contains-"));
+  const root = join(scratch, "project");
+  const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "c41");
+  try {
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), tsconfig);
+    await writeFile(
+      join(root, "src/api.ts"),
+      [
+        "export type Api = { query(): void; nested: { go(): void } };",
+        "export function render(db: { getConfig(): number }) { db.getConfig(); }",
+        "export const one = { run() {}, inner: { go() {} } };",
+        "export declare const both: { run(): void } & { stop(): void };",
+        "",
+      ].join("\n"),
+    );
+    const report = await indexProject(
+      root,
+      new LanguageRegistry([typescript]),
+      store,
+    );
+    assert.deepEqual(report.analysisErrors, []);
+    const symbols = new Map(store.findSymbols().map((s) => [s.id, s]));
+    const members = [...symbols.values()].filter((s) =>
+      s.identity.includes(".[type]."),
+    );
+    assert.ok(members.length >= 4, "type-literal member symbols");
+    const contains = store.links().filter((l) => l.kind === "contains");
+    assert.ok(contains.length > 0);
+    for (const link of contains) {
+      assert.equal(link.resolution, "resolved", link.targetName);
+      assert.ok(symbols.has(link.targetId), link.targetName);
+      assert.ok(symbols.has(link.sourceId), link.targetName);
+    }
+  } finally {
+    store.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
 test("a call that is not on a declared member of a literal stays unlinked", async () => {
   const got = await outcomes(
     {
