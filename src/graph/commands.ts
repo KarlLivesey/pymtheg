@@ -17,6 +17,8 @@ import {
 } from "./registry.js";
 import { SqliteGraphStore } from "./store.js";
 import { indexProject, type IndexReport } from "./indexer.js";
+import type { IndexSession, SessionRun } from "./session.js";
+import type { LanguageModule } from "./types.js";
 import { stage, stageSync } from "./work.js";
 import {
   captureInventory,
@@ -111,6 +113,12 @@ export interface GraphExecutionOptions {
   progress?: ((progress: GraphProgress) => void) | undefined;
   /** Tests/embedders may supply a registry; the CLI always discovers production modules. */
   registry?: LanguageRegistry;
+  /**
+   * C-45: a process that indexes more than once passes the same session: its
+   * modules are loaded once, and each module may keep proved state between
+   * runs (see IndexSession).
+   */
+  session?: IndexSession;
 }
 const arity: Record<GraphCommand, number> = {
   index: 0,
@@ -156,12 +164,16 @@ export async function executeGraph(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
-  const registry =
-    options.registry ?? (await stage("command.modules", discoverLanguages));
+  const registry = options.session
+    ? await stage("command.modules", () => options.session!.registry())
+    : (options.registry ?? (await stage("command.modules", discoverLanguages)));
   // An explicit index first verifies on a read-only connection, which
   // writes nothing to the file (C-33). It opens the writable store only if
   // it has to index.
-  const verifyFirst = request.command === "index" && !options.registry;
+  const verifyFirst =
+    request.command === "index" &&
+    !options.registry &&
+    !options.session?.injectedRegistry;
   let store: SqliteGraphStore | null = null;
   if (exists)
     try {
@@ -179,6 +191,7 @@ export async function executeGraph(
       // The writable store reports it, or prepares the file, when indexing.
       if (!verifyFirst) throw error;
     }
+  let sessionRun: SessionRun | undefined;
   try {
     const listing: InventoryListing = {
       discovered: 0,
@@ -435,8 +448,28 @@ export async function executeGraph(
       });
       const started = performance.now();
       options.progress?.({ phase: "inventory", done: 0, total });
+      // C-45: what a session kept is used only if the store is as its last
+      // completed run left it (the completion record), for this project,
+      // store and configuration.
+      sessionRun = options.session?.beginRun(
+        {
+          root,
+          store: path,
+          projectId: currentStore.projectId,
+          configuration,
+          settings,
+        },
+        previousState?.fingerprint ?? null,
+      );
+      const run = sessionRun;
       const indexed = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
+        ...(run
+          ? {
+              kept: (module: LanguageModule) =>
+                run.kept(module.id, module.version),
+            }
+          : {}),
         onFileCompared: (path) => {
           signal.throwIfAborted();
           options.progress?.({
@@ -475,8 +508,8 @@ export async function executeGraph(
         !report.analysisErrors.length &&
         !report.resolutionErrors.length
       )
-        stageSync("command.checkpointWrite", () =>
-          currentStore.completeGraphCommandState(
+        stageSync("command.checkpointWrite", () => {
+          const written = currentStore.completeGraphCommandState(
             {
               schema: checkpointSchema,
               projectId: currentStore.projectId,
@@ -490,9 +523,13 @@ export async function executeGraph(
                 : {}),
             },
             dataVersion,
-          ),
-        );
+          );
+          if (written) sessionRun?.complete(currentFingerprint());
+          return written;
+        });
       else store.invalidateGraphCommandState();
+      // A run that wrote no completion keeps nothing (see IndexSession).
+      sessionRun?.abandon();
       options.progress?.({ phase: "complete", done: total, total });
     }
     const finish = (): GraphResponse => {
@@ -760,6 +797,8 @@ export async function executeGraph(
     }
     return response;
   } finally {
+    // A run that failed or was aborted keeps nothing (no-op once complete).
+    sessionRun?.abandon();
     stageSync("command.sqliteClose", () => store?.close());
   }
 }
