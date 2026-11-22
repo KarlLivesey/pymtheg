@@ -572,6 +572,34 @@ export function enclosingAnchor(node: ts.Node): ts.Node {
   return node.getSourceFile();
 }
 
+/**
+ * The segment a type node adds to a nested type literal's identity (C-41):
+ * empty for a wrapper, the position in a union, intersection, tuple or type
+ * argument list, `[]` for an array element; undefined when `holder` is not
+ * a type that holds `value`.
+ */
+function typeSegment(holder: ts.Node, value: ts.Node): string | undefined {
+  if (
+    ts.isParenthesizedTypeNode(holder) ||
+    (ts.isTypeOperatorNode(holder) &&
+      holder.operator === ts.SyntaxKind.ReadonlyKeyword)
+  )
+    return "";
+  if (ts.isArrayTypeNode(holder)) return "[]";
+  if (ts.isUnionTypeNode(holder))
+    return `[|${holder.types.indexOf(value as ts.TypeNode)}]`;
+  if (ts.isIntersectionTypeNode(holder))
+    return `[&${holder.types.indexOf(value as ts.TypeNode)}]`;
+  if (ts.isTupleTypeNode(holder))
+    return `[#${holder.elements.indexOf(value as ts.TypeNode)}]`;
+  if (
+    ts.isTypeReferenceNode(holder) &&
+    holder.typeArguments?.includes(value as ts.TypeNode)
+  )
+    return `[<${holder.typeArguments.indexOf(value as ts.TypeNode)}>]`;
+  return undefined;
+}
+
 /** A static object member in a named binding or a declaration's return value. */
 export function objectMember(node: ts.Node): SymbolDraft | undefined {
   const parent = node.parent;
@@ -604,6 +632,14 @@ export function objectMember(node: ts.Node): SymbolDraft | undefined {
     names.unshift(memberName(name));
     let value = literal ? outerExpression(object) : object;
     holder = value.parent;
+    // A type literal inside a composite type (C-41): its place in it.
+    while (!literal) {
+      const segment = typeSegment(holder, value);
+      if (segment === undefined) break;
+      if (segment) names.unshift(segment);
+      value = holder;
+      holder = holder.parent;
+    }
     while (literal) {
       const branch =
         ts.isConditionalExpression(holder) && value !== holder.condition
@@ -648,6 +684,15 @@ export function objectMember(node: ts.Node): SymbolDraft | undefined {
   } else if (literal && ts.isArrowFunction(holder)) {
     if (!owner) return undefined;
     slot = "[return].";
+  } else if (
+    !literal &&
+    !owner &&
+    ts.isParameter(holder) &&
+    ts.isIdentifier(holder.name)
+  ) {
+    // The written type of a named parameter of an anchored function (C-41).
+    owner = anchorOf(holder.parent);
+    slot = `[param:${holder.name.text}].`;
   }
   if (!owner || ts.isSourceFile(owner)) return undefined;
   const kind = ts.isShorthandPropertyAssignment(node)

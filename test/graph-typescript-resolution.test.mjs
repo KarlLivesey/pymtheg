@@ -1772,6 +1772,8 @@ test("checkout member chains use typed declarations and preserve open receivers"
         ["api.save();", "save"],
         ["api[7]();", "api.[7]"],
         ["ops.write();", "local.[local].ops.[object].write"],
+        // C-41: the receiver's declaration writes the type literal.
+        ["inferred.run();", "inferred.[type].run"],
       ])
         assert.equal(graph.target(callOn(line)), `use.ts#${identity}`, line);
       assert.deepEqual(graph.candidates(callOn("variant.b.run();")), [
@@ -1797,7 +1799,6 @@ test("checkout member chains use typed declarations and preserve open receivers"
         ['dict["literal"]();', "index-signature"],
         ["record.missing();", "index-signature"],
         ["api[key]();", "no-symbol"],
-        ["inferred.run();", "local"],
       ]) {
         const call = callOn(line);
         assert.equal(call.resolution, "unresolved", line);

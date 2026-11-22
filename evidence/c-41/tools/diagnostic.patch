@@ -1,0 +1,65 @@
+diff --git a/src/graph/languages/typescript/extract.ts b/src/graph/languages/typescript/extract.ts
+index b524499..bb78e0b 100644
+--- a/src/graph/languages/typescript/extract.ts
++++ b/src/graph/languages/typescript/extract.ts
+@@ -1,3 +1,4 @@
++import { localShape } from "./local-shape.js";
+ // SPDX-License-Identifier: MIT
+ import { posix } from "node:path";
+ import ts from "typescript";
+@@ -178,6 +179,8 @@ interface Targets {
+    * missing-module, external-package, unresolved-alias, computed-specifier.
+    */
+   reason?: string;
++  /** C-41 diagnostic: the shape of a `local` answer's declaration. */
++  localShape?: string;
+ }
+ 
+ const TYPE_DECLARATIONS = new Set([
+@@ -873,6 +876,7 @@ export function extractFile(
+       | undefined;
+     let external = 0;
+     let local = 0;
++    const localDeclarations: ts.Node[] = [];
+     let viaAlias = false;
+     let firstAlias: ts.Symbol | undefined;
+     let declaredSomewhere = false;
+@@ -1167,7 +1171,8 @@ export function extractFile(
+               proved,
+             );
+           } else if (inCheckout(declaration)) {
+-            if (!record(declaration, current)) local++;
++            if (!record(declaration, current))
++              local++, localDeclarations.push(declaration);
+           } else external++;
+           continue;
+         }
+@@ -1176,7 +1181,8 @@ export function extractFile(
+           external++;
+           continue;
+         }
+-        if (!record(declaration, current)) local++;
++        if (!record(declaration, current))
++          local++, localDeclarations.push(declaration);
+       }
+     };
+     visit(found.symbol, 0);
+@@ -1290,6 +1296,9 @@ export function extractFile(
+       viaAlias,
+       receiver,
+       ...(!targets.length && !declaredSomewhere ? { noAnswer: true } : {}),
++      ...(local && localDeclarations[0]
++        ? { localShape: localShape(localDeclarations[0], meaning === "call") }
++        : {}),
+     };
+     return result;
+   }
+@@ -2213,6 +2222,8 @@ export function extractFile(
+         }));
+     }
+     if (reason) facts.reason = reason;
++    if (reason === "local" && found.localShape)
++      facts.localShape = found.localShape;
+     if (
+       !reason &&
+       context.unbuilt?.hasEntries &&

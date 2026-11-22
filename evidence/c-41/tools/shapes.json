@@ -1,0 +1,5 @@
+{
+  "tsconfig.json": "{\"compilerOptions\":{\"strict\":true,\"target\":\"ES2022\",\"module\":\"ESNext\",\"moduleResolution\":\"Bundler\"},\"include\":[\"src\"]}",
+  "src/api.ts": "export const api = {\n  util: { invalidateTags() {} },\n  endpoints: { q2: { initiate: () => 1 } },\n};\nexport type Api = { query(): void; nested: { run(): void } };\nexport declare const typed: Api;\nexport function make() {\n  return { build: { query() {} } };\n}\nexport const store = createStore({ dispatch() {} });\nfunction createStore<T>(t: T): T { return t; }\nexport const Kind = { A: 'a', B: 'b' } as const;\n",
+  "src/use.ts": "import { api, typed, make, store, Kind } from './api';\napi.util.invalidateTags();\napi.endpoints.q2.initiate();\ntyped.query();\ntyped.nested.run();\nmake().build.query();\nstore.dispatch();\nKind.A;\nexport function f(cb: () => void) {\n  const spy = () => 1;\n  spy();\n  cb();\n  const local = { m() {} };\n  local.m();\n  const { factory } = { factory: () => 2 };\n  factory();\n  const klass = class { go() {} };\n  new klass().go();\n}\n"
+}

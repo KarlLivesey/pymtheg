@@ -31,6 +31,7 @@ import {
   toVirtual,
 } from "./project.js";
 import type { entryProvenance, UnbuiltEntry } from "./workspace-entries.js";
+import { declaredLiteral } from "./literal-members.js";
 import {
   bundledLibraryUnit,
   importedTarget,
@@ -907,8 +908,14 @@ export function extractFile(
         (shorthandMember || !ts.isShorthandPropertyAssignment(declaration)) &&
         (meaning !== "call" ||
           (found.memberCall &&
-            ts.isObjectLiteralExpression(declaration.parent) &&
-            !declaration.getSourceFile().isDeclarationFile &&
+            ((ts.isObjectLiteralExpression(declaration.parent) &&
+              !declaration.getSourceFile().isDeclarationFile) ||
+              // A call on a type-literal member, when the receiver's own
+              // declaration writes the type that holds that literal (C-41):
+              // a type computed from expressions can be a union the checker
+              // reduced to one of several identical literals.
+              (ts.isTypeLiteralNode(declaration.parent) &&
+                declaredLiteral(checker, found.receiver, declaration.parent))) &&
             !!found.at &&
             checker.getSignaturesOfType(
               checker.getNonNullableType(checker.getTypeAtLocation(found.at)),
