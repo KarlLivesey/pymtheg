@@ -2376,6 +2376,27 @@ there is no further symbol to name. **Rules out:** crediting a member link
 that names only its package (`vi.fn`, `screen.getByRole`): it has a symbol
 to name, and it stays Level 1.
 
+### D21: the opt-in Rust route may use rust-analyzer
+
+**Decided (Karl, 22 November 2026):** "This is fine you are allowed to use the
+languages official builder for these I stated this ages ago". This lifts the
+one restriction D17 left ("`rust-analyzer` unless Karl asks") and was given in
+answer to three stated consequences: opted-in projects have their build
+scripts and procedural macros run, as a build would; the route needs the
+crates present; and the Rust coverage goal is judged with the route switched
+on, as D19 does for installed dependencies. Everything else in D17 stands:
+explicit per-project opt-in, offline by default, one recorded build
+configuration, the project never written, no claim of a security boundary.
+The measured shape is in [C-19](changes/C-19.md): answers are taken only for
+links the source-only route leaves open, under the strict join and the gates
+(no answers under a cfg condition other than `test`; trait methods stay
+candidate sets); an edit re-indexes source-only at once and no stale toolchain
+answer is shown as definite. **Why:** the owner's standing rule is that a
+language's own build chain is an allowed dependency; source-only Rust stays
+near 43% because most open links need type inference. **Rules out:** running
+the route on a project that has not opted in; reporting the opted-in figure
+without also giving the source-only one.
+
 ### D19: coverage is judged with dependencies installed
 
 **Decided (Karl, 21 November 2026):** "we will assume in 99% of cases
