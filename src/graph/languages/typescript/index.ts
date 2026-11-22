@@ -13,6 +13,7 @@ import type {
   LinkDraft,
   LinkResolution,
   ParseResult,
+  ScopedAnalysis,
 } from "../../types.js";
 import {
   CheckerLimit,
@@ -22,8 +23,14 @@ import {
 } from "./extract.js";
 import { nonReturningFlow } from "./flow.js";
 import { libraryKey, libraryReader } from "./library.js";
-import type { ProjectGroup } from "./project.js";
-import type { Renamed } from "./rename.js";
+import type { ProjectGroup, ProjectModel } from "./project.js";
+import { freshNames, type Renamed } from "./rename.js";
+import {
+  checkerSurface,
+  moveTargets,
+  rekey,
+  syntacticSurface,
+} from "./scoped.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
 import { neutralizeAssumed } from "./untrusted.js";
 import { entryProvenance } from "./workspace-entries.js";
@@ -64,6 +71,12 @@ export interface TypeScriptModuleOptions {
   checkerFault?: (method: string, node: ts.Node | undefined) => void;
   /** Called before each file's syntax-phase check; may throw. */
   syntaxFault?: (path: string) => void;
+  /**
+   * Test only (C-38): a scoped analysis skips both surface comparisons and
+   * keeps other files' stored results as they are, so the equality tests
+   * can show that each comparison is needed.
+   */
+  trustSurface?: boolean;
 }
 /** The node the module last passed to a checker method (see `attributed`). */
 let lastAsked: ts.Node | undefined;
@@ -119,7 +132,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `44+typescript-${ts.version}`;
+const MODULE_VERSION = `45+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -129,7 +142,44 @@ export const statistics = {
   /** Neutral programs built for the differential analysis (untrusted.ts). */
   neutralPrograms: 0,
   neutralExtracted: 0,
+  /** Re-indexes that extracted only the edited file (C-38). */
+  scoped: 0,
+  /** Programs built to compare an edited file's checker surface (C-38). */
+  surfacePrograms: 0,
+  /** Why a scoped analysis was not used, by reason (C-38). */
+  declined: {} as Record<string, number>,
 };
+
+/** Counts why a scoped analysis was not used; the full analysis follows. */
+const declined = (reason: string): undefined => {
+  statistics.declined[reason] = (statistics.declined[reason] ?? 0) + 1;
+};
+
+/** A program's name in `loadedBy`: its config, or "(inferred)". */
+const groupName = (group: ProjectGroup) => group.config ?? "(inferred)";
+
+/** Whether a bound source file is an ES or CommonJS module, as `moduleKind` reads it. */
+const moduleKindOf = (source: ts.SourceFile | undefined) => {
+  const flags = source as
+    | (ts.SourceFile & {
+        externalModuleIndicator?: unknown;
+        commonJsModuleIndicator?: unknown;
+      })
+    | undefined;
+  return !!flags?.externalModuleIndicator || !!flags?.commonJsModuleIndicator;
+};
+
+/**
+ * A scoped analysis (C-38): only `path` is extracted, in its own project.
+ * `broken` records anything that would make the result differ from a full
+ * analysis's; the caller then runs the full analysis.
+ */
+interface Scope {
+  path: string;
+  /** The session of each project that owns the file (several when tied). */
+  sessions: Map<ProjectGroup, Session>;
+  broken: boolean;
+}
 
 // A file whose text re-encodes to its captured byte hash was readable; unreadable
 // sources are stored with empty text and the hash of their original bytes.
@@ -954,6 +1004,7 @@ export function typescriptModule(
     extensions: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
     contextFiles: CONTEXT_PATTERNS,
     dependencyInputs: true,
+    incrementalAnalysis: true,
     analyze(context) {
       const files = context.files.filter(readable);
       // Unchanged snapshot: stored facts came from a complete analysis of these
@@ -1011,700 +1062,1102 @@ export function typescriptModule(
           ];
         }
       }
-      if (context.dependencyInputs) context.dependencyInputs.refreshed = true;
-      const model = projectModel(
-        files,
-        context.contextFiles,
-        context.dependencyInputs,
-        hooks.programCharacters,
-      );
-      const libraries = libraryReader(
-        model.manifests,
-        files,
-        model.workspaceRoots,
-        model.workspaceBoundaries,
-        model.workspaceCatalogs,
-        context.dependencyInputs,
-      );
-      const byPath = new Map(files.map((file) => [file.path, file]));
-      const captured = new Set(byPath.keys());
-      const results: AnalyzedFile[] = [];
-      // A broken config or manifest fails only the files it governs, not the module.
-      for (const [path, message] of model.failures)
-        results.push({ path, result: failed(message) });
-      const tiedResults = new Map<string, ParseResult[]>();
-      /** Projects analysed so far: the captured files their programs loaded. */
-      const loadedBy = new Map<ProjectGroup, Set<string>>();
-      const deliver = (path: string, result: ParseResult) => {
-        if (model.ties.has(path))
-          tiedResults.set(path, [...(tiedResults.get(path) ?? []), result]);
-        else results.push({ path, result });
-      };
+      const buildModel = () =>
+        projectModel(
+          files,
+          context.contextFiles,
+          context.dependencyInputs,
+          hooks.programCharacters,
+        );
       /**
-       * One rule for a file the compiler threw on while a later project was
-       * analysed, when earlier projects had already published or read it:
-       * the store has one result per file, so it is failed for the store.
-       * Its published result becomes the failed-file result; published links
-       * that target it are `target-unavailable`; and every other link of a
-       * project whose program read it is flagged
-       * `no-unseen-declarations` (computed with a file the store now calls
-       * unreadable: unverified, W2-D).
+       * A failed file (its own syntax errors) that declares no global name
+       * and that stored links name only as the specifier of an import with
+       * no bindings (`import "./fixture"`): no declaration binds it, so a
+       * program that asks for it has an empty failed-file walk (taint.ts),
+       * before and after an edit that keeps the edited file's imports. Any
+       * other failed file in a program a scoped analysis relies on: no
+       * scoped analysis.
        */
-      const retract = (path: string, message: string) => {
-        const readers = new Set<string | null>();
-        for (const [group, loaded] of loadedBy)
-          if (loaded.has(path)) readers.add(group.config);
-        const redecide = (result: ParseResult): ParseResult => {
-          if (result.status === "failed") return result;
-          const project = (result.data as { project?: string | null })?.project;
-          const read = project !== undefined && readers.has(project);
-          return {
-            ...result,
-            links: result.links.map((link) => {
-              const data = (link.data ?? {}) as { [key: string]: Json };
-              const targets = (data.targets ?? []) as unknown as TargetFact[];
-              if (targets.some((target) => target.file === path)) {
-                const next: { [key: string]: Json } = {
-                  ...data,
-                  reason: "target-unavailable",
-                };
-                delete next.targets;
-                delete next.libraryFacts;
-                return { ...link, data: next };
-              }
-              if (
-                !read ||
-                link.kind === "contains" ||
-                data.reason === "invalid-code"
-              )
-                return link;
-              const next = { ...data };
-              assume(next, "no-unseen-declarations");
-              return { ...link, data: next };
-            }),
-          };
-        };
-        for (const item of results)
-          item.result =
-            item.path === path ? failed(message) : redecide(item.result);
-        for (const [other, variants] of tiedResults)
-          tiedResults.set(
-            other,
-            variants.map((variant) =>
-              other === path ? failed(message) : redecide(variant),
-            ),
-          );
+      const quietFailures = new Map<string, boolean>();
+      const storedResults = [
+        ...files,
+        ...(context.previousFiles?.values() ?? []),
+      ].map((item) => ({ item, links: JSON.stringify(item.result.links) }));
+      const sideEffectImport = (file: GraphFile, start: number) => {
+        const source = ts.createSourceFile(
+          toVirtual(file.path),
+          file.text,
+          ts.ScriptTarget.Latest,
+          true,
+        );
+        return source.statements.some(
+          (statement) =>
+            ts.isImportDeclaration(statement) &&
+            !statement.importClause &&
+            statement.moduleSpecifier.getStart(source) === start,
+        );
       };
-      for (const group of model.groups) {
-        if (!group.roots.length) continue;
-        const roots = () =>
-          group.roots.filter((root) => !model.parseFailures.has(root.slice(1)));
-        const ownRoots = new Set(group.roots.map((root) => root.slice(1)));
-        let latestHost: ts.CompilerHost | undefined;
-        /** Compiler failures of other projects that this program loads. */
-        const inherited = () => {
-          if (!latestHost) return 0;
-          let count = 0;
-          for (const path of model.requested(latestHost))
-            if (
-              !ownRoots.has(path) &&
-              model.parseFailures.get(path)?.startsWith(COMPILER_FAILURE)
-            )
-              count++;
-          return count;
-        };
-        let normal: Session | undefined = openSession(
-          roots,
-          group.options,
-          () => (latestHost = model.host(group)),
-          model.parseFailures,
-          captured,
-          group.references,
-          model.hasWorkspacePackages,
-          // Any syntactic diagnostic fails a file: also the compiler's
-          // syntax-phase checks the parser does not make (TypeScript-only
-          // syntax in a JS file, TS8xxx).
-          (program, fail) => {
-            let failedAny = false;
-            for (const source of program.getSourceFiles()) {
-              const path = fromVirtual(source.fileName);
-              if (path === undefined || !captured.has(path)) continue;
-              let extra: readonly ts.Diagnostic[];
-              try {
-                hooks.syntaxFault?.(path);
-                extra = program.getSyntacticDiagnostics(source);
-              } catch (error) {
-                // The compiler threw on this file: it fails, absent from the
-                // next build, under the session's cap.
-                fail(path, compilerFailure(error));
-                failedAny = true;
-                continue;
-              }
-              if (extra.length && model.failSyntax(path, extra))
-                failedAny = true;
-            }
-            return failedAny;
-          },
-          hooks,
-          inherited,
-        );
-        if (model.dependencyLimit(group)) {
-          for (const root of group.roots)
-            deliver(
-              root.slice(1),
-              operationalFailure(
-                "Installed declarations exceed the TypeScript program's input budget",
-              ),
-            );
-          continue;
-        }
-        const provenance = new WeakMap<
-          ts.Program,
-          ReturnType<typeof entryProvenance>
-        >();
-        const resolveModule = (
-          session: Session,
-          specifier: ts.StringLiteralLike,
-        ): ReturnType<RenameContext["resolveModule"]> => {
-          const source = specifier.getSourceFile();
-          const from = fromVirtual(source.fileName);
-          if (from === undefined) return undefined;
-          const selected = model.selectSpecifier(specifier.text, from);
-          if (selected === undefined) return undefined;
-          const { host, program } = session;
-          const mode = relativeSpecifier(selected)
-            ? program.getModeForUsageLocation(source, specifier)
+      const quiet = (path: string): boolean => {
+        const known = quietFailures.get(path);
+        if (known !== undefined) return known;
+        const file = files.find((item) => item.path === path);
+        const failure =
+          file?.result.status === "failed" &&
+          (file.result.data as { invalid?: unknown } | undefined)?.invalid ===
+            true
+            ? syntaxFailure(path, file.text)
             : undefined;
-          const resolve = (
-            text: string,
-            resolutionMode: ts.ResolutionMode,
-            resolutionHost = host,
-          ) =>
-            ts.resolveModuleName(
-              text,
-              source.fileName,
-              group.options,
-              resolutionHost,
-              undefined,
-              undefined,
-              resolutionMode,
-            ).resolvedModule;
-          let resolved = resolve(selected, mode);
-          if (!resolved && mode === ts.ModuleKind.ESNext) {
-            // Preserve the legacy extension-only edge when adding a file
-            // extension would reach that same file in the real mode. A
-            // permissive lookup can also find an index or a package entry,
-            // which an ESM directory import must never target.
-            const fallback = resolve(selected, undefined);
-            if (!fallback) return undefined;
-            const candidate = posix.resolve(
-              posix.dirname(source.fileName),
-              selected,
-            );
-            const withoutDirectory = {
-              ...host,
-              directoryExists: (name: string) =>
-                name !== candidate &&
-                name !== candidate + "/" &&
-                (host.directoryExists?.(name) ?? true),
-            };
-            // A permissive result proves a directory edge when the literal
-            // requests a directory, or withholding that directory changes
-            // the compiler's selection. An empty directory proves nothing.
-            if (
-              /(?:\/|(?:^|\/)\.\.?)$/.test(selected) ||
-              (host.directoryExists?.(candidate) &&
-                resolve(selected, undefined, withoutDirectory)
-                  ?.resolvedFileName !== fallback.resolvedFileName)
-            )
-              return { reason: "directory-import-not-allowed-in-esm" };
-            if (
-              // With rootDirs, a directory entry and an explicitly
-              // extended file in another overlay can select the same path.
-              posix.dirname(fallback.resolvedFileName) ===
-                posix.dirname(candidate) &&
-              resolve(selected + fallback.extension, mode)?.resolvedFileName ===
-                fallback.resolvedFileName
-            )
-              resolved = fallback;
-          }
-          const path =
-            resolved &&
-            fromVirtual(
-              host.realpath?.(resolved.resolvedFileName) ??
-                resolved.resolvedFileName,
-            );
-          return path === undefined ? undefined : { path };
-        };
-        /**
-         * What a captured target file is. `script` means only: analysed, no
-         * syntax errors, and no ES or CommonJS exports. A file that failed to
-         * parse or bind is `unavailable`; one with syntax errors and no exports
-         * found is `partial` (its exports cannot be ruled out).
-         */
-        const moduleKind = (
-          session: Session,
-          path: string,
-        ): "module" | "script" | "invalid" | "unavailable" => {
-          if (model.syntaxFailures.has(path)) return "invalid";
-          if (model.parseFailures.has(path) || model.failures.has(path))
-            return "unavailable";
-          const source =
-            session.program.getSourceFile(toVirtual(path)) ??
-            session.host.getSourceFile(toVirtual(path), ts.ScriptTarget.Latest);
-          // Parsing it just now may have found a syntax error.
-          if (model.syntaxFailures.has(path)) return "invalid";
-          if (!source) return "unavailable";
-          const flags = source as ts.SourceFile & {
-            externalModuleIndicator?: unknown;
-            commonJsModuleIndicator?: unknown;
-          };
-          if (
-            !!flags.externalModuleIndicator ||
-            !!flags.commonJsModuleIndicator ||
-            /(^|[^.\w$])(module\.exports|exports\.[\w$]+)\s*=/.test(source.text)
-          )
-            return "module";
-          return "script";
-        };
-        /**
-         * One extraction attempt. An exception becomes plain data: it holds
-         * the compiler's stack frames and through them the checker, which a
-         * rebuild must be free to release.
-         */
-        const extractOnce = (
-          session: Session,
-          path: string,
-          data: { [key: string]: Json },
-          diagnostics: Diagnostic[],
-          renamed: Renamed | undefined,
-          skip: Set<string>,
-        ):
-          | { result: ParseResult }
-          | { limit: string }
-          | { drop: string; blame: string | undefined }
-          | { internal: string } => {
-          lastAsked = undefined;
-          if (exhaustedSessions.has(session))
-            markTaintExhausted(session.checker);
-          try {
-            if (injectedExtractionFaults.has(path))
-              throw new TypeError("injected internal fault (test)");
-            const source = session.program.getSourceFile(toVirtual(path));
-            if (!source) {
-              const failure = session.failures.get(path);
-              // The parser or binder exhausted its stack on this file: an
-              // environment limit, like the checker's, not invalid code.
-              if (failure?.includes("exhausted its stack"))
-                return {
-                  result: operationalFailure(
-                    `${failure} (a resource limit of the TypeScript compiler in this environment, not a defect in the file; it is retried on the next index)`,
-                  ),
-                };
-              // The compiler threw on it, or its project is too large: a
-              // failed file with that reason.
-              if (
-                failure?.startsWith(COMPILER_FAILURE) ||
-                model.omitted.has(path)
-              )
-                return { result: failed(failure!) };
-              const refused = model.refusedIn(group, path);
-              if (refused) return { result: failed(refused) };
-              // Anything else the compiler threw is an internal error.
-              throw Error(failure ?? "The compiler did not load this source");
-            }
-            if (!provenance.has(session.program))
-              provenance.set(
-                session.program,
-                entryProvenance(
-                  session.program,
-                  model.unbuiltEntries(session.host),
-                  captured,
-                ),
-              );
-            const result = extractFile(
-              source,
-              session.checker,
-              session.program,
-              captured,
-              diagnostics.map((item) => ({ ...item })),
-              { ...data },
-              // Settings from an uncaptured base are missing: see extract.ts.
-              group.limitations.length > 0,
-              {
-                fresh: model.fresh,
-                explicitTypes: group.explicitTypes === true,
-                ...(renamed ? { renamed } : {}),
-                resolveModule: (specifier) => resolveModule(session, specifier),
-                hasDenoImports: model.hasDenoImports,
-                selectSpecifier: model.selectSpecifier,
-                workspaceReason: model.workspaceReason,
-                unbuilt: provenance.get(session.program),
-                workspaceBoundaryKnown: model.workspaceBoundaryKnown,
-                skip,
-                moduleKind: (target) => moduleKind(session, target),
-                anyFailed: unseen.size > 0,
-                failedNames,
-              },
-              libraries,
-            );
-            // The core validates the batch as a whole. Check this file's
-            // positions here so bad compiler facts can use the same drop
-            // and rebuild path as a compiler exception.
-            const length = byPath.get(path)!.text.length;
-            if (
-              source.text.length !== length ||
-              result.symbols.some(
-                ({ range }) => !validSourceRange(range, length),
-              ) ||
-              result.links.some(
-                ({ range }) => !validSourceRange(range, length),
-              ) ||
-              result.diagnostics.some(
-                ({ range }) => range && !validSourceRange(range, length),
-              )
-            )
-              return {
-                drop: `${COMPILER_FAILURE}: Invalid UTF-16 range in the extracted facts for ${path}`,
-                blame: path,
-              };
-            statistics.extracted++;
-            if (taintExhausted(session.checker)) {
-              // Later checkers of this session (rebuilt from this program,
-              // one file fewer at most) skip the walk: a rebuild per failing
-              // file would otherwise repeat it to the budget each time.
-              exhaustedSessions.add(session);
-              return { result: withoutTaint(result) };
-            }
-            return { result };
-          } catch (error) {
-            if (error instanceof CheckerLimit) return { limit: error.key };
-            if (isCompilerAssertion(error))
-              return { drop: compilerFailure(error), blame: askedFile() };
-            return { internal: internalErrorMessage(path, error) };
-          }
-        };
-        /** Extracts one file, rebuilding the session after checker overflows. */
-        const extractWith = (
-          session: Session,
-          path: string,
-          data: { [key: string]: Json },
-          diagnostics: Diagnostic[],
-          renamed: Renamed | undefined,
-        ): ParseResult => {
-          if (session.rebuilds > MAX_PROGRAM_REBUILDS)
-            return operationalFailure(
-              `The TypeScript checker overflowed so often in this project (${session.rebuilds} rebuilds) that the remaining files were not analysed`,
-            );
-          const skip = new Set<string>();
-          for (let attempt = 0; ; attempt++) {
-            const outcome = extractOnce(
-              session,
-              path,
-              data,
-              diagnostics,
-              renamed,
-              skip,
-            );
-            if ("result" in outcome) return outcome.result;
-            // A rebuild below inherits a walk that reached its budget.
-            if (taintExhausted(session.checker)) exhaustedSessions.add(session);
-            if ("limit" in outcome) {
-              if (
-                attempt < MAX_LIMIT_RETRIES &&
-                session.rebuilds <= MAX_PROGRAM_REBUILDS
-              ) {
-                // The checker's state is untrustworthy after an overflow:
-                // retry with dependencies warmed before omitting a lookup.
-                if (!session.rebuild()) skip.add(outcome.limit);
-                continue;
-              }
-              // Never leave an overflowed checker in use for the next file.
-              session.rebuild();
-              return operationalFailure(
-                `The TypeScript checker exhausted its stack more than ${MAX_LIMIT_RETRIES} times in this file`,
-              );
-            }
-            if ("drop" in outcome) {
-              // A compiler assertion or invalid range makes the file's facts
-              // unavailable. Rebuild without it before extracting other files.
-              const blamed =
-                outcome.blame !== undefined && captured.has(outcome.blame)
-                  ? outcome.blame
-                  : path;
-              session.drop(blamed, outcome.drop);
-              if (session === normal) {
-                markUnseen(blamed);
-                retract(blamed, outcome.drop);
-              }
-              if (blamed !== path) continue;
-              return failed(outcome.drop);
-            }
-            return operationalFailure(outcome.internal);
-          }
-        };
-        // Failed files this program would include (roots, or imported): any of
-        // them might have declared something that changes a link.
-        const unseen = new Set([
-          ...model.requested(normal.host),
-          ...group.roots
-            .map((root) => root.slice(1))
-            .filter((path) => model.parseFailures.has(path)),
-        ]);
-        const failedNames = new Map<string, string[]>();
-        // The global names a failed file declares: as far as the parser read
-        // it, or, for a readable file left out (the compiler threw on it, or
-        // its project is too large), all of them.
-        const namesOf = (path: string): readonly string[] =>
-          model.syntaxFailures.get(path)?.names ??
-          (model.omitted.has(path) ||
-          model.refusedIn(group, path) !== undefined ||
-          model.parseFailures.get(path)?.startsWith(COMPILER_FAILURE)
-            ? model.globalNames(path)
-            : []);
-        for (const path of [...unseen].sort())
-          for (const name of namesOf(path))
-            failedNames.set(name, [...(failedNames.get(name) ?? []), path]);
-        /** A file the compiler threw on while extracting: unseen from now on. */
-        const markUnseen = (path: string) => {
-          if (unseen.has(path)) return;
-          unseen.add(path);
-          for (const name of namesOf(path))
-            failedNames.set(
-              name,
-              [...(failedNames.get(name) ?? []), path].sort(),
-            );
-        };
-        // A file dropped while this project is extracted (the compiler threw
-        // on it) changes the program: the project is extracted again from its
-        // first file, so files before and after the drop agree. Each round
-        // needs a further drop, and drops are capped (MAX_COMPILER_FAILURES).
-        let analysed: [string, ParseResult][] = [];
-        for (;;) {
-          analysed = [];
-          const dropsBefore = normal.drops;
-          for (const root of group.roots) {
-            const path = root.slice(1);
-            // A file that cannot be read is not valid code: it has failed, with
-            // its syntax errors (first by position) as diagnostics.
-            const syntax = model.syntaxFailures.get(path);
-            if (syntax) {
-              analysed.push([path, invalidResult(syntax, undefined)]);
-              continue;
-            }
-            const data: { [key: string]: Json } = {
-              analyzer: MODULE_VERSION,
-              project: group.config,
-            };
-            if (group.notes.length) data.configNotes = [...group.notes];
-            // Locally bound module-system names the compiler saw renamed (rename.ts).
-            const renamed = model.renames.get(path);
-            if (renamed) {
-              if (renamed.renamed.length)
-                data.renamedForCompiler = [...renamed.renamed];
-              if (renamed.uncertain.length)
-                data.dynamicScopeOccurrences = renamed.uncertain.length;
-            }
-            const diagnostics: Diagnostic[] = group.limitations.map(
-              (message) => ({
-                message,
-              }),
-            );
-            if (renamed?.uncertain.length)
-              diagnostics.push({
-                message: `${renamed.uncertain.length} occurrence(s) of require/module/exports cannot be decided statically (with, direct eval, reassignment, or a createRequire base other than this file); their links are unresolved`,
-              });
-            analysed.push([
-              path,
-              extractWith(normal, path, data, diagnostics, renamed),
-            ]);
-          }
-          if (normal.drops === dropsBefore) break;
-        }
-
-        // ----- differential analysis for the bundler assumption -----
-        // A free require/module in an ES module read as the loader: one
-        // neutral program with it renamed to an undeclared name; a link whose
-        // outcome differs there rests on the assumption.
-        const assumedTexts = new Map<string, string>();
-        for (const source of normal.program.getSourceFiles()) {
-          const path = fromVirtual(source.fileName);
-          if (path === undefined || !captured.has(path)) continue;
-          const offsets = model.renames.get(path)?.assumed ?? [];
-          if (offsets.length)
-            assumedTexts.set(
-              path,
-              neutralizeAssumed(source.text, offsets, model.fresh.uncertain),
-            );
-        }
-        loadedBy.set(
-          group,
-          new Set(
-            normal.program
-              .getSourceFiles()
-              .map((source) => fromVirtual(source.fileName))
-              .filter(
-                (path): path is string =>
-                  path !== undefined && captured.has(path),
+        const named = JSON.stringify(path);
+        const answer =
+          !!failure &&
+          !failure.names.length &&
+          storedResults.every(
+            ({ item, links }) =>
+              !links.includes(named) ||
+              item.result.links.every(
+                (link) =>
+                  !JSON.stringify(link).includes(named) ||
+                  (link.kind === "imports" &&
+                    sideEffectImport(item, link.range.start)),
               ),
-          ),
+          );
+        quietFailures.set(path, answer);
+        return answer;
+      };
+      const candidate = scopedCandidate(context, files);
+      if (candidate) {
+        // Anything a scoped attempt throws leaves the full analysis to
+        // decide (it builds its own model and programs).
+        let scoped: ScopedAnalysis | undefined;
+        try {
+          scoped = scopedAnalysis(
+            candidate.path,
+            candidate.previous,
+            candidate.retried,
+          );
+        } catch {
+          declined("an exception");
+        }
+        if (scoped) return scoped;
+      }
+      // The full analysis reads the installed declarations afresh.
+      if (context.dependencyInputs) context.dependencyInputs.refreshed = true;
+      return run(buildModel());
+      /**
+       * A stored result a scoped analysis can stand on: analysed by this
+       * version, not failed, and without a compiler limit (whose answers
+       * depend on what was asked before).
+       */
+      function complete(result: ParseResult): boolean {
+        const data = (result.data ?? {}) as { analyzer?: unknown };
+        return (
+          result.status !== "failed" &&
+          data.analyzer === MODULE_VERSION &&
+          !result.diagnostics.some((item) =>
+            /exhausted its stack|overflowed/.test(item.message),
+          ) &&
+          !result.links.some(
+            (link) =>
+              (link.data as { reason?: unknown } | undefined)?.reason ===
+              "compiler-limit",
+          )
         );
-        // The differential pass shares the original parse cache. Its lookups
-        // do not need the original program or checker.
-        const baseHost = normal.host;
-        const projectedEntries = model.unbuiltEntries(baseHost);
-        const workspaceAssumed =
-          projectedEntries &&
-          [...projectedEntries.values()].some((entry) => entry.assumed);
-        normal = undefined;
-        const differential = (
-          texts: ReadonlyMap<string, string>,
-          plainWorkspaceEntries: boolean,
-        ) => {
-          statistics.neutralPrograms++;
-          const failures = new Map(model.parseFailures);
-          const neutral = openSession(
-            () => group.roots.filter((root) => !failures.has(root.slice(1))),
-            group.options,
-            () =>
-              model.host(group, {
-                texts,
-                base: baseHost,
-                failures,
-                plainWorkspaceEntries,
+      }
+      /**
+       * One edited file whose old and new syntactic surfaces match, in a
+       * project whose stored results are all complete (no failed file, no
+       * compiler limit): the only case a scoped analysis is tried for.
+       */
+      function scopedCandidate(
+        context: Parameters<NonNullable<LanguageModule["analyze"]>>[0],
+        files: readonly GraphFile[],
+      ):
+        | { path: string; previous: GraphFile; retried: GraphFile[] }
+        | undefined {
+        const previousFiles = context.previousFiles;
+        if (!previousFiles || context.changedContextFiles.length)
+          return declined("no previous facts");
+        // The core retries every failed file whose failure is not certified
+        // as its content (a broken config, for one) on every index: such a
+        // file with the same content as before is not an edit.
+        const byHash = new Map(files.map((file) => [file.path, file.hash]));
+        const retried = context.changedFiles
+          .map((changed) => previousFiles.get(changed))
+          .filter(
+            (old): old is GraphFile =>
+              old?.result.status === "failed" &&
+              old.hash === byHash.get(old.path),
+          );
+        const edited = context.changedFiles.filter(
+          (changed) => !retried.some((old) => old.path === changed),
+        );
+        if (edited.length !== 1) return declined("not one edited file");
+        const path = edited[0]!;
+        const previous = previousFiles.get(path);
+        if (!previous || !files.some((file) => file.path === path))
+          return declined("no previous facts");
+        const stored = (result: ParseResult) =>
+          complete(result) &&
+          Array.isArray((result.data as { loadedBy?: unknown }).loadedBy);
+        // Another file may have failed for its own syntax errors (stored
+        // as invalid code): the programs this analysis builds must then not
+        // load it (checked there). Any other failure: no scoped analysis.
+        const invalid = (result: ParseResult) =>
+          result.status === "failed" &&
+          (result.data as { analyzer?: unknown; invalid?: unknown } | undefined)
+            ?.analyzer === MODULE_VERSION &&
+          (result.data as { invalid?: unknown }).invalid === true;
+        if (
+          !stored(previous.result) ||
+          // The edited file itself was not renamed for the compiler (rename.ts).
+          (previous.result.data as { renamedForCompiler?: unknown })
+            .renamedForCompiler !== undefined ||
+          (previous.result.data as { dynamicScopeOccurrences?: unknown })
+            .dynamicScopeOccurrences !== undefined ||
+          files.some(
+            (file) =>
+              file.path !== path &&
+              !retried.some((old) => old.path === file.path) &&
+              !stored(file.result) &&
+              !invalid(file.result),
+          )
+        )
+          return declined("a stored result it cannot stand on");
+        // A program that asked for a failed file has a failed-file walk
+        // (taint), which can read the edited file's bodies.
+        const loaders = new Set(
+          (previous.result.data as { loadedBy: string[] }).loadedBy,
+        );
+        if (
+          files.some(
+            (file) =>
+              file.result.status === "failed" &&
+              (
+                (file.result.data as { loadedBy?: string[] } | undefined)
+                  ?.loadedBy ?? []
+              ).some((name) => loaders.has(name)) &&
+              !quiet(file.path),
+          )
+        )
+          return declined("a loading program reads a failed file");
+        const current = files.find((file) => file.path === path)!;
+        const before = syntacticSurface(path, previous.text);
+        if (
+          !hooks.trustSurface &&
+          (before === undefined ||
+            before !== syntacticSurface(path, current.text))
+        )
+          return declined("syntactic surface");
+        return { path, previous, retried };
+      }
+      /**
+       * Extracts only the edited file, in its own project, and keeps every
+       * other stored result, when nothing another file's analysis reads of
+       * it changed: its checker surface is the same before and after in
+       * every program that loads it (scoped.ts). Undefined otherwise.
+       */
+      function scopedAnalysis(
+        path: string,
+        previous: GraphFile,
+        retried: readonly GraphFile[],
+      ): ScopedAnalysis | undefined {
+        const model = buildModel();
+        if (model.omitted.size || model.failures.has(path))
+          return declined("a failed config or project");
+        // A retried failure must come out as before: the failure its broken
+        // config or manifest gives (the full analysis's first results).
+        const again: AnalyzedFile[] = [];
+        for (const old of retried) {
+          const message = model.failures.get(old.path);
+          const result = message === undefined ? undefined : failed(message);
+          if (!result || JSON.stringify(result) !== JSON.stringify(old.result))
+            return declined("a retried failure");
+          again.push({ path: old.path, result });
+        }
+        if (model.renames.has(path))
+          return declined("renamed for the compiler");
+        // Fresh names come from every text: the old text must give the same.
+        const fresh = freshNames(
+          files.map((file) => (file.path === path ? previous.text : file.text)),
+        );
+        if (JSON.stringify(fresh) !== JSON.stringify(model.fresh))
+          return declined("fresh names");
+        const owners = model.groups.filter((group) =>
+          group.roots.includes(toVirtual(path)),
+        );
+        if (!owners.length) return declined("no owning project");
+        const byName = new Map<string, ProjectGroup | null>();
+        for (const group of model.groups)
+          byName.set(
+            groupName(group),
+            byName.has(groupName(group)) ? null : group,
+          );
+        const loadedBy = (previous.result.data as { loadedBy: string[] })
+          .loadedBy;
+        const loaders = loadedBy.map((name) => byName.get(name));
+        if (
+          owners.some((owner) => !loadedBy.includes(groupName(owner))) ||
+          loaders.some((group) => !group)
+        )
+          return declined("loading programs unknown");
+        const scope: Scope = { path, sessions: new Map(), broken: false };
+        // Failures the programs below find (a syntax error, a compiler
+        // exception) other than a quiet failed file: then no scoped result.
+        const failuresBefore = new Set(model.parseFailures.keys());
+        const analysed = run(model, scope);
+        const item = analysed.find((entry) => entry.path === path);
+        if (
+          scope.broken ||
+          scope.sessions.size !== owners.length ||
+          analysed.length !== 1 ||
+          !item ||
+          !complete(item.result)
+        )
+          return declined("edited file's own analysis");
+        const virtual = toVirtual(path);
+        for (const group of hooks.trustSurface
+          ? []
+          : (loaders as ProjectGroup[])) {
+          const roots = group.roots;
+          // An owning project's extraction program: its files are reused.
+          const session = scope.sessions.get(group);
+          const host = session?.host ?? model.host(group);
+          const now = ts.createProgram({
+            rootNames: roots,
+            options: group.options,
+            host,
+            ...(session ? { oldProgram: session.program } : {}),
+            ...(group.references?.length
+              ? { projectReferences: group.references }
+              : {}),
+          });
+          const source = now.getSourceFile(virtual);
+          // A program that asks for a failed file other than a quiet one has
+          // a failed-file walk (taint), which can read the edited file's
+          // bodies: no scoped analysis.
+          if (
+            !source ||
+            [...model.requested(host)].some((asked) => !quiet(asked))
+          )
+            return declined("a loading program");
+          // The same program with the file's previous text.
+          const earlier: ts.CompilerHost = {
+            ...host,
+            getSourceFile: (name, version, onError, create) =>
+              // The host caches what it parsed, so the other files are the
+              // same objects (never a program's project-reference redirect).
+              name === virtual
+                ? ts.createSourceFile(name, previous.text, version, true)
+                : host.getSourceFile(name, version, onError, create),
+          };
+          const before = ts.createProgram({
+            rootNames: roots,
+            options: group.options,
+            host: earlier,
+            oldProgram: now,
+            ...(group.references?.length
+              ? { projectReferences: group.references }
+              : {}),
+          });
+          statistics.surfacePrograms += 2;
+          let old: string | undefined;
+          let next: string | undefined;
+          try {
+            old = checkerSurface(before, before.getTypeChecker(), virtual);
+            next = checkerSurface(now, now.getTypeChecker(), virtual);
+          } catch {
+            return declined("checker threw");
+          }
+          if (old === undefined || old !== next)
+            return declined("checker surface");
+          if (
+            moduleKindOf(before.getSourceFile(virtual)) !== moduleKindOf(source)
+          )
+            return declined("module kind");
+        }
+        for (const failure of model.parseFailures.keys())
+          if (!failuresBefore.has(failure) && !quiet(failure))
+            return declined("new failures");
+        // Declarations of the file may have moved: other files' target
+        // facts follow them (the store's IDs are identity and ordinal).
+        const keys = rekey(previous.result.symbols, item.result.symbols);
+        if (!keys && !hooks.trustSurface)
+          return declined("declarations do not pair");
+        const moved: AnalyzedFile[] = [];
+        for (const file of keys ? files : []) {
+          if (file.path === path) continue;
+          const next = moveTargets(file.result, path, keys!);
+          if (!next) return declined("unknown target key");
+          if (next !== file.result)
+            moved.push({ path: file.path, result: next });
+        }
+        const digest = (previous.result.data as { failedFilesDigest?: string })
+          .failedFilesDigest;
+        const result: ParseResult = {
+          ...item.result,
+          data: {
+            ...(item.result.data as { [key: string]: Json }),
+            loadedBy,
+            ...(digest === undefined ? {} : { failedFilesDigest: digest }),
+          },
+        };
+        statistics.scoped++;
+        return {
+          files: [{ path, result }, ...moved, ...again],
+          resolutionFiles: [
+            path,
+            ...moved.map((entry) => entry.path),
+            ...again.map((entry) => entry.path),
+          ],
+        };
+      }
+      function run(model: ProjectModel, scope?: Scope): AnalyzedFile[] {
+        const libraries = libraryReader(
+          model.manifests,
+          files,
+          model.workspaceRoots,
+          model.workspaceBoundaries,
+          model.workspaceCatalogs,
+          context.dependencyInputs,
+        );
+        const byPath = new Map(files.map((file) => [file.path, file]));
+        const captured = new Set(byPath.keys());
+        const results: AnalyzedFile[] = [];
+        // A broken config or manifest fails only the files it governs, not the module.
+        // (A scoped analysis delivers these itself.)
+        if (!scope)
+          for (const [path, message] of model.failures)
+            results.push({ path, result: failed(message) });
+        const tiedResults = new Map<string, ParseResult[]>();
+        /** Projects analysed so far: the captured files their programs loaded. */
+        const loadedBy = new Map<ProjectGroup, Set<string>>();
+        /** The failed files each project's program asked for (C-38). */
+        const askedBy = new Map<ProjectGroup, ReadonlySet<string>>();
+        const deliver = (path: string, result: ParseResult) => {
+          if (model.ties.has(path))
+            tiedResults.set(path, [...(tiedResults.get(path) ?? []), result]);
+          else results.push({ path, result });
+        };
+        /**
+         * One rule for a file the compiler threw on while a later project was
+         * analysed, when earlier projects had already published or read it:
+         * the store has one result per file, so it is failed for the store.
+         * Its published result becomes the failed-file result; published links
+         * that target it are `target-unavailable`; and every other link of a
+         * project whose program read it is flagged
+         * `no-unseen-declarations` (computed with a file the store now calls
+         * unreadable: unverified, W2-D).
+         */
+        const retract = (path: string, message: string) => {
+          const readers = new Set<string | null>();
+          for (const [group, loaded] of loadedBy)
+            if (loaded.has(path)) readers.add(group.config);
+          const redecide = (result: ParseResult): ParseResult => {
+            if (result.status === "failed") return result;
+            const project = (result.data as { project?: string | null })
+              ?.project;
+            const read = project !== undefined && readers.has(project);
+            return {
+              ...result,
+              links: result.links.map((link) => {
+                const data = (link.data ?? {}) as { [key: string]: Json };
+                const targets = (data.targets ?? []) as unknown as TargetFact[];
+                if (targets.some((target) => target.file === path)) {
+                  const next: { [key: string]: Json } = {
+                    ...data,
+                    reason: "target-unavailable",
+                  };
+                  delete next.targets;
+                  delete next.libraryFacts;
+                  return { ...link, data: next };
+                }
+                if (
+                  !read ||
+                  link.kind === "contains" ||
+                  data.reason === "invalid-code"
+                )
+                  return link;
+                const next = { ...data };
+                assume(next, "no-unseen-declarations");
+                return { ...link, data: next };
               }),
-            failures,
+            };
+          };
+          for (const item of results)
+            item.result =
+              item.path === path ? failed(message) : redecide(item.result);
+          for (const [other, variants] of tiedResults)
+            tiedResults.set(
+              other,
+              variants.map((variant) =>
+                other === path ? failed(message) : redecide(variant),
+              ),
+            );
+        };
+        for (const group of model.groups) {
+          if (!group.roots.length) continue;
+          if (scope && !group.roots.includes(toVirtual(scope.path))) continue;
+          const roots = () =>
+            group.roots.filter(
+              (root) => !model.parseFailures.has(root.slice(1)),
+            );
+          const ownRoots = new Set(group.roots.map((root) => root.slice(1)));
+          let latestHost: ts.CompilerHost | undefined;
+          /** Compiler failures of other projects that this program loads. */
+          const inherited = () => {
+            if (!latestHost) return 0;
+            let count = 0;
+            for (const path of model.requested(latestHost))
+              if (
+                !ownRoots.has(path) &&
+                model.parseFailures.get(path)?.startsWith(COMPILER_FAILURE)
+              )
+                count++;
+            return count;
+          };
+          let normal: Session | undefined = openSession(
+            roots,
+            group.options,
+            () => (latestHost = model.host(group)),
+            model.parseFailures,
             captured,
             group.references,
             model.hasWorkspacePackages,
-            undefined,
+            // Any syntactic diagnostic fails a file: also the compiler's
+            // syntax-phase checks the parser does not make (TypeScript-only
+            // syntax in a JS file, TS8xxx).
+            (program, fail) => {
+              let failedAny = false;
+              for (const source of program.getSourceFiles()) {
+                const path = fromVirtual(source.fileName);
+                if (path === undefined || !captured.has(path)) continue;
+                let extra: readonly ts.Diagnostic[];
+                try {
+                  hooks.syntaxFault?.(path);
+                  extra = program.getSyntacticDiagnostics(source);
+                } catch (error) {
+                  // The compiler threw on this file: it fails, absent from the
+                  // next build, under the session's cap.
+                  fail(path, compilerFailure(error));
+                  failedAny = true;
+                  continue;
+                }
+                if (extra.length && model.failSyntax(path, extra))
+                  failedAny = true;
+              }
+              return failedAny;
+            },
             hooks,
+            inherited,
           );
-          return (path: string) => {
-            const renamed = model.renames.get(path);
-            // The assumed loader becomes an undeclared name (see rename.ts).
-            const context: Renamed | undefined =
-              texts.has(path) && renamed?.assumed.length
-                ? {
-                    ...renamed,
-                    uncertain: [...renamed.uncertain, ...renamed.assumed],
-                    assumed: [],
-                  }
-                : renamed;
-            const other = extractWith(neutral, path, {}, [], context);
-            statistics.neutralExtracted++;
-            return other;
+          if (model.dependencyLimit(group)) {
+            for (const root of group.roots)
+              deliver(
+                root.slice(1),
+                operationalFailure(
+                  "Installed declarations exceed the TypeScript program's input budget",
+                ),
+              );
+            continue;
+          }
+          const provenance = new WeakMap<
+            ts.Program,
+            ReturnType<typeof entryProvenance>
+          >();
+          const resolveModule = (
+            session: Session,
+            specifier: ts.StringLiteralLike,
+          ): ReturnType<RenameContext["resolveModule"]> => {
+            const source = specifier.getSourceFile();
+            const from = fromVirtual(source.fileName);
+            if (from === undefined) return undefined;
+            const selected = model.selectSpecifier(specifier.text, from);
+            if (selected === undefined) return undefined;
+            const { host, program } = session;
+            const mode = relativeSpecifier(selected)
+              ? program.getModeForUsageLocation(source, specifier)
+              : undefined;
+            const resolve = (
+              text: string,
+              resolutionMode: ts.ResolutionMode,
+              resolutionHost = host,
+            ) =>
+              ts.resolveModuleName(
+                text,
+                source.fileName,
+                group.options,
+                resolutionHost,
+                undefined,
+                undefined,
+                resolutionMode,
+              ).resolvedModule;
+            let resolved = resolve(selected, mode);
+            if (!resolved && mode === ts.ModuleKind.ESNext) {
+              // Preserve the legacy extension-only edge when adding a file
+              // extension would reach that same file in the real mode. A
+              // permissive lookup can also find an index or a package entry,
+              // which an ESM directory import must never target.
+              const fallback = resolve(selected, undefined);
+              if (!fallback) return undefined;
+              const candidate = posix.resolve(
+                posix.dirname(source.fileName),
+                selected,
+              );
+              const withoutDirectory = {
+                ...host,
+                directoryExists: (name: string) =>
+                  name !== candidate &&
+                  name !== candidate + "/" &&
+                  (host.directoryExists?.(name) ?? true),
+              };
+              // A permissive result proves a directory edge when the literal
+              // requests a directory, or withholding that directory changes
+              // the compiler's selection. An empty directory proves nothing.
+              if (
+                /(?:\/|(?:^|\/)\.\.?)$/.test(selected) ||
+                (host.directoryExists?.(candidate) &&
+                  resolve(selected, undefined, withoutDirectory)
+                    ?.resolvedFileName !== fallback.resolvedFileName)
+              )
+                return { reason: "directory-import-not-allowed-in-esm" };
+              if (
+                // With rootDirs, a directory entry and an explicitly
+                // extended file in another overlay can select the same path.
+                posix.dirname(fallback.resolvedFileName) ===
+                  posix.dirname(candidate) &&
+                resolve(selected + fallback.extension, mode)
+                  ?.resolvedFileName === fallback.resolvedFileName
+              )
+                resolved = fallback;
+            }
+            const path =
+              resolved &&
+              fromVirtual(
+                host.realpath?.(resolved.resolvedFileName) ??
+                  resolved.resolvedFileName,
+              );
+            return path === undefined ? undefined : { path };
           };
-        };
-        if (assumedTexts.size) {
-          const withoutBundler = differential(assumedTexts, false);
-          analysed = analysed.map(([path, result]) => [
-            path,
-            result.status === "failed"
-              ? result
-              : labelled(result, differing(result, withoutBundler(path))),
+          /**
+           * What a captured target file is. `script` means only: analysed, no
+           * syntax errors, and no ES or CommonJS exports. A file that failed to
+           * parse or bind is `unavailable`; one with syntax errors and no exports
+           * found is `partial` (its exports cannot be ruled out).
+           */
+          const moduleKind = (
+            session: Session,
+            path: string,
+          ): "module" | "script" | "invalid" | "unavailable" => {
+            if (model.syntaxFailures.has(path)) return "invalid";
+            if (model.parseFailures.has(path) || model.failures.has(path))
+              return "unavailable";
+            const source =
+              session.program.getSourceFile(toVirtual(path)) ??
+              session.host.getSourceFile(
+                toVirtual(path),
+                ts.ScriptTarget.Latest,
+              );
+            // Parsing it just now may have found a syntax error.
+            if (model.syntaxFailures.has(path)) return "invalid";
+            if (!source) return "unavailable";
+            const flags = source as ts.SourceFile & {
+              externalModuleIndicator?: unknown;
+              commonJsModuleIndicator?: unknown;
+            };
+            if (
+              !!flags.externalModuleIndicator ||
+              !!flags.commonJsModuleIndicator ||
+              /(^|[^.\w$])(module\.exports|exports\.[\w$]+)\s*=/.test(
+                source.text,
+              )
+            )
+              return "module";
+            return "script";
+          };
+          /**
+           * One extraction attempt. An exception becomes plain data: it holds
+           * the compiler's stack frames and through them the checker, which a
+           * rebuild must be free to release.
+           */
+          const extractOnce = (
+            session: Session,
+            path: string,
+            data: { [key: string]: Json },
+            diagnostics: Diagnostic[],
+            renamed: Renamed | undefined,
+            skip: Set<string>,
+          ):
+            | { result: ParseResult }
+            | { limit: string }
+            | { drop: string; blame: string | undefined }
+            | { internal: string } => {
+            lastAsked = undefined;
+            if (exhaustedSessions.has(session))
+              markTaintExhausted(session.checker);
+            try {
+              if (injectedExtractionFaults.has(path))
+                throw new TypeError("injected internal fault (test)");
+              const source = session.program.getSourceFile(toVirtual(path));
+              if (!source) {
+                const failure = session.failures.get(path);
+                // The parser or binder exhausted its stack on this file: an
+                // environment limit, like the checker's, not invalid code.
+                if (failure?.includes("exhausted its stack"))
+                  return {
+                    result: operationalFailure(
+                      `${failure} (a resource limit of the TypeScript compiler in this environment, not a defect in the file; it is retried on the next index)`,
+                    ),
+                  };
+                // The compiler threw on it, or its project is too large: a
+                // failed file with that reason.
+                if (
+                  failure?.startsWith(COMPILER_FAILURE) ||
+                  model.omitted.has(path)
+                )
+                  return { result: failed(failure!) };
+                const refused = model.refusedIn(group, path);
+                if (refused) return { result: failed(refused) };
+                // Anything else the compiler threw is an internal error.
+                throw Error(failure ?? "The compiler did not load this source");
+              }
+              if (!provenance.has(session.program))
+                provenance.set(
+                  session.program,
+                  entryProvenance(
+                    session.program,
+                    model.unbuiltEntries(session.host),
+                    captured,
+                  ),
+                );
+              const result = extractFile(
+                source,
+                session.checker,
+                session.program,
+                captured,
+                diagnostics.map((item) => ({ ...item })),
+                { ...data },
+                // Settings from an uncaptured base are missing: see extract.ts.
+                group.limitations.length > 0,
+                {
+                  fresh: model.fresh,
+                  explicitTypes: group.explicitTypes === true,
+                  ...(renamed ? { renamed } : {}),
+                  resolveModule: (specifier) =>
+                    resolveModule(session, specifier),
+                  hasDenoImports: model.hasDenoImports,
+                  selectSpecifier: model.selectSpecifier,
+                  workspaceReason: model.workspaceReason,
+                  unbuilt: provenance.get(session.program),
+                  workspaceBoundaryKnown: model.workspaceBoundaryKnown,
+                  skip,
+                  moduleKind: (target) => moduleKind(session, target),
+                  anyFailed: unseen.size > 0,
+                  failedNames,
+                },
+                libraries,
+              );
+              // The core validates the batch as a whole. Check this file's
+              // positions here so bad compiler facts can use the same drop
+              // and rebuild path as a compiler exception.
+              const length = byPath.get(path)!.text.length;
+              if (
+                source.text.length !== length ||
+                result.symbols.some(
+                  ({ range }) => !validSourceRange(range, length),
+                ) ||
+                result.links.some(
+                  ({ range }) => !validSourceRange(range, length),
+                ) ||
+                result.diagnostics.some(
+                  ({ range }) => range && !validSourceRange(range, length),
+                )
+              )
+                return {
+                  drop: `${COMPILER_FAILURE}: Invalid UTF-16 range in the extracted facts for ${path}`,
+                  blame: path,
+                };
+              statistics.extracted++;
+              if (taintExhausted(session.checker)) {
+                // Later checkers of this session (rebuilt from this program,
+                // one file fewer at most) skip the walk: a rebuild per failing
+                // file would otherwise repeat it to the budget each time.
+                exhaustedSessions.add(session);
+                return { result: withoutTaint(result) };
+              }
+              return { result };
+            } catch (error) {
+              if (error instanceof CheckerLimit) return { limit: error.key };
+              if (isCompilerAssertion(error))
+                return { drop: compilerFailure(error), blame: askedFile() };
+              return { internal: internalErrorMessage(path, error) };
+            }
+          };
+          /** Extracts one file, rebuilding the session after checker overflows. */
+          const extractWith = (
+            session: Session,
+            path: string,
+            data: { [key: string]: Json },
+            diagnostics: Diagnostic[],
+            renamed: Renamed | undefined,
+          ): ParseResult => {
+            if (session.rebuilds > MAX_PROGRAM_REBUILDS)
+              return operationalFailure(
+                `The TypeScript checker overflowed so often in this project (${session.rebuilds} rebuilds) that the remaining files were not analysed`,
+              );
+            const skip = new Set<string>();
+            for (let attempt = 0; ; attempt++) {
+              const outcome = extractOnce(
+                session,
+                path,
+                data,
+                diagnostics,
+                renamed,
+                skip,
+              );
+              if ("result" in outcome) return outcome.result;
+              // A rebuild below inherits a walk that reached its budget.
+              if (taintExhausted(session.checker))
+                exhaustedSessions.add(session);
+              if ("limit" in outcome) {
+                if (
+                  attempt < MAX_LIMIT_RETRIES &&
+                  session.rebuilds <= MAX_PROGRAM_REBUILDS
+                ) {
+                  // The checker's state is untrustworthy after an overflow:
+                  // retry with dependencies warmed before omitting a lookup.
+                  if (!session.rebuild()) skip.add(outcome.limit);
+                  continue;
+                }
+                // Never leave an overflowed checker in use for the next file.
+                session.rebuild();
+                return operationalFailure(
+                  `The TypeScript checker exhausted its stack more than ${MAX_LIMIT_RETRIES} times in this file`,
+                );
+              }
+              if ("drop" in outcome) {
+                // A compiler assertion or invalid range makes the file's facts
+                // unavailable. Rebuild without it before extracting other files.
+                const blamed =
+                  outcome.blame !== undefined && captured.has(outcome.blame)
+                    ? outcome.blame
+                    : path;
+                session.drop(blamed, outcome.drop);
+                if (session === normal) {
+                  markUnseen(blamed);
+                  retract(blamed, outcome.drop);
+                }
+                if (blamed !== path) continue;
+                return failed(outcome.drop);
+              }
+              return operationalFailure(outcome.internal);
+            }
+          };
+          // Failed files this program would include (roots, or imported): any of
+          // them might have declared something that changes a link.
+          const unseen = new Set([
+            ...model.requested(normal.host),
+            ...group.roots
+              .map((root) => root.slice(1))
+              .filter((path) => model.parseFailures.has(path)),
           ]);
-        }
-        if (workspaceAssumed) {
-          const withoutWorkspace = differential(new Map(), true);
-          let plain: [string, ParseResult][] = analysed.map(
-            ([path, result]) => [
-              path,
-              result.status === "failed" ? result : withoutWorkspace(path),
-            ],
+          const failedNames = new Map<string, string[]>();
+          // The global names a failed file declares: as far as the parser read
+          // it, or, for a readable file left out (the compiler threw on it, or
+          // its project is too large), all of them.
+          const namesOf = (path: string): readonly string[] =>
+            model.syntaxFailures.get(path)?.names ??
+            (model.omitted.has(path) ||
+            model.refusedIn(group, path) !== undefined ||
+            model.parseFailures.get(path)?.startsWith(COMPILER_FAILURE)
+              ? model.globalNames(path)
+              : []);
+          for (const path of [...unseen].sort())
+            for (const name of namesOf(path))
+              failedNames.set(name, [...(failedNames.get(name) ?? []), path]);
+          /** A file the compiler threw on while extracting: unseen from now on. */
+          const markUnseen = (path: string) => {
+            if (unseen.has(path)) return;
+            unseen.add(path);
+            for (const name of namesOf(path))
+              failedNames.set(
+                name,
+                [...(failedNames.get(name) ?? []), path].sort(),
+              );
+          };
+          // A file dropped while this project is extracted (the compiler threw
+          // on it) changes the program: the project is extracted again from its
+          // first file, so files before and after the drop agree. Each round
+          // needs a further drop, and drops are capped (MAX_COMPILER_FAILURES).
+          let analysed: [string, ParseResult][] = [];
+          for (;;) {
+            analysed = [];
+            const dropsBefore = normal.drops;
+            for (const root of group.roots) {
+              const path = root.slice(1);
+              if (scope && path !== scope.path) continue;
+              // A file that cannot be read is not valid code: it has failed, with
+              // its syntax errors (first by position) as diagnostics.
+              const syntax = model.syntaxFailures.get(path);
+              if (syntax) {
+                analysed.push([path, invalidResult(syntax, undefined)]);
+                continue;
+              }
+              const data: { [key: string]: Json } = {
+                analyzer: MODULE_VERSION,
+                project: group.config,
+              };
+              if (group.notes.length) data.configNotes = [...group.notes];
+              // Locally bound module-system names the compiler saw renamed (rename.ts).
+              const renamed = model.renames.get(path);
+              if (renamed) {
+                if (renamed.renamed.length)
+                  data.renamedForCompiler = [...renamed.renamed];
+                if (renamed.uncertain.length)
+                  data.dynamicScopeOccurrences = renamed.uncertain.length;
+              }
+              const diagnostics: Diagnostic[] = group.limitations.map(
+                (message) => ({
+                  message,
+                }),
+              );
+              if (renamed?.uncertain.length)
+                diagnostics.push({
+                  message: `${renamed.uncertain.length} occurrence(s) of require/module/exports cannot be decided statically (with, direct eval, reassignment, or a createRequire base other than this file); their links are unresolved`,
+                });
+              analysed.push([
+                path,
+                extractWith(normal, path, data, diagnostics, renamed),
+              ]);
+            }
+            if (normal.drops === dropsBefore) break;
+          }
+
+          // ----- differential analysis for the bundler assumption -----
+          // A free require/module in an ES module read as the loader: one
+          // neutral program with it renamed to an undeclared name; a link whose
+          // outcome differs there rests on the assumption.
+          const assumedTexts = new Map<string, string>();
+          for (const source of normal.program.getSourceFiles()) {
+            const path = fromVirtual(source.fileName);
+            if (path === undefined || !captured.has(path)) continue;
+            const offsets = model.renames.get(path)?.assumed ?? [];
+            if (offsets.length)
+              assumedTexts.set(
+                path,
+                neutralizeAssumed(source.text, offsets, model.fresh.uncertain),
+              );
+          }
+          loadedBy.set(
+            group,
+            new Set(
+              normal.program
+                .getSourceFiles()
+                .map((source) => fromVirtual(source.fileName))
+                .filter(
+                  (path): path is string =>
+                    path !== undefined && captured.has(path),
+                ),
+            ),
           );
+          askedBy.set(group, new Set(model.requested(normal.host)));
+          // The differential pass shares the original parse cache. Its lookups
+          // do not need the original program or checker.
+          const baseHost = normal.host;
+          const projectedEntries = model.unbuiltEntries(baseHost);
+          const workspaceAssumed =
+            projectedEntries &&
+            [...projectedEntries.values()].some((entry) => entry.assumed);
+          if (scope) {
+            // Anything that makes this project's answers depend on the files
+            // extracted with it, or on a second program: no scoped result.
+            scope.sessions.set(group, normal);
+            if (
+              normal.drops ||
+              normal.rebuilds ||
+              [...unseen].some((asked) => !quiet(asked)) ||
+              assumedTexts.size ||
+              workspaceAssumed
+            )
+              scope.broken = true;
+          }
+          normal = undefined;
+          const differential = (
+            texts: ReadonlyMap<string, string>,
+            plainWorkspaceEntries: boolean,
+          ) => {
+            statistics.neutralPrograms++;
+            const failures = new Map(model.parseFailures);
+            const neutral = openSession(
+              () => group.roots.filter((root) => !failures.has(root.slice(1))),
+              group.options,
+              () =>
+                model.host(group, {
+                  texts,
+                  base: baseHost,
+                  failures,
+                  plainWorkspaceEntries,
+                }),
+              failures,
+              captured,
+              group.references,
+              model.hasWorkspacePackages,
+              undefined,
+              hooks,
+            );
+            return (path: string) => {
+              const renamed = model.renames.get(path);
+              // The assumed loader becomes an undeclared name (see rename.ts).
+              const context: Renamed | undefined =
+                texts.has(path) && renamed?.assumed.length
+                  ? {
+                      ...renamed,
+                      uncertain: [...renamed.uncertain, ...renamed.assumed],
+                      assumed: [],
+                    }
+                  : renamed;
+              const other = extractWith(neutral, path, {}, [], context);
+              statistics.neutralExtracted++;
+              return other;
+            };
+          };
           if (assumedTexts.size) {
-            const withoutEither = differential(assumedTexts, true);
-            plain = plain.map(([path, result]) => [
+            const withoutBundler = differential(assumedTexts, false);
+            analysed = analysed.map(([path, result]) => [
               path,
               result.status === "failed"
                 ? result
-                : labelled(result, differing(result, withoutEither(path))),
+                : labelled(result, differing(result, withoutBundler(path))),
             ]);
           }
-          analysed = analysed.map(([path, result], index) => [
+          if (workspaceAssumed) {
+            const withoutWorkspace = differential(new Map(), true);
+            let plain: [string, ParseResult][] = analysed.map(
+              ([path, result]) => [
+                path,
+                result.status === "failed" ? result : withoutWorkspace(path),
+              ],
+            );
+            if (assumedTexts.size) {
+              const withoutEither = differential(assumedTexts, true);
+              plain = plain.map(([path, result]) => [
+                path,
+                result.status === "failed"
+                  ? result
+                  : labelled(result, differing(result, withoutEither(path))),
+              ]);
+            }
+            analysed = analysed.map(([path, result], index) => [
+              path,
+              withWorkspaceAssumptions(result, plain[index]![1]),
+            ]);
+          }
+          for (const [path, result] of analysed) {
+            let final = result;
+            // One rule, one place: a program with a failed file among those it
+            // would include flags every link it computed (failed links excepted).
+            if (unseen.size && final.status !== "failed")
+              final = {
+                ...final,
+                links: final.links.map((link) => {
+                  const data = {
+                    ...((link.data ?? {}) as { [key: string]: Json }),
+                  };
+                  const outside = data.libraryFacts as unknown as
+                    | LibraryTarget[]
+                    | undefined;
+                  if (
+                    data.reason === "invalid-code" ||
+                    (outside?.length &&
+                      outside.every(
+                        (fact) =>
+                          fact.evidence === "import-path" ||
+                          fact.evidence === "import-binding",
+                      ))
+                  )
+                    return link;
+                  assume(data, "no-unseen-declarations");
+                  return { ...link, data };
+                }),
+              };
+            deliver(path, final);
+          }
+        }
+        for (const [path, variants] of tiedResults)
+          results.push({
             path,
-            withWorkspaceAssumptions(result, plain[index]![1]),
-          ]);
-        }
-        for (const [path, result] of analysed) {
-          let final = result;
-          // One rule, one place: a program with a failed file among those it
-          // would include flags every link it computed (failed links excepted).
-          if (unseen.size && final.status !== "failed")
-            final = {
-              ...final,
-              links: final.links.map((link) => {
-                const data = {
-                  ...((link.data ?? {}) as { [key: string]: Json }),
-                };
-                const outside = data.libraryFacts as unknown as
-                  | LibraryTarget[]
-                  | undefined;
-                if (
-                  data.reason === "invalid-code" ||
-                  (outside?.length &&
-                    outside.every(
-                      (fact) =>
-                        fact.evidence === "import-path" ||
-                        fact.evidence === "import-binding",
-                    ))
-                )
-                  return link;
-                assume(data, "no-unseen-declarations");
-                return { ...link, data };
-              }),
-            };
-          deliver(path, final);
-        }
-      }
-      for (const [path, variants] of tiedResults)
-        results.push({
-          path,
-          result: mergeTied(
-            variants,
-            model.ties.get(path)!.map((group) => group.config),
-          ),
-        });
-      // Every result records the digest of the module's failed files and
-      // their content, so an unchanged re-index can recognise them (above).
-      const failedFilesDigest = failedDigest(
-        files
-          .filter((file) => model.syntaxFailures.has(file.path))
-          .map((file) => [file.path, file.hash] as const),
-      );
-      if (failedFilesDigest)
-        for (const item of results) {
-          const data = item.result.data as { [key: string]: Json } | undefined;
-          if (data?.analyzer === MODULE_VERSION)
+            result: mergeTied(
+              variants,
+              model.ties.get(path)!.map((group) => group.config),
+            ),
+          });
+        // Every result names the programs that loaded its file (C-38): an edit
+        // of the file is compared in each of them before other files' results
+        // are kept. A failed file names the programs that asked for it: an
+        // edit read by one of those is never scoped.
+        if (!scope)
+          for (const item of results) {
+            const data = item.result.data as
+              | { [key: string]: Json }
+              | undefined;
+            if (data?.analyzer !== MODULE_VERSION) continue;
+            const names = new Set<string>();
+            for (const [group, loaded] of item.result.status === "failed"
+              ? askedBy
+              : loadedBy)
+              if (loaded.has(item.path)) names.add(groupName(group));
             item.result = {
               ...item.result,
-              data: { ...data, failedFilesDigest },
+              data: { ...data, loadedBy: [...names].sort() },
             };
+          }
+        // Every result records the digest of the module's failed files and
+        // their content, so an unchanged re-index can recognise them (above).
+        // (A scoped analysis parses only some files: it keeps the edited
+        // file's recorded digest, the failed files being the same.)
+        const failedFilesDigest =
+          !scope &&
+          failedDigest(
+            files
+              .filter((file) => model.syntaxFailures.has(file.path))
+              .map((file) => [file.path, file.hash] as const),
+          );
+        if (failedFilesDigest)
+          for (const item of results) {
+            const data = item.result.data as
+              | { [key: string]: Json }
+              | undefined;
+            if (data?.analyzer === MODULE_VERSION)
+              item.result = {
+                ...item.result,
+                data: { ...data, failedFilesDigest },
+              };
+          }
+        // Only failures reproduced from this file alone may outlive a project
+        // analysis. Config/ownership failures, compiler/checker limits, internal
+        // exceptions and diagnostics added by a Program remain retryable. Compare
+        // the whole diagnostic set: a local syntax error must not hide another,
+        // context-dependent failure. Tied configs may order diagnostics differently.
+        const diagnosticSet = (diagnostics: readonly Diagnostic[]) =>
+          JSON.stringify(
+            diagnostics.map((item) => JSON.stringify(item)).sort(),
+          );
+        for (const item of results) {
+          if (
+            item.result.status !== "failed" ||
+            item.result.failureKind === "transient"
+          )
+            continue;
+          const file = byPath.get(item.path)!;
+          const local = syntaxFailure(file.path, file.text);
+          if (
+            local &&
+            diagnosticSet(local.diagnostics) ===
+              diagnosticSet(item.result.diagnostics)
+          )
+            item.result = { ...item.result, failureKind: "content" };
         }
-      // Only failures reproduced from this file alone may outlive a project
-      // analysis. Config/ownership failures, compiler/checker limits, internal
-      // exceptions and diagnostics added by a Program remain retryable. Compare
-      // the whole diagnostic set: a local syntax error must not hide another,
-      // context-dependent failure. Tied configs may order diagnostics differently.
-      const diagnosticSet = (diagnostics: readonly Diagnostic[]) =>
-        JSON.stringify(diagnostics.map((item) => JSON.stringify(item)).sort());
-      for (const item of results) {
-        if (
-          item.result.status !== "failed" ||
-          item.result.failureKind === "transient"
-        )
-          continue;
-        const file = byPath.get(item.path)!;
-        const local = syntaxFailure(file.path, file.text);
-        if (
-          local &&
-          diagnosticSet(local.diagnostics) ===
-            diagnosticSet(item.result.diagnostics)
-        )
-          item.result = { ...item.result, failureKind: "content" };
+        return results;
       }
-      return results;
     },
     resolutionNeedsFiles: false,
     resolve({ symbols, links }) {

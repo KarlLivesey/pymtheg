@@ -1,0 +1,6 @@
+{
+  "tsconfig.json": "{\"compilerOptions\":{\"strict\":true,\"target\":\"ES2022\",\"module\":\"ESNext\",\"moduleResolution\":\"Bundler\"},\"include\":[\"src\"]}",
+  "src/f.ts": "export enum E {\n  A = 1,\n}\n",
+  "src/p.ts": "export function pick(x: 1): { one(): void };\nexport function pick(x: number): { other(): void };\nexport function pick(x: number) {\n  return { one() {}, other() {} };\n}\n",
+  "src/g.ts": "import { E } from \"./f\";\nimport { pick } from \"./p\";\npick(E.A).one();\n"
+}

@@ -3,9 +3,11 @@
 // <root> with the production language modules and kills itself with SIGKILL
 // right after the <n>th store write commits (a transaction, a file removal,
 // or the completion record's invalidation). Prints "not killed <writes>" when
-// the index returns first.
+// the index returns first, with the number of scoped TypeScript analyses
+// (C-38) after it.
 // usage: node graph-reindex-kill-child.mjs <root> <n>
 import { executeGraph } from "../dist/graph/commands.js";
+import { statistics } from "../dist/graph/languages/typescript/index.js";
 import { SqliteGraphStore } from "../dist/graph/store.js";
 
 const [root, limit] = process.argv.slice(2);
@@ -32,4 +34,4 @@ for (const name of [
   };
 }
 await executeGraph({ command: "index", root });
-process.stdout.write(`not killed ${writes}\n`);
+process.stdout.write(`not killed ${writes} scoped ${statistics.scoped}\n`);

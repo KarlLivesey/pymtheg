@@ -42,7 +42,8 @@ const killAt = (root, n) =>
 /**
  * Indexes `files`, applies `edit`, and for n = 1, 2, … kills the re-index
  * after its nth write on a fresh copy, then checks one normal re-index
- * against a cold index. Returns the number of write boundaries tried.
+ * against a cold index. Returns the number of write boundaries tried and
+ * the number of scoped TypeScript analyses the unkilled re-index made.
  */
 async function everyKillPoint(files, edit) {
   const base = mkdtempSync(join(tmpdir(), "c22-kill-"));
@@ -70,6 +71,7 @@ async function everyKillPoint(files, edit) {
     cpSync(start, whole, { recursive: true });
     const unkilled = await killAt(whole, 0);
     const writes = Number(/^not killed (\d+)/.exec(unkilled.out)?.[1]);
+    const scoped = Number(/ scoped (\d+)/.exec(unkilled.out)?.[1]);
     assert.ok(writes > 0, unkilled.out);
     assert.deepEqual(compareRows(storeRows(graph(whole)), cold), []);
     for (let n = 1; n <= writes; n++) {
@@ -90,7 +92,7 @@ async function everyKillPoint(files, edit) {
       );
       rmSync(root, { recursive: true, force: true });
     }
-    return writes;
+    return { writes, scoped };
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
@@ -105,7 +107,7 @@ export function other(): number {
 }
 `;
 test("TypeScript: a re-index killed after any write is repaired by the next one", async (t) => {
-  const tried = await everyKillPoint(
+  const { writes: tried } = await everyKillPoint(
     {
       "package.json": JSON.stringify({ name: "fixture", private: true }),
       "tsconfig.json": JSON.stringify({
@@ -125,8 +127,32 @@ test("TypeScript: a re-index killed after any write is repaired by the next one"
   t.diagnostic(`write boundaries: ${tried}`);
 });
 
+test("TypeScript: a killed scoped re-index is repaired by the next one", async (t) => {
+  const { writes, scoped } = await everyKillPoint(
+    {
+      "package.json": JSON.stringify({ name: "fixture", private: true }),
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { strict: true },
+        include: ["src"],
+      }),
+      "src/a.ts": tsA,
+      "src/b.ts":
+        'import { hello, other } from "./a";\n\nexport const b = hello() + other();\n',
+      "src/c.ts":
+        'import { other } from "./a";\n\nexport const c = other() + 1;\n',
+      "src/d.ts": "export const unrelated = 1;\n",
+    },
+    // A body edit below a new leading comment: only a.ts is extracted, and
+    // b.ts and c.ts keep their facts with a.ts's moved keys (C-38).
+    { "src/a.ts": "// moved\n" + tsA.replace("  return 1;", "  void 0;\n  return 1;") },
+  );
+  assert.equal(scoped, 1, "the unkilled re-index took the scoped path");
+  assert.ok(writes >= 3, `write boundaries tried: ${writes}`);
+  t.diagnostic(`write boundaries: ${writes}`);
+});
+
 test("Go: a re-index killed after any write is repaired by the next one", async (t) => {
-  const tried = await everyKillPoint(
+  const { writes: tried } = await everyKillPoint(
     {
       "go.mod": "module example.com/m\n\ngo 1.22\n",
       "a/a.go": "package a\n\nfunc Hello() error { return nil }\n",
@@ -142,7 +168,7 @@ test("Go: a re-index killed after any write is repaired by the next one", async 
 });
 
 test("Go: a killed scoped re-index is repaired by the next one", async (t) => {
-  const tried = await everyKillPoint(
+  const { writes: tried } = await everyKillPoint(
     {
       "go.mod": "module example.com/m\n\ngo 1.22\n",
       "a/a.go": "package a\nfunc Existing() {}\n",
@@ -158,7 +184,7 @@ test("Go: a killed scoped re-index is repaired by the next one", async (t) => {
 
 test("Go: a killed body edit with promoted method facts is repaired by one index", async (t) => {
   const body = "package p\nfunc Call(c Carrier) int { return c.M() }\n";
-  const tried = await everyKillPoint(
+  const { writes: tried } = await everyKillPoint(
     {
       "a.go": body,
       "b.go":
@@ -171,7 +197,7 @@ test("Go: a killed body edit with promoted method facts is repaired by one index
 });
 
 test("Rust: a re-index killed after any write is repaired by the next one", async (t) => {
-  const tried = await everyKillPoint(
+  const { writes: tried } = await everyKillPoint(
     {
       "Cargo.toml":
         '[package]\nname = "fixture"\nversion = "0.1.0"\nedition = "2021"\n',

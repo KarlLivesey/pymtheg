@@ -456,8 +456,11 @@ export async function indexProject(
         validateResult(file.text, item.result);
         seen.add(item.path);
       }
+      // A validated scoped result keeps the stored results of the files it
+      // does not name, as it does for a module with a parser (C-38).
       if (
         !module.parse &&
+        !scope &&
         files.some((file) => !unreadable.has(file.path) && !seen.has(file.path))
       )
         throw Error(

@@ -814,11 +814,15 @@ test("an unchanged re-index reuses stored results when files have failed", async
     },
     {
       twice: true,
-      // Rewriting the failed file without its content marker makes the
-      // core retry it; nothing else changed, so the module must reuse its
-      // stored results instead of building a program.
+      // Without its content marker the failed file is retried by the core;
+      // nothing else changed, so the module must reuse its stored results
+      // instead of building a program. (The marker is hidden, not deleted:
+      // a direct write would also clear the analysis completion record, and
+      // the next index would then rebuild everything, C-27.)
       between: (store) => {
-        store.replaceFile(store.files().find((f) => f.path === "broken.js"));
+        const marked = store.isParseFailure.bind(store);
+        store.isParseFailure = (path) =>
+          path === "broken.js" ? false : marked(path);
         reusedBefore = statistics.reused;
       },
     },

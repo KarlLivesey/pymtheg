@@ -105,6 +105,35 @@ export function withoutGoSurface(rows) {
   };
 }
 
+/**
+ * C-38: TypeScript module version 45 records, in each result, which programs
+ * loaded the file (`loadedBy`); with that removed and the version mapped
+ * back, rows compare with version 44's.
+ */
+export function withoutTypeScriptLoadedBy(rows) {
+  const before = (version) => version.replace(/^45\+typescript-/, "44+typescript-");
+  return {
+    ...rows,
+    graph_files: rows.graph_files.map((line) => {
+      const row = JSON.parse(line);
+      const file = JSON.parse(row.body);
+      if (file.module !== "typescript") return line;
+      file.version = before(file.version);
+      const data = file.result.data;
+      if (data) {
+        delete data.loadedBy;
+        if (typeof data.analyzer === "string") data.analyzer = before(data.analyzer);
+      }
+      return JSON.stringify({ ...row, body: JSON.stringify(file) });
+    }),
+    graph_parse_failures: rows.graph_parse_failures.map((line) => {
+      const row = JSON.parse(line);
+      if (row.module === "typescript") row.version = before(row.version);
+      return JSON.stringify(row);
+    }),
+  };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [left, right] = process.argv.slice(2);
   const differences = compareRows(storeRows(left), storeRows(right));
