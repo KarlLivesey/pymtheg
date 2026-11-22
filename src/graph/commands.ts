@@ -119,6 +119,14 @@ export interface GraphExecutionOptions {
    * runs (see IndexSession).
    */
   session?: IndexSession;
+  /**
+   * C-48: told when a call into a language module (or a toolchain) begins
+   * (true) and ends (false). Between those, the module may run for long
+   * without passing a cancellation checkpoint, so a caller that must cancel
+   * promptly ends the work another way. The abort signal is checked after
+   * the call is announced, so a cancellation set before it is never missed.
+   */
+  onModuleCall?: (inside: boolean) => void;
 }
 const arity: Record<GraphCommand, number> = {
   index: 0,
@@ -261,6 +269,16 @@ export async function executeGraph(
         metadata,
       );
     const complete = previousState?.fingerprint === currentFingerprint();
+    // A toolchain runs outside this process, between checkpoints (C-48).
+    const toolchainCall = async <T>(call: () => Promise<T>): Promise<T> => {
+      options.onModuleCall?.(true);
+      try {
+        signal.throwIfAborted();
+        return await call();
+      } finally {
+        options.onModuleCall?.(false);
+      }
+    };
     const toolchainDirectory = join(
       dirname(storagePath(root, "graph")),
       "toolchain",
@@ -323,12 +341,14 @@ export async function executeGraph(
       request.noSync
         ? true
         : recordedKey !== undefined &&
-          (await goToolchainKey(
-            root,
-            toolchains.go!,
-            inventory,
-            toolchainDirectory,
-            signal,
+          (await toolchainCall(() =>
+            goToolchainKey(
+              root,
+              toolchains.go!,
+              inventory,
+              toolchainDirectory,
+              signal,
+            ),
           )) === recordedKey;
     const shouldIndex = wouldIndex || !toolchainCurrent;
     let report: IndexReport | null = null;
@@ -365,6 +385,15 @@ export async function executeGraph(
           (dirty.has(file.path) || retry.has(file.path)) &&
           registry.modules.find((m) => m.id === file.module)?.parse,
       ).length;
+      const inModule = async <T>(call: () => T | Promise<T>): Promise<T> => {
+        options.onModuleCall?.(true);
+        try {
+          signal.throwIfAborted();
+          return await call();
+        } finally {
+          options.onModuleCall?.(false);
+        }
+      };
       const tracked = new LanguageRegistry(
         registry.modules.map((module) => ({
           ...module,
@@ -375,7 +404,7 @@ export async function executeGraph(
                 ) => {
                   signal.throwIfAborted();
                   try {
-                    return await module.parse!(source);
+                    return await inModule(() => module.parse!(source));
                   } finally {
                     options.progress?.({
                       phase: "parse",
@@ -400,7 +429,7 @@ export async function executeGraph(
                     total: context.files.length,
                     module: module.id,
                   });
-                  const result = await module.analyze!(context);
+                  const result = await inModule(() => module.analyze!(context));
                   options.progress?.({
                     phase: "analyze",
                     done: context.files.length,
@@ -423,7 +452,7 @@ export async function executeGraph(
                     total: context.files.length,
                     module: module.id,
                   });
-                  const result = await module.resolve!(context);
+                  const result = await inModule(() => module.resolve!(context));
                   options.progress?.({
                     phase: "resolve",
                     done: context.files.length,
