@@ -8,6 +8,7 @@
 // sizes are deterministic; heap figures are as V8 reports them.
 //   node --expose-gc [--max-old-space-size=N] scripts/memory/probe.mjs <dist> <root> <graph.sqlite> <out.json>
 import { writeFileSync } from "node:fs";
+import { writeHeapSnapshot } from "node:v8";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -22,8 +23,17 @@ const { discoverLanguages, indexProject, LanguageRegistry, SqliteGraphStore } =
 const started = performance.now();
 const samples = [];
 const mib = (bytes) => Math.round(bytes / 1048576);
+// --snapshot <point>: a heap snapshot (beside <out>) at the first sample
+// whose point contains that text, to see what is retained there.
+const snapshotAt = process.argv.indexOf("--snapshot");
+const snapshotPoint = snapshotAt < 0 ? undefined : process.argv[snapshotAt + 1];
+let snapshotTaken = false;
 function sample(point, extra = {}) {
   globalThis.gc();
+  if (snapshotPoint && !snapshotTaken && point.includes(snapshotPoint)) {
+    snapshotTaken = true;
+    writeHeapSnapshot(`${out}.heapsnapshot`);
+  }
   const memory = process.memoryUsage();
   samples.push({
     point,
