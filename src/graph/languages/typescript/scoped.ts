@@ -218,10 +218,14 @@ export function checkerSurface(
   const where = (declaration: ts.Node): string => {
     if (declaration.getSourceFile() !== source)
       return `${declaration.getSourceFile().fileName}@${declaration.pos}`;
-    // A declaration inside a function body (a local class, interface,
-    // function, object literal): its members are not compared, and its
-    // printed name can stand for different declarations (C-38 review).
-    if (inBody(declaration)) throw new SurfaceLimit();
+    // A named declaration inside a function body (a local class, interface,
+    // enum, type alias or function): its printed name can stand for
+    // different declarations, and its members are not compared (C-38
+    // review). An anonymous one (an object or type literal, a function or
+    // arrow expression, their members) is described here by its place, and
+    // `reach` compares its members and signatures.
+    if (inBody(declaration) && !structural(declaration))
+      throw new SurfaceLimit();
     return `here:${placeOf(declaration)}`;
   };
   const seen = new Set<ts.Type>();
@@ -354,6 +358,31 @@ function placeOf(node: ts.Node): string {
     at = parent;
   }
   return parts.reverse().join("/");
+}
+
+/**
+ * An anonymous declaration, which `reach` compares by its members and
+ * signatures: an object or type literal and their members, a function or
+ * arrow expression, a parameter of one.
+ */
+function structural(node: ts.Node): boolean {
+  const parent = node.parent;
+  return (
+    ts.isObjectLiteralExpression(node) ||
+    ts.isTypeLiteralNode(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ((ts.isPropertyAssignment(node) ||
+      ts.isShorthandPropertyAssignment(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node) ||
+      ts.isSetAccessorDeclaration(node)) &&
+      ts.isObjectLiteralExpression(parent)) ||
+    ((ts.isPropertySignature(node) || ts.isMethodSignature(node)) &&
+      ts.isTypeLiteralNode(parent)) ||
+    (ts.isParameter(node) &&
+      (ts.isFunctionExpression(parent) || ts.isArrowFunction(parent)))
+  );
 }
 
 /** Whether a node is inside the body of a function (a block or an expression). */

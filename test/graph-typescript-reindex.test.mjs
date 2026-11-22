@@ -849,6 +849,30 @@ const BODY_CASES = [
   },
 ];
 
+test("TypeScript re-index equals cold: a returned object literal whose body moves stays scoped", async () => {
+  // An anonymous literal from a body is compared by its members and their
+  // types, so moving it within its body keeps the scoped path.
+  await equalAfterEdits(
+    {
+      "tsconfig.json": tsconfig(),
+      "src/f.ts":
+        "export function make() {\n  console.log(0);\n  return { a: 1, run() { return 'x'; } };\n}\n",
+      "src/g.ts": 'import { make } from "./f";\nmake().a;\nmake().run().toUpperCase();\n',
+    },
+    [
+      {
+        name: "statements inserted before the literal",
+        edit: {
+          "src/f.ts":
+            "export function make() {\n  console.log(0);\n  console.log(1);\n  return { a: 1, run() { return 'x'; } };\n}\n",
+        },
+        scoped: true,
+      },
+    ],
+    typescriptModule(),
+  );
+});
+
 for (const { name, files, edit } of BODY_CASES)
   test(`TypeScript re-index equals cold: ${name}`, async () => {
     await equalAfterEdits(
