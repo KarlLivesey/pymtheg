@@ -14,7 +14,10 @@
 // A stopped worker sets gate[0] to 1 and waits for gate[1].
 import { workerData } from "node:worker_threads";
 import { serveGraphRequests } from "../../../dist/mcp/graph-worker.js";
-import { LanguageRegistry, SqliteGraphStore } from "../../../dist/graph/index.js";
+import {
+  LanguageRegistry,
+  SqliteGraphStore,
+} from "../../../dist/graph/index.js";
 import { module as synthetic } from "../graph-core/synthetic.mjs";
 import { keepingModule } from "./keeping-module.mjs";
 
@@ -40,7 +43,11 @@ if (workerData.mode === "pause-store") {
 if (workerData.mode === "write-limit") {
   // Counts committed writes as the C-22 kill child does (outer calls only).
   let writes = 0;
-  for (const name of ["transaction", "removeFile", "invalidateGraphCommandState"]) {
+  for (const name of [
+    "transaction",
+    "removeFile",
+    "invalidateGraphCommandState",
+  ]) {
     const original = proto[name];
     proto[name] = function (...args) {
       const outer = !this.c48Writing;
@@ -73,5 +80,6 @@ if (workerData.mode === "pause-module" || workerData.mode === "crash-module") {
     },
   ]);
 }
-if (workerData.mode === "keeping") registry = new LanguageRegistry([keepingModule]);
+if (workerData.mode === "keeping")
+  registry = new LanguageRegistry([keepingModule]);
 serveGraphRequests(registry ? { registry } : {});

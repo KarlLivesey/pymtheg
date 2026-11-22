@@ -15,15 +15,21 @@ import { pathToFileURL } from "node:url";
 
 const args = process.argv.slice(2);
 const editsAt = args.indexOf("--edits");
-const edits = editsAt < 0 ? ["body", "export"] : args.splice(editsAt, 2)[1].split(",");
+const edits =
+  editsAt < 0 ? ["body", "export"] : args.splice(editsAt, 2)[1].split(",");
 const [distArg, scratch, id, outArg] = args;
 const dist = resolve(distArg);
 const load = (path) => import(pathToFileURL(join(dist, path)).href);
 const { GraphJobs } = await load("mcp/graph-jobs.js");
-const { discoverLanguages, indexProject, SqliteGraphStore } = await load("graph/index.js");
+const { discoverLanguages, indexProject, SqliteGraphStore } =
+  await load("graph/index.js");
 const here = new URL(".", import.meta.url).pathname;
-const { compareRows, storeRows } = await import(join(here, "../reindex/dump.mjs"));
-const cases = JSON.parse(readFileSync(join(here, "../reindex/cases.json"), "utf8"));
+const { compareRows, storeRows } = await import(
+  join(here, "../reindex/dump.mjs")
+);
+const cases = JSON.parse(
+  readFileSync(join(here, "../reindex/cases.json"), "utf8"),
+);
 const pin = cases.pins.find((item) => item.id === id);
 const name = id.replace(/[^A-Za-z0-9._-]/g, "_");
 const out = join(resolve(outArg), name);
@@ -63,7 +69,10 @@ const step = async (label) => {
     counts: job.work?.counts ?? {},
     stages: job.work?.stages ?? {},
   };
-  writeFileSync(join(out, `${name}.${label}.json`), JSON.stringify(record, null, 1));
+  writeFileSync(
+    join(out, `${name}.${label}.json`),
+    JSON.stringify(record, null, 1),
+  );
   console.log(
     `${id} ${label}: ${job.state}, wall ${record.wallMs} ms, cpu ${record.cpuMs} ms, rss ${record.rssMiB} MiB, worker ${record.generation}, session ${JSON.stringify(job.session)}`,
   );
@@ -85,9 +94,13 @@ const rows = storeRows(graph);
 const coldPath = join(scratch, "mcp-work", `${name}.cold.sqlite`);
 const cold = new SqliteGraphStore(coldPath, rows.project[0]);
 try {
-  await indexProject(root, await discoverLanguages(), cold, { excludeDirectories: [".pymtheg"] });
+  await indexProject(root, await discoverLanguages(), cold, {
+    excludeDirectories: [".pymtheg"],
+  });
 } finally {
   cold.close();
 }
 const differences = compareRows(rows, storeRows(coldPath));
-console.log(`${id} last revert equals cold: ${differences.length ? "NO " + JSON.stringify(differences).slice(0, 400) : "yes"}`);
+console.log(
+  `${id} last revert equals cold: ${differences.length ? "NO " + JSON.stringify(differences).slice(0, 400) : "yes"}`,
+);

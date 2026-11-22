@@ -3284,3 +3284,18 @@ what the store holds, so it is the proof for kept state too. **Rules out:**
 a file watcher as the source of truth for what changed (only a hint), and
 a separate index daemon for now. See [C-45](changes/C-45.md).
 
+### C-48 The MCP server keeps one graph worker
+
+**Decided (C-48):** the MCP server runs every graph job, one at a time, in
+one worker that lives between jobs and keeps an `IndexSession` (C-45).
+Cancellation is cooperative: through memory shared with the worker, at the
+worker's next checkpoint (every abort check of the graph command). Inside a
+language module's call or a toolchain run the worker is terminated, as
+before, and its session ends. A worker idle for 10 minutes (by an
+injectable clock) is ended. **Why:** an unchanged index costs 0.2 to 0.4 s
+instead of 0.7 to 1.3 s, and module state kept by a session can only be
+reused by a process that lives. **Trade:** a worker keeps its memory
+high-water mark between jobs (Hono: 2.6 GB resident on this branch) until it
+is ended when idle. **Rules out:** wall-clock waits before terminating a
+job that does not acknowledge a cancel. See [C-48](changes/C-48.md).
+
