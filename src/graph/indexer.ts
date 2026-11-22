@@ -438,8 +438,15 @@ export async function indexProject(
             ...changedContexts.filter((path) => needsContext(module, path)),
             ...checkedInputs.changed,
           ],
-          notePath: (note) =>
-            (report.analysisPaths ??= []).push({ module: module.id, ...note }),
+          // Only an incremental module has a path to report; others may
+          // clone their context into a worker, where a function cannot go.
+          ...(module.incrementalAnalysis && {
+            notePath: (note: AnalysisPath) =>
+              (report.analysisPaths ??= []).push({
+                module: module.id,
+                ...note,
+              }),
+          }),
         }),
       );
       if ("resolutionFiles" in output) {
