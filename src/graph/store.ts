@@ -170,7 +170,8 @@ export class SqliteGraphStore implements GraphStorage {
       if (isDatabaseFile(path)) this.turnstileFile = `${path}-turnstile`;
       // C-37: an open that finds its schema and identity in place writes
       // nothing, so a query opened writable takes no write lock. Otherwise
-      // the schema work passes the turnstile like any other write.
+      // the schema work is written before this connection has fixed its
+      // journal, so it takes no turnstile, as before C-37.
       const inPlace =
         this.schemaCurrent() &&
         !!this.db.prepare("SELECT 1 FROM graph_meta WHERE key='project'").get();
@@ -276,9 +277,13 @@ export class SqliteGraphStore implements GraphStorage {
     // so only it takes turns: with a rollback journal every write commits
     // alone, as before C-37, and taking the turnstile would only add a lock
     // to each write. A connection fixes its journal at its first write
-    // (beforeWrite), which every caller makes before it gets here, and keeps
-    // it for its life, so it never holds the turnstile under one journal
-    // and asks for it under another.
+    // (beforeWrite) and keeps that decision for its life, so it never holds
+    // the turnstile under one journal and asks for it under another. The
+    // constructor's schema work comes before that and takes no turn. One
+    // gap is accepted: a connection that kept the rollback journal because
+    // another connection blocked its switch takes no turn even if a later
+    // connection moves the file to the write-ahead log; its writes are then
+    // correct but wait without the one-batch bound.
     if (!this.writeAheadLog || !this.openTurnstile()) return false;
     if (this.turnstileDepth === 0) this.turnstile!.exec("BEGIN IMMEDIATE");
     this.turnstileDepth++;
