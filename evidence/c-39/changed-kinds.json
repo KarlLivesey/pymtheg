@@ -1,0 +1,36 @@
+{
+ "counts": {
+  "library: same package, declaration name instead of binding spelling": 3096,
+  "library: declaring package named instead of the importing package": 59,
+  "site removed": 67,
+  "now a candidate set": 8,
+  "now unresolved (external-package)": 46
+ },
+ "examples": {
+  "library: same package, declaration name instead of binding spelling": [
+   "puppeteer/puppeteer eslint.config.mjs:96 default: node:fs:default => node:fs:node:fs",
+   "puppeteer/puppeteer eslint.config.mjs:122 default: node:path:default => node:path:path",
+   "puppeteer/puppeteer eslint.config.mjs:202 default: npm:@stylistic/eslint-plugin:default => npm:@stylistic/eslint-plugin:plugin"
+  ],
+  "library: declaring package named instead of the importing package": [
+   "puppeteer/puppeteer eslint.config.mjs:259 defineConfig: npm:eslint:config:defineConfig => npm:@eslint/config-helpers:defineConfig",
+   "puppeteer/puppeteer eslint.config.mjs:273 globalIgnores: npm:eslint:config:globalIgnores => npm:@eslint/config-helpers:globalIgnores",
+   "puppeteer/puppeteer eslint.config.mjs:1106 defineConfig: npm:eslint:config:defineConfig => npm:@eslint/config-helpers:defineConfig"
+  ],
+  "site removed": [
+   "vercel/turborepo examples/with-nextjs-elysia/packages/contract/src/drizzle/table.relation.ts:89 relations: null => undefined",
+   "vercel/turborepo examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts:78 idUuid: null => undefined",
+   "vercel/turborepo examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts:152 createdAt: null => undefined"
+  ],
+  "now a candidate set": [
+   "vitejs/vite playground/ssr-alias/src/main.js:7 default: node:process:default => node:globals:process,node:process:process",
+   "vitest-dev/vitest test/unit/test/mock-internals.test.ts:745 timers.clearInterval: node:timers:clearInterval => dom:dom:clearInterval,node:globals:clearInterval",
+   "vitest-dev/vitest test/unit/test/timers-node-builtins.test.ts:61 setTimeout: node:timers:setTimeout => dom:dom:setTimeout,node:globals:setTimeout"
+  ],
+  "now unresolved (external-package)": [
+   "withastro/astro examples/blog/src/pages/rss.xml.js:9 getCollection: null => ",
+   "withastro/astro examples/blog/src/pages/rss.xml.js:196 getCollection: null => ",
+   "withastro/astro packages/astro/e2e/fixtures/cloudflare/src/pages/collections.json.js:9 getCollection: null => "
+  ]
+ }
+}

@@ -1513,7 +1513,12 @@ test("written imports can be independent of source or compiler configuration gap
       assert.equal(libraryTarget(call("use.ts", "join")).symbol, "join");
       assert.equal(libraryTarget(call("use.ts", "run")).symbol, "build");
       assert.equal(call("use.ts", "broken").data.reason, "invalid-code");
-      assert.equal(call("use.ts", "resolve").resolution, "unresolved");
+      // broken.ts spells neither name, so the unread text cannot change
+      // the standard Promise.resolve (C-39).
+      assert.equal(
+        libraryTarget(call("use.ts", "resolve")).symbol,
+        "Promise.resolve",
+      );
       assert.equal(
         libraryTarget(call("partial/use.ts", "readFile")).symbol,
         "readFile",
@@ -6687,6 +6692,7 @@ async function indexFiles(files) {
         reason: l.data?.reason,
         cause: l.data?.cause,
         assumes: l.data?.assumes,
+        unreadChecked: l.data?.unreadChecked === true,
         libraries: l.libraries,
         targets:
           l.resolution === "resolved"
@@ -6764,10 +6770,13 @@ async function differential(files, broken, unflaggedFiles = []) {
         c.libraries,
         `${key}: unchanged library identity`,
       );
+      // Either written in the source, or kept because no unread file
+      // could change it (C-39); the identity above equals the clean index.
       assert.ok(
-        b.libraries.every((target) =>
-          ["import-path", "import-binding"].includes(target.evidence),
-        ),
+        b.unreadChecked ||
+          b.libraries.every((target) =>
+            ["import-path", "import-binding"].includes(target.evidence),
+          ),
         `${key}: independent source proof`,
       );
       counts.unflagged++;
@@ -8625,7 +8634,9 @@ for (const [marker, title, today] of [
   });
 
 test("K3: in a program with a failed file, unresolved links are flagged too", async () => {
-  const bad = "export class Failed { m() {} }\n";
+  // The failed file spells `Math`, so the unread text could change
+  // `Math.floor` and the library target stays withheld (C-39).
+  const bad = "export class Failed { m() {} } // Math\n";
   const files = {
     "bad.ts": bad,
     "use.ts": [

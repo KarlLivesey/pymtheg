@@ -12,6 +12,9 @@ export class Job extends Base implements Runner {
 export function format(value: string): string;
 export function format(value: number): string;
 export function format(value: string | number): string {
+  // No program declares this name: the unresolved control.
+  // @ts-expect-error
+  undeclaredControl();
   return String(value);
 }
 export default function makeJob(): Job {

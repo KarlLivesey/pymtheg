@@ -1601,8 +1601,13 @@ test("a config extended by package name through an installed workspace link is r
       extendsName: "@scope/tsconfig/library.json",
       link: ["packages/app/node_modules/@scope/tsconfig", "../../../tsconfig"],
       files: {
-        "packages/tsconfig/package.json": JSON.stringify({ name: "@scope/tsconfig", version: "0.0.0" }),
-        "packages/tsconfig/library.json": JSON.stringify({ compilerOptions: { strict: true, types: [] } }),
+        "packages/tsconfig/package.json": JSON.stringify({
+          name: "@scope/tsconfig",
+          version: "0.0.0",
+        }),
+        "packages/tsconfig/library.json": JSON.stringify({
+          compilerOptions: { strict: true, types: [] },
+        }),
       },
       complete: true,
     },
@@ -1615,7 +1620,9 @@ test("a config extended by package name through an installed workspace link is r
           version: "0.0.0",
           exports: { "./tsconfigs/*": "./tsconfigs/*.json" },
         }),
-        "packages/astro/tsconfigs/base.json": JSON.stringify({ compilerOptions: { types: [] } }),
+        "packages/astro/tsconfigs/base.json": JSON.stringify({
+          compilerOptions: { types: [] },
+        }),
         "packages/astro/tsconfigs/strict.json": JSON.stringify({
           extends: "./base.json",
           compilerOptions: { strict: true },
@@ -1623,18 +1630,31 @@ test("a config extended by package name through an installed workspace link is r
       },
       complete: true,
     },
-    "absent package": { extendsName: "@scope/missing/library.json", files: {}, complete: false },
+    "absent package": {
+      extendsName: "@scope/missing/library.json",
+      files: {},
+      complete: false,
+    },
   };
-  for (const [variant, { extendsName, link, files, complete }] of Object.entries(cases)) {
+  for (const [
+    variant,
+    { extendsName, link, files, complete },
+  ] of Object.entries(cases)) {
     const { root, request, read, write } = await project();
     await write("node_modules/kit/package.json", manifest("kit", "1.0.0"));
-    await write("node_modules/kit/index.d.ts", "export interface Box { open(): void }\nexport declare const box: Box;\n");
+    await write(
+      "node_modules/kit/index.d.ts",
+      "export interface Box { open(): void }\nexport declare const box: Box;\n",
+    );
     for (const [path, text] of Object.entries(files)) await write(path, text);
     await write(
       "packages/app/tsconfig.json",
       JSON.stringify({ extends: extendsName, include: ["src"] }),
     );
-    await write("packages/app/src/a.ts", 'import { box } from "kit";\nbox.open();\n');
+    await write(
+      "packages/app/src/a.ts",
+      'import { box } from "kit";\nbox.open();\n',
+    );
     if (link) {
       await mkdir(dirname(join(root, link[0])), { recursive: true });
       await symlink(link[1], join(root, link[0]));
@@ -1642,7 +1662,9 @@ test("a config extended by package name through an installed workspace link is r
     await request("index");
     read((store, call) => {
       const file = store.getFile("packages/app/src/a.ts").result;
-      const missing = file.diagnostics.some(({ message }) => message.includes("node_modules is never captured"));
+      const missing = file.diagnostics.some(({ message }) =>
+        message.includes("node_modules is never captured"),
+      );
       const open = call("packages/app/src/a.ts", "box.open");
       if (complete) {
         assert.equal(missing, false, variant);
