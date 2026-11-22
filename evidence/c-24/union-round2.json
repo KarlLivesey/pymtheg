@@ -1,0 +1,114 @@
+{
+ "seed": "c24-rust-determinism-2026-11-19",
+ "pins": [
+  {
+   "id": "DioxusLabs/dioxus",
+   "candidateSites": 150404,
+   "candidateLevel2": 73311,
+   "mainSites": [
+    150404
+   ],
+   "mainLevel2": [
+    73311
+   ],
+   "likeForLikeSites": 150404,
+   "likeForLikeCandidateLevel2": 73311,
+   "likeForLikeMainLevel2": [
+    73311
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 73338,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "actix/actix-web",
+   "candidateSites": 86640,
+   "candidateLevel2": 36227,
+   "mainSites": [
+    86640
+   ],
+   "mainLevel2": [
+    36227
+   ],
+   "likeForLikeSites": 86640,
+   "likeForLikeCandidateLevel2": 36227,
+   "likeForLikeMainLevel2": [
+    36227
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 36240,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "candidateSites": 515233,
+   "candidateLevel2": 174016,
+   "mainSites": [
+    515233
+   ],
+   "mainLevel2": [
+    174016
+   ],
+   "likeForLikeSites": 515233,
+   "likeForLikeCandidateLevel2": 174016,
+   "likeForLikeMainLevel2": [
+    174016
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 174961,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tokio-rs/axum",
+   "candidateSites": 41067,
+   "candidateLevel2": 16583,
+   "mainSites": [
+    41067
+   ],
+   "mainLevel2": [
+    16583
+   ],
+   "likeForLikeSites": 41067,
+   "likeForLikeCandidateLevel2": 16583,
+   "likeForLikeMainLevel2": [
+    16583
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 16588,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  }
+ ],
+ "audit": []
+}

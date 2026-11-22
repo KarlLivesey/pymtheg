@@ -1,0 +1,34 @@
+[
+ {
+  "id": "embassy-rs/embassy",
+  "language": "rust",
+  "url": "https://github.com/embassy-rs/embassy.git",
+  "commit": "41d7b34f69fa530d30439516dced774eedebcd02",
+  "category": "library / workspace",
+  "why": "Large no_std embedded workspace with build scripts and target-specific examples."
+ },
+ {
+  "id": "DioxusLabs/dioxus",
+  "language": "rust",
+  "url": "https://github.com/DioxusLabs/dioxus.git",
+  "commit": "97adf7915e1adfef4e2da436c9bd0b6add0dfa39",
+  "category": "UI / app framework",
+  "why": "UI workspace with proc macros and macro-heavy RSX examples."
+ },
+ {
+  "id": "actix/actix-web",
+  "language": "rust",
+  "url": "https://github.com/actix/actix-web.git",
+  "commit": "3c6ea6acf52d9e6f41207222b672774246be7205",
+  "category": "web / server framework",
+  "why": "Web framework workspace with route proc macros and HTTP fixtures."
+ },
+ {
+  "id": "tokio-rs/axum",
+  "language": "rust",
+  "url": "https://github.com/tokio-rs/axum.git",
+  "commit": "36d38c4cf2766cd7313dd53d808f30546ee36b1e",
+  "category": "web / server framework",
+  "why": "Async web framework using generic handlers and proc macros."
+ }
+]
