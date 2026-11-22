@@ -716,6 +716,20 @@ test("TypeScript re-index equals cold: an object-producer lookup cut by its dept
 // C-38 review). Each edit changes only a body; each must leave the store
 // equal to cold. The audit in docs/changes/C-38.md lists every family.
 const BODY_CASES = [
+  {
+    // An expando member of a body-local arrow is compared by its type.
+    name: "an expando member of a returned arrow whose value changes",
+    files: {
+      "src/f.ts":
+        "export const make = () => {\n  const run = () => 0;\n  run.flush = () => 1;\n  return run;\n};\n",
+      "src/g.ts":
+        'import { make } from "./f";\nmake().flush().toFixed();\nmake().flush().toUpperCase();\n',
+    },
+    edit: {
+      "src/f.ts":
+        "export const make = () => {\n  const run = () => 0;\n  run.flush = () => 'x';\n  return run;\n};\n",
+    },
+  },
   // JavaScript: the binder declares members from statements in bodies.
   {
     name: "a JS constructor's this.x value",
@@ -887,6 +901,40 @@ test("TypeScript re-index equals cold: a returned object literal whose body move
           "src/f.ts":
             "export function make() {\n  console.log(0);\n  console.log(1);\n  return { a: 1, run() { return 'x'; } };\n}\n",
         },
+        scoped: true,
+      },
+    ],
+    typescriptModule(),
+  );
+});
+
+test("TypeScript re-index equals cold: inferred types with rest parameters and spread bindings stay scoped", async () => {
+  // Excalidraw's `debounce` and components: `...args` and `...props` in a
+  // printed type are syntax, not an elided type.
+  const f = [
+    "export const debounce = <T extends unknown[]>(fn: (...args: T) => void) => {",
+    "  void 0;",
+    "  const run = (...args: T) => fn(...args);",
+    "  run.flush = () => {};",
+    "  return Object.assign(run, { cancel() {} });",
+    "};",
+    "export const Button = ({ label, ...rest }: { label: string; id: number }) => {",
+    "  void 0;",
+    "  return { label, rest };",
+    "};",
+    "",
+  ].join("\n");
+  await equalAfterEdits(
+    {
+      "tsconfig.json": tsconfig(),
+      "src/f.ts": f,
+      "src/g.ts":
+        'import { debounce, Button } from "./f";\ndebounce((a: number) => a).cancel();\ndebounce(() => {}).flush();\nButton({ label: "x", id: 1 }).rest.id;\n',
+    },
+    [
+      {
+        name: "a body-only edit",
+        edit: { "src/f.ts": f.replaceAll("  void 0;", "  void 1;") },
         scoped: true,
       },
     ],

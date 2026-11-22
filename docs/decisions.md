@@ -3205,8 +3205,8 @@ the same run.
 - **Checker:** the inferred type of each declaration outside bodies, as
   printed and with every declaration it reaches, in a program with each
   text, in every program whose stored `loadedBy` names it. A named
-  declaration inside a body reached by one, or an elided type, means the
-  full analysis.
+  declaration inside a body reached by one, or a printed type cut at a
+  million characters, means the full analysis.
 
 When both match, the file is extracted alone in each project that owns it,
 after the same warm-up as a full analysis. Every other stored result is

@@ -1,0 +1,548 @@
+{
+ "id": "honojs/hono",
+ "seed": 3831,
+ "expectedSteps": 27,
+ "steps": [
+  {
+   "step": 0,
+   "file": "src/jsx/utils.test.ts",
+   "kind": "body",
+   "line": 323,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7944,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17535,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 766
+   }
+  },
+  {
+   "step": 1,
+   "file": "adapters/vercel/vite.config.ts",
+   "kind": "comment",
+   "line": 5,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3351,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6234,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 828
+   }
+  },
+  {
+   "step": 2,
+   "file": "benchmarks/routers/src/rou3.mts",
+   "kind": "body",
+   "line": 9,
+   "equal": true,
+   "differences": [],
+   "wallMs": 24076,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 46354,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 914
+   }
+  },
+  {
+   "step": 3,
+   "file": "benchmarks/jsx/src/react-jsx/page-react.tsx",
+   "kind": "comment",
+   "line": 3,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2953,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5097,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 802
+   }
+  },
+  {
+   "step": 4,
+   "file": "adapters/cloudflare-workers/src/serve-static.ts",
+   "kind": "body",
+   "line": 25,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2882,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 4994,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 798
+   }
+  },
+  {
+   "step": 5,
+   "file": "src/adapter/cloudflare-pages/handler.test.ts",
+   "kind": "delete",
+   "line": 232,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8148,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 16902,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 787
+   }
+  },
+  {
+   "step": 6,
+   "file": "src/adapter/cloudflare-pages/handler.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8458,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17797,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 869
+   }
+  },
+  {
+   "step": 7,
+   "file": "src/middleware/trailing-slash/index.ts",
+   "kind": "export",
+   "line": 159,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27092,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 48051,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 778
+   }
+  },
+  {
+   "step": 8,
+   "file": "src/middleware/trailing-slash/index.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26971,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 47437,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 820
+   }
+  },
+  {
+   "step": 9,
+   "file": "src/middleware/combine/index.test.ts",
+   "kind": "export",
+   "line": 370,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30622,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 49858,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 933
+   }
+  },
+  {
+   "step": 10,
+   "file": "src/middleware/combine/index.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30097,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 50452,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 858
+   }
+  },
+  {
+   "step": 11,
+   "file": "src/middleware/timing/timing.ts",
+   "kind": "body",
+   "line": 165,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10826,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 22493,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 773
+   }
+  },
+  {
+   "step": 12,
+   "file": "src/client/types.ts",
+   "kind": "body",
+   "line": 51,
+   "equal": true,
+   "differences": [],
+   "wallMs": 36660,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 50124,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 912
+   }
+  },
+  {
+   "step": 13,
+   "file": "src/adapter/vercel/handler.ts",
+   "kind": "body",
+   "line": 10,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11259,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 22616,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 893
+   }
+  },
+  {
+   "step": 14,
+   "file": "src/middleware/etag/digest.ts",
+   "kind": "body",
+   "line": 73,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9991,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 22214,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 866
+   }
+  },
+  {
+   "step": 15,
+   "file": "adapters/netlify/vite.config.ts",
+   "kind": "comment",
+   "line": 2,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7821,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 7661,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 851
+   }
+  },
+  {
+   "step": 16,
+   "file": "src/jsx/intrinsic-elements.ts",
+   "kind": "comment",
+   "line": 665,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12418,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 24776,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 793
+   }
+  },
+  {
+   "step": 17,
+   "file": "src/client/client.test.ts",
+   "kind": "comment",
+   "line": 850,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13248,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 19939,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 857
+   }
+  },
+  {
+   "step": 18,
+   "file": "src/adapter/cloudflare-workers/serve-static.ts",
+   "kind": "body",
+   "line": 28,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14805,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 24118,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 831
+   }
+  },
+  {
+   "step": 19,
+   "file": "adapters/netlify/src/mod.ts",
+   "kind": "comment",
+   "line": 3,
+   "equal": true,
+   "differences": [],
+   "wallMs": 4143,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 4745,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 784
+   }
+  },
+  {
+   "step": 20,
+   "file": "src/jsx/base.test.tsx",
+   "kind": "export",
+   "line": 154,
+   "equal": true,
+   "differences": [],
+   "wallMs": 33784,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 48453,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 994
+   }
+  },
+  {
+   "step": 21,
+   "file": "src/jsx/base.test.tsx",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 35746,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 53795,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 977
+   }
+  },
+  {
+   "step": 22,
+   "file": "src/helper/dev/index.ts",
+   "kind": "delete",
+   "line": 27,
+   "equal": true,
+   "differences": [],
+   "wallMs": 101830,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 648,
+   "cpuMs": 81913,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 861
+   }
+  },
+  {
+   "step": 23,
+   "file": "src/helper/dev/index.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 89609,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 70447,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 859
+   }
+  },
+  {
+   "step": 24,
+   "file": "src/adapter/deno/websocket.test.ts",
+   "kind": "body",
+   "line": 8,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11667,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 18321,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 912
+   }
+  },
+  {
+   "step": 25,
+   "file": "src/jsx/dom/css.ts",
+   "kind": "comment",
+   "line": 9,
+   "equal": true,
+   "differences": [],
+   "wallMs": 16208,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 24161,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 909
+   }
+  },
+  {
+   "step": 26,
+   "file": "src/jsx/dom/components.ts",
+   "kind": "body",
+   "line": 29,
+   "equal": true,
+   "differences": [],
+   "wallMs": 18136,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 23792,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 876
+   }
+  }
+ ],
+ "equal": true
+}

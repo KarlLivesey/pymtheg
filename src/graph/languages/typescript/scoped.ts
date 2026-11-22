@@ -277,8 +277,13 @@ export function checkerSurface(
   /** A type as printed, with the declarations it reaches. */
   const describe = (type: ts.Type): string => {
     const printed = checker.typeToString(type, undefined, flags);
-    // An elided type is not a proof of anything.
-    if (printed.includes("...")) throw new SurfaceLimit();
+    // With NoTruncation the printer elides only a cycle, a type already
+    // printed further out (as `any`; reach() still walks it), or past a
+    // million characters, where the text is also cut and ends in `...`.
+    // That last is not a proof of anything. A `...` inside the text is a
+    // rest parameter, a spread binding or a variadic tuple.
+    if (printed.length >= 1e6 || printed.endsWith("..."))
+      throw new SurfaceLimit();
     const reached: string[] = [];
     reach(type, reached);
     return `${printed} {${reached.join(" ")}}`;
@@ -378,10 +383,38 @@ function structural(node: ts.Node): boolean {
       ts.isGetAccessorDeclaration(node) ||
       ts.isSetAccessorDeclaration(node)) &&
       ts.isObjectLiteralExpression(parent)) ||
-    ((ts.isPropertySignature(node) || ts.isMethodSignature(node)) &&
+    // Anonymous types written in a body (`x as T & { clear: () => void }`).
+    ts.isFunctionTypeNode(node) ||
+    ts.isConstructorTypeNode(node) ||
+    ts.isMappedTypeNode(node) ||
+    ((ts.isPropertySignature(node) ||
+      ts.isMethodSignature(node) ||
+      ts.isCallSignatureDeclaration(node) ||
+      ts.isConstructSignatureDeclaration(node) ||
+      ts.isIndexSignatureDeclaration(node) ||
+      ts.isGetAccessorDeclaration(node) ||
+      ts.isSetAccessorDeclaration(node)) &&
       ts.isTypeLiteralNode(parent)) ||
-    (ts.isParameter(node) &&
-      (ts.isFunctionExpression(parent) || ts.isArrowFunction(parent)))
+    // A parameter or type parameter of an anonymous signature.
+    ((ts.isParameter(node) || ts.isTypeParameterDeclaration(node)) &&
+      structural(parent)) ||
+    // An expando member (`run.flush = () => {}`, excalidraw's `debounce`): a
+    // property of the function's anonymous type, compared as one.
+    expando(node) ||
+    ((ts.isPropertyAccessExpression(node) ||
+      ts.isElementAccessExpression(node)) &&
+      expando(parent) &&
+      (parent as ts.BinaryExpression).left === node)
+  );
+}
+
+/** Whether `node` is an assignment `x.name = value` (an expando's declaration). */
+function expando(node: ts.Node): boolean {
+  return (
+    ts.isBinaryExpression(node) &&
+    node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    (ts.isPropertyAccessExpression(node.left) ||
+      ts.isElementAccessExpression(node.left))
   );
 }
 
