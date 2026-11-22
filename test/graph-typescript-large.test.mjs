@@ -512,7 +512,10 @@ const CHAIN = {
   "chain.ts": [
     'import type { Value } from "./broken";',
     "export interface I0 extends Value {}",
-    ...Array.from({ length: 299 }, (_, i) => `export interface I${i + 1} extends I${i} {}`),
+    ...Array.from(
+      { length: 299 },
+      (_, i) => `export interface I${i + 1} extends I${i} {}`,
+    ),
     "",
   ].join("\n"),
   "use.ts": [
@@ -549,7 +552,12 @@ test("the walk's budget grows with its dependence graph: a fixpoint a fixed budg
 
 const inside = (node, name) => {
   for (let at = node; at; at = at.parent)
-    if (at.name?.text === name && at.kind !== undefined && at.parent && "members" in at)
+    if (
+      at.name?.text === name &&
+      at.kind !== undefined &&
+      at.parent &&
+      "members" in at
+    )
       return true;
   return false;
 };
@@ -560,7 +568,8 @@ test("a stack limit on one declaration makes only what depends on it unknown, no
     {
       "broken.ts": "export interface Value { m(): void }\nconst = ;\n",
       "base.ts": "export interface Base { b(): void }\n",
-      "a.ts": 'import type { Base } from "./base";\nexport interface Deep extends Base {}\n',
+      "a.ts":
+        'import type { Base } from "./base";\nexport interface Deep extends Base {}\n',
       "lib.ts": "export function helper() {}\n",
       "use.ts": [
         'import { helper } from "./lib";',
@@ -608,7 +617,8 @@ test("a cause the walk propagates names at most 8 failed files; taint is unchang
   // Through the walk: holder depends on the unread name, the call on holder.
   const files = {
     "lib.ts": "export interface Box extends Shared {}\n",
-    "use.ts": 'import type { Box } from "./lib";\ndeclare const box: Box;\nbox.run(); // shared-call\n',
+    "use.ts":
+      'import type { Box } from "./lib";\ndeclare const box: Box;\nbox.run(); // shared-call\n',
   };
   for (let i = 0; i < 12; i++)
     files[`broken${String(i).padStart(2, "0")}.ts`] =

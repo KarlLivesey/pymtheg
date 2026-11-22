@@ -504,7 +504,10 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
       const files = input.program
         .getSourceFiles()
         .map((source) => fromVirtual(source.fileName))
-        .filter((path): path is string => path !== undefined && input.captured.has(path));
+        .filter(
+          (path): path is string =>
+            path !== undefined && input.captured.has(path),
+        );
       let largest = 0;
       for (const set of result?.all.values() ?? [])
         largest = Math.max(largest, set.size);
@@ -738,7 +741,8 @@ function computeTaint(
         ts.forEachChild(node, (child) => {
           children.push(child);
         });
-        for (let i = children.length - 1; i >= 0; i--) pending.push(children[i]!);
+        for (let i = children.length - 1; i >= 0; i--)
+          pending.push(children[i]!);
         visitSeed(node);
       }
     }
@@ -746,15 +750,18 @@ function computeTaint(
       try {
         readSeed(node);
       } catch (error) {
-        if (!(error === STACK_LIMIT || error instanceof RangeError)) throw error;
+        if (!(error === STACK_LIMIT || error instanceof RangeError))
+          throw error;
         // A stack limit on this node: its binding (if it has one) is
         // unknown, and it is read again as a declaration, where a limit
         // makes only its own symbol unknown (C-52).
         let symbol: ts.Symbol | undefined;
         try {
-          symbol = aliasDeclared(node, checker) ?? symbolOfDeclaration(node, checker);
+          symbol =
+            aliasDeclared(node, checker) ?? symbolOfDeclaration(node, checker);
         } catch (inner) {
-          if ((inner === STACK_LIMIT || inner instanceof RangeError)) throw STACK_LIMIT;
+          if (inner === STACK_LIMIT || inner instanceof RangeError)
+            throw STACK_LIMIT;
           throw inner;
         }
         if (!symbol) throw STACK_LIMIT;
@@ -1023,7 +1030,8 @@ function computeTaint(
         symbol = symbolOfDeclaration(node, checker);
       } catch (error) {
         // No symbol to mark: the walk is unknown, as before.
-        if ((error === STACK_LIMIT || error instanceof RangeError)) throw STACK_LIMIT;
+        if (error === STACK_LIMIT || error instanceof RangeError)
+          throw STACK_LIMIT;
         throw error;
       }
       if (!symbol) continue;
@@ -1033,7 +1041,8 @@ function computeTaint(
         // The compiler (or this walk's own recursion) ran out of stack on
         // one of its parts: this declaration's dependence is unknown, and
         // only what depends on it (C-52).
-        if (!(error === STACK_LIMIT || error instanceof RangeError)) throw error;
+        if (!(error === STACK_LIMIT || error instanceof RangeError))
+          throw error;
         add(all, symbol, [UNKNOWN_CAUSE]);
         continue;
       }
@@ -1065,7 +1074,10 @@ function computeTaint(
       }
     }
     lastDeclarations = declarations.length;
-    lastEdges = [...dependents.values()].reduce((n, list) => n + list.length, 0);
+    lastEdges = [...dependents.values()].reduce(
+      (n, list) => n + list.length,
+      0,
+    );
     grow(lastEdges);
     phase = "fixpoint";
     // Nothing reaches a failed file (no binding, import type or global name).

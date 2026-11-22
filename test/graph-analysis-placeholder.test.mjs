@@ -30,17 +30,27 @@ test("a module that answers a file with the placeholder fails that file with a n
       return context.files.map((file) =>
         file.path === "a.toy"
           ? { path: file.path, result: file.result }
-          : { path: file.path, result: parse({ path: file.path, text: file.text }) },
+          : {
+              path: file.path,
+              result: parse({ path: file.path, text: file.text }),
+            },
       );
     },
   };
   const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "c52");
   try {
-    const report = await indexProject(root, new LanguageRegistry([module]), store);
+    const report = await indexProject(
+      root,
+      new LanguageRegistry([module]),
+      store,
+    );
     const a = store.getFile("a.toy").result;
     assert.equal(a.status, "failed");
     assert.notEqual(a.diagnostics[0].message, "Awaiting project analysis");
-    assert.match(a.diagnostics[0].message, /module returned no result for this file/);
+    assert.match(
+      a.diagnostics[0].message,
+      /module returned no result for this file/,
+    );
     assert.equal(a.failureKind, "transient");
     assert.equal(store.getFile("b.toy").result.status, "clean");
     assert.deepEqual(report.analysisErrors, [

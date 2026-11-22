@@ -482,7 +482,10 @@ export async function indexProject(
           placeholder(item.result)
             ? {
                 path: item.path,
-                result: { ...failure(detail), failureKind: "transient" as const },
+                result: {
+                  ...failure(detail),
+                  failureKind: "transient" as const,
+                },
               }
             : item,
         );
