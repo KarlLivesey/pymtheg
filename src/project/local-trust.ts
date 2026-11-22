@@ -147,6 +147,12 @@ export async function readLocalTrust(
 async function update(
   change: (entries: Record<string, Entry>) => void,
 ): Promise<void> {
+  // A test run (npm test sets PYMTHEG_TEST) must never write the user's real
+  // file: a process that lost its isolated folder fails loudly instead.
+  if (process.env.PYMTHEG_TEST && !process.env.PYMTHEG_CONFIG_HOME)
+    throw Error(
+      "PYMTHEG_TEST is set but PYMTHEG_CONFIG_HOME is not: refusing to write the real trust answers from a test run",
+    );
   const directory = userConfigDirectory();
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const lock = join(directory, "trust.json.lock");
