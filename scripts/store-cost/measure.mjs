@@ -13,7 +13,7 @@
 //                                 (statement journals) in memory
 // Timings are observations; counts are deterministic.
 //   node scripts/store-cost/measure.mjs <dist> <root> <graph.sqlite> <out.json> [--variant V]
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import sqlite from "node:sqlite";
@@ -83,6 +83,10 @@ const checkpoint = [...parts]
   .find((part) => part.startsWith("checkpoint="))
   ?.slice(11);
 let held = 0;
+// C-37: wall-clock time of every write commit, to count the batches a
+// waiter's wait spans, and the largest size the log reached.
+const commitTimes = [];
+let maxWalBytes = 0;
 // The write lock's longest hold: BEGIN IMMEDIATE to COMMIT or ROLLBACK.
 let lockedAt;
 let longestHoldMs = 0;
@@ -94,7 +98,19 @@ let holdFirst;
 let holdStatements = 0;
 let heldDeferred = 0;
 proto.exec = function (sql) {
-  if (sql === "BEGIN IMMEDIATE") lockedAt = performance.now();
+  // The store's own connection only: not the turnstile beside it (C-37).
+  const store_ = !String(this.location?.() ?? "").endsWith("-turnstile");
+  if (store_ && sql === "COMMIT" && lockedAt !== undefined) {
+    commitTimes.push(Date.now());
+    try {
+      maxWalBytes = Math.max(maxWalBytes, statSync(`${graph}-wal`).size);
+    } catch {
+      // No log (rollback journal).
+    }
+  }
+  if (!store_) {
+    // Not the store's lock.
+  } else if (sql === "BEGIN IMMEDIATE") lockedAt = performance.now();
   else if (
     lockedAt !== undefined &&
     (sql === "COMMIT" || sql.startsWith("ROLLBACK;") || sql === "ROLLBACK")
@@ -264,7 +280,7 @@ if (parts.has("late-indexes")) {
 const used = process.cpuUsage(cpu);
 const wallMs = performance.now() - wall;
 
-const db = new sqlite.DatabaseSync(graph, { readOnly: true });
+const db = new sqlite.DatabaseSync(graph, { readOnly: true, timeout: 30_000 });
 const objects = db
   .prepare(
     `SELECT s.name, m.type, m.tbl_name AS tbl, count(*) AS pages,
@@ -309,6 +325,8 @@ writeFileSync(
       closeMs: Math.round(closeMs),
       writeBatchRows: SqliteGraphStore.writeBatchRows,
       longestHoldMs: Math.round(longestHoldMs),
+      maxWalBytes,
+      commitTimes,
       holds,
       longHolds: longHolds.sort((a, b) => b.ms - a.ms).slice(0, 20),
       maxRssKiB: process.resourceUsage().maxRSS,

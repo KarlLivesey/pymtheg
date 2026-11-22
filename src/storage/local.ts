@@ -175,13 +175,18 @@ export function openWriteAheadLog(
   const mode = switchJournal(db, "WAL");
   // A checkpoint syncs the log and the database. Every 10,000 pages (40 MB
   // of log) instead of SQLite's 1,000 took a cold restic index from 73 s to
-  // 52 s, the same as with no sync at all (evidence/c-6). C-37: each
-  // checkpoint also copies every page changed since the last one into the
-  // database; with batched commits, every 100,000 pages (about 400 MB of
-  // log) took a cold cli/cli index on disk from 136 to 114 s. A completed
-  // run's record is still committed with a full sync, which makes the log
-  // up to it durable. After a checkpoint the log is cut back to 64 MiB, so
-  // a long-lived connection does not keep the largest log on disk.
+  // 52 s, the same as with no sync at all (evidence/c-6). C-37: a checkpoint
+  // also copies every page changed since the last one into the database,
+  // and with batched commits fewer checkpoints copy hot pages fewer times: a
+  // cold cli/cli on disk spent 54 s in commits at 10,000 pages, 44 s at
+  // 50,000 and 26 s at 100,000 (Vector 87, 83 and 56 s). The log is at most
+  // the threshold plus one transaction, which a run keeps to about one
+  // batch: at 100,000 pages it peaked at 474 MiB on cli/cli (a 463 MiB
+  // store), 499 MiB on Vector (921 MiB) and 424 MiB on restic (130 MiB).
+  // After a checkpoint the log is cut back to 64 MiB, so a long-lived
+  // connection does not keep the largest log on disk. A completed run's
+  // record is committed with a full sync, which makes the log up to it
+  // durable whatever the threshold.
   if (mode === "wal")
     db.exec(
       "PRAGMA synchronous=NORMAL; PRAGMA wal_autocheckpoint=100000; PRAGMA journal_size_limit=67108864",

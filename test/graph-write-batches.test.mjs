@@ -5,7 +5,7 @@
 // not blocked by an open batch and see the last commit; a write that fails
 // inside a batch undoes that batch and leaves the earlier commits.
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -173,3 +173,32 @@ test(
     }
   },
 );
+
+test("a writable open of a current store writes nothing and takes no write lock", async () => {
+  const base = mkdtempSync(join(tmpdir(), "c37-open-"));
+  const path = join(base, "graph.sqlite");
+  try {
+    const store = new SqliteGraphStore(path, "c37");
+    store.replaceFile(record("a.syn"));
+    store.close();
+    const before = readFileSync(path);
+    // Another connection holds the write lock and does not wait for anyone.
+    const holder = new DatabaseSync(path, { timeout: 0 });
+    holder.exec("BEGIN IMMEDIATE");
+    try {
+      const opened = new SqliteGraphStore(path);
+      assert.equal(opened.projectId, "c37");
+      assert.deepEqual(
+        opened.fileInventory().map((file) => file.path),
+        ["a.syn"],
+      );
+      opened.close();
+    } finally {
+      holder.exec("ROLLBACK");
+      holder.close();
+    }
+    assert.deepEqual(readFileSync(path), before);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});

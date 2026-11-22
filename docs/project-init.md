@@ -118,15 +118,16 @@ Initialization creates
 ignore file excludes `.pymtheg/shared/` and `.pymtheg/rebuildable/`. No database
 is created by initialization or a document preview.
 
-| Path                                  | Holds                                                                                                                  | Kind                                                      |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `.pymtheg/project.json`               | Stable workspace identity                                                                                              | Commit                                                    |
-| `.pymtheg/settings.json`              | Project configuration and scenarios                                                                                    | Commit                                                    |
-| `.pymtheg/shared/architecture.sqlite` | Requirements, links, decisions, retained observations, checkpoint history, recorded-change ledger, architecture drafts | Shared data, local database; share it by exported history |
-| `.pymtheg/shared/drafts.sqlite`       | Unsaved Studio buffers and form/context drafts                                                                         | Authored, local                                           |
-| `.pymtheg/local/writer.json`          | This installation's writer identity and author label                                                                   | Local only; ignores itself; never copy to another machine |
-| `.pymtheg/rebuildable/graph.sqlite`   | Code graph cache                                                                                                       | Rebuildable; ignores itself                               |
-| `.pymtheg/rebuildable/runs.sqlite`    | The three most recent Studio runs                                                                                      | Rebuildable; ignores itself                               |
+| Path                                          | Holds                                                                                                                  | Kind                                                      |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `.pymtheg/project.json`                       | Stable workspace identity                                                                                              | Commit                                                    |
+| `.pymtheg/settings.json`                      | Project configuration and scenarios                                                                                    | Commit                                                    |
+| `.pymtheg/shared/architecture.sqlite`         | Requirements, links, decisions, retained observations, checkpoint history, recorded-change ledger, architecture drafts | Shared data, local database; share it by exported history |
+| `.pymtheg/shared/drafts.sqlite`               | Unsaved Studio buffers and form/context drafts                                                                         | Authored, local                                           |
+| `.pymtheg/local/writer.json`                  | This installation's writer identity and author label                                                                   | Local only; ignores itself; never copy to another machine |
+| `.pymtheg/rebuildable/graph.sqlite`           | Code graph cache                                                                                                       | Rebuildable; ignores itself                               |
+| `.pymtheg/rebuildable/graph.sqlite-turnstile` | Empty lock file: writers of the graph take turns through it (C-37)                                                     | Rebuildable; never written, only locked                   |
+| `.pymtheg/rebuildable/runs.sqlite`            | The three most recent Studio runs                                                                                      | Rebuildable; ignores itself                               |
 
 Deleting `.pymtheg/rebuildable/` loses nothing that cannot be regenerated.
 Commit `.pymtheg/project.json`, `.pymtheg/settings.json`, `.pym` files and ordinary
