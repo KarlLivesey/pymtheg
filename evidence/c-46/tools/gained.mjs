@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // C-46 gained.mjs BEFORE_SCRATCH BEFORE.json AFTER_SCRATCH AFTER.json OUT.json [SAMPLE]
 // The TypeScript links that rest on a C-46 convention after (an assumption
-// `ts-unbuilt-entry-is-{bundler-entry,src-twin,rollup-entry}`), with their
+// `ts-unbuilt-entry-is-{bundler-entry,src-twin,rollup-entry,wrapped-compiler-emit}`), with their
 // outcome before at the same site (module, file, kind, range, target name):
 // counts per convention, per package (the entry's manifest), per outcome
 // before and after, and the lowest-hash SAMPLE newly Level 2 sites (seed
@@ -17,6 +17,7 @@ const CONVENTIONS = {
   "ts-unbuilt-entry-is-bundler-entry": "bundler-entry",
   "ts-unbuilt-entry-is-src-twin": "src-twin",
   "ts-unbuilt-entry-is-rollup-entry": "rollup-entry",
+  "ts-unbuilt-entry-is-wrapped-compiler-emit": "wrapped-compiler-emit",
 };
 const runs = (path) =>
   new Map(JSON.parse(readFileSync(path, "utf8")).repos.map((r) => [r.id, r]));

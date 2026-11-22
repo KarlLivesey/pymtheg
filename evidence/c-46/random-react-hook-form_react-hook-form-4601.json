@@ -1,0 +1,433 @@
+{
+ "id": "react-hook-form/react-hook-form",
+ "seed": 4601,
+ "expectedSteps": 25,
+ "steps": [
+  {
+   "step": 0,
+   "file": "src/utils/isFileInput.ts",
+   "kind": "comment",
+   "line": 2,
+   "equal": true,
+   "differences": [],
+   "wallMs": 18246,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 782
+   }
+  },
+  {
+   "step": 1,
+   "file": "src/__tests__/formStateSubscribe.test.tsx",
+   "kind": "comment",
+   "line": 128,
+   "equal": true,
+   "differences": [],
+   "wallMs": 19143,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 850
+   }
+  },
+  {
+   "step": 2,
+   "file": "package.json",
+   "kind": "manifest-version",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 18306,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 868
+   }
+  },
+  {
+   "step": 3,
+   "file": "package.json",
+   "kind": "manifest-types",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 21071,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 795
+   }
+  },
+  {
+   "step": 4,
+   "file": "src/index.ts",
+   "kind": "blank",
+   "line": 14,
+   "equal": true,
+   "differences": [],
+   "wallMs": 18284,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 796
+   }
+  },
+  {
+   "step": 5,
+   "file": "package.json",
+   "kind": "manifest-field",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 20091,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 831
+   }
+  },
+  {
+   "step": 6,
+   "file": "package.json",
+   "kind": "manifest-types",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 646,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 755
+   }
+  },
+  {
+   "step": 7,
+   "file": "package.json",
+   "kind": "manifest-types",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 1112,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 907
+   }
+  },
+  {
+   "step": 8,
+   "file": "src/index.ts",
+   "kind": "comment",
+   "line": 17,
+   "equal": true,
+   "differences": [],
+   "wallMs": 20202,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 817
+   }
+  },
+  {
+   "step": 9,
+   "file": "src/index.ts",
+   "kind": "comment",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 20502,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 783
+   }
+  },
+  {
+   "step": 10,
+   "file": "src/__tests__/controller.reset-blur.test.tsx",
+   "kind": "delete",
+   "line": 17,
+   "equal": true,
+   "differences": [],
+   "wallMs": 21178,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 830
+   }
+  },
+  {
+   "step": 11,
+   "file": "src/__tests__/useFormContext.server.test.tsx",
+   "kind": "delete",
+   "line": 57,
+   "equal": true,
+   "differences": [],
+   "wallMs": 33289,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 668
+   }
+  },
+  {
+   "step": 12,
+   "file": "src/utils/prepend.ts",
+   "kind": "comment",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 20149,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 833
+   }
+  },
+  {
+   "step": 13,
+   "file": "examples/V6/customMaskedInputWithController.tsx",
+   "kind": "delete",
+   "line": 55,
+   "equal": true,
+   "differences": [],
+   "wallMs": 43590,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 777
+   }
+  },
+  {
+   "step": 14,
+   "file": "package.json",
+   "kind": "manifest-types",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 589,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 803
+   }
+  },
+  {
+   "step": 15,
+   "file": "src/__tests__/utils/objectHasFunction.test.ts",
+   "kind": "statement",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 25226,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 786
+   }
+  },
+  {
+   "step": 16,
+   "file": "package.json",
+   "kind": "manifest-field",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 21370,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 942
+   }
+  },
+  {
+   "step": 17,
+   "file": "package.json",
+   "kind": "manifest-field",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 24225,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 881
+   }
+  },
+  {
+   "step": 18,
+   "file": "src/index.ts",
+   "kind": "blank",
+   "line": 6,
+   "equal": true,
+   "differences": [],
+   "wallMs": 25740,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 809
+   }
+  },
+  {
+   "step": 19,
+   "file": "src/logic/schemaErrorLookup.ts",
+   "kind": "comment",
+   "line": 23,
+   "equal": true,
+   "differences": [],
+   "wallMs": 22322,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 878
+   }
+  },
+  {
+   "step": 20,
+   "file": "src/utils/isKey.ts",
+   "kind": "comment",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 23845,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 884
+   }
+  },
+  {
+   "step": 21,
+   "file": "src/index.ts",
+   "kind": "comment",
+   "line": 8,
+   "equal": true,
+   "differences": [],
+   "wallMs": 23869,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 965
+   }
+  },
+  {
+   "step": 22,
+   "file": "package.json",
+   "kind": "manifest-field",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26338,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 872
+   }
+  },
+  {
+   "step": 23,
+   "file": "src/index.ts",
+   "kind": "comment",
+   "line": 17,
+   "equal": true,
+   "differences": [],
+   "wallMs": 21888,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 788
+   }
+  },
+  {
+   "step": 24,
+   "file": "src/__tests__/logic/skipValidation.test.ts",
+   "kind": "blank",
+   "line": 79,
+   "equal": true,
+   "differences": [],
+   "wallMs": 22773,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 930
+   }
+  }
+ ],
+ "equal": true
+}

@@ -1,0 +1,1486 @@
+{
+ "totals": {
+  "declaration roll-up | no src twin | literal bundler entry": 6998,
+  "(several packages in one file)": 2115,
+  "tsc | some missing entries have a src twin | no bundler config": 1956,
+  "tsc | some missing entries have a src twin | bundler config without a literal entry": 676,
+  "other script | no src twin | no bundler config": 647,
+  "tsdown+node script | every missing entry has a src twin | bundler config without a literal entry": 554,
+  "declaration roll-up | some missing entries have a src twin | no bundler config": 462,
+  "declaration roll-up | no src twin | no bundler config": 328,
+  "other script | some missing entries have a src twin | bundler config without a literal entry": 308,
+  "no build script | every missing entry has a src twin | bundler config without a literal entry": 232,
+  "declaration roll-up | some missing entries have a src twin | bundler config without a literal entry": 219,
+  "zshy | no src twin | no bundler config": 114,
+  "tsc | every missing entry has a src twin | no bundler config": 75,
+  "declaration roll-up | every missing entry has a src twin | no bundler config": 69,
+  "rollup+vite | some missing entries have a src twin | literal bundler entry": 59,
+  "rollup | every missing entry has a src twin | bundler config without a literal entry": 51,
+  "no build script | entries present | no bundler config": 30,
+  "no build script | no src twin | no bundler config": 26,
+  "(no failing module link in the file)": 19,
+  "wireit | every missing entry has a src twin | no bundler config": 18,
+  "node script | no src twin | no bundler config": 17,
+  "tsdown | every missing entry has a src twin | bundler config without a literal entry": 12,
+  "tsdown+node script | every missing entry has a src twin | literal bundler entry": 9,
+  "no build script | every missing entry has a src twin | no bundler config": 9,
+  "rollup | every missing entry has a src twin | no bundler config": 3,
+  "tsc | entries present | no bundler config": 3,
+  "other script | every missing entry has a src twin | no bundler config": 2,
+  "no build script | every missing entry has a src twin | literal bundler entry": 1
+ },
+ "packages": {
+  "changesets/changesets": {
+   "(several packages in one file)": {
+    "links": 559,
+    "files": 35,
+    "class": "(several packages in one file)"
+   },
+   "@changesets/types": {
+    "links": 183,
+    "files": 31,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/types",
+    "entries": [
+     "dist/index.mjs"
+    ],
+    "missing": [
+     "dist/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@changesets/git": {
+    "links": 16,
+    "files": 4,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/git",
+    "entries": [
+     "dist/index.mjs"
+    ],
+    "missing": [
+     "dist/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@changesets/errors": {
+    "links": 15,
+    "files": 5,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/errors",
+    "entries": [
+     "dist/index.mjs"
+    ],
+    "missing": [
+     "dist/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@changesets/write": {
+    "links": 5,
+    "files": 1,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/write",
+    "entries": [
+     "dist/index.mjs"
+    ],
+    "missing": [
+     "dist/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@changesets/config": {
+    "links": 4,
+    "files": 2,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/config",
+    "entries": [
+     "dist/index.mjs"
+    ],
+    "missing": [
+     "dist/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@changesets/parse": {
+    "links": 4,
+    "files": 1,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/parse",
+    "entries": [
+     "dist/index.mjs"
+    ],
+    "missing": [
+     "dist/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@changesets/should-skip-package": {
+    "links": 3,
+    "files": 1,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/should-skip-package",
+    "entries": [
+     "dist/index.mjs"
+    ],
+    "missing": [
+     "dist/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@changesets/changelog-git": {
+    "links": 2,
+    "files": 1,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/changelog-git",
+    "entries": [
+     "dist/index.mjs"
+    ],
+    "missing": [
+     "dist/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@changesets/cli": {
+    "links": 1,
+    "files": 1,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "literal bundler entry",
+    "root": "packages/cli",
+    "entries": [
+     "dist/index.mjs",
+     "dist/changelog.mjs",
+     "dist/commit/index.mjs",
+     "bin.js"
+    ],
+    "missing": [
+     "dist/index.mjs",
+     "dist/changelog.mjs",
+     "dist/commit/index.mjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/changelog.ts",
+     "src/commit/index.ts"
+    ]
+   }
+  },
+  "colinhacks/zod": {
+   "(several packages in one file)": {
+    "links": 145,
+    "files": 4,
+    "class": "(several packages in one file)"
+   },
+   "zod": {
+    "links": 102,
+    "files": 2,
+    "class": "zshy",
+    "twin": "no src twin",
+    "config": "no bundler config",
+    "root": "packages/zod",
+    "entries": [
+     "index.d.cts",
+     "index.js",
+     "index.cjs",
+     "mini/index.d.cts",
+     "mini/index.js",
+     "mini/index.cjs",
+     "compile.d.cts",
+     "compile.js"
+    ],
+    "missing": [
+     "index.d.cts",
+     "index.js",
+     "index.cjs",
+     "mini/index.d.cts",
+     "mini/index.js",
+     "mini/index.cjs",
+     "compile.d.cts",
+     "compile.js"
+    ],
+    "twins": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "@zod/mini": {
+    "links": 12,
+    "files": 1,
+    "class": "zshy",
+    "twin": "no src twin",
+    "config": "no bundler config",
+    "root": "packages/mini",
+    "entries": [
+     "index.d.cts",
+     "index.js",
+     "index.cjs"
+    ],
+    "missing": [
+     "index.d.cts",
+     "index.js",
+     "index.cjs"
+    ],
+    "twins": [
+     null,
+     null,
+     null
+    ]
+   }
+  },
+  "dexie/Dexie.js": {
+   "dexie": {
+    "links": 646,
+    "files": 102,
+    "class": "other script",
+    "twin": "no src twin",
+    "config": "no bundler config",
+    "root": ".",
+    "entries": [
+     "dist/dexie.d.ts",
+     "import-wrapper.mjs",
+     "dist/dexie.js",
+     "dist/dexie.js",
+     "dist/dexie.mjs"
+    ],
+    "missing": [
+     "dist/dexie.d.ts",
+     "dist/dexie.js",
+     "dist/dexie.js",
+     "dist/dexie.mjs"
+    ],
+    "twins": [
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "(several packages in one file)": {
+    "links": 221,
+    "files": 22,
+    "class": "(several packages in one file)"
+   },
+   "y-dexie": {
+    "links": 3,
+    "files": 1,
+    "class": "rollup",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "addons/y-dexie",
+    "entries": [
+     "dist/y-dexie.d.ts",
+     "dist/y-dexie.js",
+     "dist/y-dexie.js"
+    ],
+    "missing": [
+     "dist/y-dexie.d.ts",
+     "dist/y-dexie.js",
+     "dist/y-dexie.js"
+    ],
+    "twins": [
+     "src/y-dexie.ts",
+     "src/y-dexie.ts",
+     "src/y-dexie.ts"
+    ]
+   },
+   "dexie-observable": {
+    "links": 1,
+    "files": 1,
+    "class": "other script",
+    "twin": "no src twin",
+    "config": "no bundler config",
+    "root": "addons/Dexie.Observable",
+    "entries": [
+     "dist/dexie-observable.d.ts",
+     "dist/dexie-observable.js",
+     "dist/dexie-observable.es.js"
+    ],
+    "missing": [
+     "dist/dexie-observable.d.ts",
+     "dist/dexie-observable.js",
+     "dist/dexie-observable.es.js"
+    ],
+    "twins": [
+     null,
+     null,
+     null
+    ]
+   }
+  },
+  "excalidraw/excalidraw": {
+   "@excalidraw/excalidraw": {
+    "links": 15,
+    "files": 5,
+    "class": "node script",
+    "twin": "no src twin",
+    "config": "no bundler config",
+    "root": "packages/excalidraw",
+    "entries": [
+     "dist/types/excalidraw/index.d.ts",
+     "dist/types/common/src/*.d.ts",
+     "dist/types/element/src/*.d.ts",
+     "dist/types/math/src/*.d.ts",
+     "dist/types/utils/src/*.d.ts",
+     "dist/types/excalidraw/*.d.ts",
+     "dist/dev/index.js",
+     "dist/prod/index.js"
+    ],
+    "missing": [
+     "dist/types/excalidraw/index.d.ts",
+     "dist/types/common/src/*.d.ts",
+     "dist/types/element/src/*.d.ts",
+     "dist/types/math/src/*.d.ts",
+     "dist/types/utils/src/*.d.ts",
+     "dist/types/excalidraw/*.d.ts",
+     "dist/dev/index.js",
+     "dist/prod/index.js"
+    ],
+    "twins": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  },
+  "honojs/hono": {
+   "hono": {
+    "links": 308,
+    "files": 36,
+    "class": "other script",
+    "twin": "some missing entries have a src twin",
+    "config": "bundler config without a literal entry",
+    "root": ".",
+    "entries": [
+     "dist/types/index.d.ts",
+     "dist/types/index.d.ts",
+     "dist/index.js",
+     "dist/cjs/index.js",
+     "dist/types/request.d.ts",
+     "dist/request.js",
+     "dist/cjs/request.js",
+     "dist/types/types.d.ts"
+    ],
+    "missing": [
+     "dist/types/index.d.ts",
+     "dist/types/index.d.ts",
+     "dist/index.js",
+     "dist/cjs/index.js",
+     "dist/types/request.d.ts",
+     "dist/request.js",
+     "dist/cjs/request.js",
+     "dist/types/types.d.ts"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/request.ts",
+     "src/request.ts",
+     "src/request.ts",
+     "src/types.ts"
+    ]
+   }
+  },
+  "mermaid-js/mermaid": {
+   "@mermaid-js/parser": {
+    "links": 246,
+    "files": 22,
+    "class": "declaration roll-up",
+    "twin": "some missing entries have a src twin",
+    "config": "no bundler config",
+    "root": "packages/parser",
+    "entries": [
+     "dist/src/index.d.ts",
+     "dist/mermaid-parser.core.mjs",
+     "dist/src/index.d.ts"
+    ],
+    "missing": [
+     "dist/src/index.d.ts",
+     "dist/mermaid-parser.core.mjs",
+     "dist/src/index.d.ts"
+    ],
+    "twins": [
+     "src/index.ts",
+     null,
+     "src/index.ts"
+    ]
+   },
+   "(no failing module link in the file)": {
+    "links": 2,
+    "files": 1,
+    "class": "(no failing module link in the file)"
+   }
+  },
+  "nestjs/nest": {
+   "@nestjs/common": {
+    "links": 26,
+    "files": 4,
+    "class": "no build script",
+    "twin": "no src twin",
+    "config": "no bundler config",
+    "root": "packages/common",
+    "entries": [
+     "index.js",
+     "internal.js",
+     "*.js"
+    ],
+    "missing": [
+     "index.js",
+     "internal.js",
+     "*.js"
+    ],
+    "twins": [
+     null,
+     null,
+     null
+    ]
+   },
+   "@nestjs/core": {
+    "links": 3,
+    "files": 1,
+    "class": "tsc",
+    "twin": "entries present",
+    "config": "no bundler config",
+    "root": ".",
+    "entries": [],
+    "missing": [],
+    "twins": []
+   }
+  },
+  "oclif/core": {},
+  "pingdotgg/t3code": {},
+  "pmndrs/zustand": {},
+  "puppeteer/puppeteer": {
+   "puppeteer-core": {
+    "links": 455,
+    "files": 42,
+    "class": "declaration roll-up",
+    "twin": "no src twin",
+    "config": "literal bundler entry",
+    "root": "packages/puppeteer-core",
+    "entries": [
+     "lib/types.d.ts",
+     "lib/puppeteer/puppeteer-core.js"
+    ],
+    "missing": [
+     "lib/types.d.ts",
+     "lib/puppeteer/puppeteer-core.js"
+    ],
+    "twins": [
+     null,
+     null
+    ]
+   },
+   "(several packages in one file)": {
+    "links": 332,
+    "files": 18,
+    "class": "(several packages in one file)"
+   },
+   "puppeteer": {
+    "links": 328,
+    "files": 29,
+    "class": "declaration roll-up",
+    "twin": "no src twin",
+    "config": "no bundler config",
+    "root": "packages/puppeteer",
+    "entries": [
+     "lib/types.d.ts",
+     "lib/puppeteer/puppeteer.js"
+    ],
+    "missing": [
+     "lib/types.d.ts",
+     "lib/puppeteer/puppeteer.js"
+    ],
+    "twins": [
+     null,
+     null
+    ]
+   },
+   "@puppeteer/browsers": {
+    "links": 69,
+    "files": 11,
+    "class": "declaration roll-up",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "packages/browsers",
+    "entries": [
+     "lib/main.js"
+    ],
+    "missing": [
+     "lib/main.js"
+    ],
+    "twins": [
+     "src/main.ts"
+    ]
+   },
+   "@pptr/testserver": {
+    "links": 11,
+    "files": 3,
+    "class": "wireit",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "packages/testserver",
+    "entries": [
+     "lib/index.js"
+    ],
+    "missing": [
+     "lib/index.js"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@puppeteer/docgen": {
+    "links": 5,
+    "files": 1,
+    "class": "wireit",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "tools/docgen",
+    "entries": [
+     "lib/docgen.js"
+    ],
+    "missing": [
+     "lib/docgen.js"
+    ],
+    "twins": [
+     "src/docgen.ts"
+    ]
+   },
+   "@puppeteer/eslint": {
+    "links": 2,
+    "files": 1,
+    "class": "wireit",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "tools/eslint",
+    "entries": [
+     "lib/plugin.js"
+    ],
+    "missing": [
+     "lib/plugin.js"
+    ],
+    "twins": [
+     "src/plugin.ts"
+    ]
+   }
+  },
+  "react-hook-form/react-hook-form": {
+   "react-hook-form": {
+    "links": 216,
+    "files": 41,
+    "class": "declaration roll-up",
+    "twin": "some missing entries have a src twin",
+    "config": "no bundler config",
+    "root": ".",
+    "entries": [
+     "dist/index.d.ts",
+     "dist/index.d.ts",
+     "dist/react-server.esm.mjs",
+     "dist/index.esm.mjs",
+     "dist/index.cjs.js",
+     "dist/index.cjs.js",
+     "dist/index.esm.mjs"
+    ],
+    "missing": [
+     "dist/index.d.ts",
+     "dist/index.d.ts",
+     "dist/react-server.esm.mjs",
+     "dist/index.esm.mjs",
+     "dist/index.cjs.js",
+     "dist/index.cjs.js",
+     "dist/index.esm.mjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   }
+  },
+  "reduxjs/redux-toolkit": {
+   "@reduxjs/toolkit": {
+    "links": 219,
+    "files": 39,
+    "class": "declaration roll-up",
+    "twin": "some missing entries have a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/toolkit",
+    "entries": [
+     "dist/index.d.ts",
+     "dist/index.d.mts",
+     "dist/redux-toolkit.modern.mjs",
+     "dist/index.d.ts",
+     "dist/cjs/index.js",
+     "dist/redux-toolkit.browser.mjs",
+     "dist/react/index.d.mts",
+     "dist/react/redux-toolkit-react.modern.mjs"
+    ],
+    "missing": [
+     "dist/index.d.ts",
+     "dist/index.d.mts",
+     "dist/redux-toolkit.modern.mjs",
+     "dist/index.d.ts",
+     "dist/cjs/index.js",
+     "dist/redux-toolkit.browser.mjs",
+     "dist/react/index.d.mts",
+     "dist/react/redux-toolkit-react.modern.mjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     null,
+     "src/index.ts",
+     "src/index.ts",
+     null,
+     "src/react/index.ts",
+     null
+    ]
+   }
+  },
+  "trpc/trpc": {
+   "@trpc/server": {
+    "links": 357,
+    "files": 85,
+    "class": "tsdown+node script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/server",
+    "entries": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/adapters/aws-lambda/index.d.mts",
+     "dist/adapters/aws-lambda/index.mjs",
+     "dist/adapters/aws-lambda/index.d.cts",
+     "dist/adapters/aws-lambda/index.cjs"
+    ],
+    "missing": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/adapters/aws-lambda/index.d.mts",
+     "dist/adapters/aws-lambda/index.mjs",
+     "dist/adapters/aws-lambda/index.d.cts",
+     "dist/adapters/aws-lambda/index.cjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/adapters/aws-lambda/index.ts",
+     "src/adapters/aws-lambda/index.ts",
+     "src/adapters/aws-lambda/index.ts",
+     "src/adapters/aws-lambda/index.ts"
+    ]
+   },
+   "(several packages in one file)": {
+    "links": 239,
+    "files": 21,
+    "class": "(several packages in one file)"
+   },
+   "@trpc/client": {
+    "links": 103,
+    "files": 16,
+    "class": "tsdown+node script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/client",
+    "entries": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/links/httpBatchLink.d.mts",
+     "dist/links/httpBatchLink.mjs",
+     "dist/links/httpBatchLink.d.cts",
+     "dist/links/httpBatchLink.cjs"
+    ],
+    "missing": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/links/httpBatchLink.d.mts",
+     "dist/links/httpBatchLink.mjs",
+     "dist/links/httpBatchLink.d.cts",
+     "dist/links/httpBatchLink.cjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/links/httpBatchLink.ts",
+     "src/links/httpBatchLink.ts",
+     "src/links/httpBatchLink.ts",
+     "src/links/httpBatchLink.ts"
+    ]
+   },
+   "@trpc/tanstack-react-query": {
+    "links": 92,
+    "files": 12,
+    "class": "tsdown+node script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/tanstack-react-query",
+    "entries": [
+     "dist/index.d.cts",
+     "dist/index.react-server.d.mts",
+     "dist/index.react-server.mjs",
+     "dist/index.react-server.d.cts",
+     "dist/index.react-server.cjs",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs"
+    ],
+    "missing": [
+     "dist/index.d.cts",
+     "dist/index.react-server.d.mts",
+     "dist/index.react-server.mjs",
+     "dist/index.react-server.d.cts",
+     "dist/index.react-server.cjs",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.react-server.ts",
+     "src/index.react-server.ts",
+     "src/index.react-server.ts",
+     "src/index.react-server.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts"
+    ]
+   },
+   "@trpc/react-query": {
+    "links": 12,
+    "files": 4,
+    "class": "tsdown",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/react-query",
+    "entries": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/rsc.d.mts",
+     "dist/rsc.mjs",
+     "dist/rsc.d.cts",
+     "dist/rsc.cjs"
+    ],
+    "missing": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/rsc.d.mts",
+     "dist/rsc.mjs",
+     "dist/rsc.d.cts",
+     "dist/rsc.cjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/rsc.tsx",
+     "src/rsc.tsx",
+     "src/rsc.tsx",
+     "src/rsc.tsx"
+    ]
+   },
+   "@trpc/openapi": {
+    "links": 9,
+    "files": 2,
+    "class": "tsdown+node script",
+    "twin": "every missing entry has a src twin",
+    "config": "literal bundler entry",
+    "root": "packages/openapi",
+    "entries": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/heyapi/index.d.mts",
+     "dist/heyapi/index.mjs",
+     "dist/heyapi/index.d.cts",
+     "dist/heyapi/index.cjs"
+    ],
+    "missing": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/heyapi/index.d.mts",
+     "dist/heyapi/index.mjs",
+     "dist/heyapi/index.d.cts",
+     "dist/heyapi/index.cjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/heyapi/index.ts",
+     "src/heyapi/index.ts",
+     "src/heyapi/index.ts",
+     "src/heyapi/index.ts"
+    ]
+   },
+   "(no failing module link in the file)": {
+    "links": 4,
+    "files": 1,
+    "class": "(no failing module link in the file)"
+   },
+   "@trpc/next": {
+    "links": 2,
+    "files": 1,
+    "class": "tsdown+node script",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/next",
+    "entries": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/app-dir/client.d.mts",
+     "dist/app-dir/client.mjs",
+     "dist/app-dir/client.d.cts",
+     "dist/app-dir/client.cjs"
+    ],
+    "missing": [
+     "dist/index.d.cts",
+     "dist/index.d.mts",
+     "dist/index.mjs",
+     "dist/index.cjs",
+     "dist/app-dir/client.d.mts",
+     "dist/app-dir/client.mjs",
+     "dist/app-dir/client.d.cts",
+     "dist/app-dir/client.cjs"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/index.ts",
+     "src/app-dir/client.ts",
+     "src/app-dir/client.ts",
+     "src/app-dir/client.ts",
+     "src/app-dir/client.ts"
+    ]
+   }
+  },
+  "vercel/turborepo": {
+   "@repo/ui": {
+    "links": 18,
+    "files": 4,
+    "class": "no build script",
+    "twin": "entries present",
+    "config": "no bundler config",
+    "root": "examples/basic/packages/ui",
+    "entries": [],
+    "missing": [],
+    "twins": []
+   },
+   "@acme/playwright": {
+    "links": 9,
+    "files": 3,
+    "class": "no build script",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "crates/turborepo-trace-testkit/fixtures/frameworks/playwright-factory/tooling/playwright",
+    "entries": [
+     "src/config/index.ts",
+     "dist/config/index.js",
+     "dist/config/index.cjs",
+     "dist/config/opaque.js",
+     "dist/config/opaque.cjs",
+     "dist/config/project.d.ts",
+     "dist/config/project.js"
+    ],
+    "missing": [
+     "dist/config/index.js",
+     "dist/config/index.cjs",
+     "dist/config/opaque.js",
+     "dist/config/opaque.cjs",
+     "dist/config/project.d.ts",
+     "dist/config/project.js"
+    ],
+    "twins": [
+     "src/config/index.ts",
+     "src/config/index.ts",
+     "src/config/opaque.ts",
+     "src/config/opaque.ts",
+     "src/config/project.ts",
+     "src/config/project.ts"
+    ]
+   },
+   "@fx/lib": {
+    "links": 6,
+    "files": 2,
+    "class": "no build script",
+    "twin": "entries present",
+    "config": "no bundler config",
+    "root": "crates/turborepo-trace-testkit/fixtures/impact/package-exports/repo/packages/lib",
+    "entries": [
+     "src/index.js",
+     "src/feature-v1.js"
+    ],
+    "missing": [],
+    "twins": []
+   },
+   "@repo/vitest-config": {
+    "links": 4,
+    "files": 2,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "examples/with-vitest/packages/vitest-config",
+    "entries": [
+     "dist/index.d.ts",
+     "dist/index.js",
+     "dist/configs/base-config.js",
+     "dist/configs/ui-config.js",
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.d.ts",
+     "dist/index.js",
+     "dist/configs/base-config.js",
+     "dist/configs/ui-config.js",
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts",
+     "src/configs/base-config.ts",
+     "src/configs/ui-config.ts",
+     "src/index.ts"
+    ]
+   },
+   "@acme/analytics": {
+    "links": 3,
+    "files": 1,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/analytics",
+    "entries": [
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@acme/assets": {
+    "links": 3,
+    "files": 1,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/assets",
+    "entries": [
+     "dist/index.d.ts",
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.d.ts",
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts"
+    ]
+   },
+   "@acme/typed": {
+    "links": 3,
+    "files": 1,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/typed",
+    "entries": [
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@acme/gen": {
+    "links": 2,
+    "files": 1,
+    "class": "node script",
+    "twin": "no src twin",
+    "config": "no bundler config",
+    "root": "crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/gen",
+    "entries": [
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.js"
+    ],
+    "twins": [
+     null
+    ]
+   },
+   "@acme/lib": {
+    "links": 2,
+    "files": 1,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/lib",
+    "entries": [
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@acme/tool": {
+    "links": 2,
+    "files": 1,
+    "class": "other script",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/tool",
+    "entries": [
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "module-package": {
+    "links": 2,
+    "files": 1,
+    "class": "no build script",
+    "twin": "entries present",
+    "config": "no bundler config",
+    "root": "turborepo-tests/integration/fixtures/boundaries/packages/module-package",
+    "entries": [
+     "my-module.mjs"
+    ],
+    "missing": [],
+    "twins": []
+   }
+  },
+  "vitejs/vite": {
+   "vite": {
+    "links": 676,
+    "files": 170,
+    "class": "tsc",
+    "twin": "some missing entries have a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/vite",
+    "entries": [
+     "dist/node/index.js",
+     "client.d.ts",
+     "dist/node/module-runner.js",
+     "dist/node/internal.js",
+     "types/*"
+    ],
+    "missing": [
+     "dist/node/index.js",
+     "dist/node/module-runner.js",
+     "dist/node/internal.js",
+     "types/*"
+    ],
+    "twins": [
+     "src/node/index.ts",
+     null,
+     null,
+     null
+    ]
+   },
+   "(several packages in one file)": {
+    "links": 48,
+    "files": 8,
+    "class": "(several packages in one file)"
+   }
+  },
+  "vitest-dev/vitest": {
+   "vitest": {
+    "links": 6543,
+    "files": 299,
+    "class": "declaration roll-up",
+    "twin": "no src twin",
+    "config": "literal bundler entry",
+    "root": "packages/vitest",
+    "entries": [
+     "dist/index.d.ts",
+     "dist/index.js",
+     "index.d.cts",
+     "index.cjs",
+     "browser/context.d.ts",
+     "browser/context.js",
+     "optional-types.d.ts",
+     "optional-runtime-types.d.ts"
+    ],
+    "missing": [
+     "dist/index.d.ts",
+     "dist/index.js",
+     "dist/node.d.ts",
+     "dist/node.js",
+     "dist/browser.d.ts",
+     "dist/browser.js",
+     "dist/traces.js",
+     "dist/config.cjs"
+    ],
+    "twins": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ]
+   },
+   "(several packages in one file)": {
+    "links": 206,
+    "files": 7,
+    "class": "(several packages in one file)"
+   },
+   "@vitest/browser": {
+    "links": 59,
+    "files": 11,
+    "class": "rollup+vite",
+    "twin": "some missing entries have a src twin",
+    "config": "literal bundler entry",
+    "root": "packages/browser",
+    "entries": [
+     "dist/index.d.ts",
+     "dist/index.js",
+     "context.d.ts",
+     "context.js",
+     "dist/client.js",
+     "matchers.d.ts",
+     "dummy.js",
+     "dist/locators.d.ts"
+    ],
+    "missing": [
+     "dist/index.d.ts",
+     "dist/index.js",
+     "dist/client.js",
+     "dist/locators.d.ts",
+     "dist/locators.js",
+     "dist/vendor-types.d.ts"
+    ],
+    "twins": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     "src/vendor-types.ts"
+    ]
+   },
+   "@vitest/browser-preview": {
+    "links": 37,
+    "files": 6,
+    "class": "rollup",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/browser-preview",
+    "entries": [
+     "dist/index.d.ts",
+     "dist/index.js",
+     "context.d.ts"
+    ],
+    "missing": [
+     "dist/index.d.ts",
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts"
+    ]
+   },
+   "@vitest/browser-playwright": {
+    "links": 14,
+    "files": 4,
+    "class": "rollup",
+    "twin": "every missing entry has a src twin",
+    "config": "bundler config without a literal entry",
+    "root": "packages/browser-playwright",
+    "entries": [
+     "dist/index.d.ts",
+     "dist/index.js",
+     "context.d.ts"
+    ],
+    "missing": [
+     "dist/index.d.ts",
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/index.ts"
+    ]
+   },
+   "test-dep-invalid": {
+    "links": 4,
+    "files": 2,
+    "class": "no build script",
+    "twin": "entries present",
+    "config": "no bundler config",
+    "root": "test/e2e/deps/dep-invalid",
+    "entries": [],
+    "missing": [],
+    "twins": []
+   },
+   "(no failing module link in the file)": {
+    "links": 2,
+    "files": 1,
+    "class": "(no failing module link in the file)"
+   }
+  },
+  "withastro/astro": {
+   "astro": {
+    "links": 1956,
+    "files": 474,
+    "class": "tsc",
+    "twin": "some missing entries have a src twin",
+    "config": "no bundler config",
+    "root": "packages/astro",
+    "entries": [
+     "dist/index.js",
+     "env.d.ts",
+     "dist/env/runtime.js",
+     "dist/env/setup.js",
+     "types.d.ts",
+     "client.d.ts",
+     "astro-jsx.d.ts",
+     "jsx-runtime.d.ts"
+    ],
+    "missing": [
+     "dist/index.js",
+     "dist/env/runtime.js",
+     "dist/env/setup.js",
+     "dist/jsx-runtime/index.js",
+     "dist/runtime/compiler/index.js",
+     "dist/markdown/index.js",
+     "dist/config/entrypoint.js",
+     "dist/container/index.js"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/env/runtime.ts",
+     "src/env/setup.ts",
+     "src/jsx-runtime/index.ts",
+     "src/runtime/compiler/index.ts",
+     "src/markdown/index.ts",
+     "src/config/entrypoint.ts",
+     "src/container/index.ts"
+    ]
+   },
+   "(several packages in one file)": {
+    "links": 365,
+    "files": 58,
+    "class": "(several packages in one file)"
+   },
+   "@astrojs/runtime": {
+    "links": 30,
+    "files": 9,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "packages/runtime",
+    "entries": [
+     "dist/index.js",
+     "dist/server/index.js",
+     "dist/jsx-runtime/index.js",
+     "dist/render.js",
+     "dist/compiler/index.js",
+     "dist/types.js"
+    ],
+    "missing": [
+     "dist/index.js",
+     "dist/server/index.js",
+     "dist/jsx-runtime/index.js",
+     "dist/render.js",
+     "dist/compiler/index.js",
+     "dist/types.js"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/server/index.ts",
+     "src/jsx-runtime/index.ts",
+     "src/render.ts",
+     "src/compiler/index.ts",
+     "src/types.ts"
+    ]
+   },
+   "@astrojs/mdx": {
+    "links": 21,
+    "files": 7,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "packages/integrations/mdx",
+    "entries": [
+     "dist/index.js",
+     "dist/container-renderer.js",
+     "dist/server.js"
+    ],
+    "missing": [
+     "dist/index.js",
+     "dist/container-renderer.js",
+     "dist/server.js"
+    ],
+    "twins": [
+     "src/index.ts",
+     "src/container-renderer.ts",
+     "src/server.ts"
+    ]
+   },
+   "(no failing module link in the file)": {
+    "links": 11,
+    "files": 5,
+    "class": "(no failing module link in the file)"
+   },
+   "@astrojs/internal-helpers": {
+    "links": 6,
+    "files": 2,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "packages/internal-helpers",
+    "entries": [
+     "dist/path.js",
+     "dist/remote.js",
+     "dist/fs.js",
+     "dist/cli.js",
+     "dist/create-filter.js",
+     "dist/request.js",
+     "dist/object.js",
+     "dist/markdown.js"
+    ],
+    "missing": [
+     "dist/path.js",
+     "dist/remote.js",
+     "dist/fs.js",
+     "dist/cli.js",
+     "dist/create-filter.js",
+     "dist/request.js",
+     "dist/object.js",
+     "dist/markdown.js"
+    ],
+    "twins": [
+     "src/path.ts",
+     "src/remote.ts",
+     "src/fs.ts",
+     "src/cli.ts",
+     "src/create-filter.ts",
+     "src/request.ts",
+     "src/object.ts",
+     "src/markdown.ts"
+    ]
+   },
+   "@astrojs/sitemap": {
+    "links": 2,
+    "files": 1,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "packages/integrations/sitemap",
+    "entries": [
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   },
+   "@astrojs/check": {
+    "links": 1,
+    "files": 1,
+    "class": "tsc",
+    "twin": "every missing entry has a src twin",
+    "config": "no bundler config",
+    "root": "packages/language-tools/astro-check",
+    "entries": [
+     "dist/index.js"
+    ],
+    "missing": [
+     "dist/index.js"
+    ],
+    "twins": [
+     "src/index.ts"
+    ]
+   }
+  },
+  "yargs/yargs": {}
+ }
+}

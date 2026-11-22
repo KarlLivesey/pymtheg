@@ -1,0 +1,675 @@
+[
+  {
+    "id": "changesets/changesets",
+    "symbols": {
+      "before": 1653,
+      "after": 1653
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 12646,
+      "after": 12646
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 3793,
+    "definiteKept": 3793,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 2,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 792
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 7565,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "colinhacks/zod",
+    "symbols": {
+      "before": 12135,
+      "after": 12135
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 81042,
+      "after": 81042
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 49729,
+    "definiteKept": 49729,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1813,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 28497,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "dexie/Dexie.js",
+    "symbols": {
+      "before": 5841,
+      "after": 5841
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 36431,
+      "after": 36431
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 14100,
+    "definiteKept": 14100,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 789,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 50
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 7479,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "excalidraw/excalidraw",
+    "symbols": {
+      "before": 13405,
+      "after": 13405
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 104519,
+      "after": 104519
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 61615,
+    "definiteKept": 61615,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1369,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 39229,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "honojs/hono",
+    "symbols": {
+      "before": 5773,
+      "after": 5773
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 72340,
+      "after": 72340
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 36143,
+    "definiteKept": 36143,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 2146,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 525
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 32186,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "mermaid-js/mermaid",
+    "symbols": {
+      "before": 23639,
+      "after": 23639
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 125657,
+      "after": 125657
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 54313,
+    "definiteKept": 54313,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 489,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 74
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 60682,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "nestjs/nest",
+    "symbols": {
+      "before": 19464,
+      "after": 19464
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 165330,
+      "after": 165330
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 79156,
+    "definiteKept": 79156,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 661,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 78942,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "oclif/core",
+    "symbols": {
+      "before": 2723,
+      "after": 2723
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 14188,
+      "after": 14188
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 7495,
+    "definiteKept": 7495,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 215,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 6362,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "pingdotgg/t3code",
+    "symbols": {
+      "before": 30346,
+      "after": 30346
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 162711,
+      "after": 162711
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 65789,
+    "definiteKept": 65789,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1654,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 89856,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "pmndrs/zustand",
+    "symbols": {
+      "before": 598,
+      "after": 598
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 7099,
+      "after": 7099
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 2725,
+    "definiteKept": 2725,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 19,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 3330,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "puppeteer/puppeteer",
+    "symbols": {
+      "before": 8412,
+      "after": 8412
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 58244,
+      "after": 58244
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 23486,
+    "definiteKept": 23486,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 742,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 8017
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 23423,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "react-hook-form/react-hook-form",
+    "symbols": {
+      "before": 3382,
+      "after": 3382
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 49115,
+      "after": 49115
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 15539,
+    "definiteKept": 15539,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 134,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 216
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 26947,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "reduxjs/redux-toolkit",
+    "symbols": {
+      "before": 7918,
+      "after": 7918
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 57208,
+      "after": 57208
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 24045,
+    "definiteKept": 24045,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 522,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 243
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 23312,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "trpc/trpc",
+    "symbols": {
+      "before": 17804,
+      "after": 17804
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 107470,
+      "after": 107470
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 53817,
+    "definiteKept": 53817,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1715,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 991
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 46107,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vercel/turborepo",
+    "symbols": {
+      "before": 59438,
+      "after": 59438
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 743704,
+      "after": 743704
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 243545,
+    "definiteKept": 243545,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 431,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 17
+    },
+    "rust": {
+      "before": 226013,
+      "after": 226013,
+      "total": 689591
+    },
+    "receiverGaps": {
+      "written-type": 19478,
+      "callee-unresolved": 40827,
+      "no-recipe": 44404,
+      "receiver-method-unresolved": 22371,
+      "outside-type": 5393,
+      "closure-parameter": 9272,
+      "iterator-item": 4411,
+      "annotation-shape": 4028,
+      "pattern-binding": 11503,
+      "non-local-value": 1704,
+      "macro": 1931,
+      "control-flow": 1537,
+      "aggregate": 624,
+      "literal": 5919,
+      "field-owner": 1621,
+      "generic-call": 643,
+      "destructured": 9606,
+      "try-wrapper": 1089,
+      "type_cast": 113,
+      "range": 524,
+      "generic-field": 283,
+      "binding-unproved": 764,
+      "closure-call": 774,
+      "operator": 120,
+      "path-value": 318,
+      "index": 4803,
+      "binary": 454,
+      "struct-literal-owner": 166,
+      "impl-trait": 291,
+      "callee-kind": 39,
+      "field-unknown": 63,
+      "self-type": 59,
+      "receiver-too-long": 6,
+      "generic-return": 49,
+      "future-receiver": 1,
+      "call-expression": 23,
+      "deref-owned": 17,
+      "trait-object": 88,
+      "parameter-shape": 4,
+      "uninitialized": 12,
+      "await-non-async": 2,
+      "declaration-placement": 676
+    },
+    "outsideReceivers": 5393,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 86262,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vitejs/vite",
+    "symbols": {
+      "before": 10186,
+      "after": 10186
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 55576,
+      "after": 55576
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 23471,
+    "definiteKept": 23471,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 398,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 862
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 24756,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vitest-dev/vitest",
+    "symbols": {
+      "before": 17973,
+      "after": 17973
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 116220,
+      "after": 116220
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 74498,
+    "definiteKept": 74498,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 879,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 6630
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 23615,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "withastro/astro",
+    "symbols": {
+      "before": 26243,
+      "after": 26243
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 152561,
+      "after": 152561
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 66812,
+    "definiteKept": 66812,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 5221,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 74463,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "yargs/yargs",
+    "symbols": {
+      "before": 1180,
+      "after": 1180
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 0,
+    "links": {
+      "before": 12205,
+      "after": 12205
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 3967,
+    "definiteKept": 3967,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 104,
+    "ambiguousChanged": 0,
+    "newDefinite": {},
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 2630,
+    "libraryTargetsChanged": []
+  }
+]

@@ -1,0 +1,433 @@
+{
+ "id": "reduxjs/redux-toolkit",
+ "seed": 4602,
+ "expectedSteps": 25,
+ "steps": [
+  {
+   "step": 0,
+   "file": "examples/publish-ci/next/tests/playwright/rtkq.test.ts",
+   "kind": "duplicate",
+   "line": 21,
+   "equal": true,
+   "differences": [],
+   "wallMs": 65713,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1351
+   }
+  },
+  {
+   "step": 1,
+   "file": "examples/query/react/kitchen-sink/src/app/services/api.ts",
+   "kind": "blank",
+   "line": 29,
+   "equal": true,
+   "differences": [],
+   "wallMs": 68764,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1453
+   }
+  },
+  {
+   "step": 2,
+   "file": "packages/toolkit/src/query/tests/utils.test.ts",
+   "kind": "delete",
+   "line": 68,
+   "equal": true,
+   "differences": [],
+   "wallMs": 102803,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1337
+   }
+  },
+  {
+   "step": 3,
+   "file": "examples/type-portability/bundler/src/features/common/Container.tsx",
+   "kind": "blank",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 64536,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1444
+   }
+  },
+  {
+   "step": 4,
+   "file": "packages/toolkit/src/query/core/buildMiddleware/types.ts",
+   "kind": "comment",
+   "line": 8,
+   "equal": true,
+   "differences": [],
+   "wallMs": 73184,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1536
+   }
+  },
+  {
+   "step": 5,
+   "file": "packages/toolkit/src/query/react/index.ts",
+   "kind": "delete",
+   "line": 51,
+   "equal": true,
+   "differences": [],
+   "wallMs": 79070,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1406
+   }
+  },
+  {
+   "step": 6,
+   "file": "packages/toolkit/src/index.ts",
+   "kind": "delete",
+   "line": 184,
+   "equal": true,
+   "differences": [],
+   "wallMs": 72731,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1438
+   }
+  },
+  {
+   "step": 7,
+   "file": "packages/toolkit/src/react/index.ts",
+   "kind": "comment",
+   "line": 2,
+   "equal": true,
+   "differences": [],
+   "wallMs": 76505,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1430
+   }
+  },
+  {
+   "step": 8,
+   "file": "packages/toolkit/src/query/utils/isNotNullish.ts",
+   "kind": "comment",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 72855,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1427
+   }
+  },
+  {
+   "step": 9,
+   "file": "packages/toolkit/package.json",
+   "kind": "manifest-types",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 74611,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1572
+   }
+  },
+  {
+   "step": 10,
+   "file": "packages/toolkit/src/query/react/index.ts",
+   "kind": "duplicate",
+   "line": 11,
+   "equal": true,
+   "differences": [],
+   "wallMs": 84932,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1468
+   }
+  },
+  {
+   "step": 11,
+   "file": "packages/toolkit/src/query/index.ts",
+   "kind": "delete",
+   "line": 115,
+   "equal": true,
+   "differences": [],
+   "wallMs": 69985,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1541
+   }
+  },
+  {
+   "step": 12,
+   "file": "packages/toolkit/src/dynamicMiddleware/tests/react.test-d.ts",
+   "kind": "statement",
+   "line": 42,
+   "equal": true,
+   "differences": [],
+   "wallMs": 80300,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1388
+   }
+  },
+  {
+   "step": 13,
+   "file": "packages/rtk-query-codegen-openapi/src/utils/removeUndefined.ts",
+   "kind": "duplicate",
+   "line": 22,
+   "equal": true,
+   "differences": [],
+   "wallMs": 82159,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1473
+   }
+  },
+  {
+   "step": 14,
+   "file": "packages/toolkit/src/query/defaultSerializeQueryArgs.ts",
+   "kind": "comment",
+   "line": 12,
+   "equal": true,
+   "differences": [],
+   "wallMs": 78933,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1546
+   }
+  },
+  {
+   "step": 15,
+   "file": "examples/type-portability/nodenext-esm/src/app/store.ts",
+   "kind": "statement",
+   "line": 18,
+   "equal": true,
+   "differences": [],
+   "wallMs": 106838,
+   "failed": 2,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1510
+   }
+  },
+  {
+   "step": 16,
+   "file": "examples/type-portability/nodenext-esm/src/features/bundleSplitting/PostsList.tsx",
+   "kind": "delete",
+   "line": 16,
+   "equal": true,
+   "differences": [],
+   "wallMs": 125311,
+   "failed": 3,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1326
+   }
+  },
+  {
+   "step": 17,
+   "file": "packages/toolkit/src/query/tests/polling.test-d.tsx",
+   "kind": "blank",
+   "line": 19,
+   "equal": true,
+   "differences": [],
+   "wallMs": 72189,
+   "failed": 3,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1473
+   }
+  },
+  {
+   "step": 18,
+   "file": "packages/toolkit/package.json",
+   "kind": "manifest-types",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 1427,
+   "failed": 3,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1232
+   }
+  },
+  {
+   "step": 19,
+   "file": "packages/toolkit/src/query/core/setupListeners.ts",
+   "kind": "blank",
+   "line": 91,
+   "equal": true,
+   "differences": [],
+   "wallMs": 70358,
+   "failed": 3,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1419
+   }
+  },
+  {
+   "step": 20,
+   "file": "packages/toolkit/src/combineSlices.ts",
+   "kind": "blank",
+   "line": 317,
+   "equal": true,
+   "differences": [],
+   "wallMs": 86358,
+   "failed": 3,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1475
+   }
+  },
+  {
+   "step": 21,
+   "file": "packages/toolkit/src/query/index.ts",
+   "kind": "blank",
+   "line": 112,
+   "equal": true,
+   "differences": [],
+   "wallMs": 83321,
+   "failed": 3,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1429
+   }
+  },
+  {
+   "step": 22,
+   "file": "examples/query/react/basic/src/store.ts",
+   "kind": "duplicate",
+   "line": 17,
+   "equal": true,
+   "differences": [],
+   "wallMs": 148968,
+   "failed": 4,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1635
+   }
+  },
+  {
+   "step": 23,
+   "file": "examples/type-portability/nodenext-esm/src/app/listenerMiddleware.ts",
+   "kind": "duplicate",
+   "line": 5,
+   "equal": true,
+   "differences": [],
+   "wallMs": 149755,
+   "failed": 5,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1665
+   }
+  },
+  {
+   "step": 24,
+   "file": "examples/publish-ci/react-native/src/constants/TypedColors.ts",
+   "kind": "comment",
+   "line": 14,
+   "equal": true,
+   "differences": [],
+   "wallMs": 102987,
+   "failed": 5,
+   "resolvedFiles": 0,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1361
+   }
+  }
+ ],
+ "equal": true
+}

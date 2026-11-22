@@ -875,6 +875,15 @@ accept the arguments.
   that supplied its receiver type when the declaring file is also imported
   directly.
   [C-25](changes/C-25.md)
+  Where no compiler proof exists, a stated convention can name the source,
+  each link carrying its own assumption: the bundler config's literal entry
+  list (`ts-unbuilt-entry-is-bundler-entry`), an API Extractor roll-up's main
+  entry (`ts-unbuilt-entry-is-rollup-entry`), the `src/` twin of the output
+  path (`ts-unbuilt-entry-is-src-twin`), or the package's own compiler
+  configuration under a Wireit wrapper or beside a roll-up
+  (`ts-unbuilt-entry-is-wrapped-compiler-emit`). Existing output wins; a plain
+  `tsc` build, the compiler's own refusals, rewrites and conflicting configs
+  leave the link unresolved. [C-46](changes/C-46.md)
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   bare test globals with an overlapping unmodelled type request

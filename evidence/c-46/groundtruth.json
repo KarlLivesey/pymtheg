@@ -1,0 +1,113 @@
+[
+ {
+  "manifest": "packages/toolkit/package.json",
+  "totals": {
+   "ts-unbuilt-entry-is-src-twin | same declaration": 243
+  },
+  "examples": {
+   "ts-unbuilt-entry-is-src-twin | same declaration": [
+    {
+     "site": "examples/query/react/infinite-queries/src/app/createAppSlice.ts|imports|52|70|@reduxjs/toolkit",
+     "unbuilt": "packages/toolkit/src/index.ts#packages/toolkit/src/index.ts",
+     "built": "packages/toolkit/dist/index.d.mts#packages/toolkit/dist/index.d.mts"
+    },
+    {
+     "site": "examples/query/react/infinite-queries/src/app/createAppSlice.ts|imports|9|26|asyncThunkCreator",
+     "unbuilt": "packages/toolkit/src/createSlice.ts#asyncThunkCreator",
+     "built": "packages/toolkit/dist/index.d.mts#asyncThunkCreator"
+    },
+    {
+     "site": "examples/query/react/infinite-queries/src/app/createAppSlice.ts|imports|28|44|buildCreateSlice",
+     "unbuilt": "packages/toolkit/src/createSlice.ts#buildCreateSlice",
+     "built": "packages/toolkit/dist/index.d.mts#buildCreateSlice"
+    },
+    {
+     "site": "examples/query/react/infinite-queries/src/app/createAppSlice.ts|calls|171|187|buildCreateSlice",
+     "unbuilt": "packages/toolkit/src/createSlice.ts#buildCreateSlice",
+     "built": "packages/toolkit/dist/index.d.mts#buildCreateSlice"
+    },
+    {
+     "site": "examples/query/react/infinite-queries/src/app/store.ts|imports|41|59|@reduxjs/toolkit",
+     "unbuilt": "packages/toolkit/src/index.ts#packages/toolkit/src/index.ts",
+     "built": "packages/toolkit/dist/index.d.mts#packages/toolkit/dist/index.d.mts"
+    }
+   ]
+  }
+ },
+ {
+  "manifest": "packages/server/package.json",
+  "totals": {
+   "ts-unbuilt-entry-is-bundler-entry | same declaration": 545,
+   "ts-unbuilt-entry-is-bundler-entry | built: unresolved:any-receiver": 3,
+   "ts-unbuilt-entry-is-bundler-entry | built: unresolved:local": 4
+  },
+  "examples": {
+   "ts-unbuilt-entry-is-bundler-entry | same declaration": [
+    {
+     "site": "examples/.experimental/next-app-dir/src/app/api/trpc/[trpc]/route.ts|imports|36|65|@trpc/server/adapters/fetch",
+     "unbuilt": "packages/server/src/adapters/fetch/index.ts#packages/server/src/adapters/fetch/index.ts",
+     "built": "packages/server/dist/adapters/fetch/index.d.mts#packages/server/dist/adapters/fetch/index.d.mts"
+    },
+    {
+     "site": "examples/.experimental/next-app-dir/src/app/api/trpc/[trpc]/route.ts|imports|9|28|fetchRequestHandler",
+     "unbuilt": "packages/server/src/adapters/fetch/fetchRequestHandler.ts#fetchRequestHandler",
+     "built": "packages/server/dist/adapters/fetch/index.d.mts#fetchRequestHandler"
+    },
+    {
+     "site": "examples/.experimental/next-app-dir/src/app/api/trpc/[trpc]/route.ts|calls|281|300|fetchRequestHandler",
+     "unbuilt": "packages/server/src/adapters/fetch/fetchRequestHandler.ts#fetchRequestHandler",
+     "built": "packages/server/dist/adapters/fetch/index.d.mts#fetchRequestHandler"
+    },
+    {
+     "site": "examples/.experimental/next-app-dir/src/app/posts/_data.ts|imports|243|251|notFound",
+     "unbuilt": "packages/server/src/adapters/next-app-dir/notFound.ts#notFound",
+     "built": "packages/server/dist/adapters/next-app-dir.d.mts#notFound"
+    },
+    {
+     "site": "examples/.experimental/next-app-dir/src/app/posts/_data.ts|imports|253|261|redirect",
+     "unbuilt": "packages/server/src/adapters/next-app-dir/redirect.ts#redirect",
+     "built": "packages/server/dist/adapters/next-app-dir.d.mts#redirect"
+    }
+   ],
+   "ts-unbuilt-entry-is-bundler-entry | built: unresolved:any-receiver": [
+    {
+     "site": "examples/express-server/src/client.ts|calls|498|502|(expression).pipe",
+     "unbuilt": "packages/server/src/observable/types.ts#Observable.pipe",
+     "built": null
+    },
+    {
+     "site": "www/src/demos/kit/backend.ts|calls|7939|7948|(expression).subscribe",
+     "unbuilt": "packages/server/src/observable/types.ts#Subscribable.subscribe",
+     "built": null
+    },
+    {
+     "site": "www/src/demos/kit/backend.ts|calls|8334|8345|subscription.unsubscribe",
+     "unbuilt": "packages/server/src/observable/types.ts#Unsubscribable.unsubscribe",
+     "built": null
+    }
+   ],
+   "ts-unbuilt-entry-is-bundler-entry | built: unresolved:local": [
+    {
+     "site": "examples/next-prisma-websockets-starter/src/server/prodServer.ts|calls|1003|1033|handler.broadcastReconnectNotification",
+     "unbuilt": "packages/server/src/adapters/ws.ts#applyWSSHandler.[return].[object].broadcastReconnectNotification",
+     "built": null
+    },
+    {
+     "site": "examples/next-prisma-websockets-starter/src/server/wssDevServer.ts|calls|760|790|handler.broadcastReconnectNotification",
+     "unbuilt": "packages/server/src/adapters/ws.ts#applyWSSHandler.[return].[object].broadcastReconnectNotification",
+     "built": null
+    },
+    {
+     "site": "examples/next-websockets-encoder/src/server/prodServer.ts|calls|1083|1113|handler.broadcastReconnectNotification",
+     "unbuilt": "packages/server/src/adapters/ws.ts#applyWSSHandler.[return].[object].broadcastReconnectNotification",
+     "built": null
+    },
+    {
+     "site": "examples/next-websockets-encoder/src/server/wssDevServer.ts|calls|846|876|handler.broadcastReconnectNotification",
+     "unbuilt": "packages/server/src/adapters/ws.ts#applyWSSHandler.[return].[object].broadcastReconnectNotification",
+     "built": null
+    }
+   ]
+  }
+ }
+]
