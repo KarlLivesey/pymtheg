@@ -67,7 +67,8 @@ async function settings(root, go) {
   const file = trustFile();
   const answers = JSON.parse(await readFile(file, "utf8"));
   const entry = answers.checkouts[await realpath(root)];
-  entry.toolchain = typeof go === "string" ? { go, rust: false } : { rust: false };
+  entry.toolchain =
+    typeof go === "string" ? { go, rust: false } : { rust: false };
   await writeFile(file, JSON.stringify(answers));
 }
 const run = (root, command, args = [], extra = {}) =>

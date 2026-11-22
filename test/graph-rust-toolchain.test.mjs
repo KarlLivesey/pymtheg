@@ -370,19 +370,44 @@ async function gateCase(answer, overrides = {}, behaviour = {}) {
 
 test("settings: this machine's trusted answer runs the Rust route; committed settings only turn it off; tool paths are local", () => {
   // C-44: only the local answer grants trust (D22).
-  const config = (graph) => ({ version: 1, scenarios: {}, graph: graphConfig(graph) });
+  const config = (graph) => ({
+    version: 1,
+    scenarios: {},
+    graph: graphConfig(graph),
+  });
   const trusted = { trust: "trusted" };
-  assert.deepEqual(graphToolchains(config({}), trusted), { go: true, rust: true });
-  assert.deepEqual(graphToolchains(config({ trust: "trusted" }), undefined), {});
-  assert.deepEqual(graphToolchains(config({ toolchain: { rust: true } }), undefined), {});
-  assert.deepEqual(graphToolchains(config({ toolchain: { rust: false } }), trusted), { go: true });
-  // A committed path is never used; a local one is.
-  assert.deepEqual(graphToolchains(config({ toolchain: { rust: "/repo/ra" } }), trusted), { go: true, rust: true });
+  assert.deepEqual(graphToolchains(config({}), trusted), {
+    go: true,
+    rust: true,
+  });
   assert.deepEqual(
-    graphToolchains(config({}), { ...trusted, toolchain: { rust: "/opt/ra/rust-analyzer" } }),
+    graphToolchains(config({ trust: "trusted" }), undefined),
+    {},
+  );
+  assert.deepEqual(
+    graphToolchains(config({ toolchain: { rust: true } }), undefined),
+    {},
+  );
+  assert.deepEqual(
+    graphToolchains(config({ toolchain: { rust: false } }), trusted),
+    { go: true },
+  );
+  // A committed path is never used; a local one is.
+  assert.deepEqual(
+    graphToolchains(config({ toolchain: { rust: "/repo/ra" } }), trusted),
+    { go: true, rust: true },
+  );
+  assert.deepEqual(
+    graphToolchains(config({}), {
+      ...trusted,
+      toolchain: { rust: "/opt/ra/rust-analyzer" },
+    }),
     { go: true, rust: "/opt/ra/rust-analyzer" },
   );
-  assert.deepEqual(graphToolchains(config({ trust: "source-only" }), trusted), {});
+  assert.deepEqual(
+    graphToolchains(config({ trust: "source-only" }), trusted),
+    {},
+  );
   assert.throws(
     () => graphConfig({ toolchain: { rust: "rust-analyzer" } }),
     /graph.toolchain.rust must be true, false or an absolute path to rust-analyzer/,
@@ -714,16 +739,41 @@ test("not partial: packages cargo metadata lists but the run never builds, a fin
     writeProject(project, GATES);
     const scip = join(root, "answer.scip");
     writeFileSync(scip, gateScip());
-    const pm = { id: "pm 0.1.0", name: "pm", targets: [{ kind: ["proc-macro"], name: "pm", src_path: "/x/src/lib.rs" }] };
-    const unused = { id: "opt 0.1.0", name: "opt", targets: [{ kind: ["lib"], name: "opt", src_path: "/y/src/lib.rs" }, { kind: ["custom-build"], name: "build-script-build", src_path: "/y/build.rs" }] };
+    const pm = {
+      id: "pm 0.1.0",
+      name: "pm",
+      targets: [
+        { kind: ["proc-macro"], name: "pm", src_path: "/x/src/lib.rs" },
+      ],
+    };
+    const unused = {
+      id: "opt 0.1.0",
+      name: "opt",
+      targets: [
+        { kind: ["lib"], name: "opt", src_path: "/y/src/lib.rs" },
+        {
+          kind: ["custom-build"],
+          name: "build-script-build",
+          src_path: "/y/build.rs",
+        },
+      ],
+    };
     const tools = fakeToolchain(join(root, "tools"), {
       scip,
-      metadata: metadata({ packages: [pm, unused], nodes: [{ id: "pm 0.1.0" }, { id: "opt 0.1.0" }] }),
-      buildOutputs: [{ dir: "gates-0123456789abcdef", output: false }, { dir: "gates-fedcba9876543210", output: true }],
+      metadata: metadata({
+        packages: [pm, unused],
+        nodes: [{ id: "pm 0.1.0" }, { id: "opt 0.1.0" }],
+      }),
+      buildOutputs: [
+        { dir: "gates-0123456789abcdef", output: false },
+        { dir: "gates-fedcba9876543210", output: true },
+      ],
       fingerprints: [["pm-0123456789abcdef", "lib-pm"]],
       deps: ["libpm-0123456789abcdef.so"],
     });
-    const dump = await index(project, root, { environment: environment(tools) });
+    const dump = await index(project, root, {
+      environment: environment(tools),
+    });
     assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
   });
 });
@@ -981,13 +1031,22 @@ test("graph answers report the Rust route's state beside Go's", async () => {
     // The user's own answer file (C-44), outside the checkout.
     const file = trustFile();
     const answers = JSON.parse(readFileSync(file, "utf8"));
-    answers.checkouts[realpathSync(project)].toolchain = { go: false, rust: join(root, "none", "rust-analyzer") };
+    answers.checkouts[realpathSync(project)].toolchain = {
+      go: false,
+      rust: join(root, "none", "rust-analyzer"),
+    };
     writeFileSync(file, JSON.stringify(answers));
     const response = await executeGraph({ command: "index", root: project });
     assert.equal(response.trust, "trusted");
-    assert.deepEqual(Object.keys(response.toolchain).sort(), ["rust", "setting"]);
+    assert.deepEqual(Object.keys(response.toolchain).sort(), [
+      "rust",
+      "setting",
+    ]);
     assert.equal(response.toolchain.rust.state, "unavailable");
-    assert.match(response.toolchain.rust.reason, /none\/rust-analyzer does not exist$/);
+    assert.match(
+      response.toolchain.rust.reason,
+      /none\/rust-analyzer does not exist$/,
+    );
   });
 });
 

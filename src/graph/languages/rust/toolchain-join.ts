@@ -352,5 +352,10 @@ export function joinScip(
       }
     });
   }
-  return { answers, counts, documents: seen.size, ...(reasons ? { reasons } : {}) };
+  return {
+    answers,
+    counts,
+    documents: seen.size,
+    ...(reasons ? { reasons } : {}),
+  };
 }

@@ -476,8 +476,7 @@ async function unfinished(
     if (
       !deps.some(
         (file) =>
-          (file.startsWith(`lib${name}-`) &&
-            /\.(so|dylib)$/.test(file)) ||
+          (file.startsWith(`lib${name}-`) && /\.(so|dylib)$/.test(file)) ||
           (file.startsWith(`${name}-`) && file.endsWith(".dll")),
       )
     )
