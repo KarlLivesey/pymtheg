@@ -33,6 +33,7 @@ import {
 } from "./scoped.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
 import { neutralizeAssumed } from "./untrusted.js";
+import { producerStatistics } from "./object-producers.js";
 import { entryProvenance } from "./workspace-entries.js";
 import { unbuiltEntryAssumption } from "./entry-build.js";
 
@@ -1214,6 +1215,10 @@ export function typescriptModule(
             .renamedForCompiler !== undefined ||
           (previous.result.data as { dynamicScopeOccurrences?: unknown })
             .dynamicScopeOccurrences !== undefined ||
+          // Nor did it read the program's object producers (see run).
+          JSON.stringify(previous.result.data).includes(
+            '"objectProducers":true',
+          ) ||
           files.some(
             (file) =>
               file.path !== path &&
@@ -1304,7 +1309,13 @@ export function typescriptModule(
         // Failures the programs below find (a syntax error, a compiler
         // exception) other than a quiet failed file: then no scoped result.
         const failuresBefore = new Set(model.parseFailures.keys());
+        const lookupsBefore = producerStatistics.lookups;
         const analysed = run(model, scope);
+        // The edited file's lookups would fill the memo other files'
+        // lookups read in a full analysis, and their answers can depend on
+        // what was cached before (object-producers.ts).
+        if (producerStatistics.lookups !== lookupsBefore)
+          return declined("an object-producer lookup");
         const item = analysed.find((entry) => entry.path === path);
         if (
           scope.broken ||
@@ -1729,7 +1740,8 @@ export function typescriptModule(
                     captured,
                   ),
                 );
-              const result = extractFile(
+              const lookups = producerStatistics.lookups;
+              const extracted = extractFile(
                 source,
                 session.checker,
                 session.program,
@@ -1762,13 +1774,13 @@ export function typescriptModule(
               const length = byPath.get(path)!.text.length;
               if (
                 source.text.length !== length ||
-                result.symbols.some(
+                extracted.symbols.some(
                   ({ range }) => !validSourceRange(range, length),
                 ) ||
-                result.links.some(
+                extracted.links.some(
                   ({ range }) => !validSourceRange(range, length),
                 ) ||
-                result.diagnostics.some(
+                extracted.diagnostics.some(
                   ({ range }) => range && !validSourceRange(range, length),
                 )
               )
@@ -1777,6 +1789,19 @@ export function typescriptModule(
                   blame: path,
                 };
               statistics.extracted++;
+              // A file whose extraction read the program's object producers
+              // fills a memo other files' lookups read (C-38): recorded, so
+              // an edit of it is never extracted alone.
+              const result: ParseResult =
+                producerStatistics.lookups === lookups
+                  ? extracted
+                  : {
+                      ...extracted,
+                      data: {
+                        ...(extracted.data as { [key: string]: Json }),
+                        objectProducers: true,
+                      },
+                    };
               if (taintExhausted(session.checker)) {
                 // Later checkers of this session (rebuilt from this program,
                 // one file fewer at most) skip the walk: a rebuild per failing

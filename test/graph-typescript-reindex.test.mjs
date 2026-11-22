@@ -20,6 +20,7 @@ import typescript, {
   statistics,
   typescriptModule,
 } from "../dist/graph/languages/typescript/index.js";
+import { producerStatistics } from "../dist/graph/languages/typescript/object-producers.js";
 import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 
 const cold = new LanguageRegistry([typescript]);
@@ -640,4 +641,33 @@ test("TypeScript re-index equals cold: a project reference reads the edited file
     ],
     typescriptModule(),
   );
+});
+
+test("TypeScript re-index equals cold: an object-producer lookup cut by its depth limit is not scoped", async () => {
+  // `v40.m()` reads the object `make` returns through 41 bindings, past the
+  // lookup's depth limit. A cut lookup's answer can depend on what other
+  // files' lookups cached in a full analysis (a cached `v20` would answer
+  // it), so the edited file is not extracted alone (object-producers.ts).
+  let chain = "function make() {\n  return { m() {} };\n}\nconst v0 = make();\n";
+  for (let i = 1; i <= 40; i++) chain += `const v${i} = v${i - 1};\n`;
+  const f = chain + "v40.m();\nexport { v20 };\n" + TOUCH;
+  const before = producerStatistics.cuts;
+  await equalAfterEdits(
+    {
+      "tsconfig.json": tsconfig(),
+      "src/f.ts": f,
+      "src/g.ts": 'import { v20 } from "./f";\nv20.m();\n',
+    },
+    [
+      {
+        name: "a body-only edit beside the cut lookup",
+        edit: {
+          "src/f.ts": f.replace("  return 0;", "  void 0;\n  return 0;"),
+        },
+        scoped: false,
+      },
+    ],
+    typescriptModule(),
+  );
+  assert.ok(producerStatistics.cuts > before, "the fixture's lookup is cut");
 });

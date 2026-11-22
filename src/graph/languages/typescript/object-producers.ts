@@ -75,6 +75,14 @@ function ownMember(
 const MAX_PRODUCERS = 32;
 const MAX_DEPTH = 32;
 
+/**
+ * Lookups made, and lookups cut short by the depth limit or a cycle (C-38).
+ * A cut lookup's answer can depend on what an earlier lookup cached, and a
+ * file's lookups fill the memo other files' lookups read: a scoped
+ * re-index is used only for an edited file that makes none.
+ */
+export const producerStatistics = { cuts: 0, lookups: 0 };
+
 interface PropertyWrite {
   receivers: readonly ts.Expression[];
   key: string | undefined;
@@ -357,7 +365,10 @@ export function objectProducers(
   }
 
   function readRaw(node: ts.Node, depth: number): Values | undefined {
-    if (depth >= MAX_DEPTH || active.has(node)) return undefined;
+    if (depth >= MAX_DEPTH || active.has(node)) {
+      producerStatistics.cuts++;
+      return undefined;
+    }
     const previous = cache.get(node);
     if (previous) return previous;
     active.add(node);
@@ -506,6 +517,7 @@ export function objectProducers(
     receiver: ts.Node,
     name: string,
   ): readonly ts.Declaration[] | undefined => {
+    producerStatistics.lookups++;
     const values = read(receiver, 0);
     if (!values) return undefined;
     const declarations: ts.Declaration[] = [];

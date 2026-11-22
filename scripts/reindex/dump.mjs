@@ -107,7 +107,8 @@ export function withoutGoSurface(rows) {
 
 /**
  * C-38: TypeScript module version 45 records, in each result, which programs
- * loaded the file (`loadedBy`); with that removed and the version mapped
+ * loaded the file (`loadedBy`) and whether its extraction read object
+ * producers (`objectProducers`); with those removed and the version mapped
  * back, rows compare with version 44's.
  */
 export function withoutTypeScriptLoadedBy(rows) {
@@ -122,6 +123,13 @@ export function withoutTypeScriptLoadedBy(rows) {
       const data = file.result.data;
       if (data) {
         delete data.loadedBy;
+        delete data.objectProducers;
+        for (const [name, variant] of Object.entries(data.byProject ?? {})) {
+          delete variant.objectProducers;
+          if (!Object.keys(variant).length) delete data.byProject[name];
+        }
+        if (data.byProject && !Object.keys(data.byProject).length)
+          delete data.byProject;
         if (typeof data.analyzer === "string") data.analyzer = before(data.analyzer);
       }
       return JSON.stringify({ ...row, body: JSON.stringify(file) });
