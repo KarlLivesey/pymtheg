@@ -28,7 +28,8 @@ const cold = new LanguageRegistry([typescript]);
 /**
  * Indexes `files`, then applies each step's edits (path → text) and indexes
  * again with `module`, comparing with a cold index after every index. A step
- * with `scoped` set asserts whether the module took the scoped path.
+ * with `scoped` set asserts whether the module took the scoped path, and
+ * with `reused` whether it reused every stored result without a program.
  */
 async function equalAfterEdits(files, steps, module) {
   const base = mkdtempSync(join(tmpdir(), "c38-equality-"));
@@ -43,14 +44,21 @@ async function equalAfterEdits(files, steps, module) {
   const registry = new LanguageRegistry([module]);
   let n = 0;
   try {
-    const compare = async (name, scoped) => {
+    const compare = async (name, scoped, reused) => {
       const before = statistics.scoped;
+      const reusedBefore = statistics.reused;
       await indexProject(root, registry, incremental);
       if (scoped !== undefined)
         assert.equal(
           statistics.scoped - before,
           scoped ? 1 : 0,
           `${name}: ${scoped ? "scoped" : "full"} path expected`,
+        );
+      if (reused !== undefined)
+        assert.equal(
+          statistics.reused - reusedBefore,
+          reused ? 1 : 0,
+          `${name}: stored results ${reused ? "" : "not "}reused`,
         );
       const coldPath = join(base, `cold-${n++}.sqlite`);
       const store = new SqliteGraphStore(coldPath, incremental.projectId);
@@ -68,7 +76,7 @@ async function equalAfterEdits(files, steps, module) {
     await compare("first index");
     for (const step of steps) {
       for (const [path, text] of Object.entries(step.edit)) write(path, text);
-      await compare(step.name, step.scoped);
+      await compare(step.name, step.scoped, step.reused);
       step.check?.(incremental);
     }
   } finally {
@@ -480,6 +488,13 @@ test("TypeScript re-index equals cold: a broken config elsewhere, retried on eve
           "src/f.ts": f.replace("  return 0;", "  void 0;\n  return 0;"),
         },
         scoped: true,
+      },
+      {
+        // Only the retried files changed: no program is built.
+        name: "a re-index with no edit",
+        edit: {},
+        scoped: false,
+        reused: true,
       },
       {
         name: "an edit of the file the broken config governs",

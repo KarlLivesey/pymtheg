@@ -1131,7 +1131,9 @@ export function typescriptModule(
         // decide (it builds its own model and programs).
         let scoped: ScopedAnalysis | undefined;
         try {
-          scoped = scopedAnalysis(
+          scoped = candidate.retriedOnly
+            ? retriedOnly(candidate.retried)
+            : scopedAnalysis(
             candidate.path,
             candidate.previous,
             candidate.retried,
@@ -1173,7 +1175,13 @@ export function typescriptModule(
         context: Parameters<NonNullable<LanguageModule["analyze"]>>[0],
         files: readonly GraphFile[],
       ):
-        | { path: string; previous: GraphFile; retried: GraphFile[] }
+        | {
+            path: string;
+            previous: GraphFile;
+            retried: GraphFile[];
+            /** Nothing but retried failures changed: see `retriedOnly`. */
+            retriedOnly?: true;
+          }
         | undefined {
         const previousFiles = context.previousFiles;
         if (!previousFiles || context.changedContextFiles.length)
@@ -1192,6 +1200,13 @@ export function typescriptModule(
         const edited = context.changedFiles.filter(
           (changed) => !retried.some((old) => old.path === changed),
         );
+        if (!edited.length && retried.length)
+          return {
+            path: "",
+            previous: retried[0]!,
+            retried,
+            retriedOnly: true,
+          };
         if (edited.length !== 1) return declined("not one edited file");
         const path = edited[0]!;
         const previous = previousFiles.get(path);
@@ -1254,6 +1269,30 @@ export function typescriptModule(
         )
           return declined("syntactic surface");
         return { path, previous, retried };
+      }
+      /**
+       * Nothing changed but failed files the core retries on every index
+       * (a broken config's files): each comes out as its stored failure,
+       * and every other stored result came from a complete analysis of the
+       * same snapshot. Undefined when a retried failure would differ.
+       */
+      function retriedOnly(
+        retried: readonly GraphFile[],
+      ): ScopedAnalysis | undefined {
+        const model = buildModel();
+        const again: AnalyzedFile[] = [];
+        for (const old of retried) {
+          const message = model.failures.get(old.path);
+          const result = message === undefined ? undefined : failed(message);
+          if (!result || JSON.stringify(result) !== JSON.stringify(old.result))
+            return declined("a retried failure");
+          again.push({ path: old.path, result });
+        }
+        statistics.reused++;
+        return {
+          files: again,
+          resolutionFiles: again.map((entry) => entry.path),
+        };
       }
       /**
        * Extracts only the edited file, in its own project, and keeps every
