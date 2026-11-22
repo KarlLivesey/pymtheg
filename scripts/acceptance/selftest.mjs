@@ -16,6 +16,7 @@
 // A sabotage whose anchor is not found exactly once is reported NOT APPLIED
 // (a failure): a break that did not happen proves nothing.
 // Writes selftest.json and selftest.md to --out (default evidence/r1-f).
+import "../isolated-home.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";

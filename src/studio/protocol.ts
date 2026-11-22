@@ -50,6 +50,8 @@ export interface StudioRun {
 }
 export interface ProjectView {
   workspace?: import("../shared/workspace.js").WorkspaceIdentity | null;
+  /** D22: the trust that applies on this machine, for an initialised project. */
+  trust?: import("../shared/config.js").TrustState;
   inventoryWarnings?: string[];
   outputTargets?: { id: string; label: string; builtin: boolean }[];
   agentConnection: {

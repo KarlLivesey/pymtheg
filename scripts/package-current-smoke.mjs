@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Real private tarball install; never publishes or changes global packages.
+import "./isolated-home.mjs";
 import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";

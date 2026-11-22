@@ -383,7 +383,10 @@ async function withStore<T>(
   writer: HistoryWriter | undefined,
   use: (store: ArchitectureStore | null) => Promise<T> | T,
 ): Promise<T> {
-  if (!write && !(await planningExists(root))) return use(null);
+  // A write that needs existing records or links (add, remove, refresh)
+  // cannot succeed without a planning store: it reports that and writes
+  // nothing, so a failed first write never initialises the project.
+  if (!(await planningExists(root))) return use(null);
   if (write) await initializeBeforeWrite(root);
   let store: ArchitectureStore;
   try {
@@ -818,6 +821,8 @@ async function resolveAll(
 export interface CreateRequirementInput extends CodeLinkOptions {
   /** Record ID, e.g. `R1` (stored as `plan:R1`). */
   id: string;
+  /** D22: the trust answer for a project this write initialises. */
+  trust?: import("../shared/config.js").ProjectTrust;
   title: string;
   text?: string;
   /** Planning kind; default `requirement`. */
@@ -845,6 +850,9 @@ export async function createRequirement(
   const { StudioService } = await import("../studio/service.js");
   const service = new StudioService(root);
   service.initializeOnFirstWrite = true;
+  // D22: the answer recorded when this write initialises the project, which
+  // it does only once the item has validated and is being saved.
+  service.firstWriteTrust = input.trust;
   try {
     const head = (await service.architectureOverview())?.index?.id ?? "";
     const item = {

@@ -13,6 +13,7 @@
 //                                 (statement journals) in memory
 // Timings are observations; counts are deterministic.
 //   node scripts/store-cost/measure.mjs <dist> <root> <graph.sqlite> <out.json> [--variant V]
+import "../isolated-home.mjs";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
