@@ -90,7 +90,8 @@ const linkOrder = (links: readonly GraphLink[]) =>
  * - a link under a cfg condition other than `test` takes no answer (the
  *   toolchain sees one configuration);
  * - an answer whose target is under such a condition, or shares its
- *   identity with another symbol (a cfg variant), takes no answer, and a
+ *   kind and identity with a symbol under such a condition (a cfg variant:
+ *   two items of one path can only both exist under cfg), takes no answer, and a
  *   candidate set holding such a symbol stays a candidate set;
  * - a source-only definite target that differs is kept, and counted;
  * - a source-only library answer is kept;
@@ -111,21 +112,24 @@ function decideToolchain(
   // Final symbol conditions, and how many symbols share each identity.
   const gated = new Set<string>();
   const identityOf = new Map<string, string>();
-  const identities = new Map<string, number>();
+  /** Identities (kind and in-file path) some gated symbol has. */
+  const gatedIdentities = new Set<string>();
   updated.forEach((f, i) => {
     const symbols = byPath.get(f.path)?.result.symbols;
     if (!symbols) return;
     symbols.forEach((symbol, j) => {
       const id = facts[i]!.symbols[j]!.id;
       const data = (symbol.data ?? {}) as Record<string, Json>;
-      if (beyondTest(data.conditions as Json[] | undefined)) gated.add(id);
       const identity = `${symbol.kind}\u0000${symbol.identity}`;
       identityOf.set(id, identity);
-      identities.set(identity, (identities.get(identity) ?? 0) + 1);
+      if (beyondTest(data.conditions as Json[] | undefined)) {
+        gated.add(id);
+        gatedIdentities.add(identity);
+      }
     });
   });
   const variant = (id: string) =>
-    gated.has(id) || (identities.get(identityOf.get(id) ?? "") ?? 0) > 1;
+    gated.has(id) || gatedIdentities.has(identityOf.get(id) ?? "");
   updated.forEach((f, i) => {
     const a = byPath.get(f.path);
     if (!a) return;
@@ -416,12 +420,8 @@ export const rustPhases = {
       links: linkOrder(input.links),
     };
     const links: AddedLink[] = [];
-    let resolutions = resolveRust(
-      ctx,
-      undefined,
-      undefined,
-      undefined,
-      (l) => links.push(l),
+    let resolutions = resolveRust(ctx, undefined, undefined, undefined, (l) =>
+      links.push(l),
     );
     // C-43: the toolchain's answer, where the source-only one is still open.
     const upgraded = new Map<string, string>();

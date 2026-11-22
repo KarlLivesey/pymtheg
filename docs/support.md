@@ -25,7 +25,7 @@ backend exists; `check` starts no other program.
 | Latency/peak live memory                                               | reserved metric names rejected                                                                        | no additive-work pretence                                                                                                       | unsupported                                                                                    |
 | SMT/proof, liveness/fairness, code extraction/conformance, LSP, caches | deferred                                                                                              | no claims                                                                                                                       | no claims                                                                                      |
 | Agent-facing MCP                                                       | implemented local stdio                                                                               | same worker, root-confined reads, paged explanations/evidence                                                                   | built-in search (verify) and sampler (simulate), source-mapped trace steps                     |
-| Code graph and requirement links (Go, Rust, TypeScript/JavaScript)     | `pymtheg graph`, `pymtheg link`; MCP `code_graph`, `graph_result`, `requirement_links`, `link_result` | definite, candidate-set and unresolved links with possible callers; source-only unless the Go toolchain route is turned on      | not applicable; links record reviewed intent, never proof                                      |
+| Code graph and requirement links (Go, Rust, TypeScript/JavaScript)     | `pymtheg graph`, `pymtheg link`; MCP `code_graph`, `graph_result`, `requirement_links`, `link_result` | definite, candidate-set and unresolved links with possible callers; source-only unless a Go or Rust toolchain route is turned on | not applicable; links record reviewed intent, never proof                                      |
 | TypeScript / Rust / Go scaffolds                                       | one normalized contract document from checked IR                                                      | fail-fast stubs by default; optional empty bodies; arbitrary precision, explicit dependencies/omissions                         | no runtime implementation or conformance claim                                                 |
 | Language emitter plugins                                               | explicitly registered local module; versioned API                                                     | bounded process, validated output/identities; JavaScript example                                                                | trusted executable code; registered launch targets work in CLI/MCP/GUI; no automatic discovery |
 | Local Studio                                                           | implemented                                                                                           | real compiler workers, typed scenario forms, source/durable-draft conflict saves                                                | built-in search (verify) and sampler (simulate), same scopes; replay player; three cached runs |
@@ -250,7 +250,7 @@ unchanged) and read as having no library targets when opened read-only. Any
 other graph database is refused with a rebuild message; 0.1.0 refuses a
 schema-4 graph the same way. Nothing runs project code.
 Nothing runs a language toolchain unless the project is trusted at init
-(D22) or opts in to the Go toolchain route (below); nothing reads or writes `.codegraph/`. Language
+(D22) or opts in to the Go or Rust toolchain route (below); nothing reads or writes `.codegraph/`. Language
 modules are discovered from `src/graph/languages/*/`;
 production discovery offers `go`, `rust` and `typescript` (the `toy` fixture is
 test-only). Each module's current version, and the versions the index was built
@@ -449,7 +449,8 @@ character in a comment or string there is read). Sources: [W2-B](https://github.
 
 #### Rust
 
-No-toolchain module; nothing runs `cargo` or `rustc`, and macros are not expanded.
+Source-only unless the opt-in Rust toolchain route is on (below); without it
+nothing runs `cargo`, `rustc` or `rust-analyzer`, and macros are not expanded.
 Claims `*.rs`; captures `Cargo.toml`, `Cargo.lock` and `.cargo/config.toml`
 or `.cargo/config` as context, read by a snapshot-only
 TOML reader (an unsupported or invalid manifest, including any TOML datetime,
@@ -940,7 +941,7 @@ accept the arguments.
   augmented module into candidate sets. Sources: [W2-D](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-D.md),
   [W2-U](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-U.md).
 
-#### Graph commands and the Go toolchain route
+#### Graph commands and the toolchain routes
 
 `pymtheg graph index|status|search TEXT|symbol SELECTOR|callers SELECTOR|callees SELECTOR|path FROM TO|impact SELECTOR|file PATH|uses UNIT [SYMBOL]`
 (`--root`, `--json`, `--no-sync`, `--case-sensitive`, `--include-possible`,
@@ -989,17 +990,63 @@ older than 1.22; `not-indexed`). Turning it on or off makes the next query sync.
 An unreadable `.pymtheg/settings.json` keeps every route off with a
 `settings-unreadable` warning.
 
+**Rust toolchain route (opt-in, C-43; decisions D17, D21, D22).** On a
+checkout trusted on this machine (below), indexing runs `rust-analyzer` from
+`PATH`, or the absolute path named in your own trust answer file (never one
+that resolves inside the checkout), as `rust-analyzer scip`, and joins its
+index to the parsed Rust links. `cargo` and `rustc` are taken beside it, then
+from `PATH`; under rustup every process is pinned to the toolchain `rustc`
+names outside the project, and that toolchain needs `rust-src`. Policy:
+offline (`CARGO_NET_OFFLINE`); one configuration (host target, default
+features, all targets, `cfg(test)` on, build scripts and proc macros on),
+recorded on every link it decides; rust-analyzer runs on a copy of the project
+(without `target/`, `.git`, `node_modules`, `.pymtheg`; the snapshot's Rust
+files written over it) with a throwaway target directory and a crate-cache
+overlay, all outside the project and removed afterwards; the user's `PATH`
+follows the toolchain's, since build scripts link and may call `cc` or
+`pkg-config`. Running it runs the project's build scripts and proc macros, as
+building it would; there is no sandbox. The run is bounded (one hour, 256 MiB
+of output, a 1 GiB index) and cancellable. The index is cached in the user's
+cache folder (outside the checkout, as for the Go route), keyed by the tool versions, the configuration, every
+captured manifest, lockfile and Cargo configuration, every captured Rust file,
+every other project file's path, size and time, and which lockfile crates are
+in the crate cache. Answers are taken under C-19's strict join: the occurrence
+at the link's own name site, the one symbol there, a kind that fits the link,
+no module answer for a `use`, no `extern crate` or crate root, no symbol
+defined more than once, no non-macro item of a proc-macro crate from another
+package, no local binding, no trait-method declaration (dispatch stays open or
+a candidate set). No answer is taken on a link under a cfg condition other
+than `test`, nor for a target that has a cfg variant, nor out of a candidate
+set holding one. A source-only definite target the toolchain disagrees with is
+kept and counted; a source-only library target is kept. An unresolved link, or
+a candidate set holding the answer, becomes definite and records
+`toolchain: {origin: "toolchain", rustAnalyzer, configuration, upgrade, from,
+target}`; a confirmed source-only link records `from: "definite"`. Answers
+naming another crate are counted (`libraryAnswers`) and never applied: telling
+that the toolchain's declaring path and Pymtheg's written path name one item
+needs an identity rule not built yet. Every answer reports
+`toolchain.rust.state`: `used` (upgraded, confirmed, kept-where-different,
+withheld by gate, library answers), `partial` with the causes (offline
+`cargo metadata` failed, so rust-analyzer fell back to the workspace alone; a
+build script that did not finish or a proc macro that was not built, read from
+the target directory because rust-analyzer exits 0 and says nothing; a library
+root missing from the index), in which case no answer is used, or
+`unavailable` with the reason (no `Cargo.toml` at the root, no rust-analyzer,
+cargo or rustc, no `rust-src`, a failed or timed-out run). An edit re-runs
+rust-analyzer in full (a cache miss); applying library answers is C-43's second
+part and re-indexing an edit source-only first, with a `stale` state, its third.
+
 **Trust at init (decision D22, C-44).** `init` asks once whether the
 repository is trusted and records the answer for this checkout on this
 machine in the user's own configuration (`$PYMTHEG_CONFIG_HOME` or the
 platform's config folder, `trust.json`, user-only), never under a checkout;
 `pymtheg trust` lists and `--revoke` removes answers. A trusted checkout runs
-the Go route above with its default policy. A source-only checkout, or one
+the Go and Rust routes above with their default policies. A source-only checkout, or one
 with no answer on this machine (`unanswered`: a clone, a copy, a moved
 checkout), runs nothing. Nothing committed can grant trust: a committed
 `graph.trust: "source-only"` binds on every machine, a committed
 `"trusted"` is only init's preselected answer, a committed
-`graph.toolchain.go: false` turns Go off, and a committed tool path is never
+`graph.toolchain.go: false` or `graph.toolchain.rust: false` turns that route off, and a committed tool path is never
 run (warning `committed-tool-path-ignored`). Graph answers of an initialised
 project report `trust` (`trusted`, `source-only` or `unanswered`, then with
 `trustAnswer`). **Behaviour change (C-44):** a committed
@@ -1012,8 +1059,10 @@ user's own file (warning `tool-path-inside-checkout`). The question and how each
 
 #### Not built yet
 
-Toolchain-backed Rust links (`cargo`/`rustc`; investigation
-[W2-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W2-L.md)), `go.work` workspaces in the Go
+In the Rust toolchain route: library targets from its answers (C-43's
+second part), source-only re-indexing of an edit with a `stale` state (its
+third), partial
+indexes used in part, and the network; `go.work` workspaces in the Go
 toolchain route, the join with model declarations, the explore query, a Studio
 screen for the graph, and Lua.
 

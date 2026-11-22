@@ -82,7 +82,11 @@ function occurrence(
   }
   // Three numbers: one line. Anything else is not an occurrence range.
   if (range.length === 3)
-    return { range: [range[0]!, range[1]!, range[0]!, range[2]!], symbol, roles };
+    return {
+      range: [range[0]!, range[1]!, range[0]!, range[2]!],
+      symbol,
+      roles,
+    };
   if (range.length === 4)
     return {
       range: [range[0]!, range[1]!, range[2]!, range[3]!],
@@ -139,7 +143,14 @@ export interface ParsedSymbol {
  */
 export function parseSymbol(symbol: string): ParsedSymbol {
   if (symbol.startsWith("local "))
-    return { local: true, crate: "", version: "", path: [], kinds: [], last: "" };
+    return {
+      local: true,
+      crate: "",
+      version: "",
+      path: [],
+      kinds: [],
+      last: "",
+    };
   const parts: string[] = [];
   let i = 0;
   for (let n = 0; n < 4; n++) {

@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 pub trait Shape {
     fn area(&self) -> f64;
 }

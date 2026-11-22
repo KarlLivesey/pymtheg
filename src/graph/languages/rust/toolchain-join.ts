@@ -328,7 +328,10 @@ export function joinScip(
           return checkoutCrates.has(`${p.crate} ${p.version}`)
             ? "unapplied:generated"
             : "unapplied:library";
-        const name = texts.get(def.path)!.slice(def.s, def.e).replace(/^r#/, "");
+        const name = texts
+          .get(def.path)!
+          .slice(def.s, def.e)
+          .replace(/^r#/, "");
         const target = symbolAt(def.path, def.s, name);
         if (!target) return "none:no-graph-symbol";
         let group = answers.get(f.path);

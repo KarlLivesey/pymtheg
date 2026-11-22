@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 //! A proc-macro crate with no dependencies: rust-analyzer runs it.
 use proc_macro::TokenStream;
 

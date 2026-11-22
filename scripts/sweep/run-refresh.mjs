@@ -15,6 +15,7 @@ const serial = repos.filter(({ trackedSource }) =>
 
 for (const [mode, ...flags] of [
   ["bare"], ["installed", "--installed"], ["go-toolchain", "--go-toolchain"],
+  ["rust-toolchain", "--rust-toolchain"],
 ]) {
   console.error(`Starting ${mode}`);
   const run = spawnSync(process.execPath, ["scripts/sweep/run.mjs", "--local-build", ".",

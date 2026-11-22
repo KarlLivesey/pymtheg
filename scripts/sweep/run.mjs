@@ -279,7 +279,8 @@ async function corpusSize(root, listing) {
   return { files, lines, samples };
 }
 
-async function runRepository(repo, release, scratch, limitSeconds, installed, goToolchain) {
+// toolchain: "go" or "rust" for an opt-in offline toolchain run (C-43 adds Rust).
+async function runRepository(repo, release, scratch, limitSeconds, installed, toolchain) {
   // A retry gets a distinct directory even if a previous child is winding down.
   const work = join(scratch, "work", ...repo.id.split("/"), repo.commit, randomUUID());
   const root = join(work, "checkout");
@@ -316,7 +317,7 @@ async function runRepository(repo, release, scratch, limitSeconds, installed, go
     const argv = installed
       ? ["--user", "--map-root-user", "--net", "--", process.execPath, release.entry, ...args]
       : [release.entry, ...args];
-    const runResult = await run(label, runner, argv, environment, !goToolchain);
+    const runResult = await run(label, runner, argv, environment, !toolchain);
     let body;
     // Exit 2 with a normal graph response means incomplete, so keep its facts.
     if ([0, 2, 3].includes(runResult.process.code)) {
@@ -407,22 +408,24 @@ async function runRepository(repo, release, scratch, limitSeconds, installed, go
     // Never use project-supplied Pymtheg settings. init creates default settings.
     if (await exists(join(root, ".pymtheg"))) throw Error("Checkout contains existing Pymtheg settings or storage");
     await cli("init", ["init", ".", "--name", repo.id, "--format", "json"]);
-    if (goToolchain) {
+    if (toolchain) {
       const path = join(root, ".pymtheg/settings.json");
       const settings = JSON.parse(await readFile(path, "utf8"));
-      settings.graph = { ...settings.graph, toolchain: { go: true } };
+      settings.graph = { ...settings.graph, toolchain: { [toolchain]: true } };
       await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
     }
     const cold = await graph("cold", "index");
     record.cold = { wallSeconds: cold.wallSeconds, cpuSeconds: cold.cpuSeconds, peakRssKiB: cold.peakRssKiB, exitCode: cold.code, status: cold.body.status };
     record.index = await summarizeIndex(cold.body, locate, redact);
-    if (goToolchain) {
+    if (toolchain === "go") {
       const state = cold.body.toolchain?.go;
       if (!state) throw Error("Go toolchain run did not report its state");
       const { version, configuration, packages, universeClean, errors, upgradedLinks, confirmedLinks, verifiedSets, disagreements } = state;
       record.toolchain = { state: state.state, ...(state.reason && { reason: redact(state.reason) }),
         version, configuration, packages, universeClean, errorCount: errors?.length,
         upgradedLinks, confirmedLinks, verifiedSets, disagreements };
+    } else if (toolchain === "rust") {
+      record.toolchain = rustToolchainRecord(cold.body.toolchain?.rust, redact);
     } else if (cold.body.toolchain) throw Error("Unexpected toolchain state in a default source-only run");
     const warm = await graph("warm", "index");
     record.warm = { wallSeconds: warm.wallSeconds, cpuSeconds: warm.cpuSeconds, peakRssKiB: warm.peakRssKiB, exitCode: warm.code,
@@ -452,6 +455,21 @@ async function writeAtomic(path, data) {
   await rename(temporary, path);
 }
 
+/** Each opt-in mode runs on the pins of one language. */
+export const modeLanguage = { installed: "typescript", "go-toolchain": "go", "rust-toolchain": "rust" };
+
+/**
+ * C-43: the Rust route's public record. Reasons go through redact (no
+ * machine paths); a partial index lists how many causes it found.
+ */
+export function rustToolchainRecord(state, redact) {
+  if (!state) throw Error("Rust toolchain run did not report its state");
+  const { version, configuration, partial, upgradedLinks, confirmedLinks, disagreements, withheld, libraryAnswers } = state;
+  return { state: state.state, ...(state.reason && { reason: redact(state.reason) }),
+    version, configuration, ...(partial && { partialCount: partial.length }),
+    upgradedLinks, confirmedLinks, disagreements, withheld, libraryAnswers };
+}
+
 async function main() {
   const { values } = parseArgs({ options: {
     manifest: { type: "string", default: "sweep/repos.json" },
@@ -461,6 +479,7 @@ async function main() {
     "local-build": { type: "string" },
     installed: { type: "boolean" },
     "go-toolchain": { type: "boolean" },
+    "rust-toolchain": { type: "boolean" },
     "serial-pin": { type: "string", multiple: true },
     "retry-unfinished": { type: "boolean" },
     output: { type: "string" },
@@ -472,15 +491,17 @@ async function main() {
     throw Error("Use --scratch (or PYM_SCRATCH), --parallel 1..12 and a positive --wall-minutes");
   }
   const scratch = resolve(values.scratch);
-  if (values.installed && values["go-toolchain"]) throw Error("Choose one opt-in mode per run");
-  const mode = values.installed ? "installed" : values["go-toolchain"] ? "go-toolchain" : "source-only (default)";
+  const opted = ["installed", "go-toolchain", "rust-toolchain"].filter((name) => values[name]);
+  if (opted.length > 1) throw Error("Choose one opt-in mode per run");
+  const mode = opted[0] ?? "source-only (default)";
+  const toolchain = values["go-toolchain"] ? "go" : values["rust-toolchain"] ? "rust" : undefined;
   const repos = (await checkedSelection(values.manifest)).filter((repo) =>
-    !values.installed && !values["go-toolchain"] || repo.language === (values.installed ? "typescript" : "go"));
+    !opted.length || repo.language === modeLanguage[mode]);
   const release = values["local-build"] ? await localBuild(scratch, values["local-build"]) : await installRelease(scratch);
   const recordsDirectory = values.installed
     ? join(scratch, "installed-records", createHash("sha256").update(await readFile(new URL("./install.mjs", import.meta.url)))
       .update(await readFile(new URL(import.meta.url))).digest("hex"), release.sha256 ?? "release")
-    : values["go-toolchain"] ? join(scratch, "go-toolchain-records", release.sha256 ?? "release")
+    : toolchain ? join(scratch, `${toolchain}-toolchain-records`, release.sha256 ?? "release")
     : join(scratch, release.sha256 ? "build-records" : "records", release.sha256 ?? "");
   const outputPath = values.output ? resolve(values.output) : join(scratch, `results${mode === "source-only (default)" ? "" : `-${mode}`}${release.sha256 ? `-${release.sha256}` : ""}.json`);
   await mkdir(recordsDirectory, { recursive: true });
@@ -506,7 +527,7 @@ async function main() {
   let output = Promise.resolve();
   const run = async (repo) => {
     console.error(`${repo.id} started`);
-    const record = await runRepository(repo, release, scratch, limitSeconds, values.installed, values["go-toolchain"]);
+    const record = await runRepository(repo, release, scratch, limitSeconds, values.installed, toolchain);
     await mkdir(join(recordsDirectory, ...repo.id.split("/")), { recursive: true });
     await writeAtomic(recordPath(repo), `${JSON.stringify(record)}\n`);
     records.set(repo.id, record);

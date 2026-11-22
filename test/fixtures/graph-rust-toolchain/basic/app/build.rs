@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 // A build script: generates code into OUT_DIR and sets a cfg.
 use std::{env, fs, path::Path};
 

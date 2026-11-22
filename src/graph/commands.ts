@@ -372,8 +372,7 @@ export async function executeGraph(
               root,
               setting,
               inventory,
-              registry.modules.find((m) => m.id === "rust")?.contextFiles ??
-                [],
+              registry.modules.find((m) => m.id === "rust")?.contextFiles ?? [],
               toolchainDirectory,
               signal,
             )) === key

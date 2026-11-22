@@ -77,7 +77,8 @@ function goState(
     };
   const available = own.find((note) => note.status === "available");
   const merged = own.find((note) => note.status === "merged");
-  if (!available) return { state: "unavailable", reason: "no toolchain report" };
+  if (!available)
+    return { state: "unavailable", reason: "no toolchain report" };
   const decided = (merged?.decided ?? {}) as Record<string, number>;
   let upgraded = 0,
     confirmed = 0,

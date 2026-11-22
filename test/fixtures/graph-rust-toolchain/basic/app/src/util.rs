@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 pub fn helper() {}
 
 /// Builds a value with the function it is given.

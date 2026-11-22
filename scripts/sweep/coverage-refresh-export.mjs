@@ -133,8 +133,8 @@ function publicRun(repo) {
     module === "typescript" && message.includes("Debug Failure. False expression."));
   const { reason: toolchainReason, ...publicToolchain } = toolchain ?? {};
   if (toolchainReason) {
-    publicToolchain.reason = /^no go\.mod at the project root$|^go\.work workspaces are not supported yet$|^no toolchain report$/.test(toolchainReason)
-      ? toolchainReason : "offline toolchain unavailable";
+    publicToolchain.reason = /^no go\.mod at the project root$|^go\.work workspaces are not supported yet$|^no toolchain report$|^no Cargo\.toml at the project root$|^no Rust files$/.test(toolchainReason)
+      ? toolchainReason : toolchain.state === "partial" ? "offline toolchain index partial" : "offline toolchain unavailable";
   }
   const failureDetails = failure && { stage: failure.stage, ...(failure.code != null && { exit: failure.code }),
     ...(failure.signal && { signal: failure.signal }), wallSeconds: failure.wallSeconds,

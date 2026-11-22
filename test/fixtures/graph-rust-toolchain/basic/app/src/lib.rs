@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 //! Calls that need types the source-only route does not infer, a derive
 //! from a proc macro and code a build script generates.
 pub mod shapes;

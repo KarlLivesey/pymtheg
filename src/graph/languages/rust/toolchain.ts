@@ -43,7 +43,7 @@ import {
 } from "../../../backends/process.js";
 
 /** Bumped whenever the route's run or its records change: old caches are not read. */
-export const ROUTE_VERSION = "c43-1";
+export const ROUTE_VERSION = "c43-2";
 /** A bound on one rust-analyzer run; a project needing more is reported, not hung on. */
 const RUN_LIMIT_MS = 60 * 60 * 1000;
 /** rust-analyzer's own output (progress and duplicate-symbol reports). */
@@ -84,10 +84,7 @@ export const ANALYZER_CONFIG = {
   cfg: { setTest: true },
 };
 
-const find = (
-  name: string,
-  dirs: readonly string[],
-): string | undefined => {
+const find = (name: string, dirs: readonly string[]): string | undefined => {
   for (const dir of dirs) {
     if (!dir || !isAbsolute(dir)) continue;
     const path = join(dir, name);
@@ -221,7 +218,9 @@ export async function installation(
       ? join(home, ".cargo")
       : "";
   if (!cargoHome)
-    return { unavailable: "no crate cache location (CARGO_HOME or HOME unset)" };
+    return {
+      unavailable: "no crate cache location (CARGO_HOME or HOME unset)",
+    };
   return {
     ...tools,
     analyzerVersion,
@@ -376,8 +375,7 @@ async function crateCacheOverlay(user: string, overlay: string): Promise<void> {
 export interface CargoFacts {
   /** Package names whose library is a proc macro. */
   procMacroPackages: string[];
-  /** Build-script packages and proc-macro targets the run must have built. */
-  buildScripts: string[];
+  /** Proc-macro target names (crate names) of every listed package. */
   procMacroTargets: string[];
   /** Workspace library roots under the project, relative. */
   libraryRoots: string[];
@@ -395,28 +393,20 @@ interface Metadata {
     targets: MetadataTarget[];
   }[];
   workspace_members: string[];
-  resolve?: { nodes: { id: string }[] } | null;
 }
 
-/** What `cargo metadata` says the run must build, for partial detection. */
+/** What `cargo metadata` says about the packages, for the gates and partial detection. */
 function cargoFacts(metadata: Metadata, project: string): CargoFacts {
-  const resolved = new Set(
-    (metadata.resolve?.nodes ?? []).map((node) => node.id),
-  );
   const members = new Set(metadata.workspace_members);
   const procMacroPackages = new Set<string>();
-  const buildScripts = new Set<string>();
   const procMacroTargets = new Set<string>();
   const libraryRoots = new Set<string>();
   for (const pkg of metadata.packages) {
-    const built = resolved.size ? resolved.has(pkg.id) : members.has(pkg.id);
     for (const target of pkg.targets) {
       if (target.kind.includes("proc-macro")) {
         procMacroPackages.add(pkg.name);
-        if (built) procMacroTargets.add(target.name.replace(/-/g, "_"));
+        procMacroTargets.add(target.name.replace(/-/g, "_"));
       }
-      if (built && target.kind.includes("custom-build"))
-        buildScripts.add(pkg.name);
       if (
         members.has(pkg.id) &&
         (target.kind.includes("lib") || target.kind.includes("proc-macro")) &&
@@ -428,7 +418,6 @@ function cargoFacts(metadata: Metadata, project: string): CargoFacts {
   const sorted = (set: Set<string>) => [...set].sort();
   return {
     procMacroPackages: sorted(procMacroPackages),
-    buildScripts: sorted(buildScripts),
     procMacroTargets: sorted(procMacroTargets),
     libraryRoots: sorted(libraryRoots),
   };
@@ -437,39 +426,58 @@ function cargoFacts(metadata: Metadata, project: string): CargoFacts {
 /**
  * Build scripts that did not finish and proc macros that were not built,
  * read from the run's target directory: rust-analyzer exits 0 and says
- * nothing when a build script fails.
+ * nothing when a build script fails. Only what the run attempted counts:
+ * `cargo metadata` lists packages (optional or dev-only ones) that its
+ * check never builds.
  */
-async function unfinished(target: string, facts: CargoFacts): Promise<string[]> {
+async function unfinished(
+  target: string,
+  facts: CargoFacts,
+): Promise<string[]> {
   const out: string[] = [];
-  const attempted = new Map<string, boolean>();
+  // A build-script package has a compile directory and a run directory;
+  // the run directory holds `output` once the script has finished.
+  const finished = new Map<string, boolean>();
   try {
     const build = join(target, "debug", "build");
-    for (const dir of await readdir(build)) {
+    for (const dir of (await readdir(build)).sort()) {
       const name = dir.replace(/-[0-9a-f]{16}$/, "");
-      const finished = existsSync(join(build, dir, "output"));
-      // Each package has a compile directory (never an output) and a run directory.
-      const ran = existsSync(join(build, dir, "invoked.timestamp"));
-      if (!attempted.has(name)) attempted.set(name, false);
-      if (finished) attempted.set(name, true);
-      else if (ran && !attempted.get(name)) attempted.set(name, false);
+      finished.set(
+        name,
+        (finished.get(name) ?? false) || existsSync(join(build, dir, "output")),
+      );
     }
   } catch {
     /* no build directory: nothing ran */
   }
-  for (const name of facts.buildScripts)
-    if (attempted.get(name) !== true)
-      out.push(`build script of ${name} did not finish`);
+  for (const [name, done] of finished)
+    if (!done) out.push(`build script of ${name} did not finish`);
+  // A proc macro the run compiled has a fingerprint (`lib-<name>`, or its
+  // compiler messages in `output-lib-<name>`) and, when built, a library.
+  const attempted = new Set<string>();
+  try {
+    const prints = join(target, "debug", ".fingerprint");
+    const wanted = new Set(facts.procMacroTargets);
+    for (const dir of await readdir(prints))
+      for (const file of await readdir(join(prints, dir))) {
+        const name = file.replace(/^(output-)?lib-/, "");
+        if (file !== name && wanted.has(name)) attempted.add(name);
+      }
+  } catch {
+    /* nothing compiled */
+  }
   let deps: string[] = [];
   try {
     deps = await readdir(join(target, "debug", "deps"));
   } catch {
     /* none built */
   }
-  for (const name of facts.procMacroTargets)
+  for (const name of [...attempted].sort())
     if (
       !deps.some(
         (file) =>
-          file.startsWith(`lib${name}-`) ||
+          (file.startsWith(`lib${name}-`) &&
+            /\.(so|dylib)$/.test(file)) ||
           (file.startsWith(`${name}-`) && file.endsWith(".dll")),
       )
     )
@@ -525,7 +533,10 @@ export async function routeKey(
     install.cargoHome,
     ...[...contexts]
       .sort((a, b) => (a.path < b.path ? -1 : 1))
-      .map((file) => `${file.path}\u0000${file.text === undefined ? "\u0000absent" : sha(file.text)}`),
+      .map(
+        (file) =>
+          `${file.path}\u0000${file.text === undefined ? "\u0000absent" : sha(file.text)}`,
+      ),
     ...[...sources]
       .sort((a, b) => (a.path < b.path ? -1 : 1))
       .map((file) => `${file.path}\u0000${file.hash}`),
@@ -622,7 +633,6 @@ export async function runAnalyzer(
     cancelled(meta);
     let facts: CargoFacts = {
       procMacroPackages: [],
-      buildScripts: [],
       procMacroTargets: [],
       libraryRoots: [],
     };
@@ -636,12 +646,22 @@ export async function runAnalyzer(
       partial.push(
         `cargo metadata failed offline (dependencies not in the crate cache?): ${firstLine(meta)}`,
       );
-    await writeFile(join(run, "analyzer.json"), JSON.stringify(ANALYZER_CONFIG));
+    await writeFile(
+      join(run, "analyzer.json"),
+      JSON.stringify(ANALYZER_CONFIG),
+    );
     const output = join(run, "index.scip");
     const started = performance.now();
     const result = await runProcess(
       install.analyzer,
-      ["scip", ".", "--output", output, "--config-path", join(run, "analyzer.json")],
+      [
+        "scip",
+        ".",
+        "--output",
+        output,
+        "--config-path",
+        join(run, "analyzer.json"),
+      ],
       {
         cwd: project,
         timeoutMs: controls.limitMs ?? RUN_LIMIT_MS,
