@@ -39,7 +39,7 @@ export function formatGraph(response: GraphResponse): string {
       response.trust === "trusted"
         ? "Trust: trusted on this machine (build tools may run on this project)"
         : response.trust === "source-only"
-          ? "Trust: source only (Pymtheg starts no program on its behalf; it only reads files)"
+          ? "Trust: source only (Pymtheg starts no program on its behalf; it only reads the repository's files and writes its own .pymtheg/ files)"
           : `Trust: unanswered. ${response.trustAnswer ?? ""}`,
     );
   // The opt-in toolchain route (absent when off).

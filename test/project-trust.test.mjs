@@ -1434,13 +1434,9 @@ test("untrusted (source only, unanswered): no Git process is started at all; the
         `git was started: ${existsSync(starts) ? readFileSync(starts, "utf8") : ""}`,
       );
       assert.equal(existsSync(marker), false);
-      const version =
-        JSON.parse(observed.stdout).graph?.version ??
-        JSON.parse(observed.stdout).version;
-      if (version) {
-        assert.equal(version.gitCommit, head);
-        assert.equal(version.dirty, "unknown");
-      }
+      const { version } = JSON.parse(observed.stdout);
+      assert.equal(version.gitCommit, head);
+      assert.equal(version.dirty, "unknown");
     }
   });
 });
@@ -1500,5 +1496,55 @@ test("the commit is read from files: a .git file naming the git folder, a worktr
     const plain = join(root, "plain");
     mkdirSync(plain);
     assert.equal(await gitCommitFromFiles(plain), null);
+  });
+});
+
+test("the commit reader reads only bounded regular files: a FIFO or an endless device as HEAD, a loose ref, packed-refs or an outside git folder's HEAD gives no commit, never a hang", async () => {
+  const { gitCommitFromFiles } = await import("../dist/shared/safe-git.js");
+  await scratch(async (root) => {
+    const fifo = (path) => execFileSync("mkfifo", [path]);
+    const repo = async (name) => {
+      const dir = join(root, name);
+      mkdirSync(join(dir, ".git", "refs", "heads"), { recursive: true });
+      await writeFile(join(dir, ".git", "HEAD"), "ref: refs/heads/main\n");
+      return dir;
+    };
+    // 1. HEAD is a FIFO.
+    const a = await repo("head-fifo");
+    await rm(join(a, ".git", "HEAD"));
+    fifo(join(a, ".git", "HEAD"));
+    assert.equal(await gitCommitFromFiles(a), null);
+    // 2. A loose ref is a link to an endless device (outside the git folder).
+    const b = await repo("ref-device");
+    symlinkSync("/dev/zero", join(b, ".git", "refs", "heads", "main"));
+    assert.equal(await gitCommitFromFiles(b), null);
+    // 3. packed-refs is a FIFO (and the loose ref is missing).
+    const c = await repo("packed-fifo");
+    fifo(join(c, ".git", "packed-refs"));
+    assert.equal(await gitCommitFromFiles(c), null);
+    // 4. A .git file names an outside git folder whose HEAD is a FIFO.
+    const outside = join(root, "outside-gitdir");
+    mkdirSync(outside);
+    fifo(join(outside, "HEAD"));
+    const d = join(root, "linked");
+    mkdirSync(d);
+    await writeFile(join(d, ".git"), `gitdir: ${outside}\n`);
+    assert.equal(await gitCommitFromFiles(d), null);
+    // A packed-refs over the cap is not read either.
+    const e = await repo("packed-big");
+    await writeFile(
+      join(e, ".git", "packed-refs"),
+      "x".repeat(33 * 1024 * 1024),
+    );
+    assert.equal(await gitCommitFromFiles(e), null);
+    // An aborted signal stops the read.
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(gitCommitFromFiles(e, controller.signal));
+    // A regular repository still gives its commit.
+    const ok = await repo("ok");
+    const sha = "a".repeat(40);
+    await writeFile(join(ok, ".git", "refs", "heads", "main"), sha + "\n");
+    assert.equal(await gitCommitFromFiles(ok), sha);
   });
 });

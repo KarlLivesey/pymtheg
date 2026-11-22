@@ -121,7 +121,7 @@ export async function captureImplementation(
   // D22: the commit is read from the repository's files; Git runs only for
   // a trusted folder, and then only to ask whether the files have changes.
   // Otherwise that is unknown, never clean.
-  const commit = await gitCommitFromFiles(root);
+  const commit = await gitCommitFromFiles(root, signal);
   const trusted =
     commit !== null &&
     (await checkoutTrust(workspace?.root ?? root).catch(() => "unanswered")) ===
