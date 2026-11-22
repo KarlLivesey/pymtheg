@@ -242,13 +242,15 @@ The graph store, indexer and three production language modules (`src/graph/`)
 answer the CLI command `pymtheg graph` (below), the MCP tools `code_graph` and
 `graph_result`, and requirement links (`pymtheg link`, MCP `requirement_links`).
 No Studio screen uses them; `observe` still uses the older TypeScript/JavaScript
-reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 4; a schema-3
+reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 4, with an
+empty `graph.sqlite-turnstile` beside it (created only where the store uses the write-ahead log) that its writers lock to take turns
+(C-37); a schema-3
 (0.1.0) graph is migrated in place when opened for writing (its rows are kept
 unchanged) and read as having no library targets when opened read-only. Any
 other graph database is refused with a rebuild message; 0.1.0 refuses a
 schema-4 graph the same way. Nothing runs project code.
-Nothing runs a language toolchain unless the project opts in to the Go
-toolchain route (below); nothing reads or writes `.codegraph/`. Language
+Nothing runs a language toolchain unless the project is trusted at init
+(D22) or opts in to the Go toolchain route (below); nothing reads or writes `.codegraph/`. Language
 modules are discovered from `src/graph/languages/*/`;
 production discovery offers `go`, `rust` and `typescript` (the `toy` fixture is
 test-only). Each module's current version, and the versions the index was built
@@ -929,9 +931,10 @@ accept the arguments.
   The 100-file cap counts compiler failures a program imports from another
   project. A member of a namespace that is no symbol (a namespace inside a
   plain block) is contained by the next container out that is one.
-  microsoft/TypeScript indexes with a 12,000 MB heap but not with the
-  default one: the indexer holds a module's whole analysis output while it
-  writes it.
+  microsoft/TypeScript indexes at Node's default heap (C-40: 33 min 53 s
+  on the dev server, exit 2 with its 12,477 failed files). Before C-40 it
+  needed a larger heap, because the module's cache of parsed library files
+  kept the last program alive after the analysis.
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.
@@ -979,20 +982,38 @@ An unfinished run or a direct graph write requires recovery. The opt-in
 toolchain route uses a full pass. The same file tree produces the same
 graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
-**Go toolchain route (opt-in, decision D17).** With the key
-`"graph": {"toolchain": {"go": true}}` added to the existing
-`.pymtheg/settings.json` (which must keep its `version: 1` and `scenarios`; a
-file holding only the `graph` key is unreadable and the route stays off with a
-`settings-unreadable` warning; full example in the
-[code guide](code-guide.md#the-go-toolchain-route)), or an absolute path to the
-`go` to trust instead of `true`, indexing also runs that `go` (`go list` and a `go/types` helper) in a
+**Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted
+on this machine (below; [code guide](code-guide.md#the-go-toolchain-route)),
+indexing also runs `go` from `PATH`, or the absolute path named in your own
+trust answer file, (`go list` and a `go/types` helper) in a
 closed environment with network, cgo and telemetry off, and merges its facts:
 it can upgrade unresolved or candidate links to definite, confirm source-only
 links or verify candidate sets; such links carry `decidedBy: "toolchain"`.
 Every answer reports `toolchain.go.state` (`used` with counts, `unavailable` with
 the reason, such as no `go.mod` at the project root, `go.work`, no `go`, or Go
 older than 1.22; `not-indexed`). Turning it on or off makes the next query sync.
-No MCP tool changes this setting; edit the file. Sources:
+An unreadable `.pymtheg/settings.json` keeps every route off with a
+`settings-unreadable` warning.
+
+**Trust at init (decision D22, C-44).** `init` asks once whether the
+repository is trusted and records the answer for this checkout on this
+machine in the user's own configuration (`$PYMTHEG_CONFIG_HOME` or the
+platform's config folder, `trust.json`, user-only), never under a checkout;
+`pymtheg trust` lists and `--revoke` removes answers. A trusted checkout runs
+the Go route above with its default policy. A source-only checkout, or one
+with no answer on this machine (`unanswered`: a clone, a copy, a moved
+checkout), runs nothing. Nothing committed can grant trust: a committed
+`graph.trust: "source-only"` binds on every machine, a committed
+`"trusted"` is only init's preselected answer, a committed
+`graph.toolchain.go: false` turns Go off, and a committed tool path is never
+run (warning `committed-tool-path-ignored`). Graph answers of an initialised
+project report `trust` (`trusted`, `source-only` or `unanswered`, then with
+`trustAnswer`). **Behaviour change (C-44):** a committed
+`graph.toolchain.go: true` no longer turns the Go route on for whoever checks the
+repository out; each user answers the trust question once per checkout. A
+tool path that resolves inside the checkout is never run, even from the
+user's own file (warning `tool-path-inside-checkout`). The question and how each path answers it are described in
+[project initialization](project-init.md#trusting-the-repository). Sources:
 [W3-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L.md), [W3-L2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L2.md).
 
 #### Not built yet

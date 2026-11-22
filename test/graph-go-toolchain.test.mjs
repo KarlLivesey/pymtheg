@@ -94,22 +94,37 @@ const link = (dump, file, at, kind = "calls") => {
 const note = (report, status) =>
   report.toolchains?.find((item) => item.note.status === status)?.note;
 
-test("the setting: graph.toolchain.go is the explicit opt-in, off by default", () => {
-  assert.deepEqual(graphToolchains({ version: 1, scenarios: {} }), {});
+test("the setting: only this machine's trusted answer turns Go on; graph.toolchain.go may only turn it off", () => {
+  // D22 (C-44): the route needs the local trust answer; committed settings
+  // cannot turn it on, and a committed tool path is never used.
+  const trusted = { trust: "trusted" };
   assert.deepEqual(
-    graphToolchains({
-      version: 1,
-      scenarios: {},
-      graph: graphConfig({ toolchain: { go: true } }),
-    }),
-    { go: true },
+    graphToolchains({ version: 1, scenarios: {} }, undefined),
+    {},
   );
   assert.deepEqual(
-    graphToolchains({
-      version: 1,
-      scenarios: {},
-      graph: graphConfig({ toolchain: { go: false } }),
-    }),
+    graphToolchains(
+      {
+        version: 1,
+        scenarios: {},
+        graph: graphConfig({ toolchain: { go: true } }),
+      },
+      undefined,
+    ),
+    {},
+  );
+  assert.deepEqual(graphToolchains({ version: 1, scenarios: {} }, trusted), {
+    go: true,
+  });
+  assert.deepEqual(
+    graphToolchains(
+      {
+        version: 1,
+        scenarios: {},
+        graph: graphConfig({ toolchain: { go: false } }),
+      },
+      trusted,
+    ),
     {},
   );
   assert.deepEqual(graphConfig({ toolchain: { go: "/usr/lib/go/bin/go" } }), {
