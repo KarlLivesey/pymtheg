@@ -378,8 +378,10 @@ async function tokioMacroOrigin(fixture, options = {}) {
     import.meta.url,
   );
   const load = (file) => readFile(new URL(file, directory), "utf8");
-  const support = [["Cargo.lock", await load("Cargo.lock")]];
-  if (options.config) support.push([".cargo/config.toml", options.config]);
+  const support =
+    options.lock === false ? [] : [["Cargo.lock", await load("Cargo.lock")]];
+  if (options.config)
+    support.push([options.configPath ?? ".cargo/config.toml", options.config]);
   const file = options.file ?? "src/lib.rs";
   const sources = { [file]: await load("src/lib.rs") };
   if (fixture === "tokio-patched") {
@@ -418,6 +420,103 @@ test("a renamed Tokio facade needs registry evidence for the macro implementatio
     assert.deepEqual(patched("types", "Option", marker), proved(null));
     assert.deepEqual(configured("types", "Option", marker), proved(null));
   }
+});
+
+test("without a lockfile a plain registry requirement identifies the facade macro", async () => {
+  // C-24: no Cargo.lock (most library repositories commit none). A plain
+  // version requirement with no override mechanism resolves the facade and
+  // the crate implementing its macro from crates.io.
+  const unlocked = await tokioMacroOrigin("tokio-registry", { lock: false });
+  // Each override route Cargo offers can replace the implementing crate.
+  const patched = await tokioMacroOrigin("tokio-patched", { lock: false });
+  const configPaths = await tokioMacroOrigin("tokio-registry", {
+    lock: false,
+    config: 'paths = ["macros"]\n',
+  });
+  const configSource = await tokioMacroOrigin("tokio-registry", {
+    lock: false,
+    config:
+      '[source.crates-io]\nreplace-with = "vendored"\n[source.vendored]\ndirectory = "vendor"\n',
+  });
+  // A config anywhere in the checkout applies when Cargo runs from there.
+  const nestedPatch = await tokioMacroOrigin("tokio-registry", {
+    lock: false,
+    configPath: "tools/.cargo/config.toml",
+    config: '[patch.crates-io]\ntokio-macros = { path = "../macros" }\n',
+  });
+  const pathFacade = await tokioMacroOrigin("tokio-registry", {
+    lock: false,
+    features: '["macros", "rt-multi-thread"], path = "vendor/tokio"',
+  });
+  for (const marker of [
+    "// main by path",
+    "// test by import",
+    "// test by path",
+  ]) {
+    assert.deepEqual(
+      unlocked("types", "Option", marker),
+      assumed("option::Option"),
+    );
+    for (const withheld of [
+      patched,
+      configPaths,
+      configSource,
+      nestedPatch,
+      pathFacade,
+    ])
+      assert.deepEqual(withheld("types", "Option", marker), proved(null));
+  }
+  // Which crate's macro the name is depends on the registry facade alone:
+  // its re-export is published text. Only the expansion (the `Option`
+  // sites above) depends on the patched implementing crate.
+  for (const at of [unlocked, patched, nestedPatch])
+    assert.deepEqual(
+      at("macros", "runtime::main", "#[runtime::main("),
+      proved("#[main]"),
+    );
+  // A facade from a path, a replaced registry or a `paths` override (which
+  // can replace the facade itself) has no registry provenance.
+  for (const at of [pathFacade, configSource, configPaths])
+    assert.deepEqual(
+      at("macros", "runtime::main", "#[runtime::main("),
+      proved(null),
+    );
+});
+
+test("a captured Cargo config that patches the facade itself withholds its macros", async () => {
+  // Cargo takes the patched `tokio`, not the registry release, so neither
+  // the macro link nor its expansion is the registry crate's. A config in
+  // any directory of the checkout applies when Cargo runs there, and a
+  // lockfile written from elsewhere does not rule it out.
+  const patchTokio = '[patch.crates-io]\ntokio = { path = "vendor/tokio" }\n';
+  const cases = [
+    await tokioMacroOrigin("tokio-registry", {
+      lock: false,
+      config: patchTokio,
+    }),
+    await tokioMacroOrigin("tokio-registry", {
+      lock: false,
+      configPath: "tools/.cargo/config.toml",
+      config: patchTokio,
+    }),
+    await tokioMacroOrigin("tokio-registry", {
+      configPath: "tools/.cargo/config.toml",
+      config: patchTokio,
+    }),
+  ];
+  for (const at of cases) {
+    assert.deepEqual(
+      at("macros", "runtime::main", "#[runtime::main("),
+      proved(null),
+    );
+    assert.deepEqual(at("types", "Option", "// main by path"), proved(null));
+  }
+  // Control: the same locked project with no config names the macro.
+  const locked = await tokioMacroOrigin("tokio-registry");
+  assert.deepEqual(
+    locked("macros", "runtime::main", "#[runtime::main("),
+    proved("#[main]"),
+  );
 });
 
 test("written Tokio macro routes retain identity with incomplete feature facts", async () => {
