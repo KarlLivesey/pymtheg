@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
 # C-35: before → after cold indexes with the store on disk, two jobs per pin
 # (main and the change) at a time, each with its own store directory.
 #   scripts/store-cost/disk-batch.sh <main dist> <after dist> <scratch> <out dir> <pin>...

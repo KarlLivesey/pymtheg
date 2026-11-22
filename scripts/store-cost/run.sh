@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
 # C-35: one store-cost measurement on the dev server. The store goes in
 # <store dir> (memory-backed or on disk) and is removed afterwards; the
 # result and the CPU profile go in <out dir>.
