@@ -47,6 +47,7 @@ import {
 } from "./library-audit.js";
 import {
   dependencyUnit,
+  cargoMacroFacadeKnown,
   cargoMacroReexport,
   cargoMacroSourceKnown,
   exportNamespace,
@@ -248,6 +249,12 @@ type AttributeOrigin = {
 };
 type AttributeGate = AttributeOrigin & { condition: string; explicit: boolean };
 interface Place {
+  /**
+   * C-24: the accessors a lookup passed through globs on the way here. A
+   * glob-imported name is only as visible as the more restricted of the glob
+   * and the item, so an item must be visible from each of them too.
+   */
+  viaGlobs?: Place[];
   crate: Crate;
   local: string;
   scope: string;
@@ -1069,11 +1076,11 @@ export function resolveRust(
           ]),
         ];
         if (locationUnverified) moduleIncomplete.add(s.id);
-        if (
-          pathTargets.size &&
-          ([...pathTargets].some((f) => !files.has(f)) ||
-            (!path && !ordinary.some((f) => files.has(f))))
-        )
+        // C-24: with only `cfg_attr(…, path = …)` alternatives, a build that
+        // enables none of them needs the plain module file. When the checkout
+        // has none, that build does not compile (E0583), so the captured
+        // alternatives are every module this declaration can be.
+        if (pathTargets.size && [...pathTargets].some((f) => !files.has(f)))
           moduleIncomplete.add(s.id);
         const targets = possible.filter((f) => files.has(f));
         const fileConditions = targets.map((f) =>
@@ -1894,6 +1901,34 @@ export function resolveRust(
   };
   const isDescendant = (scope: string, parent: string) =>
     !parent || scope === parent || scope.startsWith(parent + "::");
+  // C-24: an item visible from a module is visible from every module inside
+  // it, so only the outermost accessors on a glob chain constrain it. Keeping
+  // just those (deduplicated, in a fixed order) bounds the chain, so a glob
+  // cycle still repeats its lookup key and is cut.
+  const insideOf = (inner: Place, outer: Place) =>
+    inner.crate.root === outer.crate.root &&
+    isDescendant(inner.scope, outer.scope);
+  function globAccessors(globModule: Place, accessor: Place): Place[] {
+    const kept: Place[] = [];
+    for (const via of [...(accessor.viaGlobs ?? []), accessor]) {
+      if (insideOf(via, globModule) || kept.some((k) => insideOf(via, k)))
+        continue;
+      for (let i = kept.length - 1; i >= 0; i--)
+        if (insideOf(kept[i]!, via)) kept.splice(i, 1);
+      kept.push(via);
+    }
+    const order = (p: Place) => `${p.crate.root}|${p.scope}`;
+    return kept.sort((a, b) =>
+      order(a) < order(b) ? -1 : order(a) > order(b) ? 1 : 0,
+    );
+  }
+  const visibleThroughGlobs = (
+    visibility: string,
+    owner: Place,
+    importer: Place,
+  ): boolean =>
+    visible(visibility, owner, importer) &&
+    (importer.viaGlobs ?? []).every((via) => visible(visibility, owner, via));
   function visible(visibility: string, owner: Place, importer: Place): boolean {
     visibility = compact(visibility);
     if (visibility === "pub") return true;
@@ -2135,7 +2170,8 @@ export function resolveRust(
             ) &&
             macroIdentityAccepts(s, headNs) &&
             possible([...(loc.conditions ?? []), ...conditionsFor(s)]) &&
-            (!accessFrom || visible(str(data(s).visibility), loc, accessFrom)),
+            (!accessFrom ||
+              visibleThroughGlobs(str(data(s).visibility), loc, accessFrom)),
         );
     // First-segment presence is independent of member-lookup completeness.
     // A present local/explicit binding shadows globs even when its member is
@@ -2308,7 +2344,8 @@ export function resolveRust(
           ...(loc.conditions ?? []),
           ...((data(l).conditions ?? []) as string[]),
         ]) &&
-        (!accessFrom || visible(str(data(l).visibility), loc, accessFrom)),
+        (!accessFrom ||
+          visibleThroughGlobs(str(data(l).visibility), loc, accessFrom)),
     );
     if (opaqueLibraryScope) {
       // A generated item in this module cannot replace a present explicit
@@ -2490,7 +2527,8 @@ export function resolveRust(
     const globs = allowGlobs
       ? (uses?.globs ?? []).filter(
           (l) =>
-            !accessFrom || visible(str(data(l).visibility), loc, accessFrom),
+            !accessFrom ||
+            visibleThroughGlobs(str(data(l).visibility), loc, accessFrom),
         )
       : [];
     if (
@@ -2509,39 +2547,61 @@ export function resolveRust(
         };
       };
       const suppliers: GraphLink[] = [];
+      // C-24: a glob imports only what its own module can see (a private
+      // `use` in the target module is not glob-imported into the parent), and
+      // the name it imports is no more visible than the item, so an item
+      // behind it must be visible from here and from every accessor on the
+      // way (rustc takes the more restricted of the glob and the item). The
+      // accessor's cfg conditions still apply.
+      const globAccess: Place = accessFrom
+        ? {
+            ...loc,
+            conditions: accessFrom.conditions ?? [],
+            viaGlobs: globAccessors(loc, accessFrom),
+          }
+        : loc;
+      const perGlob = globs.map((l) => {
+        const imported = throughGlob(
+          resolveUse(
+            { ...l, targetName: l.targetName.replace(/::\*$/, "") },
+            [],
+            "type",
+          ),
+        );
+        if (!imported.symbols.length)
+          return imported.reason ? imported : empty(false);
+        const found = merge(
+          imported.symbols.map((s) =>
+            children(s, [name, ...rest], ns, seen, true, globAccess, true),
+          ),
+        );
+        if (found.symbols.length) suppliers.push(l);
+        // A glob never supplies a definite outside binding. A captured
+        // module with no competing export can still clear a prelude name.
+        if (found.library) return empty(false);
+        return {
+          ...found,
+          complete: imported.complete && found.complete,
+        };
+      });
+      // C-24: two globs that supply different items for one name make every
+      // use of it an ambiguity error (E0659). So when one glob supplies a
+      // proven binding, another glob's only doubt, an opaque macro that could
+      // generate the name, cannot change the answer in compiling code. An
+      // unreadable file is never ruled out this way.
+      const opaqueOnly = (found: Found) =>
+        !found.complete &&
+        !found.symbols.length &&
+        !found.library &&
+        !found.failedFiles?.length &&
+        !!found.reason &&
+        found.reason
+          .split(/;\s*/)
+          .every((reason) => reason === "opaque-item-may-shadow-name");
       let result = merge(
-        globs.map((l) => {
-          const imported = throughGlob(
-            resolveUse(
-              { ...l, targetName: l.targetName.replace(/::\*$/, "") },
-              [],
-              "type",
-            ),
-          );
-          if (!imported.symbols.length)
-            return imported.reason ? imported : empty(false);
-          const found = merge(
-            imported.symbols.map((s) =>
-              children(
-                s,
-                [name, ...rest],
-                ns,
-                seen,
-                true,
-                accessFrom ?? loc,
-                true,
-              ),
-            ),
-          );
-          if (found.symbols.length) suppliers.push(l);
-          // A glob never supplies a definite outside binding. A captured
-          // module with no competing export can still clear a prelude name.
-          if (found.library) return empty(false);
-          return {
-            ...found,
-            complete: imported.complete && found.complete,
-          };
-        }),
+        perGlob.some((found) => found.complete && found.symbols.length)
+          ? perGlob.map((found) => (opaqueOnly(found) ? empty() : found))
+          : perGlob,
       );
       result = conditional(result, suppliers, loc);
       if (libraryProbe && !result.symbols.length && !scopeFailures.length)
@@ -2885,6 +2945,7 @@ export function resolveRust(
       allowGlobs,
       accessFrom?.crate.root,
       accessFrom?.scope,
+      accessFrom?.viaGlobs?.map((via) => `${via.crate.root}|${via.scope}`),
       loc.conditions,
     ]);
     const guard = baselineGuard;
@@ -2975,7 +3036,25 @@ export function resolveRust(
       if (!outerReads) rootScopeReads.length = 0;
       activeLookup = outer;
     }
-    if (result.complete) {
+    // C-24: a cycle cut answers "nothing more here" for a lookup already on
+    // the stack. A result that met such a cut at an ancestor is the answer
+    // for this entry point only: memoised as context-free, whichever lookup
+    // ran first would decide every later one (cfg-alternative sibling files
+    // importing from a parent that globs them back). Such a result is reused
+    // only under the same ancestor tests, like an incomplete one.
+    const stackFree =
+      cycleCuts === cutsBefore ||
+      (!!trace && trace.valid && [...trace.required].every((g) => g === guard));
+    if (result.complete && !stackFree) {
+      if (trace && stateKey !== undefined) {
+        observedIncompleteGuards.add(cacheKey);
+        trace.required.delete(guard);
+        trace.excluded.add(guard);
+        outer?.trace.absorb(trace, outer.expansion);
+        if (trace.fits() && revision === lookupRevision)
+          incompleteLookups.set(stateKey, { result, cut: true, trace });
+      } else if (outer) outer.trace.valid = false;
+    } else if (result.complete) {
       // A complete entry preempts a previous incomplete result or cycle cut,
       // including when another saved lookup depended on that answer.
       if (observedIncompleteGuards.has(cacheKey)) clearIncompleteLookups();
@@ -4497,7 +4576,7 @@ export function resolveRust(
     }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
   const unknownImpls = new Map<string, GraphSymbol[]>(),
-    unknownInherent = new Set<string>();
+    unknownInherent = new Map<string, Set<string>>();
   const memberOwners = new Map<string, GraphSymbol>();
   const extensionNames = new Set<string>();
   const allMembers = new Map<string, GraphSymbol[]>();
@@ -4545,7 +4624,12 @@ export function resolveRust(
     inherent: boolean,
   ): void {
     unknownImpls.set(root, unique([...(unknownImpls.get(root) ?? []), ...ms]));
-    if (inherent) for (const m of ms) unknownInherent.add(m.id);
+    if (inherent)
+      for (const m of ms)
+        unknownInherent.set(
+          m.id,
+          new Set([...(unknownInherent.get(m.id) ?? []), root]),
+        );
   }
   for (const impl of symbols.filter((s) => s.kind === "impl"))
     if (!ownerPlace(impl.file, str(data(impl).scope)).length) {
@@ -5069,8 +5153,20 @@ export function resolveRust(
           return false;
         return receiver.includes("&") || borrow === "owned";
       });
+    // An inherent impl is allowed only in the crate that defines its type
+    // (E0116), so an unplaced inherent impl in another crate cannot add a
+    // method to these types. Trait impls stay: other crates may write them.
+    const typeRoots = new Set(
+      type.symbols.flatMap((t) =>
+        ownerPlace(t.file, str(data(t).scope)).map((p) => p.crate.root),
+      ),
+    );
     const unknown = unknownMethods(loc.crate.root, name).filter(
-        (m) => !instance || data(m).receiverKind !== "none",
+        (m) =>
+          (!instance || data(m).receiverKind !== "none") &&
+          [...(unknownInherent.get(m.id) ?? ["*"])].some(
+            (r) => r === "*" || typeRoots.has(r),
+          ),
       ),
       targets = unique([...matches.map((m) => m.symbol), ...unknown]);
     const accessibleHint = (m: GraphSymbol) => {
@@ -6316,9 +6412,12 @@ export function resolveRust(
         namespace === "macro" &&
         path.unit.ecosystem === "cargo" &&
         cargoMacroReexport(path) &&
-        !cargoMacroSourceKnown(path)
+        // C-24: the name is the facade's export once the facade is a
+        // verified registry release; expansion proofs still need the
+        // implementing crate's source (scopeMacroExport).
+        !cargoMacroFacadeKnown(path)
       )
-        return refuseLibrary("macro implementation source unverified");
+        return refuseLibrary("macro facade source unverified");
       const exported =
         l.kind === "imports" && scopeMode !== "assumed"
           ? importExportNamespace(path)

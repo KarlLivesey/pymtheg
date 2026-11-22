@@ -27,6 +27,18 @@ export type Edition = "2015" | "2018" | "2021" | "2024";
 export interface MacroRegistry {
   implementations: readonly string[];
   registryOnly: boolean;
+  /**
+   * C-24: no lockfile, a plain registry requirement and no captured override
+   * mechanism, so Cargo takes the facade and the packages it depends on from
+   * the default registry. Names a root-manifest `[patch]`/`[replace]` entry
+   * touches are excluded.
+   */
+  unlocked?: { excluded: readonly string[] };
+  /**
+   * C-24: no captured Cargo config in the checkout can replace the facade
+   * (`paths`, `[source]`, an unreadable config, or a `[patch]` naming it).
+   */
+  facade: boolean;
 }
 export interface Dependency {
   name: string;
@@ -131,6 +143,44 @@ export function crates(
     }));
   const byPath = new Map(docs.map((d) => [d.path, d]));
   const directorySource = cargoSources(contexts);
+  // C-24: Cargo reads configuration from the directory it runs in and every
+  // ancestor, so a config anywhere in the checkout may apply to a build. Any
+  // captured config that sets `paths`, `[source]` or `[patch]`, or that cannot
+  // be read, leaves unlocked registry sources unestablished. A config `paths`
+  // or `[source]` (or an unreadable one) can replace any crate; a `[patch]`
+  // replaces the crates it names.
+  const configOverrides = { open: false, names: new Set<string>() };
+  for (const c of contexts) {
+    if (!/(?:^|\/)\.cargo\/config(?:\.toml)?$/.test(c.path)) continue;
+    const value = c.status === "clean" ? readToml(c.text) : null;
+    if (!value || value.paths !== undefined || value.source !== undefined)
+      configOverrides.open = true;
+    if (value?.patch === undefined) continue;
+    const groups = table(value.patch);
+    if (!groups) configOverrides.open = true;
+    for (const group of Object.values(groups ?? {})) {
+      const entries = table(group);
+      if (!entries) configOverrides.open = true;
+      for (const [alias, entry] of Object.entries(entries ?? {}))
+        configOverrides.names.add(string(table(entry)?.package) ?? alias);
+    }
+  }
+  const unlockedSourcesFixed =
+    !configOverrides.open && configOverrides.names.size === 0;
+  const withConfigOverrides = (
+    found: Omit<MacroRegistry, "facade"> | undefined,
+    facade: string,
+  ): MacroRegistry | undefined =>
+    found && {
+      ...found,
+      implementations: configOverrides.open
+        ? []
+        : found.implementations.filter(
+            (name) => !configOverrides.names.has(name),
+          ),
+      registryOnly: found.registryOnly && unlockedSourcesFixed,
+      facade: !configOverrides.open && !configOverrides.names.has(facade),
+    };
   const locks = new Map(
     contexts
       .filter((c) => p.basename(c.path) === "Cargo.lock")
@@ -476,7 +526,7 @@ export function crates(
     }
     function registryImplementations(
       row: TomlTable,
-    ): MacroRegistry | undefined {
+    ): Omit<MacroRegistry, "facade"> | undefined {
       if (!registryPackage(row)) return;
       return {
         implementations: [...registryDependencies(row)]
@@ -614,33 +664,45 @@ export function crates(
                 ? { registryRequirement: requirement }
                 : {}
             : {};
-        const macroRegistry = selectedPackage
-          ? registryImplementations(selectedPackage)
-          : registry.registryRequirement &&
-              [
-                memberSource(fields, packageName),
-                workspaceSource(fields, packageName),
-              ].every(
-                (source) =>
-                  source.identity === "crates-io" &&
-                  source.directory === undefined,
-              )
-            ? {
-                implementations: [],
-                // A crates.io release's dependencies also come from crates.io.
-                // Unlocked dependencies cannot rule out an applicable override.
-                registryOnly:
-                  overrides.length === 0 &&
-                  [
-                    memberSource(fields, null),
-                    workspaceSource(fields, null),
-                  ].every(
-                    (source) =>
-                      source.identity === "crates-io" &&
-                      source.directory === undefined,
-                  ),
-              }
-            : undefined;
+        const macroRegistry = withConfigOverrides(
+          selectedPackage
+            ? registryImplementations(selectedPackage)
+            : registry.registryRequirement &&
+                [
+                  memberSource(fields, packageName),
+                  workspaceSource(fields, packageName),
+                ].every(
+                  (source) =>
+                    source.identity === "crates-io" &&
+                    source.directory === undefined,
+                )
+              ? {
+                  implementations: [],
+                  // A crates.io release's dependencies also come from crates.io.
+                  // Unlocked dependencies cannot rule out an applicable override.
+                  registryOnly:
+                    overrides.length === 0 &&
+                    [
+                      memberSource(fields, null),
+                      workspaceSource(fields, null),
+                    ].every(
+                      (source) =>
+                        source.identity === "crates-io" &&
+                        source.directory === undefined,
+                    ),
+                  ...(unlockedSourcesFixed && libraryKnown
+                    ? {
+                        unlocked: {
+                          excluded: [
+                            ...new Set(overrides.map((o) => o.name)),
+                          ].sort(),
+                        },
+                      }
+                    : {}),
+                }
+              : undefined,
+          packageName,
+        );
         if (vendor !== undefined) {
           const version =
             selected ??
