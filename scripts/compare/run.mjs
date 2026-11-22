@@ -50,6 +50,7 @@
 // timed out is reported but left out of that repository's diff, since its
 // partial output would show as misses.
 
+import "../isolated-home.mjs";
 import { spawn } from "node:child_process";
 import {
   existsSync,

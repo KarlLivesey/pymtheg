@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 import { realpath, stat } from "node:fs/promises";
+import { gitCommitFromFiles, safeGit } from "../shared/safe-git.js";
 import { resolve, relative, isAbsolute } from "node:path";
 import { sourceFileByteLimit } from "../shared/source-limits.js";
 import { SourceReadError, readSourceBytes } from "../shared/source-read.js";
 import { decodeUtf8 } from "../shared/text.js";
 import { hash } from "../shared/identity.js";
 import { staleSourcesAsync } from "../language/project.js";
-import { findWorkspace } from "../project/workspace.js";
+import { checkoutTrust, findWorkspace } from "../project/workspace.js";
 import { runProcess } from "../backends/process.js";
 import {
   readObservedGraph,
@@ -117,21 +118,16 @@ export async function captureImplementation(
     files.push({ path, text, hash: hash(text) });
   }
   const workspace = await findWorkspace(root);
-  const git = await runProcess("git", ["rev-parse", "HEAD"], {
-    cwd: root,
-    signal,
-    timeoutMs: 5000,
-    maxBytes: 1024,
-  });
-  const commit =
-    git.kind === "exited" &&
-    git.code === 0 &&
-    /^[a-f0-9]{40,64}$/.test(git.stdout.trim())
-      ? git.stdout.trim()
-      : null;
-  const status = commit
-    ? await runProcess(
-        "git",
+  // D22: the commit is read from the repository's files; Git runs only for
+  // a trusted folder, and then only to ask whether the files have changes.
+  // Otherwise that is unknown, never clean.
+  const commit = await gitCommitFromFiles(root, signal);
+  const trusted =
+    commit !== null &&
+    (await checkoutTrust(workspace?.root ?? root).catch(() => "unanswered")) ===
+      "trusted";
+  const status = trusted
+    ? await safeGit(
         ["status", "--porcelain", "--", ...files.map((file) => file.path)],
         { cwd: root, signal, timeoutMs: 5000, maxBytes: 65536 },
       )
@@ -140,10 +136,9 @@ export async function captureImplementation(
     label,
     gitCommit: commit,
     dirty:
-      !status ||
-      status.kind !== "exited" ||
-      status.code !== 0 ||
-      status.stdout.length > 0,
+      !status || status.kind !== "exited" || status.code !== 0
+        ? ("unknown" as const)
+        : status.stdout.length > 0,
   };
   const observe = (selected: ObservedSource[]) =>
     observeInProcess(

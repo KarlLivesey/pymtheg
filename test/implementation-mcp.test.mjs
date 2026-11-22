@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-config.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
@@ -35,6 +36,7 @@ test("MCP lists pinned candidate files before a workspace exists, then captures 
         files: ["missing.ts"],
         label: "Missing",
         expectedRevision: null,
+        trust: "source-only",
       },
     });
     assert.equal(missing.isError, true);
@@ -44,6 +46,10 @@ test("MCP lists pinned candidate files before a workspace exists, then captures 
     );
     assert.ok(!missing.content[0].text.includes(root));
     assert.ok(!missing.content[0].text.includes("ENOENT"));
+    // C-44: a write that fails initialises nothing, as before the trust question.
+    await assert.rejects(readFile(join(root, ".pymtheg", "project.json")), {
+      code: "ENOENT",
+    });
     const first = await call(client, "read_implementation", {
       section: "files",
       limit: 1,
@@ -66,6 +72,7 @@ test("MCP lists pinned candidate files before a workspace exists, then captures 
       files: first.files,
       label: "Selected code",
       expectedRevision: null,
+      trust: "source-only",
     });
     const graph = await call(client, "read_implementation", {
       section: "graph",
@@ -115,6 +122,7 @@ test("real MCP retains code versions, pages both graphs and records explicit stu
       files: ["main.ts"],
       label: "Code one",
       expectedRevision: versions.activeRevision,
+      trust: "source-only",
     });
     const plan = await call(client, "read_implementation", {
       section: "graph",
@@ -252,6 +260,67 @@ test("real MCP retains code versions, pages both graphs and records explicit stu
       await readFile(join(root, ".pymtheg/shared/architecture.sqlite")),
       before,
     );
+  } finally {
+    await client?.close();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("C-44: a failing first observe or link initialises nothing and records no answer; project_info reports trust", async () => {
+  const root = await mkdtemp(join(tmpdir(), "pym-first-write-"));
+  let client;
+  try {
+    await writeFile(join(root, "a.ts"), "export const a = 1;\n");
+    client = new Client({ name: "first-write-test", version: "1.0.0" });
+    await client.connect(
+      new StdioClientTransport({
+        command: process.execPath,
+        args: [resolve("dist/cli/main.js"), "mcp", root],
+        stderr: "pipe",
+      }),
+    );
+    const observed = await client.callTool({
+      name: "observe_implementation",
+      arguments: {
+        files: ["a.ts"],
+        label: "A",
+        expectedRevision: "nope",
+        trust: "trusted",
+      },
+    });
+    assert.equal(observed.isError, true);
+    assert.match(observed.content[0].text, /Architecture changed/);
+    const linked = await client.callTool({
+      name: "link_implementation",
+      arguments: {
+        revision: "r",
+        planId: "p",
+        nodeId: "n",
+        planHash: "h",
+        observationId: "o",
+        reviewed: true,
+        trust: "trusted",
+      },
+    });
+    assert.equal(linked.isError, true);
+    await assert.rejects(readFile(join(root, ".pymtheg", "project.json")), {
+      code: "ENOENT",
+    });
+    const { listTrust } = await import("../dist/project/local-trust.js");
+    assert.equal(
+      (await listTrust()).some((a) => a.root.endsWith(root.split("/").at(-1))),
+      false,
+    );
+    // A write that proceeds initialises with the answer; project_info then reports it.
+    await call(client, "observe_implementation", {
+      files: ["a.ts"],
+      label: "A",
+      expectedRevision: null,
+      trust: "trusted",
+    });
+    const info = await call(client, "project_info", {});
+    assert.equal(info.initialised, true);
+    assert.equal(info.trust, "trusted");
   } finally {
     await client?.close();
     await rm(root, { recursive: true, force: true });

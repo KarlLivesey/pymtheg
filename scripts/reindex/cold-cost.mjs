@@ -3,6 +3,7 @@
 // fresh process (cold-once.mjs) under GNU time, its store a new file in
 // <store dir> (removed after the run), the source the pristine pin.
 //   node scripts/reindex/cold-cost.mjs <store dir> <out.json> <rounds> <label[@cache-pages]=dist>... -- <pin dir>...
+import "../isolated-home.mjs";
 import { spawnSync } from "node:child_process";
 import {
   copyFileSync,
