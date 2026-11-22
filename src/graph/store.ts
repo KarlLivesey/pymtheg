@@ -1390,6 +1390,9 @@ export class SqliteGraphStore implements GraphStorage {
     this.transaction(() => {});
     return true;
   }
+  claimIndexRun(): void {
+    if (this.indexRun.state === "pending") this.transaction(() => {});
+  }
   private readCompletedAnalysis(): ReadonlyMap<string, string> {
     const row = this.db
       .prepare("SELECT value FROM graph_meta WHERE key='analysis-complete'")
