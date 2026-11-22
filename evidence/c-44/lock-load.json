@@ -1,8 +1,10 @@
 {
- "rounds": 15,
- "inits": 900,
- "races": 60,
+ "rounds": 60,
+ "inits": 720,
+ "killedHolders": 60,
+ "revokes": 60,
  "lost": 0,
  "failed": 0,
- "falseRemovals": 0
+ "falseRemovals": 0,
+ "revokesMissed": 0
 }
