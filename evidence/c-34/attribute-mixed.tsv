@@ -1,0 +1,300 @@
+Pin	Other blockers on main	Exact origin classes	Links
+serde-rs/serde	several	built-in derive spelling + module item macro identity open + prelude or tool attribute spelling	4319
+serde-rs/serde	sole	built-in derive spelling + module item macro identity open + prelude or tool attribute spelling	3345
+rustls/rustls	several	built-in derive spelling + prelude or tool attribute spelling	2553
+helix-editor/helix	sole	built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open	2122
+rustls/rustls	sole	built-in derive spelling + prelude or tool attribute spelling	1573
+helix-editor/helix	sole	built-in derive spelling + other derive identity open	1484
+serde-rs/serde	sole	built-in derive spelling + other derive identity open	1240
+serde-rs/serde	several	built-in derive spelling + other derive identity open	1122
+rustls/rustls	several	built-in derive spelling + module item macro identity open + prelude or tool attribute spelling	928
+tokio-rs/axum	sole	attribute identity open + module macro_rules expansion	635
+rustls/rustls	several	built-in derive spelling + module item macro identity open + other derive identity open + prelude or tool attribute spelling	617
+helix-editor/helix	sole	module macro_rules expansion + other derive identity open	558
+rustls/rustls	several	built-in derive spelling + module macro_rules expansion + prelude or tool attribute spelling	477
+actix/actix-web	sole	built-in derive spelling + other derive identity open + procedural attribute	461
+tokio-rs/axum	sole	module item macro identity open + module macro_rules expansion	405
+tokio-rs/axum	several	attribute identity open + procedural attribute	392
+helix-editor/helix	sole	built-in derive spelling + module macro_rules expansion + other derive identity open	390
+actix/actix-web	several	module macro_rules expansion + procedural attribute	381
+rustls/rustls	several	module macro_rules expansion + prelude or tool attribute spelling	380
+cberner/redb	sole	built-in derive spelling + other derive identity open	374
+rustls/rustls	sole	attribute identity open + built-in derive spelling + other derive identity open	335
+tokio-rs/axum	several	attribute identity open + module macro_rules expansion	311
+rustls/rustls	several	built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open + prelude or tool attribute spelling	293
+actix/actix-web	sole	module macro_rules expansion + procedural attribute	272
+serde-rs/serde	sole	block-local macro_rules expansion + other derive identity open	259
+actix/actix-web	sole	built-in derive spelling + other derive identity open	258
+tokio-rs/axum	sole	attribute identity open + procedural attribute	254
+tokio-rs/axum	sole	attribute identity open + module macro_rules expansion + procedural attribute	232
+rustls/rustls	sole	built-in derive spelling + module item macro identity open + prelude or tool attribute spelling	229
+actix/actix-web	sole	attribute identity open + other derive identity open	220
+actix/actix-web	sole	attribute identity open + procedural attribute	215
+rustls/rustls	several	built-in derive spelling + module macro_rules expansion	213
+helix-editor/helix	several	built-in derive spelling + other derive identity open	209
+actix/actix-web	several	attribute identity open + procedural attribute	207
+serde-rs/serde	several	block statement macro identity open or external + built-in derive spelling + module item macro identity open + prelude or tool attribute spelling	197
+actix/actix-web	sole	built-in derive spelling + module item macro identity open + other derive identity open	190
+actix/actix-web	sole	external item macro + procedural attribute	188
+actix/actix-web	sole	module item macro identity open + procedural attribute	187
+serde-rs/serde	sole	module item macro identity open + prelude or tool attribute spelling	176
+rustls/rustls	sole	built-in derive spelling + module item macro identity open + other derive identity open + prelude or tool attribute spelling	169
+tokio-rs/axum	sole	attribute identity open + module item macro identity open + module macro_rules expansion	163
+tokio-rs/axum	several	module macro_rules expansion + procedural attribute	161
+rustls/rustls	several	built-in derive spelling + module item macro identity open	148
+serde-rs/serde	several	module item macro identity open + prelude or tool attribute spelling	146
+rustls/rustls	several	attribute identity open + built-in derive spelling + other derive identity open	141
+tokio-rs/axum	sole	module macro_rules expansion + procedural attribute	141
+actix/actix-web	several	built-in derive spelling + module item macro identity open + other derive identity open	139
+actix/actix-web	several	attribute identity open + module macro_rules expansion + procedural attribute	135
+actix/actix-web	several	external item macro + procedural attribute	135
+rustls/rustls	sole	built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open + prelude or tool attribute spelling	135
+actix/actix-web	several	attribute identity open + module macro_rules expansion	132
+tokio-rs/axum	several	attribute identity open + module macro_rules expansion + procedural attribute	125
+actix/actix-web	several	built-in derive spelling + other derive identity open + procedural attribute	122
+rustls/rustls	several	block statement macro identity open or external + built-in derive spelling	120
+actix/actix-web	several	attribute identity open + other derive identity open	119
+helix-editor/helix	several	built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open	116
+tokio-rs/axum	sole	built-in derive spelling + other derive identity open	115
+rustls/rustls	several	built-in derive spelling + other derive identity open + prelude or tool attribute spelling	114
+actix/actix-web	several	attribute identity open + other derive identity open + procedural attribute	113
+fjall-rs/fjall	sole	attribute identity open + other derive identity open	107
+serde-rs/serde	several	module item macro identity open + other derive identity open	107
+rustls/rustls	several	module item macro identity open + module macro_rules expansion	106
+rustls/rustls	sole	module macro_rules expansion + prelude or tool attribute spelling	106
+actix/actix-web	several	built-in derive spelling + other derive identity open	103
+tokio-rs/axum	sole	attribute identity open + module item macro identity open + other derive identity open	99
+rust-embedded/cortex-m	several	module item macro identity open + procedural attribute	98
+actix/actix-web	sole	other derive identity open + procedural attribute	93
+rustls/rustls	sole	block statement macro identity open or external + built-in derive spelling	91
+actix/actix-web	sole	built-in derive spelling + module item macro identity open + other derive identity open + procedural attribute	87
+rustls/rustls	sole	built-in derive spelling + module macro_rules expansion + prelude or tool attribute spelling	87
+fjall-rs/fjall	sole	built-in derive spelling + other derive identity open	86
+actix/actix-web	sole	built-in derive spelling + module macro_rules expansion + other derive identity open	83
+actix/actix-web	several	built-in derive spelling + module macro_rules expansion + other derive identity open	81
+actix/actix-web	sole	external derive identified + other derive identity open	81
+serde-rs/serde	sole	block statement macro identity open or external + built-in derive spelling + module item macro identity open + prelude or tool attribute spelling	80
+cberner/redb	sole	module item macro identity open + other derive identity open	76
+serde-rs/serde	sole	built-in derive proved + other derive identity open	74
+actix/actix-web	several	external derive identified + other derive identity open + procedural attribute	71
+actix/actix-web	several	external item macro + module macro_rules expansion	71
+actix/actix-web	sole	built-in derive spelling + module macro_rules expansion + other derive identity open + procedural attribute	71
+actix/actix-web	sole	attribute identity open + module macro_rules expansion + procedural attribute	70
+actix/actix-web	sole	external item macro + module item macro identity open	69
+rustls/rustls	several	built-in derive spelling + module item macro identity open + module macro_rules expansion + prelude or tool attribute spelling	69
+tokio-rs/axum	several	attribute identity open + module item macro identity open + module macro_rules expansion	67
+BurntSushi/ripgrep	sole	module macro_rules expansion + other derive identity open	66
+tokio-rs/axum	sole	attribute identity open + module macro_rules expansion + other derive identity open	65
+tokio-rs/axum	several	module item macro identity open + module macro_rules expansion	63
+rustls/rustls	sole	built-in derive spelling + other derive identity open	62
+tokio-rs/axum	several	attribute identity open + module macro_rules expansion + other derive identity open	62
+cberner/redb	sole	module item macro identity open + module macro_rules expansion	59
+actix/actix-web	several	attribute identity open + module macro_rules expansion + other derive identity open	56
+actix/actix-web	several	module item macro identity open + procedural attribute	53
+tokio-rs/axum	sole	attribute identity open + other derive identity open	52
+serde-rs/serde	several	built-in derive proved + other derive identity open	50
+actix/actix-web	several	module item macro identity open + prelude or tool attribute spelling	47
+rustls/rustls	sole	block statement macro identity open or external + module macro_rules expansion	47
+fjall-rs/fjall	sole	other derive identity open + procedural attribute	46
+rust-embedded/cortex-m	sole	module item macro identity open + procedural attribute	45
+rustls/rustls	sole	module item macro identity open + module macro_rules expansion + prelude or tool attribute spelling	43
+serde-rs/serde	several	block statement macro identity open or external + module item macro identity open + prelude or tool attribute spelling	41
+tokio-rs/axum	several	built-in derive spelling + other derive identity open	40
+tokio-rs/axum	sole	attribute identity open + built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open	40
+actix/actix-web	several	module macro_rules expansion + other derive identity open	39
+actix/actix-web	sole	module item macro identity open + prelude or tool attribute spelling	38
+helix-editor/helix	sole	built-in derive spelling + prelude or tool attribute spelling	37
+actix/actix-web	several	built-in derive spelling + module macro_rules expansion + other derive identity open + procedural attribute	36
+rustls/rustls	several	built-in derive spelling + module item macro identity open + module macro_rules expansion	36
+rustls/rustls	several	module item macro identity open + module macro_rules expansion + prelude or tool attribute spelling	36
+tokio-rs/axum	several	attribute identity open + module item macro identity open + other derive identity open	36
+tokio-rs/axum	several	attribute identity open + module item macro identity open + module macro_rules expansion + other derive identity open	35
+actix/actix-web	several	block statement macro identity open or external + procedural attribute	34
+helix-editor/helix	sole	module item macro identity open + other derive identity open	34
+helix-editor/helix	sole	block statement macro identity open or external + built-in derive spelling	33
+actix/actix-web	several	other derive identity open + procedural attribute	32
+serde-rs/serde	several	built-in derive spelling + module item macro identity open + other derive identity open	32
+fjall-rs/fjall	sole	attribute identity open + block statement macro identity open or external + other derive identity open	30
+tokio-rs/axum	several	block statement macro identity open or external + procedural attribute	30
+tokio-rs/axum	sole	block statement macro identity open or external + procedural attribute	30
+rustls/rustls	sole	built-in derive spelling + other derive identity open + prelude or tool attribute spelling	29
+actix/actix-web	several	attribute identity open + module macro_rules expansion + other derive identity open + procedural attribute	28
+fjall-rs/fjall	several	block statement macro identity open or external + other derive identity open + procedural attribute	28
+helix-editor/helix	sole	built-in derive spelling + module macro_rules expansion	28
+actix/actix-web	sole	attribute identity open + module macro_rules expansion	27
+helix-editor/helix	several	built-in derive spelling + prelude or tool attribute spelling	27
+helix-editor/helix	several	block statement macro identity open or external + built-in derive spelling	26
+rustls/rustls	sole	module item macro identity open + module macro_rules expansion	26
+actix/actix-web	several	external derive identified + other derive identity open	25
+fjall-rs/fjall	several	built-in derive spelling + other derive identity open	25
+cberner/redb	several	built-in derive spelling + other derive identity open	24
+helix-editor/helix	sole	built-in derive spelling + external item macro + other derive identity open	24
+rust-embedded/cortex-m	several	attribute identity open + prelude or tool attribute spelling + procedural attribute	24
+rust-embedded/cortex-m	sole	module macro_rules expansion + procedural attribute	24
+helix-editor/helix	sole	built-in derive spelling + external item macro	23
+tokio-rs/axum	sole	attribute identity open + module item macro identity open + module macro_rules expansion + other derive identity open	23
+actix/actix-web	several	module macro_rules expansion + other derive identity open + procedural attribute	22
+fjall-rs/fjall	sole	prelude or tool attribute spelling + procedural attribute	22
+rustls/rustls	several	block statement macro identity open or external + built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open + prelude or tool attribute spelling	22
+tokio-rs/axum	several	block-local macro_rules expansion + built-in derive spelling + other derive identity open	22
+tokio-rs/axum	sole	other derive identity open + procedural attribute	22
+actix/actix-web	several	built-in derive spelling + external item macro + module item macro identity open + other derive identity open + procedural attribute	21
+actix/actix-web	sole	module item macro identity open + other derive identity open	21
+fjall-rs/fjall	sole	block statement macro identity open or external + other derive identity open + procedural attribute	21
+rust-embedded/cortex-m	sole	attribute identity open + procedural attribute	21
+tokio-rs/axum	several	attribute identity open + block statement macro identity open or external + module item macro identity open + other derive identity open	21
+tokio-rs/axum	sole	attribute identity open + built-in derive spelling + other derive identity open	21
+actix/actix-web	sole	external derive identified + other derive identity open + procedural attribute	20
+tokio-rs/axum	sole	external item macro + module macro_rules expansion	20
+actix/actix-web	several	built-in derive spelling + module item macro identity open + other derive identity open + procedural attribute	19
+fjall-rs/fjall	several	attribute identity open + block statement macro identity open or external + other derive identity open	19
+fjall-rs/fjall	several	attribute identity open + other derive identity open	19
+actix/actix-web	several	attribute identity open + module item macro identity open	18
+actix/actix-web	several	module item macro identity open + other derive identity open	18
+cberner/redb	several	module item macro identity open + other derive identity open	18
+helix-editor/helix	several	built-in derive spelling + external derive identified + module macro_rules expansion + other derive identity open	18
+rust-embedded/cortex-m	sole	attribute identity open + prelude or tool attribute spelling + procedural attribute	18
+tokio-rs/axum	several	other derive identity open + procedural attribute	18
+crossbeam-rs/crossbeam	sole	block statement macro identity open or external + module macro_rules expansion	17
+helix-editor/helix	several	built-in derive spelling + module macro_rules expansion + other derive identity open	17
+helix-editor/helix	sole	built-in derive spelling + other derive identity open + prelude or tool attribute spelling	17
+tokio-rs/axum	several	attribute identity open + built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open	17
+cberner/redb	several	module item macro identity open + module macro_rules expansion	16
+rustls/rustls	sole	block statement macro identity open or external + built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open + prelude or tool attribute spelling	16
+rustls/rustls	sole	built-in derive spelling + module item macro identity open + module macro_rules expansion + prelude or tool attribute spelling	16
+rustls/rustls	sole	module item macro identity open + prelude or tool attribute spelling	16
+actix/actix-web	several	external item macro + module item macro identity open + procedural attribute	15
+fjall-rs/fjall	several	attribute identity open + other derive identity open + procedural attribute	15
+helix-editor/helix	sole	built-in derive spelling + external derive identified + module macro_rules expansion + other derive identity open	15
+rustls/rustls	several	block statement macro identity open or external + module macro_rules expansion	15
+fjall-rs/fjall	sole	attribute identity open + other derive identity open + procedural attribute	14
+actix/actix-web	several	block statement macro identity open or external + module macro_rules expansion + procedural attribute	13
+actix/actix-web	sole	block statement macro identity open or external + procedural attribute	12
+actix/actix-web	sole	external item macro + module macro_rules expansion	12
+fjall-rs/fjall	several	prelude or tool attribute spelling + procedural attribute	12
+rustls/rustls	several	block statement macro identity open or external + built-in derive spelling + prelude or tool attribute spelling	12
+rustls/rustls	several	module item macro identity open + prelude or tool attribute spelling	12
+serde-rs/serde	sole	block statement macro identity open or external + module item macro identity open + prelude or tool attribute spelling	12
+serde-rs/serde	sole	built-in derive proved + built-in derive spelling + other derive identity open	12
+actix/actix-web	sole	attribute identity open + other derive identity open + procedural attribute	11
+actix/actix-web	sole	block statement macro identity open or external + built-in derive spelling + module item macro identity open + other derive identity open + procedural attribute	11
+serde-rs/serde	several	built-in derive proved + built-in derive spelling + other derive identity open	11
+actix/actix-web	several	built-in derive spelling + external derive identified + module macro_rules expansion + other derive identity open	10
+rust-embedded/cortex-m	several	block statement macro identity open or external + module item macro identity open + procedural attribute	10
+serde-rs/serde	several	built-in derive spelling + module item macro identity open + other derive identity open + prelude or tool attribute spelling	10
+cberner/redb	several	attribute identity open + module item macro identity open + module macro_rules expansion	9
+crossbeam-rs/crossbeam	several	module macro_rules expansion + procedural attribute	9
+helix-editor/helix	sole	built-in derive spelling + module item macro identity open	9
+rust-embedded/cortex-m	several	attribute identity open + module item macro identity open + prelude or tool attribute spelling + procedural attribute	9
+rust-embedded/cortex-m	sole	attribute identity open + block statement macro identity open or external + procedural attribute	9
+rustls/rustls	several	attribute identity open + built-in derive spelling + module item macro identity open + other derive identity open	9
+tokio-rs/axum	several	attribute identity open + built-in derive spelling + other derive identity open	9
+tokio-rs/axum	several	attribute identity open + other derive identity open	9
+tokio-rs/axum	several	module macro_rules expansion + other derive identity open	9
+cberner/redb	sole	attribute identity open + module item macro identity open + module macro_rules expansion	8
+cberner/redb	sole	built-in derive spelling + module macro_rules expansion + other derive identity open	8
+helix-editor/helix	several	built-in derive spelling + other derive identity open + prelude or tool attribute spelling	8
+tokio-rs/axum	several	attribute identity open + built-in derive spelling + module macro_rules expansion + other derive identity open	8
+actix/actix-web	sole	external item macro + other derive identity open	7
+rustls/rustls	sole	block statement macro identity open or external + built-in derive spelling + module macro_rules expansion	7
+tokio-rs/axum	several	module macro_rules expansion + other derive identity open + procedural attribute	7
+tokio-rs/axum	sole	attribute identity open + block statement macro identity open or external + module item macro identity open + other derive identity open	7
+actix/actix-web	sole	built-in derive spelling + external item macro + module item macro identity open + other derive identity open + procedural attribute	6
+actix/actix-web	sole	built-in derive spelling + external item macro + other derive identity open + procedural attribute	6
+rust-embedded/cortex-m	several	attribute identity open + procedural attribute	6
+rustls/rustls	several	block statement macro identity open or external + prelude or tool attribute spelling	6
+tokio-rs/axum	sole	attribute identity open + built-in derive spelling + module macro_rules expansion + other derive identity open	6
+tokio-rs/axum	sole	module item macro identity open + module macro_rules expansion + other derive identity open + procedural attribute	6
+tokio-rs/axum	sole	module item macro identity open + module macro_rules expansion + other derive identity open	6
+actix/actix-web	several	external derive identified + module macro_rules expansion + other derive identity open	5
+rustls/rustls	several	block statement macro identity open or external + built-in derive spelling + module macro_rules expansion	5
+tokio-rs/axum	several	attribute identity open + built-in derive spelling + external item macro + other derive identity open	5
+tokio-rs/axum	several	external item macro + module macro_rules expansion	5
+actix/actix-web	several	attribute identity open + external item macro + other derive identity open	4
+actix/actix-web	several	block statement macro identity open or external + built-in derive spelling + module item macro identity open + other derive identity open + procedural attribute	4
+actix/actix-web	several	built-in derive spelling + external derive identified + other derive identity open	4
+actix/actix-web	several	external derive identified + module macro_rules expansion	4
+actix/actix-web	several	module item macro identity open + module macro_rules expansion	4
+actix/actix-web	sole	external derive identified + external item macro	4
+actix/actix-web	sole	external item macro + module item macro identity open + procedural attribute	4
+actix/actix-web	sole	external item macro + module macro_rules expansion + procedural attribute	4
+actix/actix-web	sole	module item macro identity open + module macro_rules expansion + procedural attribute	4
+crossbeam-rs/crossbeam	sole	module item macro identity open + module macro_rules expansion	4
+helix-editor/helix	several	built-in derive spelling + external item macro	4
+helix-editor/helix	sole	block-local macro_rules expansion + built-in derive spelling	4
+rust-embedded/cortex-m	several	attribute identity open + block statement macro identity open or external + prelude or tool attribute spelling + procedural attribute	4
+rust-embedded/cortex-m	several	block statement macro identity open or external + procedural attribute	4
+rustls/rustls	several	block statement macro identity open or external + built-in derive spelling + module item macro identity open	4
+rustls/rustls	sole	block statement macro identity open or external + prelude or tool attribute spelling	4
+tokio-rs/axum	sole	attribute identity open + block statement macro identity open or external + module item macro identity open + module macro_rules expansion + other derive identity open	4
+tokio-rs/axum	sole	attribute identity open + external item macro	4
+tokio-rs/axum	sole	block-local macro_rules expansion + built-in derive spelling + other derive identity open	4
+tokio-rs/axum	sole	module item macro identity open + module macro_rules expansion + procedural attribute	4
+actix/actix-web	several	external item macro + module item macro identity open	3
+fjall-rs/fjall	several	other derive identity open + procedural attribute	3
+helix-editor/helix	several	external item macro + module macro_rules expansion	3
+helix-editor/helix	sole	built-in derive spelling + external derive identified	3
+helix-editor/helix	sole	built-in derive spelling + module item macro identity open + other derive identity open	3
+helix-editor/helix	sole	built-in derive spelling + other derive identity open + procedural attribute	3
+helix-editor/helix	sole	other derive identity open + procedural attribute	3
+rust-embedded/cortex-m	sole	attribute identity open + module macro_rules expansion + procedural attribute	3
+rustls/rustls	several	built-in derive spelling + other derive identity open	3
+rustls/rustls	sole	built-in derive spelling + module macro_rules expansion + other derive identity open + prelude or tool attribute spelling	3
+serde-rs/serde	sole	module item macro identity open + other derive identity open	3
+tokio-rs/axum	several	attribute identity open + external item macro + procedural attribute	3
+tokio-rs/axum	several	attribute identity open + module item macro identity open	3
+tokio-rs/axum	several	external item macro + procedural attribute	3
+tokio-rs/axum	sole	module macro_rules expansion + other derive identity open + procedural attribute	3
+actix/actix-web	several	attribute identity open + built-in derive spelling + module macro_rules expansion + other derive identity open + procedural attribute	2
+actix/actix-web	several	attribute identity open + built-in derive spelling + module macro_rules expansion + other derive identity open	2
+actix/actix-web	several	attribute identity open + external item macro + module macro_rules expansion + other derive identity open	2
+actix/actix-web	several	built-in derive spelling + external item macro + other derive identity open + procedural attribute	2
+actix/actix-web	several	external item macro + other derive identity open	2
+actix/actix-web	several	module item macro identity open + module macro_rules expansion + procedural attribute	2
+actix/actix-web	sole	attribute identity open + built-in derive spelling + module macro_rules expansion + other derive identity open + procedural attribute	2
+actix/actix-web	sole	block statement macro identity open or external + module macro_rules expansion	2
+actix/actix-web	sole	module item macro identity open + module macro_rules expansion	2
+helix-editor/helix	several	module macro_rules expansion + other derive identity open	2
+rust-embedded/cortex-m	several	attribute identity open + module item macro identity open + procedural attribute	2
+rust-embedded/cortex-m	sole	block statement macro identity open or external + module item macro identity open + procedural attribute	2
+rust-embedded/cortex-m	sole	block statement macro identity open or external + procedural attribute	2
+rustls/rustls	several	attribute identity open + built-in derive spelling + module macro_rules expansion + other derive identity open	2
+rustls/rustls	several	built-in derive spelling + procedural attribute	2
+rustls/rustls	sole	attribute identity open + block statement macro identity open or external + built-in derive spelling + other derive identity open	2
+rustls/rustls	sole	built-in derive spelling + module macro_rules expansion	2
+rustls/rustls	sole	external derive identified + procedural attribute	2
+tokio-rs/axum	several	module item macro identity open + module macro_rules expansion + other derive identity open	2
+tokio-rs/axum	sole	module item macro identity open + other derive identity open	2
+actix/actix-web	several	attribute identity open + external derive identified + other derive identity open	1
+actix/actix-web	several	built-in derive spelling + external derive identified + external item macro + other derive identity open + procedural attribute	1
+actix/actix-web	several	external derive identified + external item macro	1
+actix/actix-web	sole	attribute identity open + built-in derive spelling + module macro_rules expansion + other derive identity open	1
+actix/actix-web	sole	attribute identity open + module macro_rules expansion + other derive identity open	1
+actix/actix-web	sole	external derive identified + module macro_rules expansion	1
+actix/actix-web	sole	module macro_rules expansion + other derive identity open	1
+cberner/redb	sole	built-in derive proved + other derive identity open	1
+crossbeam-rs/crossbeam	several	module item macro identity open + module macro_rules expansion	1
+helix-editor/helix	several	block-local macro_rules expansion + built-in derive spelling	1
+helix-editor/helix	several	built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open + prelude or tool attribute spelling	1
+helix-editor/helix	several	built-in derive spelling + module item macro identity open + other derive identity open + prelude or tool attribute spelling	1
+helix-editor/helix	several	built-in derive spelling + module item macro identity open	1
+helix-editor/helix	sole	built-in derive spelling + module item macro identity open + module macro_rules expansion + other derive identity open + prelude or tool attribute spelling	1
+helix-editor/helix	sole	built-in derive spelling + module item macro identity open + other derive identity open + prelude or tool attribute spelling	1
+helix-editor/helix	sole	built-in derive spelling + procedural attribute	1
+rust-embedded/cortex-m	several	attribute identity open + block statement macro identity open or external + module item macro identity open + procedural attribute	1
+rust-embedded/cortex-m	several	attribute identity open + block statement macro identity open or external + procedural attribute	1
+rust-embedded/cortex-m	several	attribute identity open + module macro_rules expansion	1
+rust-embedded/cortex-m	sole	attribute identity open + block statement macro identity open or external	1
+rust-embedded/cortex-m	sole	module item macro identity open + module macro_rules expansion	1
+rust-embedded/cortex-m	sole	prelude or tool attribute spelling + procedural attribute	1
+rustls/rustls	several	block statement macro identity open or external + built-in derive spelling + module item macro identity open + other derive identity open + prelude or tool attribute spelling	1
+rustls/rustls	several	block statement macro identity open or external + built-in derive spelling + module item macro identity open + prelude or tool attribute spelling	1
+rustls/rustls	several	built-in derive spelling + module macro_rules expansion + other derive identity open + prelude or tool attribute spelling	1
+rustls/rustls	sole	attribute identity open + built-in derive spelling + module macro_rules expansion + other derive identity open	1
+rustls/rustls	sole	block statement macro identity open or external + built-in derive spelling + prelude or tool attribute spelling	1
+tokio-rs/axum	several	attribute identity open + external derive identified	1
+tokio-rs/axum	sole	attribute identity open + built-in derive spelling + external item macro + other derive identity open	1
+tokio-rs/axum	sole	block statement macro identity open or external + module macro_rules expansion	1
+tokio-rs/axum	sole	external derive identified + module item macro identity open + module macro_rules expansion	1
+tokio-rs/axum	sole	external item macro + procedural attribute	1
+tokio-rs/axum	sole	module item macro identity open + procedural attribute	1

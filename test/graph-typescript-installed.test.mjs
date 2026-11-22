@@ -553,6 +553,61 @@ test("an augmentation contributes its members, not the installed module's identi
   });
 });
 
+test("an installed directory augmentation keeps the original type identity", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "tsconfig.json",
+    '{"compilerOptions":{"module":"CommonJS","moduleResolution":"Node10","esModuleInterop":true},"files":["main.ts"]}',
+  );
+  await write(
+    "main.ts",
+    [
+      'import CodeMirror from "codemirror";',
+      'import "codemirror/addon/edit/closebrackets";',
+      "export type Options = CodeMirror.EditorConfiguration;",
+      "export type Extra = CodeMirror.EmptyOptions;",
+      "declare const options: Options;",
+      "options.closeBrackets();",
+    ].join("\n"),
+  );
+  const types = "node_modules/@types/codemirror";
+  await write(`${types}/package.json`, manifest("@types/codemirror", "1.0.0"));
+  await write(
+    `${types}/index.d.ts`,
+    "declare namespace CodeMirror { interface EditorConfiguration { lineNumbers?: boolean } interface EmptyOptions {} } export = CodeMirror;",
+  );
+  await write(
+    `${types}/addon/edit/closebrackets.d.ts`,
+    'import "../../"; declare module "../../" { interface EditorConfiguration { closeBrackets(): void } interface EmptyOptions { enabled: boolean } }',
+  );
+  await request("index");
+  read((store, call) => {
+    const type = store
+      .links()
+      .find(
+        ({ kind, targetName }) =>
+          kind === "references" &&
+          targetName === "CodeMirror.EditorConfiguration",
+      );
+    assert.deepEqual(target(type), {
+      ecosystem: "npm",
+      unit: "codemirror",
+      symbol: "CodeMirror.EditorConfiguration",
+      version: "1.0.0",
+      versionSource: `${types}/package.json`,
+      evidence: "declaring-owner",
+    });
+    const empty = store
+      .links()
+      .find(({ targetName }) => targetName === "CodeMirror.EmptyOptions");
+    assert.equal(target(empty).symbol, "CodeMirror.EmptyOptions");
+    assert.equal(
+      target(call("main.ts", "options.closeBrackets")).symbol,
+      "EditorConfiguration.prototype.closeBrackets",
+    );
+  });
+});
+
 test("a qualified installed type uses its declaration without a runtime receiver", async () => {
   const { request, read, write } = await project();
   await write(
@@ -1363,5 +1418,70 @@ test("a call on a member merged from several declarations links the declaration 
       run.resolution !== "library" || run.libraries.length !== 1,
       JSON.stringify(run),
     );
+  });
+});
+
+test("a merged-member call keeps one identity for a same-package directory augmentation", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "tsconfig.json",
+    '{"compilerOptions":{"module":"CommonJS","moduleResolution":"Node10","esModuleInterop":true},"files":["main.ts"]}',
+  );
+  const types = "node_modules/@types/codemirror";
+  await write(`${types}/package.json`, manifest("@types/codemirror", "1.0.0"));
+  await write(
+    `${types}/index.d.ts`,
+    "declare namespace CodeMirror { interface Editor { setOption(name: 'a'): void } } export = CodeMirror;",
+  );
+  await write(
+    `${types}/addon/edit/closebrackets.d.ts`,
+    'import "../../"; declare module "../../" { interface Editor { setOption(name: \'b\'): void } }',
+  );
+  await write(
+    "node_modules/cm-extra/package.json",
+    manifest("cm-extra", "1.0.0"),
+  );
+  await write(
+    "node_modules/cm-extra/index.d.ts",
+    "import 'codemirror'; declare module 'codemirror' { interface Editor { setOption(name: 'c'): void } }\nexport {};\n",
+  );
+  await write(
+    "main.ts",
+    [
+      'import CodeMirror from "codemirror";',
+      'import "codemirror/addon/edit/closebrackets";',
+      'import "cm-extra";',
+      "declare const a: CodeMirror.Editor;",
+      "declare const b: CodeMirror.Editor;",
+      "declare const c: CodeMirror.Editor;",
+      "a.setOption('a');",
+      "b.setOption('b');",
+      "c.setOption('c');",
+    ].join("\n"),
+  );
+  await request("index");
+  read((_, call) => {
+    // The original's overload: its own identity.
+    assert.deepEqual(
+      [target(call("main.ts", "a.setOption"))].map(({ unit, symbol }) => [
+        unit,
+        symbol,
+      ]),
+      [["codemirror", "CodeMirror.Editor.prototype.setOption"]],
+    );
+    // The same-package augmentation's overload never gets an identity of its
+    // own: it is not narrowed away from the original's.
+    const own = call("main.ts", "b.setOption");
+    assert.ok(
+      own.resolution !== "library" ||
+        own.libraries.every(({ unit, symbol }) =>
+          unit === "codemirror"
+            ? symbol === "CodeMirror.Editor.prototype.setOption"
+            : true,
+        ),
+      JSON.stringify(own),
+    );
+    // Another package's overload: that package's declaration.
+    assert.equal(target(call("main.ts", "c.setOption")).unit, "cm-extra");
   });
 });

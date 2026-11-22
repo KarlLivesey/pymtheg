@@ -9,6 +9,7 @@ const compact = (s: string) => s.replace(/\s+/g, "").replace(/\br#/g, "");
 
 export type MacroInput = {
   names: string[];
+  identifierList?: true;
   hasItemIdentifier?: true;
   hasAttributes?: true;
   itemNames?: string[];
@@ -69,6 +70,16 @@ export function macroInput(
       ].some((name) => names.has(name)));
   return {
     names: [...names].sort(),
+    ...(!attachedItem &&
+    nodes.length === 1 &&
+    isGroup(nodes[0]) &&
+    inner(nodes[0]!).every(
+      (token) =>
+        token.type === "," ||
+        /^[_\p{ID_Start}][_\p{ID_Continue}]*$/u.test(token.text),
+    )
+      ? { identifierList: true }
+      : {}),
     ...(hasItemIdentifier &&
     !nodes.every((node) =>
       /^[\w.-]+(?:[/\\][\w.-]+)+$|^[\w-]+\.[\w.-]+$/.test(
@@ -332,7 +343,59 @@ export type MacroScopeProfile = {
   inputCanBind: boolean;
   opaque: boolean;
   keywordFromInput: boolean;
+  /** With identifier-only input, the arm emits only implementation items. */
+  implOnly?: true;
 };
+
+function implSequence(tokens: Node[]): boolean {
+  // A fixed impl keyword and delimiter enclose the associated items. A
+  // substituted identifier cannot end that item or open a new one.
+  const headerToken = (n: Node): boolean =>
+    n.type !== ";" &&
+    !opens(n, "{") &&
+    (n.type !== "token_repetition" || inner(n).every(headerToken));
+  const plainRepetition = (n: Node): boolean => {
+    const close = n.children.find((child) => child.type === ")");
+    const op = n.children.at(-1);
+    if (!close || !op) return false;
+    // The grammar does not always expose the separator as a child.
+    const separator = n.text
+      .slice(close.endIndex - n.startIndex, op.startIndex - n.startIndex)
+      .trim();
+    return separator === "" || separator === ",";
+  };
+  const reservedAttribute = (n: Node | undefined): boolean => {
+    if (!opens(n, "[")) return false;
+    const [name, args, extra] = inner(n!);
+    return (
+      !extra &&
+      ((name?.text === "inline" && (!args || opens(args, "("))) ||
+        ((name?.text === "allow" || name?.text === "cfg") && opens(args, "(")))
+    );
+  };
+  // A nested macro could export to the crate root, so read each body too.
+  // These reserved attributes keep or remove the annotated item.
+  const closed = (seq: Node[]): boolean =>
+    seq.every(
+      (n, i) =>
+        !n.hasError &&
+        !n.isMissing &&
+        !["!", "$", "macro", "macro_rules"].includes(word(n)) &&
+        (n.type !== "#" || reservedAttribute(seq[i + 1])) &&
+        (n.type !== "token_repetition" || plainRepetition(n)) &&
+        (!(isGroup(n) || n.type === "token_repetition") || closed(inner(n))),
+    );
+  for (let i = 0; i < tokens.length; ) {
+    if (tokens[i++]?.text !== "impl") return false;
+    const start = i;
+    while (i < tokens.length && !opens(tokens[i], "{")) {
+      if (!headerToken(tokens[i++]!)) return false;
+    }
+    if (i === start || i === tokens.length) return false;
+    i++;
+  }
+  return closed(tokens);
+}
 
 function scopeRepetitionsAreWhole(tokens: Node[]): boolean {
   return tokens.every((token, index) => {
@@ -566,7 +629,8 @@ export function macroProfile(definition: Node): MacroProfile {
     clean = true,
     scopeInputCanBind = false,
     scopeOpaque = false,
-    scopeKeywordFromInput = false;
+    scopeKeywordFromInput = false,
+    scopeImplOnly = rules.length > 0;
   let blockLocal = false;
   for (let a = definition.parent; a && a.type !== "source_file"; a = a.parent)
     if (a.type === "block") blockLocal = true;
@@ -604,6 +668,7 @@ export function macroProfile(definition: Node): MacroProfile {
     let armForwards = false;
     // Neutrality: inspect the top level of the transcriber.
     const transcriber = inner(body);
+    scopeImplOnly &&= implSequence(transcriber);
     const top = flat(transcriber);
     const scope = inspectScope(top, kinds, scopeNames);
     scopeInputCanBind ||= scope.inputCanBind;
@@ -785,6 +850,7 @@ export function macroProfile(definition: Node): MacroProfile {
       inputCanBind: scopeInputCanBind,
       opaque: !readable || scopeOpaque,
       keywordFromInput: scopeKeywordFromInput,
+      ...(readable && scopeOpaque && scopeImplOnly ? { implOnly: true } : {}),
     },
     forwards: readable && forwards ? [...forwardTargets].sort() : null,
     forwardShadow: [...forwardShadow].sort(),

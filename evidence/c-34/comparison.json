@@ -1,0 +1,393 @@
+{
+  "pins": [
+    {
+      "id": "BurntSushi/ripgrep",
+      "before": {
+        "links": 39819,
+        "level2": 26307,
+        "assumed": 1,
+        "blank": 0
+      },
+      "after": {
+        "links": 39819,
+        "level2": 26307,
+        "assumed": 1,
+        "blank": 0
+      },
+      "common": {
+        "links": 39819,
+        "before": 26307,
+        "after": 26307,
+        "beforeAssumed": 1,
+        "afterAssumed": 1
+      },
+      "compared": 26311,
+      "lost": 0,
+      "symbolsBefore": 4392,
+      "symbolsAfter": 4392,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 1288,
+        "after": 1288,
+        "liftedToLevel2": 0,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "actix/actix-web",
+      "before": {
+        "links": 86640,
+        "level2": 35578,
+        "assumed": 3105,
+        "blank": 0
+      },
+      "after": {
+        "links": 86640,
+        "level2": 35725,
+        "assumed": 3111,
+        "blank": 0
+      },
+      "common": {
+        "links": 86640,
+        "before": 35578,
+        "after": 35725,
+        "beforeAssumed": 3105,
+        "afterAssumed": 3111
+      },
+      "compared": 35591,
+      "lost": 0,
+      "symbolsBefore": 7702,
+      "symbolsAfter": 7702,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 24370,
+        "after": 24223,
+        "liftedToLevel2": 147,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "cberner/redb",
+      "before": {
+        "links": 73731,
+        "level2": 35133,
+        "assumed": 110,
+        "blank": 0
+      },
+      "after": {
+        "links": 73731,
+        "level2": 35139,
+        "assumed": 110,
+        "blank": 0
+      },
+      "common": {
+        "links": 73731,
+        "before": 35133,
+        "after": 35139,
+        "beforeAssumed": 110,
+        "afterAssumed": 110
+      },
+      "compared": 35134,
+      "lost": 0,
+      "symbolsBefore": 5523,
+      "symbolsAfter": 5523,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 8892,
+        "after": 8886,
+        "liftedToLevel2": 6,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "crossbeam-rs/crossbeam",
+      "before": {
+        "links": 34081,
+        "level2": 19103,
+        "assumed": 0,
+        "blank": 0
+      },
+      "after": {
+        "links": 34081,
+        "level2": 19103,
+        "assumed": 0,
+        "blank": 0
+      },
+      "common": {
+        "links": 34081,
+        "before": 19103,
+        "after": 19103,
+        "beforeAssumed": 0,
+        "afterAssumed": 0
+      },
+      "compared": 19125,
+      "lost": 0,
+      "symbolsBefore": 3367,
+      "symbolsAfter": 3367,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 995,
+        "after": 995,
+        "liftedToLevel2": 0,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "fjall-rs/fjall",
+      "before": {
+        "links": 13361,
+        "level2": 5970,
+        "assumed": 0,
+        "blank": 0
+      },
+      "after": {
+        "links": 13361,
+        "level2": 5970,
+        "assumed": 0,
+        "blank": 0
+      },
+      "common": {
+        "links": 13361,
+        "before": 5970,
+        "after": 5970,
+        "beforeAssumed": 0,
+        "afterAssumed": 0
+      },
+      "compared": 5970,
+      "lost": 0,
+      "symbolsBefore": 1177,
+      "symbolsAfter": 1177,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 2346,
+        "after": 2346,
+        "liftedToLevel2": 0,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "helix-editor/helix",
+      "before": {
+        "links": 90583,
+        "level2": 40639,
+        "assumed": 2491,
+        "blank": 0
+      },
+      "after": {
+        "links": 90583,
+        "level2": 40639,
+        "assumed": 2491,
+        "blank": 0
+      },
+      "common": {
+        "links": 90583,
+        "before": 40639,
+        "after": 40639,
+        "beforeAssumed": 2491,
+        "afterAssumed": 2491
+      },
+      "compared": 40652,
+      "lost": 0,
+      "symbolsBefore": 8351,
+      "symbolsAfter": 8351,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 27092,
+        "after": 27092,
+        "liftedToLevel2": 0,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "before": {
+        "links": 5531,
+        "level2": 3347,
+        "assumed": 7,
+        "blank": 0
+      },
+      "after": {
+        "links": 5531,
+        "level2": 3347,
+        "assumed": 7,
+        "blank": 0
+      },
+      "common": {
+        "links": 5531,
+        "before": 3347,
+        "after": 3347,
+        "beforeAssumed": 7,
+        "afterAssumed": 7
+      },
+      "compared": 3375,
+      "lost": 0,
+      "symbolsBefore": 1361,
+      "symbolsAfter": 1361,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 862,
+        "after": 862,
+        "liftedToLevel2": 0,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "rustls/rustls",
+      "before": {
+        "links": 70802,
+        "level2": 22988,
+        "assumed": 299,
+        "blank": 0
+      },
+      "after": {
+        "links": 70802,
+        "level2": 22988,
+        "assumed": 299,
+        "blank": 0
+      },
+      "common": {
+        "links": 70802,
+        "before": 22988,
+        "after": 22988,
+        "beforeAssumed": 299,
+        "afterAssumed": 299
+      },
+      "compared": 23006,
+      "lost": 0,
+      "symbolsBefore": 7269,
+      "symbolsAfter": 7269,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 22227,
+        "after": 22227,
+        "liftedToLevel2": 0,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "serde-rs/serde",
+      "before": {
+        "links": 30714,
+        "level2": 8297,
+        "assumed": 0,
+        "blank": 0
+      },
+      "after": {
+        "links": 30714,
+        "level2": 8297,
+        "assumed": 0,
+        "blank": 0
+      },
+      "common": {
+        "links": 30714,
+        "before": 8297,
+        "after": 8297,
+        "beforeAssumed": 0,
+        "afterAssumed": 0
+      },
+      "compared": 8306,
+      "lost": 0,
+      "symbolsBefore": 4246,
+      "symbolsAfter": 4246,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 14981,
+        "after": 14981,
+        "liftedToLevel2": 0,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    },
+    {
+      "id": "tokio-rs/axum",
+      "before": {
+        "links": 41067,
+        "level2": 16412,
+        "assumed": 1144,
+        "blank": 0
+      },
+      "after": {
+        "links": 41067,
+        "level2": 16564,
+        "assumed": 1144,
+        "blank": 0
+      },
+      "common": {
+        "links": 41067,
+        "before": 16412,
+        "after": 16564,
+        "beforeAssumed": 1144,
+        "afterAssumed": 1144
+      },
+      "compared": 16417,
+      "lost": 0,
+      "symbolsBefore": 4552,
+      "symbolsAfter": 4552,
+      "symbolLoss": 0,
+      "symbolGain": 0,
+      "opacity": {
+        "before": 12891,
+        "after": 12739,
+        "liftedToLevel2": 152,
+        "removedBelowLevel2": 0,
+        "gainedBelowLevel2": 0
+      },
+      "remainingReasons": {}
+    }
+  ],
+  "totals": {
+    "before": {
+      "links": 486329,
+      "level2": 213774,
+      "assumed": 7157,
+      "blank": 0
+    },
+    "after": {
+      "links": 486329,
+      "level2": 214079,
+      "assumed": 7163,
+      "blank": 0
+    },
+    "common": {
+      "links": 486329,
+      "before": 213774,
+      "after": 214079,
+      "beforeAssumed": 7157,
+      "afterAssumed": 7163
+    },
+    "opacity": {
+      "before": 115944,
+      "after": 115639,
+      "liftedToLevel2": 305,
+      "removedBelowLevel2": 0,
+      "gainedBelowLevel2": 0
+    }
+  },
+  "changes": []
+}
