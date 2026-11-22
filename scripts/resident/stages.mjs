@@ -40,10 +40,12 @@ export function groups(r) {
     ]),
     parse: sumOf(r, languages.map((id) => `parse.${id}`)),
     "analysis (language)": sumOf(r, languages.map((id) => `analyze.${id}`)),
-    "resolution (language)": sumOf(r, [
-      ...languages.map((id) => `resolve.${id}.withInput`),
-      ...languages.map((id) => `resolve.${id}.validate`),
-    ]),
+    // The resolver's input reads run inside its withInput stage.
+    "resolution (language)":
+      sumOf(r, [
+        ...languages.map((id) => `resolve.${id}.withInput`),
+        ...languages.map((id) => `resolve.${id}.validate`),
+      ]) - sumOf(r, languages.map((id) => `resolve.${id}.input`)),
     "store writes and completion": sumOf(r, [
       "store.writeParsed",
       "store.beginRun",
@@ -110,4 +112,43 @@ else {
   console.log(`|---|---|${cn.map(() => "--:").join("|")}|`);
   for (const row of out)
     console.log(`| ${row.pin} | ${row.step} | ${cn.map((n) => row.counters[n]).join(" | ")} |`);
+}
+
+// --achievable: what a one-file edit would cost if what a resident process
+// could keep were kept. "kept setup" removes process start and module load
+// and the stored inputs read (valid while the completion record is the
+// session's own). "floor" also keeps per-language setup that the edit does
+// not change: it counts the tree hash, parse and store writes, plus the
+// share of analysis and resolution that the edit's files need. That share
+// is counted for Go (files whose links are re-decided, of the module's
+// files) and assumed to be the edited file alone for TypeScript and Rust (a
+// lower bound: dependents of a surface edit are not counted).
+if (args.includes("--achievable")) {
+  console.log("");
+  console.log(
+    "| Pin | Edit | Now CPU s | Without start, load and stored inputs | Floor (estimate) | Share of analysis and resolution kept in the floor |",
+  );
+  console.log("|---|---|--:|--:|--:|--:|");
+  for (const row of out) {
+    if (row.step === "warm") continue;
+    const g = row.groups;
+    const c = row.counters;
+    const kept =
+      row.totalCpuMs -
+      g["process start and module load"] -
+      g["stored inputs read"];
+    const files = Math.max(1, c.analysisInputFiles);
+    const needed = c.goDecisionFiles
+      ? c.goDecisionFiles / files
+      : 1 / Math.max(files, c.tsFilesExtracted);
+    const work = g["analysis (language)"] + g["resolution (language)"];
+    const floor =
+      g["tree hash and snapshot"] +
+      g.parse +
+      g["store writes and completion"] +
+      work * needed;
+    console.log(
+      `| ${row.pin} | ${row.step} | ${(row.totalCpuMs / 1000).toFixed(1)} | ${(kept / 1000).toFixed(1)} | ${(floor / 1000).toFixed(1)} | ${(100 * needed).toFixed(2)}% |`,
+    );
+  }
 }
