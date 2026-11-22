@@ -3126,3 +3126,21 @@ read and hash the bytes of each file. Filesystem timestamps can describe a
 metadata-only change or hide an edit. Scoped Go resolution and validation use
 projections of existing facts. No second copy of the global indexes is kept
 in the store. [C-33](changes/C-33.md)
+
+### Rust re-index can reuse decisions outside the edited files (C-36)
+
+**Decided (C-36).** The Rust module uses the C-27 scoped analysis contract
+unchanged. It returns the edited paths alone only when every edited file is
+clean before and after, keeps its surface, and meets no lookup cycle cut
+while its links are decided. The surface is everything another file's
+resolution reads from the file: its symbols, file data and `imports`,
+`contains`, `macros` and `modules` links with their place in the link list,
+with source offsets replaced by their rank. The cut check runs with the
+new facts and, unless all facts are the same up to offset ranks, with the
+old ones, in both Rust passes. An answer met without a cut does not depend
+on which lookups ran before it. Every other edit, a changed Cargo context,
+an added, removed or failed file, and missing completion evidence use the
+full Rust pass. The scoped resolve pass rebuilds every link from the stored
+records in the store's id order, so it decides with the exact input the
+analysis checked. The C-22 cold equality rule and run ownership apply.
+[C-36](changes/C-36.md)

@@ -190,3 +190,21 @@ test("Rust: a re-index killed after any write is repaired by the next one", asyn
   assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
   t.diagnostic(`write boundaries: ${tried}`);
 });
+
+test("Rust: a killed scoped re-index is repaired by the next one", async (t) => {
+  const a = "pub fn hello() -> u32 {\n    1\n}\n";
+  const tried = await everyKillPoint(
+    {
+      "Cargo.toml":
+        '[package]\nname = "fixture"\nversion = "0.1.0"\nedition = "2021"\n',
+      "src/lib.rs": "pub mod a;\npub mod b;\n",
+      "src/a.rs": a,
+      "src/b.rs":
+        "use crate::a::hello;\n\npub fn b() -> u32 {\n    hello()\n}\n",
+    },
+    // A comment keeps a.rs's surface: only a.rs is re-decided.
+    { "src/a.rs": "// moved\n" + a },
+  );
+  assert.ok(tried >= 3, `write boundaries tried: ${tried}`);
+  t.diagnostic(`write boundaries: ${tried}`);
+});

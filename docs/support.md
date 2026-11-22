@@ -939,6 +939,15 @@ An unfinished run or a direct graph write requires recovery. The opt-in
 toolchain route uses a full pass. The same file tree produces the same
 graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
+Rust can reuse the stored link decisions outside the edited files. A comment,
+whitespace or body edit that leaves every fact another file reads unchanged
+re-decides only the edited file, unless deciding its links meets a lookup
+cycle, as in modules that glob each other. Any other change to symbols,
+imports, macros, modules, attributes or cfg conditions, a Cargo manifest,
+lockfile or configuration change, an added, removed or unreadable file, or an
+unfinished previous run uses the full Rust pass. The same file tree produces
+the same graph after a fresh or incremental index. [C-36](changes/C-36.md)
+
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing
 `.pymtheg/settings.json` (which must keep its `version: 1` and `scenarios`; a
