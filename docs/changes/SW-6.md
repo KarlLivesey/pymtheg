@@ -25,6 +25,11 @@ Installed Level 2 on the 20 TypeScript pins is **85.79%**: 1,238,834 of
 
 The Go and Rust sections of the plan are unchanged since SW-5.
 
+C-24, C-35 and C-26 merged after the measured commit, and are not in these
+figures. C-26 (pull request 35) is the analysis watchdog aimed at
+microsoft/TypeScript, so that pin's outcome here predates it. Its installed
+figure needs a new attempt on current main.
+
 ## Per-pin installed TypeScript Level 2
 
 | Pin | Installed attempt | Links | Level 2 SW-5 → SW-6 | Proven SW-6 | Assumption-marked SW-6 |

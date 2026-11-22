@@ -49,7 +49,8 @@ SW-5's, which are SW-4's measurements, unchanged.
 - **microsoft/TypeScript** installed, then reached the 60-minute limit
   during cold indexing (`graph analyze typescript: 0/27194`, exit 137, peak
   4,952 MiB). This was one attempt, as asked. Its receipt contributes no
-  TypeScript links.
+  TypeScript links. C-26 (the analysis watchdog for this pin) merged after the measured
+  commit, so this outcome predates it.
 - **vercel/turborepo** finished the full mixed-language sweep, with all
   languages, in 1,755 s (cold index 1,272 s, peak 5,529 MiB), inside the
   limit. Its TypeScript graph has 53,495 links at 46.98% Level 2 (30.61%
