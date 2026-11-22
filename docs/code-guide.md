@@ -260,7 +260,7 @@ that was never initialised initialises it exactly as `pymtheg init` would
 the planning database itself is ignored by Git). That write needs the answer
 to init's question, whether the repository is trusted (decision D22):
 `trust: "trusted"` lets the languages' official tools run on it, as building
-it would, and `trust: "source-only"` runs no build tool and no code from it. Without it, the
+it would, and `trust: "source-only"` means Pymtheg starts no program on its behalf, neither a build tool nor Git. Without it, the
 call returns the question and initialises nothing; ask your user or follow
 your standing instructions, then call again with `trust`.
 

@@ -12,9 +12,11 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   statSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -37,7 +39,6 @@ import {
   readLocalTrust,
   revokeTrust,
   trustFile,
-  trustLockHooks,
   writeLocalTrust,
 } from "../dist/project/local-trust.js";
 import { askTrust, TrustCancelled } from "../dist/project/trust.js";
@@ -500,7 +501,7 @@ test("graph answers report the trust on this machine: unanswered says how to ans
         assert.equal(response.trust, "unanswered");
         assert.match(
           response.trustAnswer,
-          /^No trust answer on this machine, so no build tool and no code from this repository is run\./,
+          /^No trust answer on this machine, so Pymtheg starts no program on this repository's behalf/,
         );
       } else {
         assert.equal(response.trust, "source-only");
@@ -976,24 +977,6 @@ test("a corrupt answers file is moved aside, user-only, not silently replaced; t
   });
 });
 
-test(
-  "a lock left by a reused pid (another start time) is taken over",
-  { skip: process.platform !== "linux" && "start times come from /proc" },
-  async () => {
-    await scratch(async (root) => {
-      await initializeWorkspace(root);
-      mkdirSync(dirname(trustFile()), { recursive: true });
-      // This process's pid, with a start time it does not have.
-      await writeFile(
-        join(dirname(trustFile()), "trust.json.lock"),
-        `${process.pid} 1 stale-token`,
-      );
-      await writeLocalTrust(root, "trusted");
-      assert.equal(await checkoutTrust(root), "trusted");
-    });
-  },
-);
-
 test("a tool path reaching the checkout through a symlink chain, or a checkout opened through a symlinked parent, is refused", async () => {
   await scratch(async (root) => {
     const real = join(root, "real");
@@ -1036,87 +1019,6 @@ const gate = () => {
   const promise = new Promise((resolve) => (open = resolve));
   return { promise, open };
 };
-
-test("the lock: a writer holding it makes another wait until it is done; both answers are kept", async () => {
-  await scratch(async (root) => {
-    const [a, b] = [join(root, "a"), join(root, "b")];
-    for (const project of [a, b]) await initializeWorkspace(project);
-    const entered = gate(),
-      proceed = gate(),
-      bWaiting = gate();
-    let first = true;
-    trustLockHooks.afterLock = async () => {
-      if (!first) return;
-      first = false;
-      entered.open();
-      await proceed.promise;
-    };
-    trustLockHooks.onWait = (why) => why === "held" && bWaiting.open();
-    try {
-      const writingA = writeLocalTrust(a, "trusted");
-      await entered.promise;
-      let bDone = false;
-      const writingB = writeLocalTrust(b, "source-only").then(
-        () => (bDone = true),
-      );
-      await bWaiting.promise;
-      assert.equal(bDone, false, "B wrote while A held the lock");
-      proceed.open();
-      await Promise.all([writingA, writingB]);
-    } finally {
-      trustLockHooks.afterLock = undefined;
-      trustLockHooks.onWait = undefined;
-    }
-    assert.equal(await checkoutTrust(a), "trusted");
-    assert.equal(await checkoutTrust(b), "source-only");
-  });
-});
-
-test("the lock: an unreadable lock is held, never taken; a dead owner's lock is taken over; a foreign lock is never released", async () => {
-  await scratch(async (root) => {
-    await initializeWorkspace(root);
-    const lock = join(dirname(trustFile()), "trust.json.lock");
-    mkdirSync(dirname(lock), { recursive: true });
-    // Unreadable (empty, as a lock being created would look to a reader once).
-    await writeFile(lock, "");
-    const waiting = gate();
-    trustLockHooks.onWait = (why) => why === "unreadable" && waiting.open();
-    try {
-      let done = false;
-      const writing = writeLocalTrust(root, "trusted").then(
-        () => (done = true),
-      );
-      await waiting.promise;
-      assert.equal(done, false, "an unreadable lock was taken");
-      await rm(lock);
-      await writing;
-    } finally {
-      trustLockHooks.onWait = undefined;
-    }
-    assert.equal(await checkoutTrust(root), "trusted");
-    // A dead owner (a process that has exited): taken over.
-    const dead = spawnSync(
-      process.execPath,
-      ["-e", "process.stdout.write(String(process.pid))"],
-      { encoding: "utf8" },
-    );
-    await writeFile(lock, `${dead.stdout} 1 dead-token`);
-    await revokeTrust(root);
-    assert.equal(await checkoutTrust(root), "unanswered");
-    assert.equal(existsSync(lock), false);
-    // A lock that another writer holds by the time we release is not ours to remove.
-    trustLockHooks.afterLock = async () => {
-      await writeFile(lock, `${process.pid} 0 someone-else`);
-    };
-    try {
-      await writeLocalTrust(root, "trusted");
-    } finally {
-      trustLockHooks.afterLock = undefined;
-    }
-    assert.equal(await readFile(lock, "utf8"), `${process.pid} 0 someone-else`);
-    await rm(lock);
-  });
-});
 
 test("the lock under contention: twelve inits at once, three rounds, and a revoke racing them, lose nothing", async () => {
   await scratch(async (root) => {
@@ -1184,89 +1086,6 @@ test("a configuration home inside the checkout is refused", async () => {
   });
 });
 
-test("source only: a folder's Git configuration cannot start a program when Pymtheg asks Git", async () => {
-  await scratch(async (root) => {
-    for (const answer of ["source-only", undefined]) {
-      const project = join(root, answer ?? "unanswered");
-      mkdirSync(project);
-      const marker = join(root, `git-ran-${answer ?? "unanswered"}.txt`);
-      const script = join(root, `evil-${answer ?? "unanswered"}.sh`);
-      await writeFile(script, `#!/bin/sh\necho ran >> '${marker}'\ncat\n`);
-      chmodSync(script, 0o755);
-      git(project, "init", "--quiet");
-      await writeFile(join(project, "a.ts"), "export const a = 1;\n");
-      git(project, "add", "a.ts");
-      git(
-        project,
-        "-c",
-        "user.name=t",
-        "-c",
-        "user.email=t@example.invalid",
-        "commit",
-        "--quiet",
-        "-m",
-        "a",
-      );
-      // The folder arrives with configuration naming a program, and an
-      // attribute applying a filter driver to the file.
-      await writeFile(join(project, ".gitattributes"), "*.ts filter=evil\n");
-      const config = join(project, ".git", "config");
-      await writeFile(
-        config,
-        (await readFile(config, "utf8")) +
-          `[core]\n\tfsmonitor = ${script}\n[filter "evil"]\n\tclean = ${script}\n\tsmudge = ${script}\n[diff]\n\texternal = ${script}\n`,
-      );
-      // Touch the file so status re-reads it through the filter.
-      await writeFile(join(project, "a.ts"), "export const a = 2;\n");
-      const init = spawnSync(
-        process.execPath,
-        [cli, "init", project, ...(answer ? ["--source-only"] : [])],
-        { encoding: "utf8", input: "" },
-      );
-      assert.equal(init.status, 0, init.stderr);
-      if (!answer) await revokeTrust(project);
-      const observed = spawnSync(
-        process.execPath,
-        [cli, "observe", "a.ts", "--root", project, "--format", "json"],
-        { encoding: "utf8" },
-      );
-      assert.equal(observed.status, 0, observed.stderr);
-      assert.equal(
-        existsSync(marker),
-        false,
-        `the repository's Git configuration started a program (${answer ?? "unanswered"})`,
-      );
-    }
-  });
-});
-
-test("a Go helper planted in the checkout is never run: toolchain work lives in the user's cache", async () => {
-  await scratch(async (root) => {
-    const project = join(root, "project");
-    cpSync(GO_FIXTURE, project, { recursive: true });
-    await initializeWorkspace(project, undefined, trusted);
-    const marker = join(root, "planted-ran.txt");
-    const planted = join(project, ".pymtheg/rebuildable/toolchain/go");
-    mkdirSync(planted, { recursive: true });
-    for (let i = 0; i < 4; i++) {
-      const name = join(
-        planted,
-        `golinks-${"0123456789abcdef".slice(i)}${"0".repeat(i)}`,
-      );
-      await writeFile(name, `#!/bin/sh\necho ran > '${marker}'\n`);
-      chmodSync(name, 0o755);
-    }
-    const { toolchainWorkDirectory } = await import(
-      "../dist/project/local-trust.js"
-    );
-    const work = toolchainWorkDirectory(project);
-    assert.equal(work.startsWith(process.env.PYMTHEG_CACHE_HOME), true);
-    assert.equal(work.startsWith(realpathSync(project)), false);
-    await executeGraph({ command: "index", root: project });
-    assert.equal(existsSync(marker), false);
-  });
-});
-
 test("the tool's own configuration folder (…/pymtheg) is tightened to user-only on a write", async () => {
   await scratch(async (root) => {
     const project = join(root, "project");
@@ -1274,7 +1093,11 @@ test("the tool's own configuration folder (…/pymtheg) is tightened to user-onl
     const xdg = join(root, "xdg");
     mkdirSync(join(xdg, "pymtheg"), { recursive: true, mode: 0o755 });
     chmodSync(join(xdg, "pymtheg"), 0o755);
-    const { PYMTHEG_CONFIG_HOME: _home, ...env } = process.env;
+    const {
+      PYMTHEG_CONFIG_HOME: _home,
+      PYMTHEG_TEST: _test,
+      ...env
+    } = process.env;
     const result = spawnSync(
       process.execPath,
       [cli, "init", project, "--trust"],
@@ -1286,5 +1109,396 @@ test("the tool's own configuration folder (…/pymtheg) is tightened to user-onl
     assert.equal(result.status, 0, result.stderr);
     assert.equal(statSync(join(xdg, "pymtheg")).mode & 0o777, 0o700);
     assert.equal(statSync(xdg).mode & 0o777, statSync(xdg).mode & 0o777);
+  });
+});
+
+// ---------------------------------------------------------------- the answers lock (round 5: SQLite)
+
+/** A child process with its output lines as a queue of awaited events. */
+function child(args) {
+  const proc = spawn(
+    process.execPath,
+    [
+      fileURLToPath(new URL("./trust-lock-child.mjs", import.meta.url)),
+      ...args,
+    ],
+    {
+      stdio: ["pipe", "pipe", "inherit"],
+    },
+  );
+  const lines = [];
+  const waiting = [];
+  let buffer = "";
+  proc.stdout.on("data", (chunk) => {
+    buffer += chunk;
+    for (let i; (i = buffer.indexOf("\n")) >= 0; ) {
+      const line = buffer.slice(0, i);
+      buffer = buffer.slice(i + 1);
+      lines.push(line);
+      waiting.splice(0).forEach((wake) => wake());
+    }
+  });
+  const exited = new Promise((resolve) => proc.on("exit", resolve));
+  // Resolves when the child has printed `line`; a child that exits first fails.
+  const saw = async (line) => {
+    for (;;) {
+      if (lines.includes(line)) return;
+      const more = new Promise((wake) => waiting.push(wake));
+      const ended = await Promise.race([
+        more.then(() => false),
+        exited.then(() => true),
+      ]);
+      if (ended && !lines.includes(line))
+        throw Error(`child exited before "${line}" (${lines.join(", ")})`);
+    }
+  };
+  return { proc, lines, saw, exited };
+}
+
+test(
+  "the lock: a holder makes another writer wait until it releases; a holder killed while holding releases at once",
+  { timeout: 120_000 },
+  async () => {
+    await scratch(async (root) => {
+      const [a, b, c] = ["a", "b", "c"].map((n) => join(root, n));
+      for (const project of [a, b, c]) await initializeWorkspace(project);
+      const events = [];
+      const holder = child(["hold", a]);
+      await holder.saw("held");
+      const writer = child(["write", b, "source-only"]);
+      await writer.saw("start");
+      writer.exited.then(() => events.push("writer done"));
+      events.push("releasing");
+      holder.proc.stdin.write("go\n");
+      await holder.saw("released");
+      await writer.saw("done");
+      assert.deepEqual(
+        events.slice(0, 1),
+        ["releasing"],
+        "the writer finished while the lock was held",
+      );
+      await Promise.all([holder.exited, writer.exited]);
+      assert.equal(await checkoutTrust(a), "trusted");
+      assert.equal(await checkoutTrust(b), "source-only");
+      // A holder killed with SIGKILL while holding: the next writer proceeds.
+      const killed = child(["hold", c]);
+      await killed.saw("held");
+      killed.proc.kill("SIGKILL");
+      await killed.exited;
+      await writeLocalTrust(c, "trusted");
+      assert.equal(await checkoutTrust(c), "trusted");
+    });
+  },
+);
+
+test(
+  "the lock under contention with a killed holder each round: twelve inits and a revoke race, nothing lost",
+  { timeout: 300_000 },
+  async () => {
+    await scratch(async (root) => {
+      const victim = join(root, "victim");
+      await initializeWorkspace(victim, undefined, trusted);
+      const run = (args) =>
+        new Promise((done, fail) => {
+          const proc = spawn(process.execPath, [cli, ...args], {
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+          let out = "";
+          proc.stdout.on("data", (d) => (out += d));
+          proc.on("exit", (code) =>
+            code === 0
+              ? done(out)
+              : fail(Error(`${args.join(" ")} exited ${code}`)),
+          );
+        });
+      for (let round = 0; round < 3; round++) {
+        const dirs = Array.from({ length: 12 }, (_, i) =>
+          join(root, `r${round}-${i}`),
+        );
+        for (const dir of [...dirs, join(root, `k${round}`)])
+          await initializeWorkspace(dir);
+        const killed = child(["hold", join(root, `k${round}`)]);
+        await killed.saw("held");
+        const all = Promise.all([
+          run(["trust", "--revoke", victim]),
+          ...dirs.map((dir) => run(["init", dir, "--trust"])),
+        ]);
+        killed.proc.kill("SIGKILL");
+        const [revoked] = await all;
+        for (const dir of dirs)
+          assert.equal(await checkoutTrust(dir), "trusted", dir);
+        assert.match(revoked, /Removed the trust answer/);
+        assert.equal(await checkoutTrust(victim), "unanswered");
+        await writeLocalTrust(victim, "trusted");
+      }
+    });
+  },
+);
+
+test(
+  "a Go helper planted at the name the code computes, in the checkout, is never run",
+  needsGo,
+  async () => {
+    const { createHash } = await import("node:crypto");
+    const { HELPER_SOURCE, installation } = await import(
+      "../dist/graph/languages/go/toolchain.js"
+    );
+    await scratch(async (root) => {
+      const project = join(root, "project");
+      cpSync(GO_FIXTURE, project, { recursive: true });
+      await initializeWorkspace(project, undefined, trusted);
+      const install = await installation(true, process.env, join(root, "env"));
+      assert.ok(!("unavailable" in install), JSON.stringify(install));
+      const sha = (...parts) => {
+        const hash = createHash("sha256");
+        for (const part of parts) hash.update(part).update("\u0000");
+        return hash.digest("hex");
+      };
+      const name = `golinks-${sha(readFileSync(HELPER_SOURCE), install.go, install.version).slice(0, 16)}`;
+      const marker = join(root, "planted-ran.txt");
+      const plant = (dir) => {
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(
+          join(dir, name),
+          `#!/bin/sh\necho ran >> '${marker}'\nexit 1\n`,
+        );
+        chmodSync(join(dir, name), 0o755);
+      };
+      // The place C-44's first rounds built the helper.
+      plant(join(project, ".pymtheg/rebuildable/toolchain/go"));
+      await executeGraph({ command: "index", root: project });
+      assert.equal(existsSync(marker), false, "the planted helper ran");
+      // Control: a work folder inside the checkout, as before the fix, does run it.
+      const store = new SqliteGraphStore(join(root, "control.sqlite"), "tc");
+      try {
+        await indexProject(project, new LanguageRegistry([go]), store, {
+          toolchains: { go: true },
+          toolchainDirectory: join(project, ".pymtheg/rebuildable/toolchain"),
+        });
+      } finally {
+        store.close();
+      }
+      assert.equal(
+        existsSync(marker),
+        true,
+        "the control did not reach the planted name",
+      );
+    });
+  },
+);
+
+test("a cache home inside the checkout turns the routes off", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    cpSync(GO_FIXTURE, project, { recursive: true });
+    await initializeWorkspace(project, undefined, trusted);
+    const result = spawnSync(
+      process.execPath,
+      [cli, "graph", "index", "--root", project, "--json"],
+      {
+        encoding: "utf8",
+        env: { ...process.env, PYMTHEG_CACHE_HOME: join(project, "cache") },
+      },
+    );
+    const response = JSON.parse(result.stdout);
+    assert.ok(
+      response.warnings.some((w) => w.code === "cache-home-inside-checkout"),
+    );
+    assert.equal(response.toolchain, undefined);
+    assert.equal(existsSync(join(project, "cache")), false);
+  });
+});
+
+test("the test guards: no real configuration or cache from a test run, whatever XDG says", async () => {
+  await scratch(async (base) => {
+    const root = join(base, "p");
+    await initializeWorkspace(root);
+    const {
+      PYMTHEG_CONFIG_HOME: _c,
+      PYMTHEG_CACHE_HOME: _k,
+      ...env
+    } = process.env;
+    const answer = spawnSync(process.execPath, [cli, "init", root, "--trust"], {
+      encoding: "utf8",
+      input: "",
+      env: { ...env, PYMTHEG_TEST: "1", XDG_CONFIG_HOME: join(base, "xdg") },
+    });
+    assert.notEqual(answer.status, 0);
+    assert.match(
+      answer.stderr + answer.stdout,
+      /refusing to write the real trust answers/,
+    );
+    const { toolchainWorkDirectory } = await import(
+      "../dist/project/local-trust.js"
+    );
+    const saved = process.env.PYMTHEG_CACHE_HOME;
+    delete process.env.PYMTHEG_CACHE_HOME;
+    try {
+      assert.throws(
+        () => toolchainWorkDirectory(root),
+        /refusing to use the real cache/,
+      );
+    } finally {
+      process.env.PYMTHEG_CACHE_HOME = saved;
+    }
+    // Cache folders are user-only.
+    const work = toolchainWorkDirectory(root);
+    assert.equal(statSync(work).mode & 0o777, 0o700);
+    assert.equal(statSync(dirname(work)).mode & 0o777, 0o700);
+  });
+});
+
+/**
+ * A folder that arrives with Git configuration naming a script: core.fsmonitor,
+ * a clean/smudge filter whose driver name contains "=" (`x=y`), diff.external,
+ * and an included file of 30,000 keys ahead of a second filter.
+ */
+async function hostileRepository(project, script) {
+  mkdirSync(project, { recursive: true });
+  git(project, "init", "--quiet");
+  await writeFile(join(project, "a.ts"), "export const a = 1;\n");
+  git(project, "add", "a.ts");
+  git(
+    project,
+    "-c",
+    "user.name=t",
+    "-c",
+    "user.email=t@example.invalid",
+    "commit",
+    "--quiet",
+    "-m",
+    "a",
+  );
+  await writeFile(
+    join(project, ".gitattributes"),
+    "a.ts filter=x=y\n*.ts filter=late\n",
+  );
+  const big = join(project, ".git", "big.config");
+  await writeFile(
+    big,
+    "[padding]\n" +
+      Array.from({ length: 30000 }, (_, i) => `\tkey${i} = value${i}\n`).join(
+        "",
+      ) +
+      `[filter "late"]\n\tclean = ${script}\n\tsmudge = ${script}\n`,
+  );
+  const config = join(project, ".git", "config");
+  await writeFile(
+    config,
+    (await readFile(config, "utf8")) +
+      `[core]\n\tfsmonitor = ${script}\n[filter "x=y"]\n\tclean = ${script}\n\tsmudge = ${script}\n[diff]\n\texternal = ${script}\n[include]\n\tpath = big.config\n`,
+  );
+  await writeFile(join(project, "a.ts"), "export const a = 2;\n");
+}
+
+test("untrusted (source only, unanswered): no Git process is started at all; the commit is read from files and changes are unknown", async () => {
+  await scratch(async (root) => {
+    const bin = join(root, "bin");
+    mkdirSync(bin);
+    const starts = join(root, "git-starts.txt");
+    // A spy git first on PATH records every start (and then fails).
+    await writeFile(
+      join(bin, "git"),
+      `#!/bin/sh\necho "$@" >> '${starts}'\nexit 1\n`,
+    );
+    chmodSync(join(bin, "git"), 0o755);
+    const marker = join(root, "script-ran.txt");
+    const script = join(root, "evil.sh");
+    await writeFile(script, `#!/bin/sh\necho ran >> '${marker}'\ncat\n`);
+    chmodSync(script, 0o755);
+    for (const answer of ["source-only", undefined]) {
+      const project = join(root, answer ?? "unanswered");
+      await hostileRepository(project, script);
+      const head = git(project, "rev-parse", "HEAD").trim();
+      if (existsSync(starts)) await rm(starts);
+      const env = {
+        ...process.env,
+        PATH: `${bin}${delimiter}${process.env.PATH}`,
+      };
+      const init = spawnSync(
+        process.execPath,
+        [cli, "init", project, ...(answer ? ["--source-only"] : [])],
+        { encoding: "utf8", input: "", env },
+      );
+      assert.equal(init.status, 0, init.stderr);
+      if (!answer) await revokeTrust(project);
+      const observed = spawnSync(
+        process.execPath,
+        [cli, "observe", "a.ts", "--root", project, "--format", "json"],
+        { encoding: "utf8", env },
+      );
+      assert.equal(observed.status, 0, observed.stderr);
+      assert.equal(
+        existsSync(starts),
+        false,
+        `git was started: ${existsSync(starts) ? readFileSync(starts, "utf8") : ""}`,
+      );
+      assert.equal(existsSync(marker), false);
+      const version =
+        JSON.parse(observed.stdout).graph?.version ??
+        JSON.parse(observed.stdout).version;
+      if (version) {
+        assert.equal(version.gitCommit, head);
+        assert.equal(version.dirty, "unknown");
+      }
+    }
+  });
+});
+
+test("trusted: Git runs, and nothing from the folder's configuration (a driver named x=y, a 30,000-key include) starts", async () => {
+  await scratch(async (root) => {
+    const marker = join(root, "script-ran.txt");
+    const script = join(root, "evil.sh");
+    await writeFile(script, `#!/bin/sh\necho ran >> '${marker}'\ncat\n`);
+    chmodSync(script, 0o755);
+    const project = join(root, "trusted");
+    await hostileRepository(project, script);
+    await initializeWorkspace(project, undefined, trusted);
+    const observed = spawnSync(
+      process.execPath,
+      [cli, "observe", "a.ts", "--root", project, "--format", "json"],
+      { encoding: "utf8" },
+    );
+    assert.equal(observed.status, 0, observed.stderr);
+    assert.equal(
+      existsSync(marker),
+      false,
+      "the folder's Git configuration started a program",
+    );
+  });
+});
+
+test("the commit is read from files: a .git file naming the git folder, a worktree, packed refs and a detached HEAD", async () => {
+  const { gitCommitFromFiles } = await import("../dist/shared/safe-git.js");
+  await scratch(async (root) => {
+    const repo = join(root, "repo");
+    mkdirSync(repo);
+    git(repo, "init", "--quiet");
+    await writeFile(join(repo, "a.txt"), "a\n");
+    git(repo, "add", "a.txt");
+    git(
+      repo,
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@example.invalid",
+      "commit",
+      "--quiet",
+      "-m",
+      "a",
+    );
+    const head = git(repo, "rev-parse", "HEAD").trim();
+    assert.equal(await gitCommitFromFiles(repo), head);
+    mkdirSync(join(repo, "sub", "dir"), { recursive: true });
+    assert.equal(await gitCommitFromFiles(join(repo, "sub", "dir")), head);
+    git(repo, "pack-refs", "--all");
+    assert.equal(await gitCommitFromFiles(repo), head);
+    git(repo, "worktree", "add", "--quiet", join(root, "wt"));
+    assert.equal(await gitCommitFromFiles(join(root, "wt")), head);
+    git(repo, "checkout", "--quiet", "--detach");
+    assert.equal(await gitCommitFromFiles(repo), head);
+    const plain = join(root, "plain");
+    mkdirSync(plain);
+    assert.equal(await gitCommitFromFiles(plain), null);
   });
 });

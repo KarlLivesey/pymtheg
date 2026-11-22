@@ -1,33 +1,25 @@
 // SPDX-License-Identifier: MIT
 /**
- * D22: Pymtheg asks Git about a folder (the commit, whether files changed)
- * whatever the folder's trust answer, so the folder's own Git configuration
- * must not be able to start a program. Git reads `.git/config` (and anything
- * it includes) from the folder itself, which can arrive with an archive or
- * a shared copy. Every Git call goes through here, with each configuration
- * key that can run a command for the commands we use overridden on the
- * command line:
+ * D22: what Pymtheg learns from Git about a folder, by trust.
  *
- *   core.fsmonitor         run by status and other index reads
- *   core.hooksPath         hooks (status runs none; set anyway)
- *   core.pager, pager.*    no pager is started (also GIT_PAGER, PAGER)
- *   core.sshCommand, core.gitProxy, credential.helper
- *                          network and credential helpers (not used here)
- *   diff.external          an external diff program
- *   filter.<driver>.clean, .smudge, .process
- *                          content filters status may run when it re-reads a
- *                          file; every driver the folder's configuration
- *                          names is emptied, which disables it
- *   diff.<driver>.textconv text conversion (status does not run it; emptied)
- *   uploadpack.packObjectsHook, core.editor, sequence.editor, gpg.program
- *                          not reached by the commands used; emptied anyway
+ * Untrusted (unanswered or source only): no Git process is started at all.
+ * The commit is read from the repository's files (\`gitCommitFromFiles\`),
+ * and whether the working tree has changes is \`unknown\`.
  *
- * The folder's configuration is listed first with `git config --list`, which
- * parses it (following includes) without starting anything. Prompts and
- * optional index writes are off.
+ * Trusted: Git may run, and \`safeGit\` still keeps the folder's own
+ * configuration from naming a program, as defence in depth. The folder's
+ * configuration is listed first (parsing it starts nothing); each key that
+ * can run a command is then overridden through GIT_CONFIG_COUNT,
+ * GIT_CONFIG_KEY_n and GIT_CONFIG_VALUE_n, which keep key and value apart
+ * (a \`-c key=value\` argument splits at the first "=", which a filter driver's
+ * own name may contain). If the listing does not finish with exit 0 within
+ * its limit, Git is not run.
  */
+import { readFile, stat } from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { runProcess, type ProcessResult } from "../backends/process.js";
 
+/** Keys that can name a command, and the value that disables each. */
 const fixed: [string, string][] = [
   ["core.fsmonitor", "false"],
   ["core.hooksPath", "/dev/null"],
@@ -44,23 +36,34 @@ const fixed: [string, string][] = [
 ];
 /** Keys of the folder's configuration that name a command to run. */
 const executing =
-  /^(filter\.[^\n]+\.(clean|smudge|process)|diff\.[^\n]+\.(textconv|command)|pager\.[^\n]+|merge\.[^\n]+\.driver)$/i;
+  /^(filter\..+\.(clean|smudge|process)|diff\..+\.(textconv|command)|pager\..+|merge\..+\.driver)$/is;
+/** The most configuration the listing may print before Git is refused. */
+const LISTING_LIMIT = 8 * 1024 * 1024;
 
-const environment = (): NodeJS.ProcessEnv => ({
-  ...process.env,
-  GIT_PAGER: "cat",
-  PAGER: "cat",
-  GIT_TERMINAL_PROMPT: "0",
-  GIT_OPTIONAL_LOCKS: "0",
-  GIT_EXTERNAL_DIFF: "",
-  GIT_ASKPASS: "",
-  SSH_ASKPASS: "",
-});
+const environment = (pairs: [string, string][]): NodeJS.ProcessEnv => {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    GIT_PAGER: "cat",
+    PAGER: "cat",
+    GIT_TERMINAL_PROMPT: "0",
+    GIT_OPTIONAL_LOCKS: "0",
+    GIT_EXTERNAL_DIFF: "",
+    GIT_ASKPASS: "",
+    SSH_ASKPASS: "",
+    GIT_CONFIG_COUNT: String(pairs.length),
+  };
+  pairs.forEach(([key, value], i) => {
+    env[`GIT_CONFIG_KEY_${i}`] = key;
+    env[`GIT_CONFIG_VALUE_${i}`] = value;
+  });
+  return env;
+};
 
-const overrides = (pairs: [string, string][]) =>
-  pairs.flatMap(([key, value]) => ["-c", `${key}=${value}`]);
-
-/** Runs `git <args>` in `cwd` with the folder's configuration unable to start a program. */
+/**
+ * Runs \`git <args>\` in \`cwd\` with the folder's configuration unable to name
+ * a program. For a trusted folder only. Null when the configuration could
+ * not be listed completely: then no Git ran.
+ */
 export async function safeGit(
   args: readonly string[],
   options: {
@@ -69,31 +72,93 @@ export async function safeGit(
     timeoutMs: number;
     maxBytes: number;
   },
-): Promise<ProcessResult> {
-  const run = (argv: string[], maxBytes: number) =>
+): Promise<ProcessResult | null> {
+  const run = (argv: string[], pairs: [string, string][], maxBytes: number) =>
     runProcess("git", argv, {
       cwd: options.cwd,
       timeoutMs: options.timeoutMs,
       maxBytes,
-      env: environment(),
+      env: environment(pairs),
       ...(options.signal ? { signal: options.signal } : {}),
     });
-  const base = overrides(fixed);
   const listed = await run(
-    [...base, "config", "--includes", "--null", "--name-only", "--list"],
-    1024 * 1024,
+    ["config", "--includes", "--null", "--name-only", "--list"],
+    fixed,
+    LISTING_LIMIT,
   );
-  const named =
-    listed.kind === "exited" && listed.code === 0
-      ? [
-          ...new Set(
-            listed.stdout.split("\0").filter((key) => executing.test(key)),
-          ),
-        ]
-      : [];
-  if (listed.kind === "cancelled") return listed;
+  if (listed.kind !== "exited" || listed.code !== 0) return null;
+  const named = [
+    ...new Set(listed.stdout.split("\0").filter((key) => executing.test(key))),
+  ];
   return run(
-    [...base, ...overrides(named.map((key) => [key, ""])), ...args],
+    [...args],
+    [...fixed, ...named.map((key): [string, string] => [key, ""])],
     options.maxBytes,
   );
+}
+
+const SHA = /^[0-9a-f]{40}$|^[0-9a-f]{64}$/;
+const readText = (path: string) =>
+  readFile(path, "utf8").then(
+    (text) => text,
+    () => null,
+  );
+
+/**
+ * The commit checked out in the repository containing \`start\`, read from
+ * its files without running Git: the nearest \`.git\` (a folder, or a file
+ * naming the git folder, as worktrees and submodules have), its \`HEAD\`
+ * (detached, or a ref followed through loose refs and \`packed-refs\` in the
+ * common folder). Null when there is no repository or the commit cannot be
+ * read.
+ */
+export async function gitCommitFromFiles(
+  start: string,
+): Promise<string | null> {
+  let dir = resolve(start);
+  let gitDir: string | null = null;
+  for (;;) {
+    const candidate = join(dir, ".git");
+    const info = await stat(candidate).catch(() => null);
+    if (info?.isDirectory()) {
+      gitDir = candidate;
+      break;
+    }
+    if (info?.isFile()) {
+      const text = (await readText(candidate)) ?? "";
+      const named = /^gitdir:\s*(.+?)\s*$/m.exec(text)?.[1];
+      if (!named) return null;
+      gitDir = isAbsolute(named) ? named : resolve(dir, named);
+      break;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+  const common = await readText(join(gitDir, "commondir"));
+  const commonDir = common?.trim()
+    ? isAbsolute(common.trim())
+      ? common.trim()
+      : resolve(gitDir, common.trim())
+    : gitDir;
+  let head = (await readText(join(gitDir, "HEAD")))?.trim() ?? "";
+  for (let hops = 0; hops < 8; hops++) {
+    if (SHA.test(head)) return head;
+    const ref = /^ref:\s*(\S+)$/.exec(head)?.[1];
+    if (!ref || ref.includes("..")) return null;
+    const loose =
+      (await readText(join(gitDir, ref)))?.trim() ??
+      (await readText(join(commonDir, ref)))?.trim();
+    if (loose !== undefined && loose !== null) {
+      head = loose;
+      continue;
+    }
+    const packed = (await readText(join(commonDir, "packed-refs"))) ?? "";
+    for (const line of packed.split("\n")) {
+      const [sha, name] = line.trim().split(" ");
+      if (name === ref && sha && SHA.test(sha)) return sha;
+    }
+    return null;
+  }
+  return null;
 }

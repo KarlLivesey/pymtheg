@@ -38,6 +38,7 @@ import {
   type TrustState,
 } from "../shared/config.js";
 import {
+  cacheInsideCheckout,
   readLocalTrust,
   toolchainWorkDirectory,
   toolInsideCheckout,
@@ -246,6 +247,7 @@ export async function executeGraph(
     let ignoredPaths: string[] = [];
     const insidePaths: string[] = [];
     const hardLinked: string[] = [];
+    let cacheInside = false;
     try {
       const { config } = await loadConfig(root);
       const local = await readLocalTrust(root);
@@ -254,6 +256,12 @@ export async function executeGraph(
       // Defence in depth (D22): a tool path that resolves inside the
       // checkout is the repository's code; it is never run, even when the
       // user's own configuration names it. The route stays off.
+      // The cache folder holds the routes' helpers and facts: one inside the
+      // checkout would let the repository supply them, so no route runs.
+      if (Object.keys(toolchains).length && (await cacheInsideCheckout(root))) {
+        toolchains = {};
+        cacheInside = true;
+      }
       for (const [key, setting] of Object.entries(toolchains)) {
         if (typeof setting !== "string") continue;
         if (await toolInsideCheckout(setting, root)) {
@@ -291,7 +299,7 @@ export async function executeGraph(
       );
     const complete = previousState?.fingerprint === currentFingerprint();
     // D22: outside the checkout (the user's cache folder), never in it.
-    const toolchainDirectory = toolchainWorkDirectory(root);
+    const toolchainDirectory = toolchainOn ? toolchainWorkDirectory(root) : "";
     // The completion and the analysis completion are read again in one
     // snapshot, which supplies the answer. The analysis completion names
     // each incremental module that owns a stored file, as an index run
@@ -677,6 +685,13 @@ export async function executeGraph(
           code: "toolchain-inputs-not-rechecked",
           message:
             "Toolchain-backed facts are as recorded at the last sync; the toolchain's inputs (Go version, go.mod/go.sum, local replace targets, Go files outside the index) were not re-checked. Sync (a query without --no-sync, or graph index) to re-check them.",
+          files: [],
+        });
+      if (cacheInside)
+        response.warnings.push({
+          code: "cache-home-inside-checkout",
+          message:
+            "The Pymtheg cache folder lies inside this checkout, so no toolchain route runs. Set PYMTHEG_CACHE_HOME to a folder outside it.",
           files: [],
         });
       if (hardLinked.length)
