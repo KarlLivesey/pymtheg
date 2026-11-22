@@ -2437,7 +2437,16 @@ exactly, which is what the owner's library rule asks (library and symbol).
 **Rules out:** counting a candidate set whose members are different symbols
 (union arms such as `toString` on several types); counting a set that includes
 a checkout or synthesised target; a mark given without the compiler's own
-single-symbol proof.
+single-symbol proof. **Narrowed in review (22 November 2026):** the compiler
+also merges globals that two competing packages declare (`describe` and `it`
+from two test frameworks loaded together, `expect` from two assertion
+libraries). Those units ARE alternatives: a file runs under one of them. So
+no set is marked when any of its units is a test framework, or when its
+variable declarations disagree on the type (the compiler's own
+"subsequent variable declarations must have the same type" condition, which
+`skipLibCheck` hides). The mark is for environment globals: the language
+library, DOM, workers, Node and compatible runtimes, and packages that
+augment them.
 
 ### D19: coverage is judged with dependencies installed
 
@@ -2874,6 +2883,8 @@ or one transaction per phase: W3-P1 measured readers and second writers locked
 out, and under a write-ahead log batches of 64 were no faster), and
 `synchronous=OFF` (the database itself may be corrupted by a power loss).
 See [C-6](changes/C-6.md).
+**Superseded in part by C-37:** one commit per file and the checkpoint every
+10,000 pages (see below).
 
 ### C-9 Rust library paths
 
@@ -3267,6 +3278,66 @@ link names a container only if that container is a symbol. One link
 without a source rejects a module's whole output, so a namespace that is
 no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).
+
+### C-37 Graph index writes commit in bounded batches
+
+**Decided (C-37):** under the write-ahead log, an index run's writes (parse
+results, analysed results and each module's resolution write) share one
+transaction until about 50,000 rows are written (a fixed count of each
+write statement's direct changes; rows changed by triggers and cascades are
+not counted), then commit; the rest commits at the end of each write phase.
+Every batch is one commit with the run's checks at its start: the
+unfinished-run mark at the first, and at each one the proof that no other
+run has written since. Every store write by a connection that chose the
+write-ahead log at its first write, and every batch, first takes a
+turnstile, a lock-only database beside the store (`graph.sqlite-turnstile`,
+SQLite's own file lock), and leaves it once it holds the write lock. A
+writable open that finds its schema and identity in place writes nothing.
+A write that fails undoes its open batch; the store is then its earlier
+commits, as after a crash. With a rollback journal, or where the turnstile
+cannot be opened, each write still commits alone. The log checkpoints
+every 100,000 pages and is cut back to 64 MiB afterwards. This supersedes
+C-6's one commit per file and checkpoint every 10,000 pages; its
+write-ahead log, `synchronous=NORMAL` and the fully synced completion
+record are unchanged.
+**Why:** on disk, repeated commits rewrote the same index pages into the
+log (cli/cli wrote 9.23 GiB for a 463 MiB store). **Bound:** a writer that
+waits holds the turnstile, so the run finishes at most the batch in progress
+before the writer has the write lock (a counted test proves it); a dead
+holder's lock is released by the operating system. Readers are never
+blocked under the write-ahead log. A run overtaken between two batches
+stops at the next batch. **Trade:** a run cut short loses up to one batch
+more of progress, which its mark makes the next run redo; the log reaches
+the checkpoint threshold plus about one batch (474 MiB on cli/cli, 499 MiB
+on Vector; 553 MiB on cli/cli counting direct changes). Only a connection
+that chose the write-ahead log at its first write takes the turnstile; with
+a rollback journal every write commits alone and takes no turn, as before.
+A connection that kept the rollback journal because another connection
+blocked its switch takes no turn for its life; if the store is later moved
+to the write-ahead log while it is open, its writes are correct but wait
+without the one-batch bound.
+Waiters are not served first in, first out, and nothing gives the run
+fairness against a continuous stream of writers. **Rules out:**
+savepoints per write (several times slower inserts), batches bounded by
+time, batching under a rollback journal (a batch larger than the page cache
+would lock readers out), and 50,000 pages or fewer per checkpoint (most of
+the gain lost). See [C-37](changes/C-37.md).
+
+### C-40 An analysis leaves no TypeScript program behind
+
+**Decided (C-40):** when the TypeScript module's `analyze` returns or
+throws, its cache of parsed compiler library files is cleared, and so is the
+last syntax node it passed to a checker. **Why:** programs share the cached
+library files and each checker records its facts on their symbols, so the
+cache kept the last program and its checker alive for the rest of the run:
+on microsoft/TypeScript the 27,000-file program, 2.75 GB of a 4.2 GB heap,
+through every later write and resolution. It ran out of the default heap at
+the Go resolution input. With the cache released it finishes at the default
+heap. **Trade:** each analysis parses the library files again (once per CLI
+command, as before; once per sync in a long-lived process). **Rules out
+for now:** streaming a module's results to the store. The results were
+small (298 MiB as JSON on microsoft/TypeScript); the retained program was
+the cost. See [C-40](changes/C-40.md).
 
 ### TypeScript symbol keys are name paths, not offsets (C-49)
 

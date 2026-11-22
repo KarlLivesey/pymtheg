@@ -1,0 +1,41 @@
+== before vercel_turborepo
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 16:21.48
+	Maximum resident set size (kbytes): 5362568
+exit 0
+== after vercel_turborepo
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 13:34.11
+	Maximum resident set size (kbytes): 5398636
+exit 0
+vercel_turborepo rows equal
+== before withastro_astro
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:38.52
+	Maximum resident set size (kbytes): 2209128
+exit 0
+== after withastro_astro
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:37.05
+	Maximum resident set size (kbytes): 2173148
+exit 0
+withastro_astro rows equal
+== before cli_cli
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:16.77
+	Maximum resident set size (kbytes): 1465472
+exit 0
+== after cli_cli
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:39.64
+	Maximum resident set size (kbytes): 1424420
+exit 0
+cli_cli rows equal
+== before helix-editor_helix
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:45.83
+	Maximum resident set size (kbytes): 1338904
+exit 0
+== after helix-editor_helix
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:34.36
+	Maximum resident set size (kbytes): 1369024
+exit 0
+helix-editor_helix rows equal
+== after microsoft/TypeScript (graph index through the CLI, default heap)
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 33:52.96
+	Maximum resident set size (kbytes): 5451564
+exit 2
+{"status":"incomplete","exitCode":2,"counts":{"files":32448,"symbols":274386,"links":993013,"failed":12477,"partial":2,"unresolved":165257,"ambiguous":5764,"library":88944},"failedFiles":12477,"analysisErrors":0,"resolutionErrors":0}
