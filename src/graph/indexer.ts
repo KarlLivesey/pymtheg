@@ -308,7 +308,9 @@ export async function indexProject(
   // analysis and written once, with the analysed result, instead of being
   // written here and replaced there. A run stopped in between leaves its
   // unfinished mark, so the next run trusts no record and parses again.
-  const deferred = new Map<string, GraphFile[]>();
+  // Each held file is kept as the record the store would hold, so what a
+  // module does to its analysis input never reaches a stored record.
+  const deferred = new Map<string, string[]>();
   for (const module of registry.modules)
     if (module.analyze) deferred.set(module.id, []);
   // Modules that may reuse their earlier analysis are handed the previous
@@ -338,7 +340,7 @@ export async function indexProject(
       ]);
       for (const file of updates) {
         const pending = deferred.get(file.module);
-        if (pending) pending.push(file);
+        if (pending) pending.push(JSON.stringify(file));
         else {
           previousFiles.delete(file.path);
           await writeParsed(file);
@@ -383,7 +385,11 @@ export async function indexProject(
         : (await store.files()).filter((file) => file.module === module.id),
     );
     count(`analyze.${module.id}.inputFiles`, files.length);
-    const pending = deferred.get(module.id);
+    const heldRecords = deferred.get(module.id);
+    const pending = heldRecords?.map((text) => JSON.parse(text) as GraphFile);
+    const heldRecord = new Map(
+      pending?.map((file, index) => [file.path, heldRecords![index]!]),
+    );
     if (pending?.length) {
       // A held file replaces its stored record; a new one joins in path
       // order, the order the store lists records in.
@@ -522,7 +528,10 @@ export async function indexProject(
         // resolver has proved can be left alone).
         const analyzedPaths = new Set(results.map((file) => file.path));
         for (const file of pending ?? [])
-          if (!analyzedPaths.has(file.path)) await writeParsed(file);
+          if (!analyzedPaths.has(file.path))
+            await writeParsed(
+              JSON.parse(heldRecord.get(file.path)!) as GraphFile,
+            );
         report.indexed += pending
           ? pending.filter((file) => analyzedPaths.has(file.path)).length
           : 0;
