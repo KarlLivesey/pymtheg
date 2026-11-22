@@ -453,6 +453,15 @@ or `.cargo/config` as context, read by a snapshot-only
 TOML reader (an unsupported or invalid manifest, including any TOML datetime,
 makes that whole manifest unknown). Private items are ordinary symbols.
 
+- **Determinism:** the Rust graph is a function of the snapshot. Graph ids
+  (and so the order stores list rows in) include the project's random id;
+  no Rust answer depends on that order ([C-24](changes/C-24.md)).
+- **cfg-chosen module files:** a `mod` declared only with
+  `cfg_attr(…, path = …)` alternatives, with no plain module file in the
+  checkout, is exactly those alternatives (a build enabling none of them does
+  not compile, E0583). A glob imports only what its own module can see, so a
+  private `use` in a globbed child is never resolved through the parent's
+  glob ([C-24](changes/C-24.md)).
 - **Cancellation:** the graph CLI can interrupt Rust analysis and resolution
   with SIGINT or SIGTERM. Interrupted syncs leave an incomplete index and can
   be retried. When an import path reaches the resolver's depth boundary, an
@@ -501,7 +510,10 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   of a trait the type implements or derives, or of any checkout trait; every
   import in scope resolves into the checkout or names a standard trait whose
   methods are known; no unknown macro, failed file, non-standard derive or
-  attribute macro can add one. Every other dot call is unresolved with
+  attribute macro can add one. An inherent impl whose self type cannot be
+  placed is a possible candidate only for types of its own crate (E0116);
+  an unplaced trait impl stays possible in every crate in reach
+  ([C-24](changes/C-24.md)). Every other dot call is unresolved with
   would-be targets and a reason (`later-probe-step`, `trait-dispatch`,
   `receiver-type-unverified`, …); no dot call has a closed candidate set.
   Trait methods (even of a checkout trait implemented for the type), `Box`,
@@ -602,7 +614,15 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   and named imports establish the export for compiling code when registry
   provenance is verified. Feature facts can identify namespace facets.
   A registry re-export needs a verified registry edge to the implementing
-  crate. Checkout implementations need an output proof. A glob which could only
+  crate for its expansion; the macro link itself (which facade export the
+  name is) needs only the verified facade, and neither holds when any
+  captured `.cargo/config` in the checkout patches the facade or sets
+  `paths` or `[source]`. With no `Cargo.lock`, a plain
+  version requirement verifies both when the root manifest has no
+  `[patch]`/`[replace]` entry for the implementing crate and no captured
+  `.cargo/config` anywhere in the checkout sets `paths`, `[source]` or
+  `[patch]` ([C-24](changes/C-24.md)).
+  Checkout implementations need an output proof. A glob which could only
   compete with an established outer macro or path head does not prevent
   the proof, since rustc rejects that ambiguity. An uncaptured macro-use
   import and a glob without an established competing binding can still
@@ -892,6 +912,20 @@ accept the arguments.
   it is left out of that program only (installed declarations have their
   own budget). Invalid extracted UTF-16 ranges use the same per-file
   containment and report the file as unavailable.
+- **Files whose analysis would not return (C-26):** a file where the
+  compiler's flow analysis would follow a cycle of flow nodes without a
+  limit fails, with the line and column, before any query reaches it. The
+  check reads the bound flow graph only, so the outcome depends on the
+  source alone. Other non-returning work (another compiler loop, a Go or
+  Rust analysis loop) has no bound yet. A file the compiler throws on in a
+  later project is failed for the store; links into it from earlier
+  projects become `target-unavailable`, and their other links are flagged.
+  The 100-file cap counts compiler failures a program imports from another
+  project. A member of a namespace that is no symbol (a namespace inside a
+  plain block) is contained by the next container out that is one.
+  microsoft/TypeScript indexes with a 12,000 MB heap but not with the
+  default one: the indexer holds a module's whole analysis output while it
+  writes it.
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.

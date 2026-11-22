@@ -1,0 +1,1265 @@
+{
+ "seed": "c24-rust-determinism-2026-11-19",
+ "pins": [
+  {
+   "id": "DioxusLabs/dioxus",
+   "candidateSites": 150404,
+   "candidateLevel2": 73090,
+   "mainSites": [
+    150404,
+    150404
+   ],
+   "mainLevel2": [
+    69581,
+    69579
+   ],
+   "likeForLikeSites": 150404,
+   "likeForLikeCandidateLevel2": 73090,
+   "likeForLikeMainLevel2": [
+    69581,
+    69579
+   ],
+   "mainUnstableSites": 2,
+   "unionDefinite": 69608,
+   "lostStable": [
+    {
+     "file": "packages/dx/src/build/link.rs",
+     "start": 11129,
+     "kind": "calls",
+     "name": "crate::build::create_undefined_symbol_stub",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/build/patch.rs\\\",\\\"function\\\",\\\"item:36847\\\",0,\\\"create_undefined_symbol_stub\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/build/patch.rs\\\",\\\"function\\\",\\\"item:36847\\\",0,\\\"create_undefined_symbol_stub\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/build/link.rs",
+     "start": 53521,
+     "kind": "types",
+     "name": "HotpatchModuleCache",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/build/patch.rs\\\",\\\"struct\\\",\\\"item:2321\\\",0,\\\"HotpatchModuleCache\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/build/patch.rs\\\",\\\"struct\\\",\\\"item:2321\\\",0,\\\"HotpatchModuleCache\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/build/request.rs",
+     "start": 122175,
+     "kind": "types",
+     "name": "BundlePlatform",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"enum\\\",\\\"item:1943\\\",0,\\\"BundlePlatform\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"enum\\\",\\\"item:1943\\\",0,\\\"BundlePlatform\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/build/web.rs",
+     "start": 2935,
+     "kind": "calls",
+     "name": "crate::build::prepare_wasm_base_module",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/build/patch.rs\\\",\\\"function\\\",\\\"item:59530\\\",0,\\\"prepare_wasm_base_module\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/build/patch.rs\\\",\\\"function\\\",\\\"item:59530\\\",0,\\\"prepare_wasm_base_module\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 1515,
+     "kind": "patterns",
+     "name": "ServeUpdate::BuilderUpdate",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:581\\\",0,\\\"ServeUpdate::BuilderUpdate\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:581\\\",0,\\\"ServeUpdate::BuilderUpdate\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 7966,
+     "kind": "patterns",
+     "name": "ServeUpdate::Exit",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:886\\\",0,\\\"ServeUpdate::Exit\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:886\\\",0,\\\"ServeUpdate::Exit\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8017,
+     "kind": "patterns",
+     "name": "ServeUpdate::NewConnection",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:306\\\",0,\\\"ServeUpdate::NewConnection\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:306\\\",0,\\\"ServeUpdate::NewConnection\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8073,
+     "kind": "patterns",
+     "name": "ServeUpdate::WsMessage",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:417\\\",0,\\\"ServeUpdate::WsMessage\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:417\\\",0,\\\"ServeUpdate::WsMessage\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8125,
+     "kind": "patterns",
+     "name": "ServeUpdate::FilesChanged",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:661\\\",0,\\\"ServeUpdate::FilesChanged\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:661\\\",0,\\\"ServeUpdate::FilesChanged\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8180,
+     "kind": "patterns",
+     "name": "ServeUpdate::OpenApp",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:717\\\",0,\\\"ServeUpdate::OpenApp\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:717\\\",0,\\\"ServeUpdate::OpenApp\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8223,
+     "kind": "patterns",
+     "name": "ServeUpdate::RequestRebuild",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:731\\\",0,\\\"ServeUpdate::RequestRebuild\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:731\\\",0,\\\"ServeUpdate::RequestRebuild\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8273,
+     "kind": "patterns",
+     "name": "ServeUpdate::CycleHotreloadMode",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:752\\\",0,\\\"ServeUpdate::CycleHotreloadMode\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:752\\\",0,\\\"ServeUpdate::CycleHotreloadMode\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8327,
+     "kind": "patterns",
+     "name": "ServeUpdate::OpenDebugger",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:777\\\",0,\\\"ServeUpdate::OpenDebugger\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:777\\\",0,\\\"ServeUpdate::OpenDebugger\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8382,
+     "kind": "patterns",
+     "name": "ServeUpdate::Redraw",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:825\\\",0,\\\"ServeUpdate::Redraw\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:825\\\",0,\\\"ServeUpdate::Redraw\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/cli/run.rs",
+     "start": 8424,
+     "kind": "patterns",
+     "name": "ServeUpdate::TracingLog",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:838\\\",0,\\\"ServeUpdate::TracingLog\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:838\\\",0,\\\"ServeUpdate::TracingLog\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/config/inline_config.rs",
+     "start": 6080,
+     "kind": "types",
+     "name": "super::DioxusConfig",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"struct\\\",\\\"item:186\\\",0,\\\"DioxusConfig\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"struct\\\",\\\"item:186\\\",0,\\\"DioxusConfig\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/config/inline_config.rs",
+     "start": 6138,
+     "kind": "types",
+     "name": "super::DioxusConfig",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"struct\\\",\\\"item:186\\\",0,\\\"DioxusConfig\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"struct\\\",\\\"item:186\\\",0,\\\"DioxusConfig\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/logging.rs",
+     "start": 14293,
+     "kind": "types",
+     "name": "ServeUpdate",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"enum\\\",\\\"item:272\\\",0,\\\"ServeUpdate\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"enum\\\",\\\"item:272\\\",0,\\\"ServeUpdate\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/logging.rs",
+     "start": 14483,
+     "kind": "types",
+     "name": "ServeUpdate::TracingLog",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:838\\\",0,\\\"ServeUpdate::TracingLog\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:838\\\",0,\\\"ServeUpdate::TracingLog\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 3213,
+     "kind": "values",
+     "name": "HotReloadMode::Hotpatch",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/runner.rs\\\",\\\"variant\\\",\\\"item:4198\\\",0,\\\"HotReloadMode::Hotpatch\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/runner.rs\\\",\\\"variant\\\",\\\"item:4198\\\",0,\\\"HotReloadMode::Hotpatch\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 3960,
+     "kind": "patterns",
+     "name": "ServeUpdate::FilesChanged",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:661\\\",0,\\\"ServeUpdate::FilesChanged\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:661\\\",0,\\\"ServeUpdate::FilesChanged\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 4066,
+     "kind": "values",
+     "name": "HotReloadMode::Disabled",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/runner.rs\\\",\\\"variant\\\",\\\"item:4225\\\",0,\\\"HotReloadMode::Disabled\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/runner.rs\\\",\\\"variant\\\",\\\"item:4225\\\",0,\\\"HotReloadMode::Disabled\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 4242,
+     "kind": "patterns",
+     "name": "ServeUpdate::RequestRebuild",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:731\\\",0,\\\"ServeUpdate::RequestRebuild\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:731\\\",0,\\\"ServeUpdate::RequestRebuild\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 4931,
+     "kind": "patterns",
+     "name": "ServeUpdate::NewConnection",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:306\\\",0,\\\"ServeUpdate::NewConnection\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:306\\\",0,\\\"ServeUpdate::NewConnection\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 5666,
+     "kind": "patterns",
+     "name": "ServeUpdate::WsMessage",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:417\\\",0,\\\"ServeUpdate::WsMessage\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:417\\\",0,\\\"ServeUpdate::WsMessage\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 6001,
+     "kind": "patterns",
+     "name": "ServeUpdate::BuilderUpdate",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:581\\\",0,\\\"ServeUpdate::BuilderUpdate\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:581\\\",0,\\\"ServeUpdate::BuilderUpdate\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 8471,
+     "kind": "types",
+     "name": "PatchError",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/build/patch.rs\\\",\\\"enum\\\",\\\"item:997\\\",0,\\\"PatchError\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/build/patch.rs\\\",\\\"enum\\\",\\\"item:997\\\",0,\\\"PatchError\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 11774,
+     "kind": "patterns",
+     "name": "ServeUpdate::TracingLog",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:838\\\",0,\\\"ServeUpdate::TracingLog\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:838\\\",0,\\\"ServeUpdate::TracingLog\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 12273,
+     "kind": "patterns",
+     "name": "ServeUpdate::OpenApp",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:717\\\",0,\\\"ServeUpdate::OpenApp\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:717\\\",0,\\\"ServeUpdate::OpenApp\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 12344,
+     "kind": "values",
+     "name": "HotReloadMode::Hotpatch",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/runner.rs\\\",\\\"variant\\\",\\\"item:4198\\\",0,\\\"HotReloadMode::Hotpatch\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/runner.rs\\\",\\\"variant\\\",\\\"item:4198\\\",0,\\\"HotReloadMode::Hotpatch\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 13083,
+     "kind": "patterns",
+     "name": "ServeUpdate::Redraw",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:825\\\",0,\\\"ServeUpdate::Redraw\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:825\\\",0,\\\"ServeUpdate::Redraw\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 13191,
+     "kind": "patterns",
+     "name": "ServeUpdate::CycleHotreloadMode",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:752\\\",0,\\\"ServeUpdate::CycleHotreloadMode\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:752\\\",0,\\\"ServeUpdate::CycleHotreloadMode\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 13788,
+     "kind": "patterns",
+     "name": "ServeUpdate::OpenDebugger",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:777\\\",0,\\\"ServeUpdate::OpenDebugger\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:777\\\",0,\\\"ServeUpdate::OpenDebugger\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/serve/mod.rs",
+     "start": 13914,
+     "kind": "patterns",
+     "name": "ServeUpdate::Exit",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:886\\\",0,\\\"ServeUpdate::Exit\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/serve/update.rs\\\",\\\"variant\\\",\\\"item:886\\\",0,\\\"ServeUpdate::Exit\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/workspace.rs",
+     "start": 16663,
+     "kind": "types",
+     "name": "DioxusConfig",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"struct\\\",\\\"item:186\\\",0,\\\"DioxusConfig\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"struct\\\",\\\"item:186\\\",0,\\\"DioxusConfig\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/dx/src/workspace.rs",
+     "start": 17964,
+     "kind": "types",
+     "name": "DioxusConfig",
+     "main": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"struct\\\",\\\"item:186\\\",0,\\\"DioxusConfig\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/dx/src/config/dioxus_config.rs\\\",\\\"struct\\\",\\\"item:186\\\",0,\\\"DioxusConfig\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/fullstack/src/payloads/files.rs",
+     "start": 972,
+     "kind": "types",
+     "name": "StreamingError",
+     "main": "[\"resolved\",\"[\\\"packages/fullstack/src/payloads/stream.rs\\\",\\\"enum\\\",\\\"item:4018\\\",0,\\\"StreamingError\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/fullstack/src/payloads/stream.rs\\\",\\\"enum\\\",\\\"item:4018\\\",0,\\\"StreamingError\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/fullstack/src/payloads/files.rs",
+     "start": 12555,
+     "kind": "types",
+     "name": "StreamingError",
+     "main": "[\"resolved\",\"[\\\"packages/fullstack/src/payloads/stream.rs\\\",\\\"enum\\\",\\\"item:4018\\\",0,\\\"StreamingError\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/fullstack/src/payloads/stream.rs\\\",\\\"enum\\\",\\\"item:4018\\\",0,\\\"StreamingError\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/components/outlet.rs",
+     "start": 1895,
+     "kind": "types",
+     "name": "OutletContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/outlet.rs\\\",\\\"struct\\\",\\\"item:522\\\",0,\\\"OutletContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/outlet.rs\\\",\\\"struct\\\",\\\"item:522\\\",0,\\\"OutletContext\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/components/router.rs",
+     "start": 2020,
+     "kind": "types",
+     "name": "OutletContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/outlet.rs\\\",\\\"struct\\\",\\\"item:522\\\",0,\\\"OutletContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/outlet.rs\\\",\\\"struct\\\",\\\"item:522\\\",0,\\\"OutletContext\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/contexts/navigator.rs",
+     "start": 378,
+     "kind": "types",
+     "name": "RouterContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/contexts/navigator.rs",
+     "start": 575,
+     "kind": "types",
+     "name": "RouterContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/hooks/use_navigator.rs",
+     "start": 1116,
+     "kind": "types",
+     "name": "Navigator",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/navigator.rs\\\",\\\"struct\\\",\\\"item:543\\\",0,\\\"Navigator\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/navigator.rs\\\",\\\"struct\\\",\\\"item:543\\\",0,\\\"Navigator\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/hooks/use_router.rs",
+     "start": 252,
+     "kind": "types",
+     "name": "RouterContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/hooks/use_router.rs",
+     "start": 442,
+     "kind": "types",
+     "name": "RouterContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/hooks/use_router.rs",
+     "start": 610,
+     "kind": "types",
+     "name": "RouterContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/router_cfg.rs",
+     "start": 908,
+     "kind": "types",
+     "name": "RoutingCallback",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"type\\\",\\\"item:2015\\\",0,\\\"RoutingCallback\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"type\\\",\\\"item:2015\\\",0,\\\"RoutingCallback\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/router_cfg.rs",
+     "start": 2095,
+     "kind": "types",
+     "name": "GenericRouterContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:11271\\\",0,\\\"GenericRouterContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:11271\\\",0,\\\"GenericRouterContext\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/router_cfg.rs",
+     "start": 2130,
+     "kind": "types",
+     "name": "NavigationTarget",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/navigation.rs\\\",\\\"enum\\\",\\\"item:799\\\",0,\\\"NavigationTarget\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/navigation.rs\\\",\\\"enum\\\",\\\"item:799\\\",0,\\\"NavigationTarget\\\"]\",[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/router/src/utils/use_router_internal.rs",
+     "start": 500,
+     "kind": "types",
+     "name": "RouterContext",
+     "main": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[\"rust-external-macro-name\"]]",
+     "candidate": "[\"resolved\",\"[\\\"packages/router/src/contexts/router.rs\\\",\\\"struct\\\",\\\"item:3401\\\",0,\\\"RouterContext\\\"]\",[]]",
+     "reason": ""
+    }
+   ],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 3559,
+   "newLevel2Stable": 3559,
+   "retargeted": 50,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "candidateSites": 515233,
+   "candidateLevel2": 173800,
+   "mainSites": [
+    514539,
+    514539
+   ],
+   "mainLevel2": [
+    170198,
+    170199
+   ],
+   "likeForLikeSites": 514539,
+   "likeForLikeCandidateLevel2": 173800,
+   "likeForLikeMainLevel2": [
+    170198,
+    170199
+   ],
+   "mainUnstableSites": 15,
+   "unionDefinite": 171142,
+   "lostStable": [
+    {
+     "file": "embassy-executor/src/platform/aarch32.rs",
+     "start": 4183,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-executor/src/platform/avr.rs",
+     "start": 413,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-executor/src/platform/cortex_m.rs",
+     "start": 2007,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-executor/src/platform/riscv.rs",
+     "start": 383,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-executor/src/platform/spin.rs",
+     "start": 341,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-executor/src/platform/wasm.rs",
+     "start": 439,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-stm32/src/rcc/f247.rs",
+     "start": 526,
+     "kind": "imports",
+     "name": "crate::rcc::dsi",
+     "main": "[\"resolved\",\"[\\\"embassy-stm32/src/rcc/mod.rs\\\",\\\"module\\\",\\\"item:568\\\",0,\\\"dsi\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-stm32/src/rcc/l.rs",
+     "start": 398,
+     "kind": "imports",
+     "name": "crate::rcc::dsi",
+     "main": "[\"resolved\",\"[\\\"embassy-stm32/src/rcc/mod.rs\\\",\\\"module\\\",\\\"item:568\\\",0,\\\"dsi\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-stm32/src/rcc/u5.rs",
+     "start": 586,
+     "kind": "imports",
+     "name": "crate::rcc::dsi",
+     "main": "[\"resolved\",\"[\\\"embassy-stm32/src/rcc/mod.rs\\\",\\\"module\\\",\\\"item:568\\\",0,\\\"dsi\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    },
+    {
+     "file": "embassy-stm32/src/time_driver/lptim.rs",
+     "start": 481,
+     "kind": "imports",
+     "name": "super::AlarmState",
+     "main": "[\"resolved\",\"[\\\"embassy-stm32/src/time_driver/mod.rs\\\",\\\"struct\\\",\\\"item:150\\\",0,\\\"AlarmState\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name"
+    }
+   ],
+   "lostUnstable": 5,
+   "lostUnstableSamples": [
+    {
+     "file": "embassy-executor/src/platform/aarch32.rs",
+     "start": 1606,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": [
+      "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+      "[\"unresolved\",null,[]]"
+     ],
+     "candidate": "[\"unresolved\",null,[]]"
+    },
+    {
+     "file": "embassy-executor/src/platform/std.rs",
+     "start": 375,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": [
+      "[\"unresolved\",null,[]]",
+      "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]"
+     ],
+     "candidate": "[\"unresolved\",null,[]]"
+    },
+    {
+     "file": "embassy-stm32/src/can/bxcan/mod.rs",
+     "start": 634,
+     "kind": "imports",
+     "name": "super::util",
+     "main": [
+      "[\"resolved\",\"[\\\"embassy-stm32/src/can/mod.rs\\\",\\\"module\\\",\\\"item:237\\\",0,\\\"util\\\"]\",[]]",
+      "[\"unresolved\",null,[]]"
+     ],
+     "candidate": "[\"unresolved\",null,[]]"
+    },
+    {
+     "file": "embassy-stm32/src/can/fdcan.rs",
+     "start": 887,
+     "kind": "imports",
+     "name": "super::util",
+     "main": [
+      "[\"unresolved\",null,[]]",
+      "[\"resolved\",\"[\\\"embassy-stm32/src/can/mod.rs\\\",\\\"module\\\",\\\"item:237\\\",0,\\\"util\\\"]\",[]]"
+     ],
+     "candidate": "[\"unresolved\",null,[]]"
+    },
+    {
+     "file": "embassy-stm32/src/rtc/v3.rs",
+     "start": 186,
+     "kind": "imports",
+     "name": "crate::rtc::SealedInstance",
+     "main": [
+      "[\"unresolved\",null,[]]",
+      "[\"resolved\",\"[\\\"embassy-stm32/src/rtc/mod.rs\\\",\\\"trait\\\",\\\"item:15232\\\",0,\\\"SealedInstance\\\"]\",[]]"
+     ],
+     "candidate": "[\"unresolved\",null,[]]"
+    }
+   ],
+   "newLevel2": 3610,
+   "newLevel2Stable": 3610,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  }
+ ],
+ "audit": [
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/reactive_context.rs\\\",\\\"struct\\\",\\\"item:378\\\",0,\\\"ReactiveContext\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/stores/src/subscriptions.rs",
+   "start": 3752,
+   "kind": "types",
+   "name": "ReactiveContext",
+   "target": "[\"packages/vdom/src/reactive_context.rs\",\"struct\",\"item:378\",0,\"ReactiveContext\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/crypto/symmetric/aes_cracen.rs\\\",\\\"function\\\",\\\"item:1218\\\",0,\\\"load_countermeasure_mask\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/crypto/symmetric/mod.rs",
+   "start": 6687,
+   "kind": "calls",
+   "name": "aes::load_countermeasure_mask",
+   "target": "[\"embassy-nrf/src/crypto/symmetric/aes_cracen.rs\",\"function\",\"item:1218\",0,\"load_countermeasure_mask\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/global_context.rs\\\",\\\"function\\\",\\\"item:15615\\\",0,\\\"use_before_render\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/hooks/src/use_hook_did_run.rs",
+   "start": 661,
+   "kind": "calls",
+   "name": "use_before_render",
+   "target": "[\"packages/vdom/src/global_context.rs\",\"function\",\"item:15615\",0,\"use_before_render\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/dx/src/check/metadata.rs\\\",\\\"method\\\",\\\"item:1196\\\",0,\\\"impl MatchInfo::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/dx/src/check/mod.rs",
+   "start": 8059,
+   "kind": "calls",
+   "name": "MatchInfo::new",
+   "target": "[\"packages/dx/src/check/metadata.rs\",\"method\",\"item:1196\",0,\"impl MatchInfo::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/gpio.rs\\\",\\\"macro\\\",\\\"item:32589\\\",0,\\\"impl_pin\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/chips/nrf52810.rs",
+   "start": 2821,
+   "kind": "macros",
+   "name": "impl_pin",
+   "target": "[\"embassy-nrf/src/gpio.rs\",\"macro\",\"item:32589\",0,\"impl_pin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/gpio.rs\\\",\\\"macro\\\",\\\"item:32589\\\",0,\\\"impl_pin\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/chips/nrf52811.rs",
+   "start": 3241,
+   "kind": "macros",
+   "name": "impl_pin",
+   "target": "[\"embassy-nrf/src/gpio.rs\",\"macro\",\"item:32589\",0,\"impl_pin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/hotreload_utils.rs\\\",\\\"method\\\",\\\"item:2211\\\",0,\\\"impl FmtedSegments::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/rsx-hotreload/tests/hotreload_pattern.rs",
+   "start": 8254,
+   "kind": "calls",
+   "name": "FmtedSegments::new",
+   "target": "[\"packages/vdom/src/hotreload_utils.rs\",\"method\",\"item:2211\",0,\"impl FmtedSegments::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-stm32/src/gpio.rs\\\",\\\"method\\\",\\\"item:19230\\\",0,\\\"impl<'d> OutputOpenDrain<'d>::is_set_low\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-stm32/src/gpio.rs",
+   "start": 32830,
+   "kind": "calls",
+   "name": "self.is_set_low",
+   "target": "[\"embassy-stm32/src/gpio.rs\",\"method\",\"item:19230\",0,\"impl<'d> OutputOpenDrain<'d>::is_set_low\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/html/src/events/touch.rs\\\",\\\"trait\\\",\\\"item:7108\\\",0,\\\"HasTouchPointData\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/web/src/events/touch.rs",
+   "start": 1998,
+   "kind": "types",
+   "name": "HasTouchPointData",
+   "target": "[\"packages/html/src/events/touch.rs\",\"trait\",\"item:7108\",0,\"HasTouchPointData\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"cyw43/src/consts.rs\\\",\\\"variant\\\",\\\"item:21841\\\",0,\\\"Ioctl::SetVar\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "cyw43/src/runner.rs",
+   "start": 56164,
+   "kind": "values",
+   "name": "Ioctl::SetVar",
+   "target": "[\"cyw43/src/consts.rs\",\"variant\",\"item:21841\",0,\"Ioctl::SetVar\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/reactive_context.rs\\\",\\\"method\\\",\\\"item:11815\\\",0,\\\"impl Subscribers::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/error_boundary.rs",
+   "start": 3682,
+   "kind": "calls",
+   "name": "Subscribers::new",
+   "target": "[\"packages/vdom/src/reactive_context.rs\",\"method\",\"item:11815\",0,\"impl Subscribers::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/nodes.rs\\\",\\\"variant\\\",\\\"item:17478\\\",0,\\\"BorrowedAttributeValue::Float\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/diff/attributes.rs",
+   "start": 10786,
+   "kind": "calls",
+   "name": "BorrowedAttributeValue::Float",
+   "target": "[\"packages/vdom/src/nodes.rs\",\"variant\",\"item:17478\",0,\"BorrowedAttributeValue::Float\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/scopes.rs\\\",\\\"struct\\\",\\\"item:700\\\",0,\\\"ScopeId\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/suspense/component.rs",
+   "start": 12234,
+   "kind": "types",
+   "name": "ScopeId",
+   "target": "[\"packages/vdom/src/scopes.rs\",\"struct\",\"item:700\",0,\"ScopeId\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-microchip/src/gpio.rs\\\",\\\"method\\\",\\\"item:15687\\\",0,\\\"impl<'d> Flex<'d>::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-microchip/src/gpio.rs",
+   "start": 3635,
+   "kind": "calls",
+   "name": "Flex::new",
+   "target": "[\"embassy-microchip/src/gpio.rs\",\"method\",\"item:15687\",0,\"impl<'d> Flex<'d>::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/gpio.rs\\\",\\\"macro\\\",\\\"item:32589\\\",0,\\\"impl_pin\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/chips/nrf52832.rs",
+   "start": 3821,
+   "kind": "macros",
+   "name": "impl_pin",
+   "target": "[\"embassy-nrf/src/gpio.rs\",\"macro\",\"item:32589\",0,\"impl_pin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/global_context.rs\\\",\\\"function\\\",\\\"item:2733\\\",0,\\\"provide_context\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/router/src/contexts/router.rs",
+   "start": 1806,
+   "kind": "calls",
+   "name": "provide_context",
+   "target": "[\"packages/vdom/src/global_context.rs\",\"function\",\"item:2733\",0,\"provide_context\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/desktop/src/config.rs\\\",\\\"method\\\",\\\"item:12837\\\",0,\\\"impl Config::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/desktop/src/config.rs",
+   "start": 20472,
+   "kind": "calls",
+   "name": "Self::new",
+   "target": "[\"packages/desktop/src/config.rs\",\"method\",\"item:12837\",0,\"impl Config::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-stm32/src/fmt.rs\\\",\\\"macro\\\",\\\"item:1213\\\",0,\\\"assert_eq\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-stm32/src/can/bxcan/filter.rs",
+   "start": 15098,
+   "kind": "macros",
+   "name": "assert_eq",
+   "target": "[\"embassy-stm32/src/fmt.rs\",\"macro\",\"item:1213\",0,\"assert_eq\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-usb/src/class/uvc/device.rs\\\",\\\"method\\\",\\\"item:14501\\\",0,\\\"impl<'d> Shared<'d>::get\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-usb/src/class/uvc/device.rs",
+   "start": 25433,
+   "kind": "calls",
+   "name": "self.shared.get",
+   "target": "[\"embassy-usb/src/class/uvc/device.rs\",\"method\",\"item:14501\",0,\"impl<'d> Shared<'d>::get\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/html/src/events/mouse.rs\\\",\\\"trait\\\",\\\"item:1413\\\",0,\\\"HasMouseData\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/web/src/events/mouse.rs",
+   "start": 1863,
+   "kind": "types",
+   "name": "HasMouseData",
+   "target": "[\"packages/html/src/events/mouse.rs\",\"trait\",\"item:1413\",0,\"HasMouseData\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/arena.rs\\\",\\\"method\\\",\\\"item:1681\\\",0,\\\"impl MountedElementId::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/mount.rs",
+   "start": 24375,
+   "kind": "calls",
+   "name": "MountedElementId::new",
+   "target": "[\"packages/vdom/src/arena.rs\",\"method\",\"item:1681\",0,\"impl MountedElementId::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/timer.rs\\\",\\\"macro\\\",\\\"item:930\\\",0,\\\"impl_timer\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/chips/nrf5340_net.rs",
+   "start": 3424,
+   "kind": "macros",
+   "name": "impl_timer",
+   "target": "[\"embassy-nrf/src/timer.rs\",\"macro\",\"item:930\",0,\"impl_timer\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/arena.rs\\\",\\\"struct\\\",\\\"item:4135\\\",0,\\\"MountId\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/diff/context.rs",
+   "start": 3039,
+   "kind": "types",
+   "name": "MountId",
+   "target": "[\"packages/vdom/src/arena.rs\",\"struct\",\"item:4135\",0,\"MountId\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/diff/node.rs\\\",\\\"method\\\",\\\"item:12119\\\",0,\\\"impl VNode::find_first_element\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/diff/node.rs",
+   "start": 16164,
+   "kind": "calls",
+   "name": "self.find_first_element",
+   "target": "[\"packages/vdom/src/diff/node.rs\",\"method\",\"item:12119\",0,\"impl VNode::find_first_element\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/gpio.rs\\\",\\\"macro\\\",\\\"item:32589\\\",0,\\\"impl_pin\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/chips/nrf5340_app.rs",
+   "start": 8595,
+   "kind": "macros",
+   "name": "impl_pin",
+   "target": "[\"embassy-nrf/src/gpio.rs\",\"macro\",\"item:32589\",0,\"impl_pin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-stm32/src/can/fd/message_ram/txbuffer_element.rs\\\",\\\"method\\\",\\\"item:6478\\\",0,\\\"impl<'a> EFC_W<'a>::set_event_control\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-stm32/src/can/fd/message_ram/txbuffer_element.rs",
+   "start": 11979,
+   "kind": "calls",
+   "name": "self.efc().set_event_control",
+   "target": "[\"embassy-stm32/src/can/fd/message_ram/txbuffer_element.rs\",\"method\",\"item:6478\",0,\"impl<'a> EFC_W<'a>::set_event_control\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"core\\\",\\\"option::Option::None\\\",null,null,\\\"declared-builtin\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/crypto/symmetric/aes_cracen.rs",
+   "start": 9874,
+   "kind": "values",
+   "name": "None",
+   "target": "[\"rust-std\",\"core\",\"option::Option::None\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom-template/src/path.rs\\\",\\\"method\\\",\\\"item:2248\\\",0,\\\"impl TemplatePath::is_root\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/diff/template.rs",
+   "start": 6167,
+   "kind": "calls",
+   "name": "anchor.static_path().is_root",
+   "target": "[\"packages/vdom-template/src/path.rs\",\"method\",\"item:2248\",0,\"impl TemplatePath::is_root\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-time/src/instant.rs\\\",\\\"method\\\",\\\"item:723\\\",0,\\\"impl Instant::now\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-time/src/instant.rs",
+   "start": 5507,
+   "kind": "calls",
+   "name": "Instant::now",
+   "target": "[\"embassy-time/src/instant.rs\",\"method\",\"item:723\",0,\"impl Instant::now\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/scopes.rs\\\",\\\"method\\\",\\\"item:2614\\\",0,\\\"impl ScopeId::index\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/suspense/component.rs",
+   "start": 14741,
+   "kind": "calls",
+   "name": "scope_id.index",
+   "target": "[\"packages/vdom/src/scopes.rs\",\"method\",\"item:2614\",0,\"impl ScopeId::index\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/gpio.rs\\\",\\\"macro\\\",\\\"item:32589\\\",0,\\\"impl_pin\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/chips/nrf52805.rs",
+   "start": 2402,
+   "kind": "macros",
+   "name": "impl_pin",
+   "target": "[\"embassy-nrf/src/gpio.rs\",\"macro\",\"item:32589\",0,\"impl_pin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/document/src/document.rs\\\",\\\"function\\\",\\\"item:943\\\",0,\\\"create_element_in_head\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/desktop/src/document.rs",
+   "start": 2366,
+   "kind": "calls",
+   "name": "create_element_in_head",
+   "target": "[\"packages/document/src/document.rs\",\"function\",\"item:943\",0,\"create_element_in_head\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/nodes.rs\\\",\\\"method\\\",\\\"item:7096\\\",0,\\\"impl<'a> MountedVNode<'a>::vnode\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/diff/node.rs",
+   "start": 2410,
+   "kind": "calls",
+   "name": "self.vnode",
+   "target": "[\"packages/vdom/src/nodes.rs\",\"method\",\"item:7096\",0,\"impl<'a> MountedVNode<'a>::vnode\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"cyw43/src/consts.rs\\\",\\\"const\\\",\\\"item:2795\\\",0,\\\"REG_BACKPLANE_CHIP_CLOCK_CSR\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "cyw43/src/runner.rs",
+   "start": 21795,
+   "kind": "values",
+   "name": "REG_BACKPLANE_CHIP_CLOCK_CSR",
+   "target": "[\"cyw43/src/consts.rs\",\"const\",\"item:2795\",0,\"REG_BACKPLANE_CHIP_CLOCK_CSR\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/launch.rs\\\",\\\"trait\\\",\\\"item:252\\\",0,\\\"LaunchConfig\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/liveview/src/config.rs",
+   "start": 393,
+   "kind": "types",
+   "name": "LaunchConfig",
+   "target": "[\"packages/vdom/src/launch.rs\",\"trait\",\"item:252\",0,\"LaunchConfig\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/dx/src/config/manifest.rs\\\",\\\"struct\\\",\\\"item:1107\\\",0,\\\"PermissionsConfig\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/dx/src/config/manifest_mapper.rs",
+   "start": 19900,
+   "kind": "types",
+   "name": "PermissionsConfig",
+   "target": "[\"packages/dx/src/config/manifest.rs\",\"struct\",\"item:1107\",0,\"PermissionsConfig\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-stm32/src/gpio.rs\\\",\\\"method\\\",\\\"item:9683\\\",0,\\\"impl<'d> Flex<'d>::is_low\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-stm32/src/gpio.rs",
+   "start": 9596,
+   "kind": "calls",
+   "name": "self.is_low",
+   "target": "[\"embassy-stm32/src/gpio.rs\",\"method\",\"item:9683\",0,\"impl<'d> Flex<'d>::is_low\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-mcxa/src/cmp.rs\\\",\\\"method\\\",\\\"item:25728\\\",0,\\\"impl<M:AsyncMode> Cmp<'_,M>::wait_for_any_edge\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-mcxa/src/cmp.rs",
+   "start": 28900,
+   "kind": "calls",
+   "name": "Cmp::wait_for_any_edge",
+   "target": "[\"embassy-mcxa/src/cmp.rs\",\"method\",\"item:25728\",0,\"impl<M:AsyncMode> Cmp<'_,M>::wait_for_any_edge\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/gpio.rs\\\",\\\"macro\\\",\\\"item:32589\\\",0,\\\"impl_pin\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/chips/nrf52820.rs",
+   "start": 2900,
+   "kind": "macros",
+   "name": "impl_pin",
+   "target": "[\"embassy-nrf/src/gpio.rs\",\"macro\",\"item:32589\",0,\"impl_pin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-stm32/src/can/fd/message_ram/generic.rs\\\",\\\"trait\\\",\\\"item:560\\\",0,\\\"ResetValue\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-stm32/src/can/fd/message_ram/txbuffer_element.rs",
+   "start": 687,
+   "kind": "types",
+   "name": "generic::ResetValue",
+   "target": "[\"embassy-stm32/src/can/fd/message_ram/generic.rs\",\"trait\",\"item:560\",0,\"ResetValue\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  }
+ ]
+}

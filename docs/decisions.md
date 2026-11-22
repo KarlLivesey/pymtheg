@@ -2863,6 +2863,27 @@ or a named library target. A captured macro definition, a competing glob, an
 unproven macro binding and a layout expansion keep their source requirements.
 See [C-12](changes/C-12.md).
 
+### C-24 Rust determinism, unlocked registry facades, inherent impl crates
+
+A Rust lookup that meets a cycle cut at a lookup still on the stack is an
+answer for that entry point only; it is reused only under the same
+ancestor tests, never memoised as context-free. The Rust phases take their
+inputs in an order the snapshot fixes, not the store's id order (which
+follows the random project id). A glob imports only names its own module
+can see, so a private `use` in the globbed module is never resolved
+through the glob. A module chosen only by `cfg_attr(…, path = …)`, with no
+plain module file in the checkout, is exactly its captured alternatives: a
+build enabling none of them does not compile (E0583).
+With no lockfile, a dependency declared by registry version requirement
+alone resolves from the default registry, together with the facade's own
+registry dependencies, unless the root manifest patches or replaces the
+crate or a captured Cargo config anywhere in the checkout sets `paths`,
+`[source]` or `[patch]`. A macro link names a verified registry facade's
+export without the implementing crate's source; expansion proofs still
+need it. Neither holds when a captured config patches the facade. An unplaced inherent impl adds a possible method only to types
+of its own crate (Rust E0116); trait impls are unaffected.
+[C-24](changes/C-24.md)
+
 ### C-18 Rust macro identity
 
 The lexical scope retry checks the binding that Rust would use during macro
@@ -3137,3 +3158,34 @@ read and hash the bytes of each file. Filesystem timestamps can describe a
 metadata-only change or hide an edit. Scoped Go resolution and validation use
 projections of existing facts. No second copy of the global indexes is kept
 in the store. [C-33](changes/C-33.md)
+
+### C-26 Non-returning analysis: a deterministic check before any deadline
+
+A file whose analysis would not return fails with a reason. Where the cause
+can be decided from the source, it is, with no clock. TypeScript 5.9's
+`getTypeAtFlowNode` follows single-successor flow steps in an uncounted loop.
+After binding, the module follows the same steps from every flow node of a
+captured file. A file where they repeat a node fails ("its control-flow
+analysis would not return", with line and column) under C-13's containment
+and cap. On microsoft/TypeScript it flags exactly the three
+`unreachableFlowAfterThrowing*` conformance tests, and nothing on the seven
+identity pins. Under a stopped taint walk the judge's dependence graphs are
+not explored, for cost: on microsoft/TypeScript that search exhausted the
+heap. So a link whose receiver reaches a failed file only at depth is
+stored `taint-budget-exhausted` instead of `invalid-code` with a cause.
+Links that touch the failed file directly keep `invalid-code`. Both are
+unresolved, and within the budget nothing changes.
+A file the compiler throws on in a later project is failed for the store.
+Earlier projects' links into it become `target-unavailable`, and their other
+links are flagged `no-unseen-declarations`. The cap counts compiler failures
+a program imports. **Trade:** other non-returning work (another compiler
+loop, exponential type work, a Go or Rust loop) still has no bound. A
+wall-clock watchdog in a worker is the only general bound. It is not built
+until a case needs it, because it would make results depend on the machine
+for the files it stops. Each result records a digest of the module's
+failed files (`failedFilesDigest`), not the map: a map of N failed files in
+each of M separately stored results is N x M in the store. A `contains`
+link names a container only if that container is a symbol. One link
+without a source rejects a module's whole output, so a namespace that is
+no symbol passes its members to the next container out. **Rules out:**
+time limits where a deterministic property exists. See [C-26](changes/C-26.md).

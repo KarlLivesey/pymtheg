@@ -1,0 +1,10 @@
+[
+  {
+    "id": "microsoft/TypeScript",
+    "language": "typescript",
+    "url": "https://github.com/microsoft/TypeScript.git",
+    "commit": "21ba970871efd2766ee46813d0bb67253e7878fa",
+    "category": "compiler / dev tool",
+    "why": "Language compiler repository with a Go compiler port, large TypeScript and JavaScript fixtures, and intentional negative tests."
+  }
+]

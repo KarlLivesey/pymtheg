@@ -1,0 +1,76 @@
+microsoft/TypeScript at 21ba970871efd2766ee46813d0bb67253e7878fa, cold
+`graph index --json` of a fresh copy of the pinned checkout
+(tools/heap-index.sh). Dev server, Node 24.21.0, shared and loaded by other
+runs; times are observations.
+
+Final: C-26 merged with main 2dc05be (C-22 to C-34, SW-5, D19)
+---------------------------------------------------------------
+
+--max-old-space-size=12000
+  peak RSS 8,597,616 KiB, wall 3,813 s, exit 2 (finished; failed files)
+  analysisErrors [], resolutionErrors []
+  counts, failed files and taint: identical to the run below (d3d07f0):
+  files 32,448, symbols 274,386, links 993,013, failed 12,477; the same
+  12,418 / 44 / 3 / 3 / 4 / 5 split and the same three non-returning files;
+  138,466 taint-budget-exhausted.
+
+Default heap (about 4 GB)
+  peak RSS 5,194,320 KiB, wall 3,652 s, signal 6: heap limit reached.
+
+Neither run's progress reader got past inventory, so their stages were not
+stamped; the stage times below are from the d3d07f0 run.
+
+C-26 merged with main d3d07f0 (C-22 to C-31, SW-5)
+---------------------------------------------------
+
+--max-old-space-size=12000
+  peak RSS 7,987,916 KiB, wall 5,519 s, exit 2 (finished; failed files)
+  analysisErrors [], resolutionErrors []
+  counts: files 32,448, symbols 274,386, links 993,013, failed 12,477,
+          partial 2, unresolved 180,990, ambiguous 5,764, library 73,211
+  failed files (tools/failed-kinds.mjs):
+    12,418 syntax errors (the conformance tests' deliberate ones)
+        44 compiler failures (an assertion or exception in the compiler)
+         3 would not return (the flow check):
+           tsc/testdata/tests/cases/compiler/unreachableFlowAfterThrowingForHead1.ts
+           tsc/testdata/tests/cases/compiler/unreachableFlowAfterThrowingForInOfHead1.ts
+           tsc/testdata/tests/cases/compiler/unreachableFlowAfterThrowingForInOfHead2.ts
+         3 binder stack exhausted (a resource limit)
+         4 not valid UTF-8
+         5 internal errors of the TypeScript module
+  TypeScript links taint-budget-exhausted: 138,466
+
+  Stages, seconds since start (stamped progress lines)
+     1115  analyze go start
+     1126  analyze go done
+     2105  analyze typescript start
+     3486  analyze typescript done
+     4990  resolve go start
+     5002  resolve go done
+     5266  resolve typescript start
+     5267  resolve typescript done
+     5505  complete
+
+Default heap (about 4 GB)
+  peak RSS 4,841,428 KiB, wall 5,084 s, signal 6: heap limit reached (a
+  Node fatal-error report was written). This run's progress reader stopped
+  early, so its stages were not stamped.
+
+Earlier runs
+------------
+
+C-26 merged with main c6b77dc (before C-30):
+  12,000 MB heap: the same counts and failed files; 5,100 s, peak RSS
+  8,533,276 KiB. Stages: analysis 1,021 to 2,447 s, resolve go from
+  4,191 s, complete 5,093 s.
+  Default heap: peak RSS 5,072,000 KiB; heap limit at 4,332 s, after the
+  TypeScript analysis returned (2,509 s), while its results were written,
+  before resolution.
+
+C-26 at 2e42301 on main 0ccd239:
+  12,000 MB heap: the same counts and failed files; 5,942 s, peak RSS
+  8,197,572 KiB.
+  Default heap: heap limit at 5,203 s, at the same stage.
+  Sweep runs (scripts/sweep/run.mjs, default heap):
+    60-minute wall:  wall-limit at 3,611 s, in the cold index
+    180-minute wall: killed-for-memory at 5,172 s, in the cold index
