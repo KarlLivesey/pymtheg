@@ -282,10 +282,13 @@ export class SqliteGraphStore implements GraphStorage {
   };
   /**
    * C-37: rows a batched write may add before it commits, as SQLite counts
-   * direct changes (total_changes()). Tests lower it to put batch boundaries
-   * inside small fixtures.
+   * direct changes (total_changes()). A cold cli/cli index on disk took
+   * 155 s with 20,000 and 134 s with 50,000 (from 172 s committing each
+   * file). One batch held the write lock for about 5 s there; one module's
+   * resolution write, a single transaction before and after, held it up to
+   * 16 s. Tests lower it to put batch boundaries inside small fixtures.
    */
-  static writeBatchRows = 20_000;
+  static writeBatchRows = 50_000;
   /** Inside writeBatch: writes share one transaction until the budget is met. */
   private batching = false;
   /** The total_changes() at which the open batch transaction began. */

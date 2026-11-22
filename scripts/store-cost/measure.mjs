@@ -77,7 +77,8 @@ const batch = Number(
   [...parts].find((part) => part.startsWith("batch="))?.slice(6) ?? 1,
 );
 // checkpoint=N (measurement only): the write-ahead log checkpoints every N
-// pages instead of 10,000; 0 leaves the whole log to the checkpoint on close.
+// pages instead of the store's interval; 0 leaves the whole log to the
+// checkpoint on close.
 const checkpoint = [...parts]
   .find((part) => part.startsWith("checkpoint="))
   ?.slice(11);
@@ -111,9 +112,9 @@ proto.exec = function (sql) {
     holdFirst = undefined;
     holdStatements = 0;
   }
-  if (checkpoint !== undefined && sql.includes("wal_autocheckpoint=10000"))
+  if (checkpoint !== undefined && /wal_autocheckpoint=\d+/.test(sql))
     sql = sql.replace(
-      "wal_autocheckpoint=10000",
+      /wal_autocheckpoint=\d+/,
       `wal_autocheckpoint=${checkpoint}`,
     );
   if (parts.has("temp-memory") && sql.includes("PRAGMA foreign_keys=ON"))

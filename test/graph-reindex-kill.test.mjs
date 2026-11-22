@@ -71,8 +71,12 @@ async function everyKillPoint(files, edit, batchRows) {
     const whole = join(base, "whole");
     cpSync(start, whole, { recursive: true });
     const unkilled = await killAt(whole, 0, batchRows);
-    const writes = Number(/^not killed (\d+)/.exec(unkilled.out)?.[1]);
+    const [, written, committed] =
+      /^not killed (\d+) commits (\d+)/.exec(unkilled.out) ?? [];
+    const writes = Number(written);
     assert.ok(writes > 0, unkilled.out);
+    // With a budget of several writes, batches formed: fewer commits.
+    if (batchRows >= 40) assert.ok(Number(committed) < writes, unkilled.out);
     assert.deepEqual(compareRows(storeRows(graph(whole)), cold), []);
     for (let n = 1; n <= writes; n++) {
       const root = join(base, `kill-${n}`);
@@ -224,9 +228,13 @@ for (const [language, files, edit] of [
     },
     { "b/shadow.go": "package b\n\ntype error = int\n" },
   ],
-])
-  test(`${language}: a re-index in small write batches killed at any boundary is repaired by the next one`, async (t) => {
-    const tried = await everyKillPoint(files, edit, 5);
-    assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
-    t.diagnostic(`write boundaries: ${tried}`);
-  });
+]) {
+  // 5 rows: most writes commit alone. 40 rows: a batch holds several writes,
+  // so some kill points fall inside an open batch, before its commit.
+  for (const rows of [5, 40])
+    test(`${language}: a re-index in write batches of ${rows} rows killed at any boundary is repaired by the next one`, async (t) => {
+      const tried = await everyKillPoint(files, edit, rows);
+      assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
+      t.diagnostic(`write boundaries: ${tried}`);
+    });
+}

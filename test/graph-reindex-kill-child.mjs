@@ -8,6 +8,7 @@
 // boundaries; the end of each batch scope, where its last batch commits, is
 // a kill point of its own.
 // usage: node graph-reindex-kill-child.mjs <root> <n> [batch rows]
+import { DatabaseSync } from "node:sqlite";
 import { executeGraph } from "../dist/graph/commands.js";
 import { SqliteGraphStore } from "../dist/graph/store.js";
 
@@ -15,6 +16,18 @@ const [root, limit, batchRows] = process.argv.slice(2);
 if (batchRows) SqliteGraphStore.writeBatchRows = Number(batchRows);
 const proto = SqliteGraphStore.prototype;
 let writes = 0;
+// Write commits, to show that batches of several writes formed.
+let commits = 0;
+let writing = false;
+const exec = DatabaseSync.prototype.exec;
+DatabaseSync.prototype.exec = function (sql) {
+  if (sql === "BEGIN IMMEDIATE") writing = true;
+  else if (sql === "COMMIT" && writing) {
+    commits++;
+    writing = false;
+  } else if (sql === "ROLLBACK") writing = false;
+  return exec.call(this, sql);
+};
 const writeBatch = proto.writeBatch;
 proto.writeBatch = async function (...args) {
   try {
@@ -44,4 +57,4 @@ for (const name of [
   };
 }
 await executeGraph({ command: "index", root });
-process.stdout.write(`not killed ${writes}\n`);
+process.stdout.write(`not killed ${writes} commits ${commits}\n`);
