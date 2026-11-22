@@ -2874,6 +2874,8 @@ or one transaction per phase: W3-P1 measured readers and second writers locked
 out, and under a write-ahead log batches of 64 were no faster), and
 `synchronous=OFF` (the database itself may be corrupted by a power loss).
 See [C-6](changes/C-6.md).
+**Superseded in part by C-37:** one commit per file and the checkpoint every
+10,000 pages (see below).
 
 ### C-9 Rust library paths
 
@@ -3267,3 +3269,47 @@ link names a container only if that container is a symbol. One link
 without a source rejects a module's whole output, so a namespace that is
 no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).
+
+### C-37 Graph index writes commit in bounded batches
+
+**Decided (C-37):** under the write-ahead log, an index run's writes (parse
+results, analysed results and each module's resolution write) share one
+transaction until about 50,000 rows are written (a fixed count of each
+write statement's direct changes; rows changed by triggers and cascades are
+not counted), then commit; the rest commits at the end of each write phase.
+Every batch is one commit with the run's checks at its start: the
+unfinished-run mark at the first, and at each one the proof that no other
+run has written since. Every store write by a connection that chose the
+write-ahead log at its first write, and every batch, first takes a
+turnstile, a lock-only database beside the store (`graph.sqlite-turnstile`,
+SQLite's own file lock), and leaves it once it holds the write lock. A
+writable open that finds its schema and identity in place writes nothing.
+A write that fails undoes its open batch; the store is then its earlier
+commits, as after a crash. With a rollback journal, or where the turnstile
+cannot be opened, each write still commits alone. The log checkpoints
+every 100,000 pages and is cut back to 64 MiB afterwards. This supersedes
+C-6's one commit per file and checkpoint every 10,000 pages; its
+write-ahead log, `synchronous=NORMAL` and the fully synced completion
+record are unchanged.
+**Why:** on disk, repeated commits rewrote the same index pages into the
+log (cli/cli wrote 9.23 GiB for a 463 MiB store). **Bound:** a writer that
+waits holds the turnstile, so the run finishes at most the batch in progress
+before the writer has the write lock (a counted test proves it); a dead
+holder's lock is released by the operating system. Readers are never
+blocked under the write-ahead log. A run overtaken between two batches
+stops at the next batch. **Trade:** a run cut short loses up to one batch
+more of progress, which its mark makes the next run redo; the log reaches
+the checkpoint threshold plus about one batch (474 MiB on cli/cli, 499 MiB
+on Vector; 553 MiB on cli/cli counting direct changes). Only a connection
+that chose the write-ahead log at its first write takes the turnstile; with
+a rollback journal every write commits alone and takes no turn, as before.
+A connection that kept the rollback journal because another connection
+blocked its switch takes no turn for its life; if the store is later moved
+to the write-ahead log while it is open, its writes are correct but wait
+without the one-batch bound.
+Waiters are not served first in, first out, and nothing gives the run
+fairness against a continuous stream of writers. **Rules out:**
+savepoints per write (several times slower inserts), batches bounded by
+time, batching under a rollback journal (a batch larger than the page cache
+would lock readers out), and 50,000 pages or fewer per checkpoint (most of
+the gain lost). See [C-37](changes/C-37.md).

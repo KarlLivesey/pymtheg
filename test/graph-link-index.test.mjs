@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   indexProject,
@@ -11,6 +11,7 @@ import {
   SqliteGraphStore,
 } from "../dist/graph/index.js";
 import toy from "../dist/graph/languages/toy/index.js";
+import { writeAheadLogSafe } from "../dist/storage/local.js";
 
 // Analysis rewrites every file, so both write phases are exercised.
 const analysed = {
@@ -42,35 +43,81 @@ async function project(run) {
   }
 }
 
-test("after every file write another connection can read status and open the store for writing", async () => {
-  await project(async ({ root, database }) => {
-    const store = new SqliteGraphStore(database, "lock-project");
-    const original = store.replaceFile;
-    const probes = [];
-    // The handshake is this hook (after each write returns), not a clock.
-    store.replaceFile = function (...args) {
-      original.apply(this, args);
-      // Fail-fast connection: BEGIN IMMEDIATE succeeds only if no write lock is held.
-      const raw = new DatabaseSync(database, { timeout: 0 });
+/** After each file write: whether a no-wait writer could take the lock, then
+ * the files `graph status` reads, and a writable open once the lock is free. */
+function probing(store, database, probes) {
+  const original = store.replaceFile;
+  // The handshake is this hook (after each write returns), not a clock.
+  store.replaceFile = function (...args) {
+    original.apply(this, args);
+    // Fail-fast connection: BEGIN IMMEDIATE succeeds only if no write lock is held.
+    const raw = new DatabaseSync(database, { timeout: 0 });
+    let free = true;
+    try {
       raw.exec("BEGIN IMMEDIATE");
       raw.exec("ROLLBACK");
+    } catch (error) {
+      if (!/locked|busy/i.test(error.message)) throw error;
+      free = false;
+    } finally {
       raw.close();
-      // The reads `graph status` makes, then a writable open.
-      const reader = new SqliteGraphStore(database, undefined, {
-        readOnly: true,
-      });
-      probes.push(reader.fileInventory().length);
-      reader.graphCommandState();
-      reader.close();
-      new SqliteGraphStore(database).close();
-    };
+    }
+    // The reads `graph status` makes: never blocked.
+    const reader = new SqliteGraphStore(database, undefined, {
+      readOnly: true,
+    });
+    probes.push([reader.fileInventory().length, free]);
+    reader.graphCommandState();
+    reader.close();
+    if (free) new SqliteGraphStore(database).close();
+  };
+}
+
+test("with one-row batches, after every file write another connection can read status and open the store for writing", async () => {
+  await project(async ({ root, database }) => {
+    const previous = SqliteGraphStore.writeBatchRows;
+    SqliteGraphStore.writeBatchRows = 1;
+    const store = new SqliteGraphStore(database, "lock-project");
+    const probes = [];
+    probing(store, database, probes);
+    try {
+      await indexProject(root, new LanguageRegistry([analysed]), store);
+    } finally {
+      store.close();
+      SqliteGraphStore.writeBatchRows = previous;
+    }
+    // Four parse writes, then four analysis writes; each one already committed.
+    assert.deepEqual(
+      probes,
+      [1, 2, 3, 4, 4, 4, 4, 4].map((files) => [files, true]),
+    );
+  });
+});
+
+// C-37: under the write-ahead log a batch holds the write lock across its
+// writes, so another writer waits for the batch (here each phase is one
+// batch); readers are never blocked and read the last commit.
+test("within a write batch readers read the last commit; another writer gets the lock after it", async () => {
+  await project(async ({ root, database }) => {
+    const batched = writeAheadLogSafe(dirname(database));
+    const store = new SqliteGraphStore(database, "lock-project");
+    const probes = [];
+    probing(store, database, probes);
     try {
       await indexProject(root, new LanguageRegistry([analysed]), store);
     } finally {
       store.close();
     }
-    // Four parse writes, then four analysis writes; each one already committed.
-    assert.deepEqual(probes, [1, 2, 3, 4, 4, 4, 4, 4]);
+    assert.deepEqual(
+      probes,
+      batched
+        ? [0, 0, 0, 0, 4, 4, 4, 4].map((files) => [files, false])
+        : [1, 2, 3, 4, 4, 4, 4, 4].map((files) => [files, true]),
+    );
+    const raw = new DatabaseSync(database, { timeout: 0 });
+    raw.exec("BEGIN IMMEDIATE");
+    raw.exec("ROLLBACK");
+    raw.close();
   });
 });
 
