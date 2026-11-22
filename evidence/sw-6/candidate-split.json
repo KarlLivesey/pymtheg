@@ -1,0 +1,111 @@
+{
+ "total": {
+  "one name declared by several library typings": 14366,
+  "checkout candidates only": 2794,
+  "checkout and library candidates": 667,
+  "library candidates with different names": 1330
+ },
+ "byPin": {
+  "changesets/changesets": {
+   "one name declared by several library typings": 2
+  },
+  "colinhacks/zod": {
+   "one name declared by several library typings": 617,
+   "checkout candidates only": 734,
+   "checkout and library candidates": 1,
+   "library candidates with different names": 461
+  },
+  "dexie/Dexie.js": {
+   "one name declared by several library typings": 608,
+   "library candidates with different names": 87,
+   "checkout candidates only": 80,
+   "checkout and library candidates": 14
+  },
+  "excalidraw/excalidraw": {
+   "one name declared by several library typings": 887,
+   "library candidates with different names": 174,
+   "checkout and library candidates": 308
+  },
+  "honojs/hono": {
+   "one name declared by several library typings": 2016,
+   "library candidates with different names": 115,
+   "checkout candidates only": 10,
+   "checkout and library candidates": 5
+  },
+  "mermaid-js/mermaid": {
+   "one name declared by several library typings": 456,
+   "checkout candidates only": 8,
+   "checkout and library candidates": 3,
+   "library candidates with different names": 22
+  },
+  "nestjs/nest": {
+   "one name declared by several library typings": 632,
+   "checkout candidates only": 20,
+   "library candidates with different names": 9
+  },
+  "oclif/core": {
+   "checkout candidates only": 79,
+   "one name declared by several library typings": 136
+  },
+  "pingdotgg/t3code": {
+   "one name declared by several library typings": 574,
+   "checkout candidates only": 936,
+   "checkout and library candidates": 5,
+   "library candidates with different names": 139
+  },
+  "pmndrs/zustand": {
+   "one name declared by several library typings": 15,
+   "checkout candidates only": 2,
+   "library candidates with different names": 2
+  },
+  "puppeteer/puppeteer": {
+   "library candidates with different names": 48,
+   "one name declared by several library typings": 656,
+   "checkout candidates only": 19,
+   "checkout and library candidates": 19
+  },
+  "react-hook-form/react-hook-form": {
+   "one name declared by several library typings": 128,
+   "checkout candidates only": 5,
+   "library candidates with different names": 1
+  },
+  "reduxjs/redux-toolkit": {
+   "library candidates with different names": 76,
+   "one name declared by several library typings": 309,
+   "checkout candidates only": 135,
+   "checkout and library candidates": 2
+  },
+  "trpc/trpc": {
+   "one name declared by several library typings": 1664,
+   "checkout candidates only": 7,
+   "library candidates with different names": 44
+  },
+  "vercel/turborepo": {
+   "library candidates with different names": 7,
+   "one name declared by several library typings": 238,
+   "checkout candidates only": 40
+  },
+  "vitejs/vite": {
+   "one name declared by several library typings": 256,
+   "library candidates with different names": 22,
+   "checkout and library candidates": 106,
+   "checkout candidates only": 14
+  },
+  "vitest-dev/vitest": {
+   "one name declared by several library typings": 494,
+   "checkout candidates only": 157,
+   "library candidates with different names": 26,
+   "checkout and library candidates": 202
+  },
+  "withastro/astro": {
+   "one name declared by several library typings": 4575,
+   "library candidates with different names": 96,
+   "checkout candidates only": 548,
+   "checkout and library candidates": 2
+  },
+  "yargs/yargs": {
+   "one name declared by several library typings": 103,
+   "library candidates with different names": 1
+  }
+ }
+}

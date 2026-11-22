@@ -171,16 +171,18 @@ These estimates prioritise work. They do not add definite score credit.
 
 ### Reproduce the coverage plan for 0.2.0
 
-The plan uses SW-4's bare and offline Go graphs, and a mix of SW-4 and
-SW-5 installed TypeScript graphs. The input includes all pin outcomes,
-exact link inventories, the original fixed-seed source review and build
-provenance for each replayed pin. The 0.1.0 archive supplies the comparison.
-Regenerate the whole plan from the repository root.
+The plan uses SW-4's bare and offline Go graphs and SW-6's installed
+TypeScript graphs. All 20 TypeScript pins were refreshed at SW-6 on main
+`2dc05be`. The input includes all pin outcomes, exact link inventories, the
+original fixed-seed source review, and the build provenance of each
+refreshed pin. The 0.1.0 archive supplies the comparison. SW-6's post-step
+adds the remaining-work list for TypeScript. Regenerate the whole plan from
+the repository root.
 
 ```sh
-node scripts/sweep/coverage.mjs --results evidence/sw-5/coverage-plan-input.json.gz \
+node scripts/sweep/coverage.mjs --results evidence/sw-6/coverage-plan-input.json.gz \
   --plan docs/coverage-plan.md
-node evidence/c-25/plan-refresh.mjs evidence/c-25/coverage-plan-input.json.gz docs/coverage-plan.md
+node evidence/sw-6/plan-sw6.mjs docs/coverage-plan.md
 node --test scripts/sweep/*.test.mjs
 ```
 
@@ -193,8 +195,8 @@ under `$PYM_SCRATCH`. `node scripts/sweep/refresh-evidence.mjs export` reads
 the finished graphs and verifies their totals against the warm CLI answers.
 The `draw` and `context` subcommands list the sampled links and their pinned
 source. See the [SW-4 evidence](../evidence/sw-4/README.md) for the review
-fields and intervals. The [SW-5 evidence](../evidence/sw-5/README.md) gives
-the installed replay and archive commands.
+fields and intervals. The [SW-6 evidence](../evidence/sw-6/README.md) gives
+the installed refresh and archive commands.
 
 ### Reproduce the committed Rust plan
 

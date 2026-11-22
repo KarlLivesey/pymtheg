@@ -438,6 +438,32 @@ export function storedLibraryIdentity(link) {
   return identified(target.unit, target.symbol ?? null, target.evidence);
 }
 
+/**
+ * D20 (22 November 2026): a link whose referent is a library module or
+ * package, and which names that library unit, is complete without a symbol.
+ * It counts at Level 2 as a separately reported part, "library module links".
+ * In the stored inventory these are import links (`[module, "imports",
+ * "library", reasons, count]`) with no stored reason: a TypeScript module
+ * specifier or a whole-module binding (`import * as x`), a Go `import "pkg"`,
+ * a Rust whole-crate `use`/`extern crate`. A member link that names only the
+ * package (a call or reference, such as `vi.fn`) has a symbol to name and
+ * stays Level 1.
+ */
+export function libraryModuleRow([, kind, outcome, reasons]) {
+  return kind === "imports" && outcome === "library" && reasons.length === 0;
+}
+
+/** Library module links of one language in a set of refresh repos (D20). */
+export function libraryModuleLinks(repos, module, own = false) {
+  let links = 0;
+  for (const repo of repos) {
+    if (!repo.counts || (own && repo.language !== module)) continue;
+    for (const row of repo.inventory ?? [])
+      if (row[0] === module && libraryModuleRow(row)) links += row[4];
+  }
+  return links;
+}
+
 /** Identity already expressible using the released link and its stored facts. */
 export function externalIdentity(link, evidence, project, disposition) {
   if (link.resolution === "library") return storedLibraryIdentity(link);

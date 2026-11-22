@@ -1,0 +1,29 @@
+{
+ "total": 2719,
+ "reasons": {
+  "external | no unread file in the program": 2581,
+  "incomplete-config | no unread file in the program": 54,
+  "external | computed beside an unread file (C-13 marker)": 84
+ },
+ "pins": {
+  "changesets/changesets": 32,
+  "colinhacks/zod": 143,
+  "dexie/Dexie.js": 10,
+  "excalidraw/excalidraw": 225,
+  "honojs/hono": 26,
+  "mermaid-js/mermaid": 262,
+  "nestjs/nest": 103,
+  "oclif/core": 6,
+  "pingdotgg/t3code": 672,
+  "pmndrs/zustand": 7,
+  "puppeteer/puppeteer": 55,
+  "react-hook-form/react-hook-form": 250,
+  "reduxjs/redux-toolkit": 154,
+  "trpc/trpc": 344,
+  "vercel/turborepo": 88,
+  "vitejs/vite": 46,
+  "vitest-dev/vitest": 124,
+  "withastro/astro": 168,
+  "yargs/yargs": 4
+ }
+}

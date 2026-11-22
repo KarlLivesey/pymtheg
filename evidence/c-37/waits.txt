@@ -1,0 +1,99 @@
+Turnstile, resolution writes in one transaction (first review fix):
+main-vector: index wall 1107.9 s, 3174 commits, log peak 309 MiB; 795 waits, 0 errors
+  17.2 s, 1 commits of the index inside
+  5.3 s, 10 commits of the index inside
+  5.3 s, 27 commits of the index inside
+  3.3 s, 39 commits of the index inside
+  3.0 s, 16 commits of the index inside
+head-vector: index wall 563.6 s, 33 commits, log peak 606 MiB; 332 waits, 0 errors
+  25.1 s, 1 commits of the index inside
+  14.5 s, 1 commits of the index inside
+  12.5 s, 1 commits of the index inside
+  11.8 s, 1 commits of the index inside
+  7.5 s, 1 commits of the index inside
+main-cli: index wall 372.8 s, 2161 commits, log peak 306 MiB; 250 waits, 1 errors (database is locked)
+  30.0 s, 0 commits of the index inside
+  7.7 s, 1 commits of the index inside
+  5.1 s, 0 commits of the index inside
+  3.2 s, 16 commits of the index inside
+  2.5 s, 11 commits of the index inside
+head-cli: index wall 149.6 s, 19 commits, log peak 501 MiB; 66 waits, 1 errors (database is locked)
+  30.5 s, 0 commits of the index inside
+  12.8 s, 1 commits of the index inside
+  4.9 s, 1 commits of the index inside
+  4.6 s, 1 commits of the index inside
+  4.4 s, 1 commits of the index inside
+
+Turnstile and resolution writes cut at the budget, by checkpoint interval:
+vector-100000: index wall 478.5 s, 37 commits, log peak 499 MiB; 326 waits, 0 errors
+  13.1 s, 1 commits of the index inside
+  9.4 s, 1 commits of the index inside
+  9.4 s, 1 commits of the index inside
+  8.0 s, 1 commits of the index inside
+  7.9 s, 1 commits of the index inside
+vector-50000: index wall 535.2 s, 37 commits, log peak 301 MiB; 370 waits, 0 errors
+  12.7 s, 1 commits of the index inside
+  12.6 s, 1 commits of the index inside
+  5.9 s, 1 commits of the index inside
+  5.4 s, 1 commits of the index inside
+  5.3 s, 1 commits of the index inside
+vector-25000: index wall 485.1 s, 37 commits, log peak 213 MiB; 360 waits, 0 errors
+  6.2 s, 1 commits of the index inside
+  5.7 s, 1 commits of the index inside
+  5.6 s, 1 commits of the index inside
+  5.1 s, 0 commits of the index inside
+  4.8 s, 1 commits of the index inside
+vector-25000b: index wall 458.6 s, 37 commits, log peak 213 MiB; 349 waits, 0 errors
+  6.1 s, 1 commits of the index inside
+  5.9 s, 1 commits of the index inside
+  5.6 s, 1 commits of the index inside
+  5.0 s, 1 commits of the index inside
+  4.1 s, 1 commits of the index inside
+vector-10000: index wall 471.1 s, 37 commits, log peak 157 MiB; 356 waits, 0 errors
+  5.1 s, 1 commits of the index inside
+  4.9 s, 1 commits of the index inside
+  4.5 s, 1 commits of the index inside
+  4.5 s, 1 commits of the index inside
+  4.3 s, 1 commits of the index inside
+cli-100000: index wall 139.5 s, 27 commits, log peak 474 MiB; 73 waits, 0 errors
+  6.4 s, 0 commits of the index inside
+  5.5 s, 1 commits of the index inside
+  4.8 s, 1 commits of the index inside
+  3.9 s, 1 commits of the index inside
+  3.7 s, 1 commits of the index inside
+cli-50000: index wall 143.8 s, 27 commits, log peak 268 MiB; 77 waits, 0 errors
+  4.7 s, 1 commits of the index inside
+  4.4 s, 1 commits of the index inside
+  4.0 s, 1 commits of the index inside
+  3.7 s, 1 commits of the index inside
+  3.6 s, 1 commits of the index inside
+cli-25000: index wall 129.4 s, 27 commits, log peak 169 MiB; 85 waits, 0 errors
+  5.5 s, 1 commits of the index inside
+  4.3 s, 1 commits of the index inside
+  4.2 s, 1 commits of the index inside
+  3.1 s, 1 commits of the index inside
+  2.4 s, 1 commits of the index inside
+cli-25000b: index wall 135.4 s, 27 commits, log peak 169 MiB; 80 waits, 0 errors
+  4.5 s, 1 commits of the index inside
+  4.3 s, 1 commits of the index inside
+  3.8 s, 1 commits of the index inside
+  3.3 s, 1 commits of the index inside
+  3.1 s, 1 commits of the index inside
+cli-10000: index wall 140.5 s, 27 commits, log peak 122 MiB; 89 waits, 0 errors
+  4.1 s, 1 commits of the index inside
+  3.5 s, 1 commits of the index inside
+  3.1 s, 1 commits of the index inside
+  3.1 s, 1 commits of the index inside
+  2.8 s, 1 commits of the index inside
+restic-100000: index wall 32.4 s, 9 commits, log peak 424 MiB; 21 waits, 0 errors
+  3.7 s, 1 commits of the index inside
+  1.6 s, 1 commits of the index inside
+  1.5 s, 1 commits of the index inside
+  1.2 s, 1 commits of the index inside
+  1.2 s, 0 commits of the index inside
+restic-50000: index wall 34.3 s, 9 commits, log peak 217 MiB; 19 waits, 0 errors
+  3.7 s, 1 commits of the index inside
+  2.0 s, 1 commits of the index inside
+  1.8 s, 0 commits of the index inside
+  1.5 s, 1 commits of the index inside
+  1.5 s, 1 commits of the index inside

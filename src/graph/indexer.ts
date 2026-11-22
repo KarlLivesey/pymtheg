@@ -321,24 +321,32 @@ export async function indexProject(
     await store.replaceFile(file, cacheableFailures.has(file.path));
     report.indexed++;
   };
-  await stage("store.writeParsed", async () => {
-    await store.replaceContexts([
-      ...contexts,
-      ...[...dependencies.values()].flat(),
-    ]);
-    for (const file of updates) {
-      const pending = deferred.get(file.module);
-      if (pending) pending.push(file);
-      else {
-        previousFiles.delete(file.path);
-        await writeParsed(file);
+  // C-37: a run's file writes commit in bounded batches where the store can.
+  const batched = <T>(action: () => Promise<T>): Promise<T> =>
+    store.writeBatch ? store.writeBatch(action) : action();
+  await stage("store.writeParsed", () =>
+    batched(async () => {
+      await store.replaceContexts([
+        ...contexts,
+        ...[...dependencies.values()].flat(),
+      ]);
+      for (const file of updates) {
+        const pending = deferred.get(file.module);
+        if (pending) pending.push(file);
+        else {
+          previousFiles.delete(file.path);
+          await writeParsed(file);
+        }
       }
-    }
-    // Edited files whose writes wait for their module's analysis: the run
-    // claims the store now, as writing them first would (C-22, C-38).
-    if ([...deferred.values()].some((pending) => pending.length))
-      await store.claimIndexRun?.();
-  });
+    }),
+  );
+  // Edited files whose writes wait for their module's analysis: the run
+  // claims the store now, as writing them first would (C-22, C-38). Outside
+  // the write batch above (C-37), whose scope has ended and committed: inside
+  // a batch the claim would only commit when the scope ends, so it is made
+  // here, as its own committed transaction, before any analysis starts.
+  if ([...deferred.values()].some((pending) => pending.length))
+    await store.claimIndexRun?.();
   // Written: release every captured text and parse result (C-2). Only the
   // context files and which captures failed are needed from here on.
   updates.length = 0;
@@ -502,42 +510,44 @@ export async function indexProject(
       dependencies.set(module.id, checkedInputs.current);
     if (scope) resolutionScopes.set(module.id, scope);
     const pendingPaths = new Set(pending?.map((file) => file.path));
-    await stage(`analyze.${module.id}.write`, async () => {
-      // A scoped write must never remove a still-valid derived symbol from an
-      // edited file between parse and analysis. SQLite would clear incoming
-      // links that the resolver has proved can be left alone.
-      if (pending && !scope)
-        for (const file of pending) await writeParsed(file);
-      else if (pending) {
-        const analyzedPaths = new Set(results.map((file) => file.path));
-        for (const file of pending)
-          if (!analyzedPaths.has(file.path)) await writeParsed(file);
-        report.indexed += pending.filter((file) =>
-          analyzedPaths.has(file.path),
-        ).length;
-      }
-      for (const item of results) {
-        const file = filesByPath.get(item.path)!;
-        if (
-          (scope && pendingPaths.has(file.path)) ||
-          JSON.stringify(file.result) !== JSON.stringify(item.result)
-        ) {
-          count(`analyze.${module.id}.filesChanged`);
-          await store.replaceFile(
-            { ...file, result: item.result },
-            !analysisFailed &&
-              item.result.status === "failed" &&
-              item.result.failureKind !== "transient" &&
-              // Analyze-only modules may explicitly certify a file-local content
-              // failure. Unclassified analysis failures are never cached.
-              (item.result.failureKind === "content" ||
-                (file.result.status === "failed" &&
-                  (await store.isParseFailure?.(file.path)) === true)),
-          );
+    await stage(`analyze.${module.id}.write`, () =>
+      batched(async () => {
+        // A scoped write must never remove a still-valid derived symbol from an
+        // edited file between parse and analysis. SQLite would clear incoming
+        // links that the resolver has proved can be left alone.
+        if (pending && !scope)
+          for (const file of pending) await writeParsed(file);
+        else if (pending) {
+          const analyzedPaths = new Set(results.map((file) => file.path));
+          for (const file of pending)
+            if (!analyzedPaths.has(file.path)) await writeParsed(file);
+          report.indexed += pending.filter((file) =>
+            analyzedPaths.has(file.path),
+          ).length;
         }
-        report.analyzed++;
-      }
-    });
+        for (const item of results) {
+          const file = filesByPath.get(item.path)!;
+          if (
+            (scope && pendingPaths.has(file.path)) ||
+            JSON.stringify(file.result) !== JSON.stringify(item.result)
+          ) {
+            count(`analyze.${module.id}.filesChanged`);
+            await store.replaceFile(
+              { ...file, result: item.result },
+              !analysisFailed &&
+                item.result.status === "failed" &&
+                item.result.failureKind !== "transient" &&
+                // Analyze-only modules may explicitly certify a file-local content
+                // failure. Unclassified analysis failures are never cached.
+                (item.result.failureKind === "content" ||
+                  (file.result.status === "failed" &&
+                    (await store.isParseFailure?.(file.path)) === true)),
+            );
+          }
+          report.analyzed++;
+        }
+      }),
+    );
     deferred.delete(module.id);
     if (pending) for (const file of pending) previousFiles.delete(file.path);
   };
@@ -656,10 +666,13 @@ export async function indexProject(
       });
       result = { resolutions: [], links: [] };
     }
+    // C-37: a large resolution write commits in batches too.
     await stage(`resolve.${module.id}.write`, () =>
-      prepared
-        ? store.replaceAnalysis(module.id, result, prepared)
-        : store.replaceAnalysis(module.id, result),
+      batched(async () =>
+        prepared
+          ? store.replaceAnalysis(module.id, result, prepared)
+          : store.replaceAnalysis(module.id, result),
+      ),
     );
   };
   // The modules that own at least one stored file, after analysis.

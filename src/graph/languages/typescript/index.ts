@@ -123,6 +123,7 @@ import {
   fromVirtual,
   projectModel,
   relativeSpecifier,
+  releaseLibraryFiles,
   syntaxFailure,
   toVirtual,
 } from "./project.js";
@@ -2281,6 +2282,17 @@ export function typescriptModule(
       }
       return resolutions;
     },
+  };
+  // C-40: an analysis leaves no program behind (see releaseLibraryFiles),
+  // nor the last node a checker was asked about, which holds its file.
+  const analyze = module.analyze!;
+  module.analyze = (context) => {
+    try {
+      return analyze(context);
+    } finally {
+      releaseLibraryFiles();
+      lastAsked = undefined;
+    }
   };
   return module;
 }
