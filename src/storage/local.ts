@@ -82,14 +82,16 @@ function validateDatabaseFiles(file: string): void {
  * Studio writers wait for each other; a lock held longer is reported as
  * "database is locked", never waited on forever. */
 export const writerWaitMs = 30_000;
+/** A database in a file of its own path, not in memory or named by a URI. */
+export const isDatabaseFile = (file: string): boolean =>
+  file !== ":memory:" && !file.startsWith("file:");
 /** Explicit paths support temporary immutable snapshots and the graph's existing
  * public constructor. Production project callers obtain paths via storagePath. */
 export function openDatabase(
   file: string,
   options?: DatabaseSyncOptions,
 ): DatabaseSync {
-  if (file !== ":memory:" && !file.startsWith("file:"))
-    validateDatabaseFiles(file);
+  if (isDatabaseFile(file)) validateDatabaseFiles(file);
   return new (sqlite().DatabaseSync)(file, {
     timeout: writerWaitMs,
     ...options,
@@ -165,9 +167,7 @@ export function openWriteAheadLog(
   ),
 ): boolean {
   const safe =
-    file !== ":memory:" &&
-    !file.startsWith("file:") &&
-    writeAheadLogSafe(dirname(file), sqliteVersion);
+    isDatabaseFile(file) && writeAheadLogSafe(dirname(file), sqliteVersion);
   if (!safe) {
     leaveWriteAheadLog(db);
     return false;

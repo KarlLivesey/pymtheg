@@ -2,10 +2,12 @@
 import type { DatabaseSync, StatementSync } from "node:sqlite";
 import {
   closeWriteAheadLog,
+  isDatabaseFile,
   openDatabase,
   openWriteAheadLog,
 } from "../storage/local.js";
 import { randomUUID } from "node:crypto";
+import { accessSync, constants } from "node:fs";
 import { totalmem } from "node:os";
 import { compare, fileFacts, validateResult } from "./identity.js";
 import { LinkDecider, resolutionFacts } from "./analysis.js";
@@ -123,6 +125,7 @@ export class SqliteGraphStore implements GraphStorage {
     this.sqliteVersion = options.sqliteVersion;
     this.db = countStatements(
       openDatabase(path, { readOnly: options.readOnly ?? false }),
+      (rows) => (this.rowsWritten += rows),
     );
     try {
       if (options.readOnly) {
@@ -162,7 +165,9 @@ export class SqliteGraphStore implements GraphStorage {
       )
         this.db.exec(`PRAGMA cache_size=-${cacheKiB}`);
       this.db.exec("PRAGMA foreign_keys=ON");
-      this.turnstileFile = `${path}-turnstile`;
+      // No turnstile for a database in memory or named by a URI: only one
+      // connection writes it, and the name is no path beside it.
+      if (isDatabaseFile(path)) this.turnstileFile = `${path}-turnstile`;
       // C-37: an open that finds its schema and identity in place writes
       // nothing, so a query opened writable takes no write lock. Otherwise
       // the schema work passes the turnstile like any other write.
@@ -257,7 +262,11 @@ export class SqliteGraphStore implements GraphStorage {
     if (this.turnstile === undefined)
       try {
         this.turnstile = openDatabase(this.turnstileFile);
+        // SQLite opens a file it cannot write read-only, and a lock taken
+        // through it does not exclude another writer: no turnstile then.
+        accessSync(this.turnstileFile, constants.W_OK);
       } catch {
+        this.turnstile?.close();
         this.turnstile = null;
       }
     return this.turnstile;
@@ -415,10 +424,14 @@ export class SqliteGraphStore implements GraphStorage {
         }
     }
   }
-  private changes: StatementSync | undefined;
+  /**
+   * Rows written by this connection's statements, as SQLite reports each
+   * statement's direct changes (the count `total_changes()` keeps), summed
+   * as the statements run, so counting a batch takes no SQL of its own.
+   */
+  private rowsWritten = 0;
   private totalChanges(): number {
-    this.changes ??= this.db.prepare("SELECT total_changes() AS n");
-    return Number(this.changes.get()!.n);
+    return this.rowsWritten;
   }
   /**
    * Undoes the open write transaction. SQLite may already have rolled it
@@ -1803,7 +1816,10 @@ const graphObjects = [
  * Counts every SQL statement this connection executes (C-22 observation:
  * `store.sqlStatements`). The statements and their results are unchanged.
  */
-function countStatements(db: DatabaseSync): DatabaseSync {
+function countStatements(
+  db: DatabaseSync,
+  written: (rows: number) => void,
+): DatabaseSync {
   const prepare = db.prepare.bind(db);
   const exec = db.exec.bind(db);
   db.exec = (sql: string) => {
@@ -1819,12 +1835,18 @@ function countStatements(db: DatabaseSync): DatabaseSync {
       const original = statement[method].bind(statement) as (
         ...args: unknown[]
       ) => unknown;
-      (statement as unknown as Record<string, unknown>)[method] = (
-        ...args: unknown[]
-      ) => {
-        count("store.sqlStatements");
-        return original(...args);
-      };
+      (statement as unknown as Record<string, unknown>)[method] =
+        method === "run"
+          ? (...args: unknown[]) => {
+              count("store.sqlStatements");
+              const result = original(...args) as { changes: number | bigint };
+              written(Number(result.changes));
+              return result;
+            }
+          : (...args: unknown[]) => {
+              count("store.sqlStatements");
+              return original(...args);
+            };
     }
     return statement;
   }) as DatabaseSync["prepare"];

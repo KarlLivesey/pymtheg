@@ -1,0 +1,195 @@
+{
+ "(unit only) | no unread file in the program": {
+  "links": 32617,
+  "pins": {
+   "changesets/changesets": 355,
+   "colinhacks/zod": 438,
+   "dexie/Dexie.js": 324,
+   "excalidraw/excalidraw": 958,
+   "honojs/hono": 202,
+   "mermaid-js/mermaid": 2378,
+   "nestjs/nest": 1863,
+   "oclif/core": 232,
+   "pingdotgg/t3code": 6016,
+   "pmndrs/zustand": 167,
+   "puppeteer/puppeteer": 749,
+   "react-hook-form/react-hook-form": 5103,
+   "reduxjs/redux-toolkit": 1119,
+   "trpc/trpc": 1975,
+   "vercel/turborepo": 2561,
+   "vitejs/vite": 1524,
+   "vitest-dev/vitest": 1611,
+   "withastro/astro": 4975,
+   "yargs/yargs": 67
+  }
+ },
+ "external | no unread file in the program": {
+  "links": 6987,
+  "pins": {
+   "changesets/changesets": 157,
+   "colinhacks/zod": 174,
+   "dexie/Dexie.js": 35,
+   "excalidraw/excalidraw": 917,
+   "honojs/hono": 301,
+   "mermaid-js/mermaid": 953,
+   "nestjs/nest": 605,
+   "oclif/core": 11,
+   "pingdotgg/t3code": 1218,
+   "pmndrs/zustand": 9,
+   "puppeteer/puppeteer": 162,
+   "react-hook-form/react-hook-form": 297,
+   "reduxjs/redux-toolkit": 323,
+   "trpc/trpc": 671,
+   "vercel/turborepo": 110,
+   "vitejs/vite": 262,
+   "vitest-dev/vitest": 407,
+   "withastro/astro": 355,
+   "yargs/yargs": 20
+  }
+ },
+ "(candidate set) | no unread file in the program": {
+  "links": 18545,
+  "pins": {
+   "changesets/changesets": 2,
+   "colinhacks/zod": 1813,
+   "dexie/Dexie.js": 789,
+   "excalidraw/excalidraw": 1369,
+   "honojs/hono": 2146,
+   "mermaid-js/mermaid": 489,
+   "nestjs/nest": 661,
+   "oclif/core": 215,
+   "pingdotgg/t3code": 1654,
+   "pmndrs/zustand": 19,
+   "puppeteer/puppeteer": 742,
+   "react-hook-form/react-hook-form": 134,
+   "reduxjs/redux-toolkit": 522,
+   "trpc/trpc": 1715,
+   "vercel/turborepo": 245,
+   "vitejs/vite": 389,
+   "vitest-dev/vitest": 861,
+   "withastro/astro": 4676,
+   "yargs/yargs": 104
+  }
+ },
+ "local | no unread file in the program": {
+  "links": 39200,
+  "pins": {
+   "changesets/changesets": 132,
+   "colinhacks/zod": 1292,
+   "dexie/Dexie.js": 3229,
+   "excalidraw/excalidraw": 2112,
+   "honojs/hono": 2400,
+   "mermaid-js/mermaid": 772,
+   "nestjs/nest": 2336,
+   "oclif/core": 115,
+   "pingdotgg/t3code": 3317,
+   "pmndrs/zustand": 882,
+   "puppeteer/puppeteer": 433,
+   "react-hook-form/react-hook-form": 5249,
+   "reduxjs/redux-toolkit": 6503,
+   "trpc/trpc": 4004,
+   "vercel/turborepo": 754,
+   "vitejs/vite": 500,
+   "vitest-dev/vitest": 1571,
+   "withastro/astro": 3304,
+   "yargs/yargs": 295
+  }
+ },
+ "any-receiver | no unread file in the program": {
+  "links": 12747,
+  "pins": {
+   "changesets/changesets": 35,
+   "colinhacks/zod": 226,
+   "dexie/Dexie.js": 1863,
+   "excalidraw/excalidraw": 278,
+   "honojs/hono": 217,
+   "mermaid-js/mermaid": 3807,
+   "nestjs/nest": 1548,
+   "oclif/core": 20,
+   "pingdotgg/t3code": 30,
+   "pmndrs/zustand": 24,
+   "puppeteer/puppeteer": 827,
+   "react-hook-form/react-hook-form": 66,
+   "reduxjs/redux-toolkit": 415,
+   "trpc/trpc": 85,
+   "vercel/turborepo": 50,
+   "vitejs/vite": 311,
+   "vitest-dev/vitest": 318,
+   "withastro/astro": 796,
+   "yargs/yargs": 1831
+  }
+ },
+ "no-symbol | no unread file in the program": {
+  "links": 27305,
+  "pins": {
+   "changesets/changesets": 161,
+   "colinhacks/zod": 102,
+   "dexie/Dexie.js": 5495,
+   "excalidraw/excalidraw": 193,
+   "honojs/hono": 711,
+   "mermaid-js/mermaid": 3110,
+   "nestjs/nest": 2342,
+   "oclif/core": 100,
+   "pingdotgg/t3code": 1535,
+   "pmndrs/zustand": 93,
+   "puppeteer/puppeteer": 7155,
+   "react-hook-form/react-hook-form": 249,
+   "reduxjs/redux-toolkit": 702,
+   "trpc/trpc": 1000,
+   "vercel/turborepo": 140,
+   "vitejs/vite": 357,
+   "vitest-dev/vitest": 320,
+   "withastro/astro": 197,
+   "yargs/yargs": 3343
+  }
+ },
+ "external | computed beside an unread file (C-13 marker)": {
+  "links": 13967,
+  "pins": {
+   "puppeteer/puppeteer": 900,
+   "vercel/turborepo": 3916,
+   "vitejs/vite": 3564,
+   "vitest-dev/vitest": 4599,
+   "withastro/astro": 988
+  }
+ },
+ "no-symbol | computed beside an unread file (C-13 marker)": {
+  "links": 2304,
+  "pins": {
+   "puppeteer/puppeteer": 377,
+   "vercel/turborepo": 999,
+   "vitejs/vite": 484,
+   "vitest-dev/vitest": 403,
+   "withastro/astro": 41
+  }
+ },
+ "any-receiver | computed beside an unread file (C-13 marker)": {
+  "links": 3252,
+  "pins": {
+   "puppeteer/puppeteer": 95,
+   "vercel/turborepo": 2628,
+   "vitejs/vite": 148,
+   "vitest-dev/vitest": 156,
+   "withastro/astro": 225
+  }
+ },
+ "local | computed beside an unread file (C-13 marker)": {
+  "links": 3968,
+  "pins": {
+   "puppeteer/puppeteer": 34,
+   "vercel/turborepo": 677,
+   "vitejs/vite": 235,
+   "vitest-dev/vitest": 2721,
+   "withastro/astro": 301
+  }
+ },
+ "(candidate set) | computed beside an unread file (C-13 marker)": {
+  "links": 612,
+  "pins": {
+   "vercel/turborepo": 40,
+   "vitejs/vite": 9,
+   "vitest-dev/vitest": 18,
+   "withastro/astro": 545
+  }
+ }
+}

@@ -1,10 +1,15 @@
 {
- "main": "5d97762",
+ "main": "60d4f2b",
  "reviewedHead": "3756b30",
  "buildExit": 0,
  "typeCheckExit": 0,
  "formatCheckExit": 0,
- "npmTest": { "exit": 0, "passed": 3280, "failed": 0, "skipped": 0 },
+ "npmTest": {
+  "exit": 0,
+  "passed": 3282,
+  "failed": 0,
+  "skipped": 0
+ },
  "earlierFullTests": [
   {
    "passed": 3275,
@@ -22,7 +27,12 @@
   }
  ],
  "coldEquality": {
-  "pins": ["restic/restic", "cli/cli", "trpc/trpc", "helix-editor/helix"],
+  "pins": [
+   "restic/restic",
+   "cli/cli",
+   "trpc/trpc",
+   "helix-editor/helix"
+  ],
   "disk": "4 of 4 equal to main",
   "memory": "4 of 4 equal to main",
   "alsoEqual": "every run with a second writer beside it (Vector, cli/cli, restic), and this head beside the reviewed head",
@@ -36,13 +46,22 @@
  },
  "killHarness": {
   "file": "test/graph-reindex-kill.test.mjs",
-  "batchBudgets": [5, 40, 50000],
+  "batchBudgets": [
+   5,
+   40,
+   50000
+  ],
   "note": "a kill point after every write, including each link of a resolution write, and at the end of every batch scope; with 40 rows the run made fewer commits than writes"
  },
  "oneFileEdits": {
-  "pins": ["restic/restic", "cli/cli"],
+  "pins": [
+   "restic/restic",
+   "cli/cli"
+  ],
   "rounds": 3,
   "revertEqualsCold": "every round",
-  "sqlStatements": "cli/cli body edit 1,422 against 1,420 on main (first head); after the review fixes 1,459 against 1,420, restic 746 against 725; same files and links written"
- }
+  "sqlStatements": "cli/cli body edit 1,422 against 1,420 on main (first head); after the review fixes 1,459 against 1,420, restic 746 against 725; same files and links written",
+  "secondReview": "internal/restic/blob.go body edit: 886 statements against 888 on main; pkg/cmdutil/errors.go (cli/cli): 1,418 against 1,420; same files, link rows and target rows"
+ },
+ "strayFilesAfterSuite": "none: no file outside node_modules and dist was created by the focused suites or the full suite"
 }
