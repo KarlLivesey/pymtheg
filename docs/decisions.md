@@ -2409,9 +2409,14 @@ covering every language, put as a trust question in the manner of coding
 agents: **trusted** (each language's official tooling may run on the project,
 which runs its build scripts and macros as a build would) or **source only**
 (nothing of the project is ever run). As implemented by the manager: trusting
-is the preselected answer of the prompt, since that is the usual case; an init
-that cannot ask (no terminal, MCP, Studio without an explicit choice) records
-source only, because nobody answered; the answer is stored in the project
+is the preselected answer of the prompt, since that is the usual case. Over
+MCP the question is still asked (Karl, same day: it "should still respond with
+something saying like, do you trust this repo and like maybe that model might
+have a pre-existing instruction to approve it"): an initialisation without the
+answer does not guess; it returns the trust question to the calling model,
+which answers from its user or its standing instructions and calls again.
+Studio setup shows the same question. Only a command-line init with no
+terminal and no flag records source only, and says so; the answer is stored in the project
 configuration, shown in answers, and can be changed later; the per-language
 settings of D17 remain as overrides. **Why:** running a toolchain on a project
 is as trusted as building it (D17), and that is a single judgement about the
