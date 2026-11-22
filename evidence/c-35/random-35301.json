@@ -1,0 +1,368 @@
+{
+ "id": "restic/restic",
+ "seed": 35301,
+ "expectedSteps": 30,
+ "equal": true,
+ "steps": [
+  {
+   "step": 0,
+   "file": "internal/restorer/filerestorer.go",
+   "kind": "import",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 784
+   }
+  },
+  {
+   "step": 1,
+   "file": "internal/backend/rest/rest_unix_test.go",
+   "kind": "build",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 747
+   }
+  },
+  {
+   "step": 2,
+   "file": "internal/fuse/dir.go",
+   "kind": "signature",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 775
+   }
+  },
+  {
+   "step": 3,
+   "file": "internal/restic/id.go",
+   "kind": "signature",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 712
+   }
+  },
+  {
+   "step": 4,
+   "file": "internal/backend/retry/testing.go",
+   "kind": "import",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 765
+   }
+  },
+  {
+   "step": 5,
+   "file": "internal/backend/mem/mem_backend.go",
+   "kind": "comment",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 731
+   }
+  },
+  {
+   "step": 6,
+   "file": "internal/repository/prune_internal_test.go",
+   "kind": "body",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 784
+   }
+  },
+  {
+   "step": 7,
+   "file": "internal/repository/c27_random_7.go",
+   "kind": "file-add",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 760
+   }
+  },
+  {
+   "step": 8,
+   "file": "internal/feature/registry.go",
+   "kind": "interface",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 838
+   }
+  },
+  {
+   "step": 9,
+   "file": "internal/backend/mock/backend.go",
+   "kind": "comment",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 760
+   }
+  },
+  {
+   "step": 10,
+   "file": "internal/fuse/dir.go",
+   "kind": "signature",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 735
+   }
+  },
+  {
+   "step": 11,
+   "file": "internal/restic/backend_find.go",
+   "kind": "embed",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 798
+   }
+  },
+  {
+   "step": 12,
+   "file": "internal/fs/node_windows.go",
+   "kind": "signature",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 782
+   }
+  },
+  {
+   "step": 13,
+   "file": "cmd/restic/cmd_mount_integration_test.go",
+   "kind": "add-export",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 730
+   }
+  },
+  {
+   "step": 14,
+   "file": "internal/repository/prune_internal_test.go",
+   "kind": "build",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 767
+   }
+  },
+  {
+   "step": 15,
+   "file": "internal/backend/layout/layout_test.go",
+   "kind": "embed",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 762
+   }
+  },
+  {
+   "step": 16,
+   "file": "internal/ui/restore/progress.go",
+   "kind": "dot",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 743
+   }
+  },
+  {
+   "step": 17,
+   "file": "internal/backend/mem/mem_backend_test.go",
+   "kind": "interface",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 731
+   }
+  },
+  {
+   "step": 18,
+   "file": "internal/fs/node.go",
+   "kind": "signature",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 771
+   }
+  },
+  {
+   "step": 19,
+   "file": "internal/restic/uid_unix.go",
+   "kind": "embed",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 762
+   }
+  },
+  {
+   "step": 20,
+   "file": "cmd/restic/c27_random_20.go",
+   "kind": "file-add",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 770
+   }
+  },
+  {
+   "step": 21,
+   "file": "internal/repository/pack/doc.go",
+   "kind": "import",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 840
+   }
+  },
+  {
+   "step": 22,
+   "file": "internal/backend/b2/b2_test.go",
+   "kind": "add-export",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 771
+   }
+  },
+  {
+   "step": 23,
+   "file": "cmd/restic/c27_random_20.go",
+   "kind": "file-delete",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 838
+   }
+  },
+  {
+   "step": 24,
+   "file": "internal/terminal/tcsetpgrp_aix.go",
+   "kind": "embed",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 786
+   }
+  },
+  {
+   "step": 25,
+   "file": "internal/terminal/stdio.go",
+   "kind": "comment",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 891
+   }
+  },
+  {
+   "step": 26,
+   "file": "internal/selfupdate/download_unix.go",
+   "kind": "import",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 828
+   }
+  },
+  {
+   "step": 27,
+   "file": "internal/repository/crypto/crypto.go",
+   "kind": "signature",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 835
+   }
+  },
+  {
+   "step": 28,
+   "file": "internal/terminal/terminal_windows.go",
+   "kind": "import",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 836
+   }
+  },
+  {
+   "step": 29,
+   "file": "internal/repository/index/associated_data.go",
+   "kind": "body",
+   "equal": true,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 939
+   }
+  }
+ ]
+}

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 import type { ContextFile, GraphFile, LanguageModule } from "../../types.js";
 import { crates } from "./cargo.js";
-import type { AddedLink, Json } from "../../types.js";
+import type { AddedLink, GraphLink, GraphSymbol, Json } from "../../types.js";
 import { parseRust } from "./parse.js";
-import { fileFacts } from "../../identity.js";
+import { compare, fileFacts } from "../../identity.js";
 import { resolveRust, type RustDecisionScope } from "./resolve.js";
 import { count } from "../../work.js";
 import { macroScopeAssumption } from "./macro-scope.js";
@@ -22,6 +22,41 @@ type RustAnalysisInput = {
 
 const cargoInputs = (files: readonly ContextFile[]) =>
   files.map(({ path, status, text }) => ({ path, status, text }));
+
+// C-24: stores list rows by id, and every id includes the project's random
+// id, so two indexes of one snapshot list the same rows in different orders.
+// Lookups through glob cycles can depend on which lookup ran first, so the
+// Rust phases take their inputs in an order the snapshot alone fixes: path,
+// then position, then what is written there.
+const pathOrder = <T extends { path: string }>(items: readonly T[]): T[] =>
+  [...items].sort((a, b) => compare(a.path, b.path));
+const bySite = <
+  T extends {
+    file: string;
+    range: { start: number; end: number };
+    kind: string;
+    data?: Json | undefined;
+  },
+>(
+  items: readonly T[],
+  written: (item: T) => string[],
+): T[] =>
+  [...items].sort(
+    (a, b) =>
+      compare(a.file, b.file) ||
+      a.range.start - b.range.start ||
+      a.range.end - b.range.end ||
+      compare(a.kind, b.kind) ||
+      written(a).reduce(
+        (order, part, i) => order || compare(part, written(b)[i]!),
+        0,
+      ) ||
+      compare(JSON.stringify(a.data ?? null), JSON.stringify(b.data ?? null)),
+  );
+const symbolOrder = (symbols: readonly GraphSymbol[]) =>
+  bySite(symbols, (s) => [s.key, s.identity, s.name]);
+const linkOrder = (links: readonly GraphLink[]) =>
+  bySite(links, (l) => [l.origin, l.targetName, l.sourceKey ?? ""]);
 
 type Crates = ReadonlyMap<string, ReturnType<typeof crates>[number]>;
 export const crateRoots = (
@@ -101,12 +136,11 @@ export function analysisInput(
 }
 
 type RustRecord = Pick<GraphFile, "path" | "module" | "result">;
-const byId = (a: { id: string }, b: { id: string }) =>
-  a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 
 /**
  * The resolve phase's input, built from stored file records exactly as the
- * store presents it: every Rust symbol and parsed link in id order, unresolved.
+ * store presents it: every Rust symbol and parsed link, unresolved. The resolve
+ * phase orders them by path and position (C-24).
  */
 function resolutionInput(
   projectId: string,
@@ -130,8 +164,8 @@ function resolutionInput(
         },
       };
     }),
-    symbols: facts.flatMap((fact) => fact.symbols).sort(byId),
-    links: facts.flatMap((fact) => fact.links).sort(byId),
+    symbols: facts.flatMap((fact) => fact.symbols),
+    links: facts.flatMap((fact) => fact.links),
   };
 }
 
@@ -232,7 +266,14 @@ export const rustPhases = {
       ...rustPhases.analyze(full),
     };
   },
-  analyze({ projectId, files, contextFiles, scope }: RustAnalysisInput) {
+  analyze({
+    projectId,
+    files: listed,
+    contextFiles: contexts,
+    scope,
+  }: RustAnalysisInput) {
+    const files = pathOrder(listed),
+      contextFiles = pathOrder(contexts);
     const inScope = scope ? new Set(scope) : undefined;
     const roots = crateRoots(contextFiles, files);
     const analyzed = files
@@ -264,8 +305,8 @@ export const rustPhases = {
         projectId,
         files: updated,
         contextFiles,
-        symbols: facts.flatMap((f) => f.symbols),
-        links: facts.flatMap((f) => f.links),
+        symbols: symbolOrder(facts.flatMap((f) => f.symbols)),
+        links: linkOrder(facts.flatMap((f) => f.links)),
       },
       (l, targets, reason, files, attributes) =>
         unknown.set(l.id, {
@@ -376,8 +417,15 @@ export const rustPhases = {
     };
   },
   resolve(
-    ctx: Parameters<typeof resolveRust>[0] & { scope?: readonly string[] },
+    input: Parameters<typeof resolveRust>[0] & { scope?: readonly string[] },
   ) {
+    const ctx = {
+      ...input,
+      files: pathOrder(input.files),
+      contextFiles: pathOrder(input.contextFiles),
+      symbols: symbolOrder(input.symbols),
+      links: linkOrder(input.links),
+    };
     const links: AddedLink[] = [];
     const decide: RustDecisionScope = ctx.scope
       ? { files: new Set(ctx.scope) }
@@ -408,7 +456,7 @@ export const rustPhases = {
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "45",
+  version: "47",
   extensions: [".rs"],
   contextFiles: [
     "Cargo.toml",
@@ -479,7 +527,7 @@ const rust: LanguageModule = {
     if (!links.length) return [];
     if (resolutionFiles) {
       // The scoped analysis proved these decisions with this exact input:
-      // every stored record's links and symbols, in the store's id order.
+      // every stored record's links and symbols, ordered by the phase.
       // Without declared scoped link kinds the indexer passes whole records.
       const records = files as readonly Partial<RustRecord>[];
       if (records.some((file) => !file.result?.symbols))

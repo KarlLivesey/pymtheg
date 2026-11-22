@@ -370,11 +370,29 @@ export function cargoMacroSourceKnown(path: LibraryPath): boolean {
     !!path.registry?.length &&
     path.registry.every(
       ({ macroRegistry }) =>
-        !!macroRegistry &&
+        !!macroRegistry?.facade &&
         (implementation
-          ? macroRegistry.implementations.includes(implementation)
+          ? macroRegistry.implementations.includes(implementation) ||
+            // C-24: an unlocked requirement inside the catalogued release
+            // family resolves the facade's own dependency from the registry.
+            (!!direct &&
+              !!macroRegistry.unlocked &&
+              !macroRegistry.unlocked.excluded.includes(implementation))
           : !!direct || macroRegistry.registryOnly),
     )
+  );
+}
+
+/**
+ * C-24: which crate's macro a name is. A registry facade's re-export is fixed
+ * published text, so in compiling code the name is the facade's export
+ * whichever source supplies the crate behind it; only what that macro
+ * expands to depends on the implementing crate (`cargoMacroSourceKnown`).
+ */
+export function cargoMacroFacadeKnown(path: LibraryPath): boolean {
+  return (
+    !!path.registry?.length &&
+    path.registry.every(({ macroRegistry }) => !!macroRegistry?.facade)
   );
 }
 

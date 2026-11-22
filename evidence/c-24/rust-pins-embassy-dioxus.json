@@ -1,0 +1,18 @@
+[
+ {
+  "id": "embassy-rs/embassy",
+  "language": "rust",
+  "url": "https://github.com/embassy-rs/embassy.git",
+  "commit": "41d7b34f69fa530d30439516dced774eedebcd02",
+  "category": "library / workspace",
+  "why": "Large no_std embedded workspace with build scripts and target-specific examples."
+ },
+ {
+  "id": "DioxusLabs/dioxus",
+  "language": "rust",
+  "url": "https://github.com/DioxusLabs/dioxus.git",
+  "commit": "97adf7915e1adfef4e2da436c9bd0b6add0dfa39",
+  "category": "UI / app framework",
+  "why": "UI workspace with proc macros and macro-heavy RSX examples."
+ }
+]

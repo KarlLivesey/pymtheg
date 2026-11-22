@@ -1,0 +1,1201 @@
+{
+ "seed": "c24-rust-determinism-2026-11-19",
+ "pins": [
+  {
+   "id": "BurntSushi/ripgrep",
+   "candidateSites": 39819,
+   "candidateLevel2": 26104,
+   "mainSites": [
+    39819,
+    39819,
+    39819
+   ],
+   "mainLevel2": [
+    26104,
+    26104,
+    26104
+   ],
+   "likeForLikeSites": 39819,
+   "likeForLikeCandidateLevel2": 26104,
+   "likeForLikeMainLevel2": [
+    26104,
+    26104,
+    26104
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 26108,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "candidateSites": 150404,
+   "candidateLevel2": 69661,
+   "mainSites": [
+    150404,
+    150404,
+    150404
+   ],
+   "mainLevel2": [
+    69284,
+    69285,
+    69283
+   ],
+   "likeForLikeSites": 150404,
+   "likeForLikeCandidateLevel2": 69661,
+   "likeForLikeMainLevel2": [
+    69284,
+    69285,
+    69283
+   ],
+   "mainUnstableSites": 2,
+   "unionDefinite": 69312,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 376,
+   "newLevel2Stable": 376,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "RustCrypto/hashes",
+   "candidateSites": 12911,
+   "candidateLevel2": 6160,
+   "mainSites": [
+    12911,
+    12911,
+    12911
+   ],
+   "mainLevel2": [
+    6160,
+    6160,
+    6160
+   ],
+   "likeForLikeSites": 12911,
+   "likeForLikeCandidateLevel2": 6160,
+   "likeForLikeMainLevel2": [
+    6160,
+    6160,
+    6160
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 6206,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "actix/actix-web",
+   "candidateSites": 86640,
+   "candidateLevel2": 35425,
+   "mainSites": [
+    86640,
+    86640,
+    86640
+   ],
+   "mainLevel2": [
+    34923,
+    34923,
+    34923
+   ],
+   "likeForLikeSites": 86640,
+   "likeForLikeCandidateLevel2": 35425,
+   "likeForLikeMainLevel2": [
+    34923,
+    34923,
+    34923
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 34936,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 502,
+   "newLevel2Stable": 502,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "alacritty/alacritty",
+   "candidateSites": 31393,
+   "candidateLevel2": 15385,
+   "mainSites": [
+    31393,
+    31393,
+    31393
+   ],
+   "mainLevel2": [
+    15047,
+    15047,
+    15047
+   ],
+   "likeForLikeSites": 31393,
+   "likeForLikeCandidateLevel2": 15385,
+   "likeForLikeMainLevel2": [
+    15047,
+    15047,
+    15047
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 15050,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 338,
+   "newLevel2Stable": 338,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "cberner/redb",
+   "candidateSites": 73731,
+   "candidateLevel2": 31345,
+   "mainSites": [
+    73731,
+    73731,
+    73731
+   ],
+   "mainLevel2": [
+    31261,
+    31261,
+    31261
+   ],
+   "likeForLikeSites": 73731,
+   "likeForLikeCandidateLevel2": 31345,
+   "likeForLikeMainLevel2": [
+    31261,
+    31261,
+    31261
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 31262,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 84,
+   "newLevel2Stable": 84,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "clap-rs/clap",
+   "candidateSites": 60489,
+   "candidateLevel2": 20330,
+   "mainSites": [
+    60489,
+    60489,
+    60489
+   ],
+   "mainLevel2": [
+    20330,
+    20330,
+    20330
+   ],
+   "likeForLikeSites": 60489,
+   "likeForLikeCandidateLevel2": 20330,
+   "likeForLikeMainLevel2": [
+    20330,
+    20330,
+    20330
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 20334,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "crossbeam-rs/crossbeam",
+   "candidateSites": 34081,
+   "candidateLevel2": 17487,
+   "mainSites": [
+    34081,
+    34081,
+    34081
+   ],
+   "mainLevel2": [
+    17452,
+    17452,
+    17452
+   ],
+   "likeForLikeSites": 34081,
+   "likeForLikeCandidateLevel2": 17487,
+   "likeForLikeMainLevel2": [
+    17452,
+    17452,
+    17452
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 17474,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 35,
+   "newLevel2Stable": 35,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "candidateSites": 13361,
+   "candidateLevel2": 6018,
+   "mainSites": [
+    13361,
+    13361,
+    13361
+   ],
+   "mainLevel2": [
+    5916,
+    5916,
+    5916
+   ],
+   "likeForLikeSites": 13361,
+   "likeForLikeCandidateLevel2": 6018,
+   "likeForLikeMainLevel2": [
+    5916,
+    5916,
+    5916
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 5916,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 102,
+   "newLevel2Stable": 102,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "helix-editor/helix",
+   "candidateSites": 90583,
+   "candidateLevel2": 40237,
+   "mainSites": [
+    90583,
+    90583,
+    90583
+   ],
+   "mainLevel2": [
+    40237,
+    40237,
+    40237
+   ],
+   "likeForLikeSites": 90583,
+   "likeForLikeCandidateLevel2": 40237,
+   "likeForLikeMainLevel2": [
+    40237,
+    40237,
+    40237
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 40250,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "ratatui/ratatui",
+   "candidateSites": 60424,
+   "candidateLevel2": 23853,
+   "mainSites": [
+    60424,
+    60424,
+    60424
+   ],
+   "mainLevel2": [
+    23853,
+    23853,
+    23853
+   ],
+   "likeForLikeSites": 60424,
+   "likeForLikeCandidateLevel2": 23853,
+   "likeForLikeMainLevel2": [
+    23853,
+    23853,
+    23853
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 23871,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rust-embedded/cortex-m",
+   "candidateSites": 5531,
+   "candidateLevel2": 3047,
+   "mainSites": [
+    5531,
+    5531,
+    5531
+   ],
+   "mainLevel2": [
+    3047,
+    3047,
+    3047
+   ],
+   "likeForLikeSites": 5531,
+   "likeForLikeCandidateLevel2": 3047,
+   "likeForLikeMainLevel2": [
+    3047,
+    3047,
+    3047
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 3075,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rust-lang/mdBook",
+   "candidateSites": 13866,
+   "candidateLevel2": 7176,
+   "mainSites": [
+    13866,
+    13866,
+    13866
+   ],
+   "mainLevel2": [
+    7176,
+    7176,
+    7176
+   ],
+   "likeForLikeSites": 13866,
+   "likeForLikeCandidateLevel2": 7176,
+   "likeForLikeMainLevel2": [
+    7176,
+    7176,
+    7176
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 7181,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rustls/rustls",
+   "candidateSites": 70802,
+   "candidateLevel2": 20348,
+   "mainSites": [
+    70802,
+    70802,
+    70802
+   ],
+   "mainLevel2": [
+    20276,
+    20276,
+    20276
+   ],
+   "likeForLikeSites": 70802,
+   "likeForLikeCandidateLevel2": 20348,
+   "likeForLikeMainLevel2": [
+    20276,
+    20276,
+    20276
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 20294,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 72,
+   "newLevel2Stable": 72,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "serde-rs/serde",
+   "candidateSites": 30714,
+   "candidateLevel2": 8282,
+   "mainSites": [
+    30714,
+    30714,
+    30714
+   ],
+   "mainLevel2": [
+    8282,
+    8282,
+    8282
+   ],
+   "likeForLikeSites": 30714,
+   "likeForLikeCandidateLevel2": 8282,
+   "likeForLikeMainLevel2": [
+    8282,
+    8282,
+    8282
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 8291,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tauri-apps/tauri",
+   "candidateSites": 88113,
+   "candidateLevel2": 42105,
+   "mainSites": [
+    88113,
+    88113,
+    88113
+   ],
+   "mainLevel2": [
+    41940,
+    41940,
+    41940
+   ],
+   "likeForLikeSites": 88113,
+   "likeForLikeCandidateLevel2": 42105,
+   "likeForLikeMainLevel2": [
+    41940,
+    41940,
+    41940
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 41949,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 165,
+   "newLevel2Stable": 165,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tokio-rs/axum",
+   "candidateSites": 41067,
+   "candidateLevel2": 16232,
+   "mainSites": [
+    41067,
+    41067,
+    41067
+   ],
+   "mainLevel2": [
+    16213,
+    16213,
+    16213
+   ],
+   "likeForLikeSites": 41067,
+   "likeForLikeCandidateLevel2": 16232,
+   "likeForLikeMainLevel2": [
+    16213,
+    16213,
+    16213
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 16218,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 19,
+   "newLevel2Stable": 19,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "candidateSites": 54645,
+   "candidateLevel2": 24496,
+   "mainSites": [
+    54645,
+    54645,
+    54645
+   ],
+   "mainLevel2": [
+    23682,
+    23682,
+    23682
+   ],
+   "likeForLikeSites": 54645,
+   "likeForLikeCandidateLevel2": 24496,
+   "likeForLikeMainLevel2": [
+    23682,
+    23682,
+    23682
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 23683,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 814,
+   "newLevel2Stable": 814,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  }
+ ],
+ "audit": [
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:115886\\\",0,\\\"impl QueryCursor::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/query_test.rs",
+   "start": 117509,
+   "kind": "calls",
+   "name": "QueryCursor::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:115886\",0,\"impl QueryCursor::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:138979\\\",0,\\\"impl Point::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/node_test.rs",
+   "start": 35499,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:138979\",0,\"impl Point::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "actix/actix-web",
+   "decision": "[\"resolved\",\"[\\\"actix-router/src/regex_set.rs\\\",\\\"method\\\",\\\"item:968\\\",0,\\\"impl RegexSet::empty\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "actix-router/src/resource.rs",
+   "start": 31308,
+   "kind": "calls",
+   "name": "RegexSet::empty",
+   "target": "[\"actix-router/src/regex_set.rs\",\"method\",\"item:968\",0,\"impl RegexSet::empty\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/dx/src/check/metadata.rs\\\",\\\"method\\\",\\\"item:1196\\\",0,\\\"impl MatchInfo::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/dx/src/check/mod.rs",
+   "start": 8059,
+   "kind": "calls",
+   "name": "MatchInfo::new",
+   "target": "[\"packages/dx/src/check/metadata.rs\",\"method\",\"item:1196\",0,\"impl MatchInfo::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "actix/actix-web",
+   "decision": "[\"resolved\",\"[\\\"actix-router/src/path.rs\\\",\\\"method\\\",\\\"item:846\\\",0,\\\"impl<T:ResourcePath> Path<T>::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "actix-router/src/router.rs",
+   "start": 8424,
+   "kind": "calls",
+   "name": "Path::new",
+   "target": "[\"actix-router/src/path.rs\",\"method\",\"item:846\",0,\"impl<T:ResourcePath> Path<T>::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/hotreload_utils.rs\\\",\\\"method\\\",\\\"item:2211\\\",0,\\\"impl FmtedSegments::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/rsx-hotreload/tests/hotreload_pattern.rs",
+   "start": 8254,
+   "kind": "calls",
+   "name": "FmtedSegments::new",
+   "target": "[\"packages/vdom/src/hotreload_utils.rs\",\"method\",\"item:2211\",0,\"impl FmtedSegments::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tokio-rs/axum",
+   "decision": "[\"resolved\",\"[\\\"axum-core/src/body.rs\\\",\\\"method\\\",\\\"item:1113\\\",0,\\\"impl Body::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "axum-extra/src/response/file_stream.rs",
+   "start": 9256,
+   "kind": "calls",
+   "name": "body::Body::new",
+   "target": "[\"axum-core/src/body.rs\",\"method\",\"item:1113\",0,\"impl Body::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "actix/actix-web",
+   "decision": "[\"resolved\",\"[\\\"actix-router/src/resource.rs\\\",\\\"method\\\",\\\"item:10461\\\",0,\\\"impl ResourceDef::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "actix-router/src/resource.rs",
+   "start": 60563,
+   "kind": "calls",
+   "name": "ResourceDef::new",
+   "target": "[\"actix-router/src/resource.rs\",\"method\",\"item:10461\",0,\"impl ResourceDef::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "actix/actix-web",
+   "decision": "[\"resolved\",\"[\\\"actix-web/src/service.rs\\\",\\\"method\\\",\\\"item:4810\\\",0,\\\"impl ServiceRequest::head\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "actix-web/src/service.rs",
+   "start": 5509,
+   "kind": "calls",
+   "name": "self.head",
+   "target": "[\"actix-web/src/service.rs\",\"method\",\"item:4810\",0,\"impl ServiceRequest::head\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "rustls/rustls",
+   "decision": "[\"resolved\",\"[\\\"bogo/src/client.rs\\\",\\\"method\\\",\\\"item:12364\\\",0,\\\"impl ClientCacheWithSpecificKxHints::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "bogo/src/client.rs",
+   "start": 4130,
+   "kind": "calls",
+   "name": "ClientCacheWithSpecificKxHints::new",
+   "target": "[\"bogo/src/client.rs\",\"method\",\"item:12364\",0,\"impl ClientCacheWithSpecificKxHints::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/desktop/src/config.rs\\\",\\\"method\\\",\\\"item:12837\\\",0,\\\"impl Config::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/desktop/src/config.rs",
+   "start": 20472,
+   "kind": "calls",
+   "name": "Self::new",
+   "target": "[\"packages/desktop/src/config.rs\",\"method\",\"item:12837\",0,\"impl Config::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:138979\\\",0,\\\"impl Point::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/query_test.rs",
+   "start": 75332,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:138979\",0,\"impl Point::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"str::from_utf8\\\",null,null,\\\"qualified-path\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 593,
+   "kind": "calls",
+   "name": "std::str::from_utf8",
+   "target": "[\"rust-std\",\"std\",\"str::from_utf8\",null,null,\"qualified-path\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/arena.rs\\\",\\\"method\\\",\\\"item:1681\\\",0,\\\"impl MountedElementId::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/mount.rs",
+   "start": 24375,
+   "kind": "calls",
+   "name": "MountedElementId::new",
+   "target": "[\"packages/vdom/src/arena.rs\",\"method\",\"item:1681\",0,\"impl MountedElementId::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "alacritty/alacritty",
+   "decision": "[\"resolved\",\"[\\\"alacritty_terminal/src/vi_mode.rs\\\",\\\"method\\\",\\\"item:1980\\\",0,\\\"impl ViModeCursor::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "alacritty_terminal/src/vi_mode.rs",
+   "start": 30840,
+   "kind": "calls",
+   "name": "ViModeCursor::new",
+   "target": "[\"alacritty_terminal/src/vi_mode.rs\",\"method\",\"item:1980\",0,\"impl ViModeCursor::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:133670\\\",0,\\\"impl QueryProperty::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/query_test.rs",
+   "start": 110517,
+   "kind": "calls",
+   "name": "QueryProperty::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:133670\",0,\"impl QueryProperty::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:138979\\\",0,\\\"impl Point::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/tree_test.rs",
+   "start": 18498,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:138979\",0,\"impl Point::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:138979\\\",0,\\\"impl Point::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/tree_test.rs",
+   "start": 7573,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:138979\",0,\"impl Point::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom-template/src/path.rs\\\",\\\"method\\\",\\\"item:2248\\\",0,\\\"impl TemplatePath::is_root\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/diff/template.rs",
+   "start": 6167,
+   "kind": "calls",
+   "name": "anchor.static_path().is_root",
+   "target": "[\"packages/vdom-template/src/path.rs\",\"method\",\"item:2248\",0,\"impl TemplatePath::is_root\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:25065\\\",0,\\\"impl Parser::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/language_test.rs",
+   "start": 139,
+   "kind": "calls",
+   "name": "Parser::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:25065\",0,\"impl Parser::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "actix/actix-web",
+   "decision": "[\"resolved\",\"[\\\"actix-multipart/src/multipart.rs\\\",\\\"method\\\",\\\"item:2261\\\",0,\\\"impl Multipart::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "actix-multipart/src/field.rs",
+   "start": 33129,
+   "kind": "calls",
+   "name": "Multipart::new",
+   "target": "[\"actix-multipart/src/multipart.rs\",\"method\",\"item:2261\",0,\"impl Multipart::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:25065\\\",0,\\\"impl Parser::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "test/fixtures/rust_wasm_web/src/rust_wasm_web.rs",
+   "start": 8007,
+   "kind": "calls",
+   "name": "Parser::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:25065\",0,\"impl Parser::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "actix/actix-web",
+   "decision": "[\"resolved\",\"[\\\"actix-web/src/service.rs\\\",\\\"method\\\",\\\"item:4810\\\",0,\\\"impl ServiceRequest::head\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "actix-web/src/service.rs",
+   "start": 10784,
+   "kind": "calls",
+   "name": "self.head",
+   "target": "[\"actix-web/src/service.rs\",\"method\",\"item:4810\",0,\"impl ServiceRequest::head\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "alacritty/alacritty",
+   "decision": "[\"resolved\",\"[\\\"alacritty_terminal/src/index.rs\\\",\\\"method\\\",\\\"item:1287\\\",0,\\\"impl<L,C> Point<L,C>::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "alacritty_terminal/src/selection.rs",
+   "start": 20541,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"alacritty_terminal/src/index.rs\",\"method\",\"item:1287\",0,\"impl<L,C> Point<L,C>::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/vdom/src/arena.rs\\\",\\\"method\\\",\\\"item:1681\\\",0,\\\"impl MountedElementId::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/vdom/src/mount.rs",
+   "start": 24020,
+   "kind": "calls",
+   "name": "MountedElementId::new",
+   "target": "[\"packages/vdom/src/arena.rs\",\"method\",\"item:1681\",0,\"impl MountedElementId::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "rustls/rustls",
+   "decision": "[\"resolved\",\"[\\\"ci-bench/src/valgrind.rs\\\",\\\"method\\\",\\\"item:15270\\\",0,\\\"impl CountInstructions::start\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "ci-bench/src/main.rs",
+   "start": 32708,
+   "kind": "calls",
+   "name": "CountInstructions::start",
+   "target": "[\"ci-bench/src/valgrind.rs\",\"method\",\"item:15270\",0,\"impl CountInstructions::start\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"vec!\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1993,
+   "kind": "macros",
+   "name": "vec",
+   "target": "[\"rust-std\",\"std\",\"vec!\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "decision": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"option::Option::Some\\\",null,null,\\\"declared-builtin\\\"]\",[\"rust-external-macro-name\"]]",
+   "definite": true,
+   "level2": true,
+   "file": "examples/structured/src/main.rs",
+   "start": 1424,
+   "kind": "calls",
+   "name": "Some",
+   "target": "[\"rust-std\",\"std\",\"option::Option::Some\",null,null,\"declared-builtin\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:138979\\\",0,\\\"impl Point::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/node_test.rs",
+   "start": 27000,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:138979\",0,\"impl Point::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/stores/src/scope.rs\\\",\\\"method\\\",\\\"item:2891\\\",0,\\\"impl<Lens> SelectorScope<Lens>::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/stores/src/store.rs",
+   "start": 4818,
+   "kind": "calls",
+   "name": "SelectorScope::new",
+   "target": "[\"packages/stores/src/scope.rs\",\"method\",\"item:2891\",0,\"impl<Lens> SelectorScope<Lens>::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:89830\\\",0,\\\"impl Query::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/query_test.rs",
+   "start": 6749,
+   "kind": "calls",
+   "name": "Query::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:89830\",0,\"impl Query::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "actix/actix-web",
+   "decision": "[\"resolved\",\"[\\\"actix-router/src/resource.rs\\\",\\\"method\\\",\\\"item:10461\\\",0,\\\"impl ResourceDef::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "actix-router/src/resource.rs",
+   "start": 45452,
+   "kind": "calls",
+   "name": "ResourceDef::new",
+   "target": "[\"actix-router/src/resource.rs\",\"method\",\"item:10461\",0,\"impl ResourceDef::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/dx/src/opt/mod.rs\\\",\\\"method\\\",\\\"item:1018\\\",0,\\\"impl AppManifest::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/dx/src/build/assets.rs",
+   "start": 25741,
+   "kind": "calls",
+   "name": "AppManifest::new",
+   "target": "[\"packages/dx/src/opt/mod.rs\",\"method\",\"item:1018\",0,\"impl AppManifest::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:138979\\\",0,\\\"impl Point::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/node_test.rs",
+   "start": 4923,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:138979\",0,\"impl Point::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "crossbeam-rs/crossbeam",
+   "decision": "[\"resolved\",\"[\\\"crossbeam-utils/src/cache_padded.rs\\\",\\\"method\\\",\\\"item:6637\\\",0,\\\"impl<T> CachePadded<T>::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crossbeam-epoch/src/internal.rs",
+   "start": 12514,
+   "kind": "calls",
+   "name": "CachePadded::new",
+   "target": "[\"crossbeam-utils/src/cache_padded.rs\",\"method\",\"item:6637\",0,\"impl<T> CachePadded<T>::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "actix/actix-web",
+   "decision": "[\"resolved\",\"[\\\"actix-web/src/service.rs\\\",\\\"method\\\",\\\"item:2083\\\",0,\\\"impl ServiceRequest::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "actix-web/src/test/test_request.rs",
+   "start": 8933,
+   "kind": "calls",
+   "name": "ServiceRequest::new",
+   "target": "[\"actix-web/src/service.rs\",\"method\",\"item:2083\",0,\"impl ServiceRequest::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "alacritty/alacritty",
+   "decision": "[\"resolved\",\"[\\\"alacritty_terminal/src/index.rs\\\",\\\"method\\\",\\\"item:1287\\\",0,\\\"impl<L,C> Point<L,C>::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "alacritty_terminal/src/vi_mode.rs",
+   "start": 22214,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"alacritty_terminal/src/index.rs\",\"method\",\"item:1287\",0,\"impl<L,C> Point<L,C>::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tauri-apps/tauri",
+   "decision": "[\"resolved\",\"[\\\"crates/tauri-build/src/lib.rs\\\",\\\"method\\\",\\\"item:17530\\\",0,\\\"impl Attributes::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/tauri-build/src/lib.rs",
+   "start": 39686,
+   "kind": "calls",
+   "name": "crate::Attributes::new",
+   "target": "[\"crates/tauri-build/src/lib.rs\",\"method\",\"item:17530\",0,\"impl Attributes::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:138979\\\",0,\\\"impl Point::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/query_test.rs",
+   "start": 79374,
+   "kind": "calls",
+   "name": "Point::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:138979\",0,\"impl Point::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "decision": "[\"resolved\",\"[\\\"lib/binding_rust/lib.rs\\\",\\\"method\\\",\\\"item:25065\\\",0,\\\"impl Parser::new\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "crates/cli/src/tests/query_test.rs",
+   "start": 65846,
+   "kind": "calls",
+   "name": "Parser::new",
+   "target": "[\"lib/binding_rust/lib.rs\",\"method\",\"item:25065\",0,\"impl Parser::new\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  }
+ ]
+}

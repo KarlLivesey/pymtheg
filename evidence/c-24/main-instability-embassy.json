@@ -1,0 +1,699 @@
+{
+ "seed": "c24-rust-determinism-2026-11-19",
+ "pins": [
+  {
+   "id": "BurntSushi/ripgrep",
+   "candidateSites": 39819,
+   "candidateLevel2": 26104,
+   "mainSites": [
+    39819
+   ],
+   "mainLevel2": [
+    26104
+   ],
+   "likeForLikeSites": 39819,
+   "likeForLikeCandidateLevel2": 26104,
+   "likeForLikeMainLevel2": [
+    26104
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 26108,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "candidateSites": 149592,
+   "candidateLevel2": 68526,
+   "mainSites": [
+    149592
+   ],
+   "mainLevel2": [
+    68527
+   ],
+   "likeForLikeSites": 149592,
+   "likeForLikeCandidateLevel2": 68526,
+   "likeForLikeMainLevel2": [
+    68527
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 68552,
+   "lostStable": [
+    {
+     "file": "packages/fullstack/src/payloads/sse.rs",
+     "start": 12850,
+     "kind": "implements",
+     "name": "std::ops::Deref",
+     "main": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"ops::Deref\\\",null,null,\\\"qualified-path\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": ""
+    },
+    {
+     "file": "packages/fullstack/src/payloads/sse.rs",
+     "start": 13068,
+     "kind": "implements",
+     "name": "std::ops::DerefMut",
+     "main": "[\"library\",\"[\\\"rust-std\\\",\\\"std\\\",\\\"ops::DerefMut\\\",null,null,\\\"qualified-path\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": ""
+    }
+   ],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 1,
+   "newLevel2Stable": 1,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "RustCrypto/hashes",
+   "candidateSites": 12911,
+   "candidateLevel2": 6160,
+   "mainSites": [
+    12911
+   ],
+   "mainLevel2": [
+    6160
+   ],
+   "likeForLikeSites": 12911,
+   "likeForLikeCandidateLevel2": 6160,
+   "likeForLikeMainLevel2": [
+    6160
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 6206,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "actix/actix-web",
+   "candidateSites": 86640,
+   "candidateLevel2": 34923,
+   "mainSites": [
+    86640
+   ],
+   "mainLevel2": [
+    34923
+   ],
+   "likeForLikeSites": 86640,
+   "likeForLikeCandidateLevel2": 34923,
+   "likeForLikeMainLevel2": [
+    34923
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 34936,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "alacritty/alacritty",
+   "candidateSites": 30965,
+   "candidateLevel2": 14852,
+   "mainSites": [
+    30965
+   ],
+   "mainLevel2": [
+    14852
+   ],
+   "likeForLikeSites": 30965,
+   "likeForLikeCandidateLevel2": 14852,
+   "likeForLikeMainLevel2": [
+    14852
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 14855,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "cberner/redb",
+   "candidateSites": 73731,
+   "candidateLevel2": 31261,
+   "mainSites": [
+    73731
+   ],
+   "mainLevel2": [
+    31261
+   ],
+   "likeForLikeSites": 73731,
+   "likeForLikeCandidateLevel2": 31261,
+   "likeForLikeMainLevel2": [
+    31261
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 31262,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "clap-rs/clap",
+   "candidateSites": 52417,
+   "candidateLevel2": 19785,
+   "mainSites": [
+    52417
+   ],
+   "mainLevel2": [
+    19785
+   ],
+   "likeForLikeSites": 52417,
+   "likeForLikeCandidateLevel2": 19785,
+   "likeForLikeMainLevel2": [
+    19785
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 19789,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "crossbeam-rs/crossbeam",
+   "candidateSites": 34081,
+   "candidateLevel2": 17452,
+   "mainSites": [
+    34081
+   ],
+   "mainLevel2": [
+    17452
+   ],
+   "likeForLikeSites": 34081,
+   "likeForLikeCandidateLevel2": 17452,
+   "likeForLikeMainLevel2": [
+    17452
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 17474,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "candidateSites": 514539,
+   "candidateLevel2": 165208,
+   "mainSites": [
+    514539
+   ],
+   "mainLevel2": [
+    165208
+   ],
+   "likeForLikeSites": 514539,
+   "likeForLikeCandidateLevel2": 165208,
+   "likeForLikeMainLevel2": [
+    165208
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 166145,
+   "lostStable": [
+    {
+     "file": "embassy-executor/src/platform/spin.rs",
+     "start": 341,
+     "kind": "imports",
+     "name": "crate::raw",
+     "main": "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": ""
+    },
+    {
+     "file": "embassy-nrf/src/ppi/dppi.rs",
+     "start": 80,
+     "kind": "imports",
+     "name": "super::Event",
+     "main": "[\"resolved\",\"[\\\"embassy-nrf/src/ppi/mod.rs\\\",\\\"struct\\\",\\\"item:4980\\\",0,\\\"Event\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "conditional module path lacks captured alternatives"
+    },
+    {
+     "file": "embassy-nrf/src/ppi/dppi.rs",
+     "start": 102,
+     "kind": "imports",
+     "name": "super::Task",
+     "main": "[\"resolved\",\"[\\\"embassy-nrf/src/ppi/mod.rs\\\",\\\"struct\\\",\\\"item:3810\\\",0,\\\"Task\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "conditional module path lacks captured alternatives"
+    },
+    {
+     "file": "embassy-stm32/src/can/fdcan.rs",
+     "start": 887,
+     "kind": "imports",
+     "name": "super::util",
+     "main": "[\"resolved\",\"[\\\"embassy-stm32/src/can/mod.rs\\\",\\\"module\\\",\\\"item:237\\\",0,\\\"util\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": ""
+    },
+    {
+     "file": "embassy-stm32/src/rcc/f247.rs",
+     "start": 526,
+     "kind": "imports",
+     "name": "crate::rcc::dsi",
+     "main": "[\"resolved\",\"[\\\"embassy-stm32/src/rcc/mod.rs\\\",\\\"module\\\",\\\"item:568\\\",0,\\\"dsi\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": "opaque-item-may-shadow-name; conditional module path lacks captured alternatives"
+    },
+    {
+     "file": "embassy-stm32/src/time_driver/tim.rs",
+     "start": 488,
+     "kind": "imports",
+     "name": "super::AlarmState",
+     "main": "[\"resolved\",\"[\\\"embassy-stm32/src/time_driver/mod.rs\\\",\\\"struct\\\",\\\"item:150\\\",0,\\\"AlarmState\\\"]\",[]]",
+     "candidate": "[\"unresolved\",null,[]]",
+     "reason": ""
+    }
+   ],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 6,
+   "newLevel2Stable": 6,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "fjall-rs/fjall",
+   "candidateSites": 13361,
+   "candidateLevel2": 5916,
+   "mainSites": [
+    13361
+   ],
+   "mainLevel2": [
+    5916
+   ],
+   "likeForLikeSites": 13361,
+   "likeForLikeCandidateLevel2": 5916,
+   "likeForLikeMainLevel2": [
+    5916
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 5916,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "helix-editor/helix",
+   "candidateSites": 90583,
+   "candidateLevel2": 40237,
+   "mainSites": [
+    90583
+   ],
+   "mainLevel2": [
+    40237
+   ],
+   "likeForLikeSites": 90583,
+   "likeForLikeCandidateLevel2": 40237,
+   "likeForLikeMainLevel2": [
+    40237
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 40250,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "ratatui/ratatui",
+   "candidateSites": 60424,
+   "candidateLevel2": 23853,
+   "mainSites": [
+    60424
+   ],
+   "mainLevel2": [
+    23853
+   ],
+   "likeForLikeSites": 60424,
+   "likeForLikeCandidateLevel2": 23853,
+   "likeForLikeMainLevel2": [
+    23853
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 23871,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rust-embedded/cortex-m",
+   "candidateSites": 5531,
+   "candidateLevel2": 3047,
+   "mainSites": [
+    5531
+   ],
+   "mainLevel2": [
+    3047
+   ],
+   "likeForLikeSites": 5531,
+   "likeForLikeCandidateLevel2": 3047,
+   "likeForLikeMainLevel2": [
+    3047
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 3075,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rust-lang/mdBook",
+   "candidateSites": 12557,
+   "candidateLevel2": 6705,
+   "mainSites": [
+    12557
+   ],
+   "mainLevel2": [
+    6705
+   ],
+   "likeForLikeSites": 12557,
+   "likeForLikeCandidateLevel2": 6705,
+   "likeForLikeMainLevel2": [
+    6705
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 6710,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "rustls/rustls",
+   "candidateSites": 69929,
+   "candidateLevel2": 19809,
+   "mainSites": [
+    69929
+   ],
+   "mainLevel2": [
+    19809
+   ],
+   "likeForLikeSites": 69929,
+   "likeForLikeCandidateLevel2": 19809,
+   "likeForLikeMainLevel2": [
+    19809
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 19827,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "serde-rs/serde",
+   "candidateSites": 30714,
+   "candidateLevel2": 8282,
+   "mainSites": [
+    30714
+   ],
+   "mainLevel2": [
+    8282
+   ],
+   "likeForLikeSites": 30714,
+   "likeForLikeCandidateLevel2": 8282,
+   "likeForLikeMainLevel2": [
+    8282
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 8291,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tauri-apps/tauri",
+   "candidateSites": 88051,
+   "candidateLevel2": 41918,
+   "mainSites": [
+    88051
+   ],
+   "mainLevel2": [
+    41918
+   ],
+   "likeForLikeSites": 88051,
+   "likeForLikeCandidateLevel2": 41918,
+   "likeForLikeMainLevel2": [
+    41918
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 41927,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tokio-rs/axum",
+   "candidateSites": 41067,
+   "candidateLevel2": 16213,
+   "mainSites": [
+    41067
+   ],
+   "mainLevel2": [
+    16213
+   ],
+   "likeForLikeSites": 41067,
+   "likeForLikeCandidateLevel2": 16213,
+   "likeForLikeMainLevel2": [
+    16213
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 16218,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  },
+  {
+   "id": "tree-sitter/tree-sitter",
+   "candidateSites": 54645,
+   "candidateLevel2": 23682,
+   "mainSites": [
+    54645
+   ],
+   "mainLevel2": [
+    23682
+   ],
+   "likeForLikeSites": 54645,
+   "likeForLikeCandidateLevel2": 23682,
+   "likeForLikeMainLevel2": [
+    23682
+   ],
+   "mainUnstableSites": 0,
+   "unionDefinite": 23683,
+   "lostStable": [],
+   "lostUnstable": 0,
+   "lostUnstableSamples": [],
+   "newLevel2": 0,
+   "newLevel2Stable": 0,
+   "retargeted": 0,
+   "symbolKeysMissing": 0,
+   "symbolKeysAdded": 0,
+   "mainOnlySites": 0
+  }
+ ],
+ "audit": [
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/ppi/mod.rs\\\",\\\"struct\\\",\\\"item:3810\\\",0,\\\"Task\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/ppi/ppi.rs",
+   "start": 102,
+   "kind": "imports",
+   "name": "super::Task",
+   "target": "[\"embassy-nrf/src/ppi/mod.rs\",\"struct\",\"item:3810\",0,\"Task\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-stm32/src/time_driver/mod.rs\\\",\\\"struct\\\",\\\"item:150\\\",0,\\\"AlarmState\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-stm32/src/time_driver/lptim.rs",
+   "start": 481,
+   "kind": "imports",
+   "name": "super::AlarmState",
+   "target": "[\"embassy-stm32/src/time_driver/mod.rs\",\"struct\",\"item:150\",0,\"AlarmState\"]",
+   "reason": "conditional module path lacks captured alternatives",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-executor/src/lib.rs\\\",\\\"module\\\",\\\"item:2745\\\",0,\\\"raw\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-executor/src/platform/avr.rs",
+   "start": 413,
+   "kind": "imports",
+   "name": "crate::raw",
+   "target": "[\"embassy-executor/src/lib.rs\",\"module\",\"item:2745\",0,\"raw\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-nrf/src/ppi/mod.rs\\\",\\\"struct\\\",\\\"item:4980\\\",0,\\\"Event\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-nrf/src/ppi/ppi.rs",
+   "start": 80,
+   "kind": "imports",
+   "name": "super::Event",
+   "target": "[\"embassy-nrf/src/ppi/mod.rs\",\"struct\",\"item:4980\",0,\"Event\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-stm32/src/can/mod.rs\\\",\\\"module\\\",\\\"item:237\\\",0,\\\"util\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-stm32/src/can/bxcan/mod.rs",
+   "start": 634,
+   "kind": "imports",
+   "name": "super::util",
+   "target": "[\"embassy-stm32/src/can/mod.rs\",\"module\",\"item:237\",0,\"util\"]",
+   "reason": "conditional module path lacks captured alternatives",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "DioxusLabs/dioxus",
+   "decision": "[\"resolved\",\"[\\\"packages/dx/src/serve/runner.rs\\\",\\\"struct\\\",\\\"item:1585\\\",0,\\\"AppServer\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "packages/dx/src/serve/server.rs",
+   "start": 2679,
+   "kind": "types",
+   "name": "AppServer",
+   "target": "[\"packages/dx/src/serve/runner.rs\",\"struct\",\"item:1585\",0,\"AppServer\"]",
+   "reason": "opaque-item-may-shadow-name; namespace-binding-unverified; opaque-item-may-shadow-name; opaque-item-may-shadow-name",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  },
+  {
+   "id": "embassy-rs/embassy",
+   "decision": "[\"resolved\",\"[\\\"embassy-stm32/src/rcc/mod.rs\\\",\\\"module\\\",\\\"item:568\\\",0,\\\"dsi\\\"]\",[]]",
+   "definite": true,
+   "level2": true,
+   "file": "embassy-stm32/src/rcc/h.rs",
+   "start": 496,
+   "kind": "imports",
+   "name": "crate::rcc::dsi",
+   "target": "[\"embassy-stm32/src/rcc/mod.rs\",\"module\",\"item:568\",0,\"dsi\"]",
+   "reason": "",
+   "mainBefore": [
+    "[\"unresolved\",null,[]]"
+   ]
+  }
+ ]
+}

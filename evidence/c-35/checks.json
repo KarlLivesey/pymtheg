@@ -1,0 +1,39 @@
+{
+ "testedTree": "2f4de19",
+ "main": "2dc05be",
+ "buildExit": 0,
+ "typeCheckExit": 0,
+ "formatCheckExit": 0,
+ "npmTest": { "exit": 0, "passed": 3252, "failed": 0, "skipped": 0 },
+ "earlierFullTest": {
+  "passed": 3251,
+  "failed": 1,
+  "failures": [
+   "every first-party source file carries the SPDX tag: two new shell scripts lacked it; tagged, and the licence test then passed"
+  ]
+ },
+ "newTest": {
+  "file": "test/graph-store-statement-journal.test.mjs",
+  "onMain": "fails: one SQLite temporary file open during the index, expected none",
+  "withChange": "passes"
+ },
+ "coldEquality": {
+  "pins": [
+   "restic/restic",
+   "cli/cli",
+   "trpc/trpc",
+   "helix-editor/helix",
+   "BurntSushi/ripgrep"
+  ],
+  "againstMain7b99b5e": { "memory": "5 of 5 equal", "disk": "5 of 5 equal" },
+  "againstMain2dc05beAfterMerge": { "memory": "5 of 5 equal" },
+  "method": "SHA-256 and row count of every table dump.mjs compares, same project id"
+ },
+ "seededCommandEdits": {
+  "pin": "restic/restic",
+  "seed": 35301,
+  "steps": 30,
+  "equalToCold": 30,
+  "noEditRunsVerifiedAndByteIdentical": 30
+ }
+}
