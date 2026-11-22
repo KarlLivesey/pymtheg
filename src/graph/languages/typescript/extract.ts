@@ -1871,7 +1871,11 @@ export function extractFile(
       limited
     )
       return undefined;
-    if (context.anyFailed)
+    // C-39: beside an unread file, the declared module is read as in a clean
+    // program only when no unread file could declare one (every unread file
+    // is a module with no `declare` token; index.ts `unreadFacts`), so the
+    // module link has the identity a clean index gives it.
+    if (context.anyFailed && !context.unseenInert?.([]))
       return globals.hasInstalledTypes ? importFact(specifier) : undefined;
     const declarations = checker.getSymbolAtLocation(specifier)?.declarations;
     if (

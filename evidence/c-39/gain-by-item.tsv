@@ -1,8 +1,5 @@
 15	item 2 (config read) | trpc/trpc
-12196	item 2 (config read) | vercel/turborepo
+12273	item 2 (config read) | vercel/turborepo
 368	item 2 (config read) | withastro/astro
-677	item 4 (kept beside an unread file) | puppeteer/puppeteer
-3479	item 4 (kept beside an unread file) | vitejs/vite
-3871	item 4 (kept beside an unread file) | vitest-dev/vitest
-367	item 4 (kept beside an unread file) | withastro/astro
+3602	item 4 (kept beside an unread file) | vitest-dev/vitest
 602	other (main: library) | vercel/turborepo

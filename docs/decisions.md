@@ -3053,16 +3053,30 @@ containment path. [C-32](changes/C-32.md)
 
 C-13 withheld every installed library target in a program that contains a
 failed file, because an unread file might declare something that changes the
-checker's answer. TypeScript binds, merges, shadows and augments by name. So
-an unread file can change a library target only by spelling one of the names
-involved, by adding declarations outside its own names (`declare`, `global`,
-`namespace`, `module`, a triple-slash reference), or by importing a module
-the program does not otherwise load. The library target is kept when none of
-these hold for any unread file, as decided from the file's raw text and the
-program's module resolution. The existing taint checks still decide bindings
-and receivers that reach the unread file. Such a kept link carries no
-`no-unseen-declarations` assumption, because it has been checked. A const
-assertion is not a reference and stores no link.
+checker's answer. A script's top-level declarations are global, and a global
+interface merge (`interface HTMLElementTagNameMap`, `interface Document`)
+retypes values without spelling any name at the reference. A module's
+declarations are its own: it reaches the global scope or another module only
+through `declare global`, `declare module` or `export as namespace`. So the
+library target is kept only when every unread file in the program:
+
+- is provably a module: a non-declaration `.mts`, `.cts`, `.mjs` or `.cjs`
+  file, or a file whose parsed text has a top-level `import` or `export`
+  statement ending before the first parse error;
+- spells none of the names involved (the reference, its receiver chain, the
+  target's path);
+- has no `declare`, `global`, `namespace` or `module` token, no triple-slash
+  reference and no `\u` escape;
+- imports only modules the program already loads.
+
+The existing taint checks still decide bindings and receivers that reach the
+unread file. Such a kept link carries no `no-unseen-declarations`
+assumption, because it has been checked. Not covered: a failed file that is
+a script or a `.d.ts` without module syntax before its error withholds as
+before, and so does a CommonJS file (`module.exports` spells `module`). A
+const assertion is not a reference and stores no link. A manifest range the
+compiler's semver parser throws on is an unknown range: it identifies the
+registry dependency and never yields a version pin.
 [C-39](changes/C-39.md)
 
 ### C-13 TypeScript program budget and compiler exceptions

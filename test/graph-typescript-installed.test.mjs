@@ -1711,6 +1711,49 @@ test("a failed module unrelated to the reference keeps the library target", asyn
   });
 });
 
+test("a module link beside a failed unrelated module has the identity of the clean index", async () => {
+  // A pattern ambient module (`declare module "*.css"`) from an installed
+  // package, imported dynamically, as Vite's client types declare it.
+  const identities = [];
+  for (const broken of [undefined, "export const z = 1;\nlet = ;\n"]) {
+    const { request, read, write } = await project();
+    await write(
+      "tsconfig.json",
+      JSON.stringify({
+        compilerOptions: { strict: true, types: ["kit"] },
+        include: ["src"],
+      }),
+    );
+    await write("node_modules/kit/package.json", manifest("kit", "1.0.0"));
+    await write(
+      "node_modules/kit/index.d.ts",
+      'declare module "*.css" { const css: string; export default css; }\n',
+    );
+    await write(
+      "src/main.ts",
+      'export const load = () => import("./App.css");\n',
+    );
+    if (broken) await write("src/other.ts", broken);
+    await request("index");
+    read((store) => {
+      const link = store
+        .links()
+        .find(
+          (link) =>
+            link.file === "src/main.ts" && link.targetName === "./App.css",
+        );
+      identities.push(
+        link.libraries.map(({ unit, symbol, evidence }) => ({
+          unit,
+          symbol,
+          evidence,
+        })),
+      );
+    });
+  }
+  assert.deepEqual(identities[1], identities[0]);
+});
+
 test("a receiver whose type comes from an unread file stays withheld", async () => {
   const { request, read, write } = await project();
   await unreadLayout(write, undefined);

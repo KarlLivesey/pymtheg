@@ -1,26 +1,21 @@
-symbols only on main: 35
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.relation.ts | module | examples/with-nextjs-elysia/packages/contract/src/drizzle/table.relation.ts | module@0
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.relation.ts | constant | relations | constant@89
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | module | examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | module@0
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | constant | idUuid | constant@78
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | constant | createdAt | constant@152
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | constant | updatedAt | constant@253
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | constant | Audit | constant@386
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | property | Audit.[object].id | property@404
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | property | Audit.[object].createdAt | property@418
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | property | Audit.[object].updatedAt | property@431
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | constant | userTable | constant@446
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts | constant | roleTable | constant@1113
-sites only on main (not as const): 174
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.relation.ts 9 imports:drizzle-orm, imports:defineRelations
-   examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts 63 imports:drizzle-orm, imports:sql
-   examples/with-nextjs-elysia/packages/contract/src/utils/utils.ts 72 imports:@sinclair/typebox, imports:Kind
-   examples/with-nextjs-elysia/packages/contract/drizzle.config.prod.ts 4 imports:drizzle-kit, imports:defineConfig
-   examples/with-nextjs-elysia/packages/contract/drizzle.config.ts 4 imports:drizzle-kit, imports:defineConfig
+symbols only on main: 12
+   examples/with-svelte/apps/docs/eslint.config.js | module | examples/with-svelte/apps/docs/eslint.config.js | module@0
+   examples/with-svelte/apps/docs/svelte.config.js | module | examples/with-svelte/apps/docs/svelte.config.js | module@0
+   examples/with-svelte/apps/docs/svelte.config.js | constant | config | constant@156
+   examples/with-svelte/apps/docs/svelte.config.js | property | config.[object].preprocess | property@279
+   examples/with-svelte/apps/docs/svelte.config.js | property | config.[object].kit | property@310
+   examples/with-svelte/apps/docs/svelte.config.js | property | config.[object].kit.adapter | property@593
+   examples/with-svelte/apps/web/eslint.config.js | module | examples/with-svelte/apps/web/eslint.config.js | module@0
+   examples/with-svelte/apps/web/svelte.config.js | module | examples/with-svelte/apps/web/svelte.config.js | module@0
+   examples/with-svelte/apps/web/svelte.config.js | constant | config | constant@156
+   examples/with-svelte/apps/web/svelte.config.js | property | config.[object].preprocess | property@279
+   examples/with-svelte/apps/web/svelte.config.js | property | config.[object].kit | property@310
+   examples/with-svelte/apps/web/svelte.config.js | property | config.[object].kit.adapter | property@593
+sites only on main (not as const): 22
    examples/with-svelte/apps/docs/eslint.config.js 3 imports:@repo/eslint-config, imports:config
    examples/with-svelte/apps/docs/svelte.config.js 8 imports:@sveltejs/adapter-auto, imports:default
    examples/with-svelte/apps/web/eslint.config.js 3 imports:@repo/eslint-config, imports:config
    examples/with-svelte/apps/web/svelte.config.js 8 imports:@sveltejs/adapter-auto, imports:default
-examples/with-nextjs-elysia/packages/contract/src/drizzle/table.relation.ts main: partial examples/with-nextjs-elysia/packages/contract/tsconfig.json | cand: failed undefined [{"message":"The TypeScript compiler failed while analysing this file: Debug Failure. False expression: Invalid argument: prerelease"}]
-examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts main: partial examples/with-nextjs-elysia/packages/contract/tsconfig.json | cand: failed undefined [{"message":"The TypeScript compiler failed while analysing this file: Debug Failure. False expression: Invalid argument: prerelease"}]
-examples/with-nextjs-elysia/packages/contract/src/utils/utils.ts main: partial examples/with-nextjs-elysia/packages/contract/tsconfig.json | cand: failed undefined [{"message":"The TypeScript compiler failed while analysing this file: Debug Failure. False expression: Invalid argument: prerelease"}]
+examples/with-svelte/apps/docs/eslint.config.js main: clean null | cand: failed undefined [{"message":"TypeScript config examples/with-svelte/apps/docs/tsconfig.json extends \"./.svelte-kit/tsconfig.json\", which is missing from the snapshot"}]
+examples/with-svelte/apps/docs/svelte.config.js main: clean null | cand: failed undefined [{"message":"TypeScript config examples/with-svelte/apps/docs/tsconfig.json extends \"./.svelte-kit/tsconfig.json\", which is missing from the snapshot"}]
+examples/with-svelte/apps/web/eslint.config.js main: clean null | cand: failed undefined [{"message":"TypeScript config examples/with-svelte/apps/web/tsconfig.json extends \"./.svelte-kit/tsconfig.json\", which is missing from the snapshot"}]

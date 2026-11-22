@@ -1,31 +1,31 @@
 {
  "counts": {
-  "library: same package, declaration name instead of binding spelling": 3096,
-  "library: declaring package named instead of the importing package": 59,
-  "site removed": 67,
-  "now a candidate set": 8,
+  "library: same package, declaration name instead of binding spelling": 507,
+  "library: declaring package named instead of the importing package": 18,
+  "site removed": 18,
+  "now a candidate set": 5,
   "now unresolved (external-package)": 46
  },
  "examples": {
   "library: same package, declaration name instead of binding spelling": [
-   "puppeteer/puppeteer eslint.config.mjs:96 default: node:fs:default => node:fs:node:fs",
-   "puppeteer/puppeteer eslint.config.mjs:122 default: node:path:default => node:path:path",
-   "puppeteer/puppeteer eslint.config.mjs:202 default: npm:@stylistic/eslint-plugin:default => npm:@stylistic/eslint-plugin:plugin"
+   "vercel/turborepo packages/turbo-gen/__tests__/cli.test.ts:278 path.resolve: node:path:resolve => node:path:path.PlatformPath.prototype.resolve",
+   "vercel/turborepo packages/turbo-gen/__tests__/cli.test.ts:896 path.join: node:path:join => node:path:path.PlatformPath.prototype.join",
+   "vercel/turborepo packages/turbo-gen/__tests__/cli.test.ts:1115 path.join: node:path:join => node:path:path.PlatformPath.prototype.join"
   ],
   "library: declaring package named instead of the importing package": [
-   "puppeteer/puppeteer eslint.config.mjs:259 defineConfig: npm:eslint:config:defineConfig => npm:@eslint/config-helpers:defineConfig",
-   "puppeteer/puppeteer eslint.config.mjs:273 globalIgnores: npm:eslint:config:globalIgnores => npm:@eslint/config-helpers:globalIgnores",
-   "puppeteer/puppeteer eslint.config.mjs:1106 defineConfig: npm:eslint:config:defineConfig => npm:@eslint/config-helpers:defineConfig"
+   "vercel/turborepo packages/turbo-releaser/src/native.test.ts:5370 assert.rejects: node:assert/strict:rejects => node:assert:assert.rejects",
+   "vercel/turborepo packages/turbo-releaser/src/native.test.ts:5733 assert.rejects: node:assert/strict:rejects => node:assert:assert.rejects",
+   "vercel/turborepo packages/turbo-releaser/src/npm.test.ts:3033 assert.rejects: node:assert/strict:rejects => node:assert:assert.rejects"
   ],
   "site removed": [
-   "vercel/turborepo examples/with-nextjs-elysia/packages/contract/src/drizzle/table.relation.ts:89 relations: null => undefined",
-   "vercel/turborepo examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts:78 idUuid: null => undefined",
-   "vercel/turborepo examples/with-nextjs-elysia/packages/contract/src/drizzle/table.schema.ts:152 createdAt: null => undefined"
+   "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:23 @repo/eslint-config: null => undefined",
+   "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:9 config: null => undefined",
+   "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:62 default: null => undefined"
   ],
   "now a candidate set": [
-   "vitejs/vite playground/ssr-alias/src/main.js:7 default: node:process:default => node:globals:process,node:process:process",
    "vitest-dev/vitest test/unit/test/mock-internals.test.ts:745 timers.clearInterval: node:timers:clearInterval => dom:dom:clearInterval,node:globals:clearInterval",
-   "vitest-dev/vitest test/unit/test/timers-node-builtins.test.ts:61 setTimeout: node:timers:setTimeout => dom:dom:setTimeout,node:globals:setTimeout"
+   "vitest-dev/vitest test/unit/test/timers-node-builtins.test.ts:61 setTimeout: node:timers:setTimeout => dom:dom:setTimeout,node:globals:setTimeout",
+   "vitest-dev/vitest test/unit/test/timers-node-builtins.test.ts:1903 timers.setTimeout: node:timers:setTimeout => dom:dom:setTimeout,node:globals:setTimeout"
   ],
   "now unresolved (external-package)": [
    "withastro/astro examples/blog/src/pages/rss.xml.js:9 getCollection: null => ",

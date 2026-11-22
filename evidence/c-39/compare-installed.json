@@ -211,13 +211,13 @@
   ],
   "level2": [
    45437,
-   46114
+   45437
   ],
-  "likeForLikeLevel2": 46114,
+  "likeForLikeLevel2": 45437,
   "onlyMain": 55,
   "onlyCand": 0,
-  "changedDefinite": 100,
-  "newlyDefinite": 677,
+  "changedDefinite": 0,
+  "newlyDefinite": 0,
   "symbolsOnlyMain": 0,
   "symbolsOnlyCand": 0,
   "ownerChanges": {},
@@ -301,18 +301,18 @@
   "pin": "vercel/turborepo",
   "links": [
    53495,
-   53233
+   53385
   ],
   "level2": [
    25134,
-   37865
+   37991
   ],
-  "likeForLikeLevel2": 37865,
-  "onlyMain": 262,
+  "likeForLikeLevel2": 37991,
+  "onlyMain": 110,
   "onlyCand": 0,
   "changedDefinite": 177,
-  "newlyDefinite": 12798,
-  "symbolsOnlyMain": 35,
+  "newlyDefinite": 12875,
+  "symbolsOnlyMain": 12,
   "symbolsOnlyCand": 0,
   "ownerChanges": {
    "(none) -> examples/basic/apps/docs/tsconfig.json": 1,
@@ -325,8 +325,6 @@
    "(none) -> examples/with-microfrontends/apps/docs/tsconfig.json": 1,
    "(none) -> examples/with-microfrontends/apps/web/tsconfig.json": 1,
    "(none) -> examples/with-nestjs/apps/web/tsconfig.json": 1,
-   "examples/with-nextjs-elysia/tsconfig.json -> (none)": 2,
-   "examples/with-nextjs-elysia/packages/contract/tsconfig.json -> (none)": 3,
    "(none) -> examples/with-npm/apps/docs/tsconfig.json": 1,
    "(none) -> examples/with-npm/apps/web/tsconfig.json": 1,
    "(none) -> examples/with-otel/apps/docs/tsconfig.json": 1,
@@ -466,13 +464,15 @@
    "incomplete-config | examples/with-nextjs-elysia/apps/web/tsconfig.json -> examples/with-nextjs-elysia/apps/web/tsconfig.json | missing-module": 1,
    "incomplete-config | examples/with-nextjs-elysia/apps/web/tsconfig.json -> examples/with-nextjs-elysia/apps/web/tsconfig.json | external": 1,
    "incomplete-config | examples/with-nextjs-elysia/apps/web/tsconfig.json -> examples/with-nextjs-elysia/apps/web/tsconfig.json | ambiguous": 2,
-   "incomplete-config | examples/with-nextjs-elysia/packages/contract/tsconfig.json -> examples/with-nextjs-elysia/packages/contract/tsconfig.json | target-unavailable": 5,
-   "incomplete-config | examples/with-nextjs-elysia/packages/contract/tsconfig.json -> examples/with-nextjs-elysia/packages/contract/tsconfig.json | level2": 6,
-   "incomplete-config | examples/with-nextjs-elysia/packages/contract/tsconfig.json -> examples/with-nextjs-elysia/packages/contract/tsconfig.json | library": 34,
-   "incomplete-config | examples/with-nextjs-elysia/packages/contract/tsconfig.json -> examples/with-nextjs-elysia/packages/contract/tsconfig.json | external": 5,
+   "incomplete-config | examples/with-nextjs-elysia/packages/contract/tsconfig.json -> examples/with-nextjs-elysia/packages/contract/tsconfig.json | level2": 79,
+   "incomplete-config | examples/with-nextjs-elysia/packages/contract/tsconfig.json -> examples/with-nextjs-elysia/packages/contract/tsconfig.json | library": 41,
+   "incomplete-config | examples/with-nextjs-elysia/packages/contract/tsconfig.json -> examples/with-nextjs-elysia/packages/contract/tsconfig.json | any-receiver": 3,
+   "incomplete-config | examples/with-nextjs-elysia/packages/contract/tsconfig.json -> examples/with-nextjs-elysia/packages/contract/tsconfig.json | external-package": 24,
    "incomplete-config | examples/with-nextjs-elysia/packages/ui/tsconfig.json -> examples/with-nextjs-elysia/packages/ui/tsconfig.json | library": 5,
    "incomplete-config | examples/with-nextjs-elysia/packages/ui/tsconfig.json -> examples/with-nextjs-elysia/packages/ui/tsconfig.json | level2": 5,
    "incomplete-config | examples/with-nextjs-elysia/packages/ui/tsconfig.json -> examples/with-nextjs-elysia/packages/ui/tsconfig.json | external": 2,
+   "incomplete-config | examples/with-nextjs-elysia/tsconfig.json -> examples/with-nextjs-elysia/tsconfig.json | library": 2,
+   "incomplete-config | examples/with-nextjs-elysia/tsconfig.json -> examples/with-nextjs-elysia/tsconfig.json | level2": 4,
    "incomplete-config | examples/with-npm/apps/docs/tsconfig.json -> examples/with-npm/apps/docs/tsconfig.json | missing-module": 5,
    "incomplete-config | examples/with-npm/apps/docs/tsconfig.json -> examples/with-npm/apps/docs/tsconfig.json | library": 3,
    "incomplete-config | examples/with-npm/apps/docs/tsconfig.json -> examples/with-npm/apps/docs/tsconfig.json | level2": 17,
@@ -671,13 +671,13 @@
   ],
   "level2": [
    46319,
-   49797
+   46319
   ],
-  "likeForLikeLevel2": 49797,
+  "likeForLikeLevel2": 46319,
   "onlyMain": 46,
   "onlyCand": 0,
-  "changedDefinite": 2241,
-  "newlyDefinite": 3479,
+  "changedDefinite": 0,
+  "newlyDefinite": 0,
   "symbolsOnlyMain": 0,
   "symbolsOnlyCand": 0,
   "ownerChanges": {},
@@ -695,13 +695,13 @@
   ],
   "level2": [
    95780,
-   99646
+   99377
   ],
-  "likeForLikeLevel2": 99646,
+  "likeForLikeLevel2": 99377,
   "onlyMain": 124,
   "onlyCand": 0,
-  "changedDefinite": 510,
-  "newlyDefinite": 3871,
+  "changedDefinite": 343,
+  "newlyDefinite": 3602,
   "symbolsOnlyMain": 0,
   "symbolsOnlyCand": 0,
   "ownerChanges": {},
@@ -715,13 +715,13 @@
   ],
   "level2": [
    131627,
-   132314
+   131949
   ],
-  "likeForLikeLevel2": 132314,
+  "likeForLikeLevel2": 131949,
   "onlyMain": 168,
   "onlyCand": 0,
-  "changedDefinite": 181,
-  "newlyDefinite": 735,
+  "changedDefinite": 56,
+  "newlyDefinite": 368,
   "symbolsOnlyMain": 0,
   "symbolsOnlyCand": 0,
   "ownerChanges": {

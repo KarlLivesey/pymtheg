@@ -776,11 +776,14 @@ declarations of one receiver type links the declaration of the signature
 the checker selects, when no declaration from another body could also
 accept the arguments. A const assertion (`as const`, `<const>x`) stores no link.
 In a program that contains an unread (failed) file, an installed library
-target is kept when no unread file could change it (C-39): no unread file
-spells a name of the reference, its receiver chain or the target's path,
-contains a `declare`, `global`, `namespace` or `module` token or a
-triple-slash reference, or imports a module the program lacks. Otherwise it
-is withheld as before.
+target is kept when no unread file could change it (C-39). Every unread file
+must be provably a module: a non-declaration `.mts`, `.cts`, `.mjs` or
+`.cjs` file, or one whose top-level `import` or `export` statement ends
+before its first parse error. It must also not spell a name of the
+reference, its receiver chain or the target's path, and must contain no
+`declare`, `global`, `namespace` or `module` token, triple-slash reference
+or `\u` escape. Finally, it must not import a module the program lacks. An
+unread script or `.d.ts` without such module syntax withholds as before.
 
 - **Definite:** module imports; import and export bindings to the original
   declaration through barrels, `export *`, renames and default exports; CommonJS

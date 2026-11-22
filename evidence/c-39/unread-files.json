@@ -1,0 +1,86 @@
+{
+ "puppeteer/puppeteer | not provably a module": {
+  "files": 1,
+  "examples": [
+   "test/assets/syntax-error.js"
+  ]
+ },
+ "trpc/trpc | passes (names and imports decide per link)": {
+  "files": 6,
+  "examples": [
+   "examples/nuxt/nuxt.config.ts",
+   "examples/nuxt/playwright.config.ts",
+   "examples/nuxt/plugins/trpc.ts"
+  ]
+ },
+ "vercel/turborepo | token namespace": {
+  "files": 1,
+  "examples": [
+   "crates/turborepo-trace-testkit/fixtures/js/extract/esm.mjs"
+  ]
+ },
+ "vercel/turborepo | passes (names and imports decide per link)": {
+  "files": 22,
+  "examples": [
+   "crates/turborepo-trace-testkit/fixtures/js/extract/flow.js",
+   "crates/turborepo-trace-testkit/fixtures/js/extract/malformed.js",
+   "examples/with-svelte/apps/docs/eslint.config.js"
+  ]
+ },
+ "vercel/turborepo | not provably a module": {
+  "files": 4,
+  "examples": [
+   "crates/turborepo-trace-testkit/fixtures/js/nft/syntax-err/input.js",
+   "crates/turborepo-trace-testkit/fixtures/js/nft/tsx/lib.tsx",
+   "examples/with-svelte/apps/docs/src/lib/index.ts"
+  ]
+ },
+ "vercel/turborepo | token global": {
+  "files": 1,
+  "examples": [
+   "crates/turborepo-turbo-json/bindings/RawTurboJson.ts"
+  ]
+ },
+ "vercel/turborepo | token declare": {
+  "files": 2,
+  "examples": [
+   "examples/with-svelte/apps/docs/src/app.d.ts",
+   "examples/with-svelte/apps/web/src/app.d.ts"
+  ]
+ },
+ "vitejs/vite | not provably a module": {
+  "files": 3,
+  "examples": [
+   "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.js",
+   "packages/vite/src/node/ssr/__tests__/fixtures/errors/syntax-error.ts",
+   "playground/tsconfig-json-load-error/has-error/main.ts"
+  ]
+ },
+ "vitest-dev/vitest | not provably a module": {
+  "files": 2,
+  "examples": [
+   "test/e2e/deps/optimizer/unparsable/index.js",
+   "test/e2e/fixtures/reporters/with-syntax-error.test.js"
+  ]
+ },
+ "vitest-dev/vitest | passes (names and imports decide per link)": {
+  "files": 1,
+  "examples": [
+   "test/e2e/fixtures/list-parse-error/broken.test.ts"
+  ]
+ },
+ "withastro/astro | not provably a module": {
+  "files": 1,
+  "examples": [
+   "packages/astro/e2e/fixtures/errors/src/components/JSSyntaxError.js"
+  ]
+ },
+ "withastro/astro | passes (names and imports decide per link)": {
+  "files": 3,
+  "examples": [
+   "packages/astro/e2e/fixtures/errors/src/components/preact/PreactSyntaxError.jsx",
+   "packages/astro/e2e/fixtures/errors/src/components/react/ReactSyntaxError.jsx",
+   "packages/astro/e2e/fixtures/errors/src/components/solid/SolidSyntaxError.jsx"
+  ]
+ }
+}
