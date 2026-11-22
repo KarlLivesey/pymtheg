@@ -24,6 +24,21 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { executeGraph } from "../dist/graph/commands.js";
 import { LanguageRegistry } from "../dist/graph/registry.js";
+
+/**
+ * The storage directory's files. C-37: besides the store, a writer leaves its
+ * turnstile, a lock-only database that stays empty (it is never written,
+ * only locked), so it is listed here and checked to be empty.
+ */
+async function stored(directory) {
+  const names = await readdir(directory);
+  if (names.includes("graph.sqlite-turnstile"))
+    assert.equal(
+      (await stat(join(directory, "graph.sqlite-turnstile"))).size,
+      0,
+    );
+  return names;
+}
 import { indexProject } from "../dist/graph/indexer.js";
 import { readdirSync } from "node:fs";
 import { SqliteGraphStore } from "../dist/graph/store.js";
@@ -277,7 +292,11 @@ test("a completed index is readable from a storage directory the reader cannot w
   const directory = join(root, ".pymtheg/rebuildable");
   try {
     assert.equal((await run(root, "index")).sync.complete, true);
-    assert.deepEqual(await readdir(directory), [".gitignore", "graph.sqlite"]);
+    assert.deepEqual(await stored(directory), [
+      ".gitignore",
+      "graph.sqlite",
+      "graph.sqlite-turnstile",
+    ]);
     await chmod(directory, 0o555);
     const status = await executeGraph(
       { command: "symbol", args: ["f1"], root, noSync: true },
@@ -347,9 +366,10 @@ test("with an affected SQLite a writer keeps the rollback journal and first remo
       db.close();
     }
     assert.deepEqual(await format(root), [1, 1]);
-    assert.deepEqual(await readdir(join(root, ".pymtheg/rebuildable")), [
+    assert.deepEqual(await stored(join(root, ".pymtheg/rebuildable")), [
       ".gitignore",
       "graph.sqlite",
+      "graph.sqlite-turnstile",
     ]);
     // The killed run's committed rows survive the switch unchanged.
     assert.deepEqual(rows(root), before);
@@ -402,10 +422,11 @@ test("a reader still open when the last writer closes keeps the log; every later
         // A connection that has read through the log keeps it in use, and the
         // switch back needs every other connection closed: the log stays.
         assert.deepEqual(await format(root), [2, 2]);
-        assert.deepEqual(await readdir(directory), [
+        assert.deepEqual(await stored(directory), [
           ".gitignore",
           "graph.sqlite",
           "graph.sqlite-shm",
+          "graph.sqlite-turnstile",
           "graph.sqlite-wal",
         ]);
       }
@@ -428,7 +449,11 @@ test("a reader still open when the last writer closes keeps the log; every later
     // The next writer of this build that closes alone restores the format.
     assert.equal((await run(root, "index")).sync.complete, true);
     assert.deepEqual(await format(root), [1, 1]);
-    assert.deepEqual(await readdir(directory), [".gitignore", "graph.sqlite"]);
+    assert.deepEqual(await stored(directory), [
+      ".gitignore",
+      "graph.sqlite",
+      "graph.sqlite-turnstile",
+    ]);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
