@@ -1,0 +1,86 @@
+[
+ {
+  "pin": "labstack_echo",
+  "round": 0,
+  "build": "main",
+  "wallS": 25.17,
+  "cpuS": 17.5,
+  "peakMiB": 544,
+  "equality": {
+   "rows": {
+    "graph_files": 114,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4168,
+    "graph_links": 31880,
+    "graph_candidates": 606,
+    "graph_library_targets": 13790,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "labstack_echo",
+  "round": 0,
+  "build": "after",
+  "wallS": 19.88,
+  "cpuS": 18.2,
+  "peakMiB": 543,
+  "equality": {
+   "rows": {
+    "graph_files": 114,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4168,
+    "graph_links": 31880,
+    "graph_candidates": 606,
+    "graph_library_targets": 13790,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "fjall-rs_fjall",
+  "round": 0,
+  "build": "main",
+  "wallS": 26.82,
+  "cpuS": 22.9,
+  "peakMiB": 606,
+  "equality": {
+   "rows": {
+    "graph_files": 120,
+    "graph_contexts": 25,
+    "graph_parse_failures": 0,
+    "graph_symbols": 1179,
+    "graph_links": 13401,
+    "graph_candidates": 14,
+    "graph_library_targets": 2131,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "fjall-rs_fjall",
+  "round": 0,
+  "build": "after",
+  "wallS": 26.73,
+  "cpuS": 21.7,
+  "peakMiB": 604,
+  "equality": {
+   "rows": {
+    "graph_files": 120,
+    "graph_contexts": 25,
+    "graph_parse_failures": 0,
+    "graph_symbols": 1179,
+    "graph_links": 13401,
+    "graph_candidates": 14,
+    "graph_library_targets": 2131,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]
