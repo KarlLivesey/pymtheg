@@ -2631,6 +2631,8 @@ test("pnpm subpath exports and checkout path dependencies use TypeScript's resol
         '"@t3tools/shared/devHome"',
         "imports",
       );
+      // The package's build is plain tsc, which emits no `.d.cts`: the
+      // compiler decides, and no C-46 convention applies.
       assert.equal(require.resolution, "unresolved");
       assert.equal(require.data.reason, "workspace-build-output-missing");
     },
@@ -3055,19 +3057,39 @@ test("plain builds prove a declaration entry, and visible rollups and rewrites r
         assumed.data.unbuiltEntry.output,
         "packages/unconfigured/dist/index.d.ts",
       );
-      for (const name of [
-        "bundled",
-        "generated",
-        "rollup",
-        "wrapped",
-        "rewritten",
-        "packed",
-      ]) {
+      // C-46: no compiler proof, but a stated convention names the source,
+      // assumption-marked; a rewrite of the output still rules it out.
+      const outcome = (name) => {
         const call = graph.link("use.ts", name, "calls");
-        assert.equal(call.resolution, "unresolved");
-        assert.equal(call.data.reason, "workspace-build-output-missing");
-        assert.equal(call.data.assumes, undefined);
-      }
+        return call.resolution === "resolved"
+          ? [graph.target(call), call.data.assumes]
+          : [call.resolution, call.data.reason, call.data.assumes];
+      };
+      assert.deepEqual(
+        Object.fromEntries(
+          ["bundled", "generated", "rollup", "wrapped", "rewritten", "packed"].map(
+            (name) => [name, outcome(name)],
+          ),
+        ),
+        {
+          // The trimmed roll-up drops the @internal `open`: withheld.
+          bundled: ["unresolved", "workspace-build-output-missing", undefined],
+          generated: [
+            "packages/generated/src/index.ts#open",
+            ["ts-unbuilt-entry-is-src-twin"],
+          ],
+          rollup: [
+            "packages/rollup/src/index.ts#open",
+            ["ts-unbuilt-entry-is-bundler-entry"],
+          ],
+          wrapped: [
+            "packages/wrapped/src/index.ts#open",
+            ["ts-unbuilt-entry-is-src-twin"],
+          ],
+          rewritten: ["unresolved", "workspace-build-output-missing", undefined],
+          packed: ["unresolved", "workspace-build-output-missing", undefined],
+        },
+      );
     },
   );
 });
@@ -3169,11 +3191,24 @@ test("a visible bundler config must name the mapped source literally", async () 
     },
     async (graph, report) => {
       clean(report);
-      for (const name of ["alternate", "opaque"]) {
-        const call = graph.link("app.ts", name, "calls");
-        assert.equal(call.resolution, "unresolved");
-        assert.equal(call.data.reason, "workspace-build-output-missing");
-      }
+      // C-25 proves neither. C-46: the literal entry list names the source
+      // of `dist/index.d.ts` (src/actual.ts); an entry that is not data
+      // leaves the src/ twin.
+      const alternate = graph.link("app.ts", "alternate", "calls");
+      assert.equal(
+        graph.target(alternate),
+        "packages/alternate/src/actual.ts#run",
+      );
+      assert.deepEqual(alternate.data.assumes, [
+        "ts-unbuilt-entry-is-bundler-entry",
+      ]);
+      assert.equal(
+        alternate.data.unbuiltEntry.config,
+        "packages/alternate/tsup.config.ts",
+      );
+      const opaque = graph.link("app.ts", "opaque", "calls");
+      assert.equal(graph.target(opaque), "packages/opaque/src/index.ts#run");
+      assert.deepEqual(opaque.data.assumes, ["ts-unbuilt-entry-is-src-twin"]);
       const call = graph.link("app.ts", "matching", "calls");
       assert.equal(graph.target(call), "packages/matching/src/index.ts#run");
       assert.deepEqual(call.data.assumes, [

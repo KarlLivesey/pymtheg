@@ -28,6 +28,19 @@ import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
 import { neutralizeAssumed } from "./untrusted.js";
 import { entryProvenance } from "./workspace-entries.js";
 import { unbuiltEntryAssumption } from "./entry-build.js";
+import {
+  type Convention,
+  conventionAssumptions,
+} from "./entry-convention.js";
+
+/** Every assumption an unbuilt workspace entry can rest on (C-25, C-46). */
+const unbuiltAssumptions = new Set([
+  unbuiltEntryAssumption,
+  ...Object.values(conventionAssumptions),
+]);
+/** The assumption a projected entry rests on: its convention, or C-25's. */
+const entryAssumption = (entry: { proof?: string } | undefined) =>
+  conventionAssumptions[entry?.proof as Convention] ?? unbuiltEntryAssumption;
 
 /** Program rebuilds per file after checker stack overflows before giving up. */
 const MAX_LIMIT_RETRIES = 25;
@@ -119,7 +132,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `44+typescript-${ts.version}`;
+const MODULE_VERSION = `47+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -612,7 +625,9 @@ function withWorkspaceAssumptions(
       if (link.kind === "contains") return link;
       const previous = existing.get(key(link));
       const data = { ...((link.data ?? {}) as { [key: string]: Json }) };
-      const entry = data.unbuiltEntry as { assumed?: true } | undefined;
+      const entry = data.unbuiltEntry as
+        | { assumed?: true; proof?: string }
+        | undefined;
       const changed = !previous || outcomeOf(previous) !== outcomeOf(link);
       const before = previous?.data as
         | {
@@ -638,7 +653,7 @@ function withWorkspaceAssumptions(
           data.reason = "workspace-build-output-missing";
           return { ...link, data };
         }
-        assume(data, unbuiltEntryAssumption);
+        assume(data, entryAssumption(entry));
         return { ...link, data };
       }
       return link;
@@ -886,12 +901,12 @@ export function mergeTied(
       ),
     );
     const assumptions = merged.assumes as string[] | undefined;
-    if (assumptions?.includes(unbuiltEntryAssumption)) {
+    if (assumptions?.some((name) => unbuiltAssumptions.has(name))) {
       const entries = new Map(
         datas
           .filter((data) =>
-            (data.assumes as string[] | undefined)?.includes(
-              unbuiltEntryAssumption,
+            (data.assumes as string[] | undefined)?.some((name) =>
+              unbuiltAssumptions.has(name),
             ),
           )
           .map((data) => [
@@ -907,7 +922,7 @@ export function mergeTied(
         delete merged.libraryFacts;
         merged.reason = "ambiguous-project";
         merged.assumes = assumptions.filter(
-          (name) => name !== unbuiltEntryAssumption,
+          (name) => !unbuiltAssumptions.has(name),
         );
       }
     }

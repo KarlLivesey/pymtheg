@@ -9,11 +9,22 @@ import {
   unbuiltEntryAssumption,
   unbuiltEntryAssumptionText,
 } from "../graph/languages/typescript/entry-build.js";
+import {
+  bundlerEntryAssumption,
+  bundlerEntryAssumptionText,
+  rollupEntryAssumption,
+  rollupEntryAssumptionText,
+  srcTwinAssumption,
+  srcTwinAssumptionText,
+} from "../graph/languages/typescript/entry-convention.js";
 import { textPage } from "./text-pages.js";
 
 const assumptionDescriptions = new Map([
   [macroScopeAssumption, macroScopeAssumptionText],
   [unbuiltEntryAssumption, unbuiltEntryAssumptionText],
+  [bundlerEntryAssumption, bundlerEntryAssumptionText],
+  [srcTwinAssumption, srcTwinAssumptionText],
+  [rollupEntryAssumption, rollupEntryAssumptionText],
 ]);
 
 const record = (v: unknown): Record<string, any> =>

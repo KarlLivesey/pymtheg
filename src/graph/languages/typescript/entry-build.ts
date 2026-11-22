@@ -273,7 +273,15 @@ export function entryBuildGuards(
       scripts: string[];
     }
   >();
-  return (root: string, manifest: Manifest, source: string, output: string) => {
+  /** With `rewriteOnly`, only a literal rewrite of the output counts (C-46:
+   * a convention route already rests on the bundler, roll-up or wrapper). */
+  return (
+    root: string,
+    manifest: Manifest,
+    source: string,
+    output: string,
+    rewriteOnly = false,
+  ) => {
     let build = cache.get(root);
     if (!build) {
       const commands = scriptCommands(manifest);
@@ -365,19 +373,21 @@ export function entryBuildGuards(
       };
       cache.set(root, build);
     }
-    if (build.rollup) return "declaration-rollup";
-    if (build.wrapper) return "wireit-wrapper";
-    if (build.compilerOverride) return "compiler-mapping-options";
-    if (build.configs.some((entries) => !entries))
-      return "bundler-config-unverified";
-    if (
-      build.configs.some((entries) =>
-        entries?.some((entry) => entry !== source),
+    if (!rewriteOnly) {
+      if (build.rollup) return "declaration-rollup";
+      if (build.wrapper) return "wireit-wrapper";
+      if (build.compilerOverride) return "compiler-mapping-options";
+      if (build.configs.some((entries) => !entries))
+        return "bundler-config-unverified";
+      if (
+        build.configs.some((entries) =>
+          entries?.some((entry) => entry !== source),
+        )
       )
-    )
-      return "bundler-config-entry";
-    if (build.entries.size && !build.entries.has(source))
-      return "different-entry";
+        return "bundler-config-entry";
+      if (build.entries.size && !build.entries.has(source))
+        return "different-entry";
+    }
     // A captured wrapper sometimes writes the very declaration we would
     // substitute. Recognise a literal write to that path as contrary evidence.
     const relativeOutput = posix.relative(root, output);
