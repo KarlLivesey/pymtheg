@@ -17,11 +17,15 @@ import {
   setPageCache,
   storeRows,
   withoutGoSurface,
+  withoutTypeScriptLoadedBy,
 } from "./dump.mjs";
 
 const args = process.argv.slice(2);
 const compareGo = args.includes("--go-surface");
 if (compareGo) args.splice(args.indexOf("--go-surface"), 1);
+// C-38: compare TypeScript rows without `loadedBy`, version 45 as 44.
+const compareTs = args.includes("--ts-loaded-by");
+if (compareTs) args.splice(args.indexOf("--ts-loaded-by"), 1);
 const exact = args.includes("--exact");
 if (exact) args.splice(args.indexOf("--exact"), 1);
 const option = (name) => {
@@ -65,9 +69,10 @@ for (const pin of pins) {
         if (cachePages !== undefined) setPageCache(saved, 0);
       }
       let equality;
-      if (child.status === 0 && (compareGo || exact)) {
+      if (child.status === 0 && (compareGo || compareTs || exact)) {
         const rawRows = storeRows(store);
-        const rows = compareGo ? withoutGoSurface(rawRows) : rawRows;
+        const goRows = compareGo ? withoutGoSurface(rawRows) : rawRows;
+        const rows = compareTs ? withoutTypeScriptLoadedBy(goRows) : goRows;
         baseline ??= rows;
         equality = {
           rows: Object.fromEntries(

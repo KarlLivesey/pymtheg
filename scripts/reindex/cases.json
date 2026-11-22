@@ -50,6 +50,22 @@
       "export": "\nexport function c22Probe(): number {\n  return 1;\n}\n"
     },
     {
+      "id": "vitejs/vite",
+      "file": "packages/vite/src/node/utils.ts",
+      "comment": "\n// c38: comment-only edit\n",
+      "anchor": "export function normalizePath(id: string): string {",
+      "body": "\n  void 0",
+      "export": "\nexport function c38Probe(): number {\n  return 1\n}\n"
+    },
+    {
+      "id": "excalidraw/excalidraw",
+      "file": "packages/common/src/utils.ts",
+      "comment": "\n// c38: comment-only edit\n",
+      "anchor": "export const isInteractive = (target: Element | EventTarget | null) => {",
+      "body": "\n  void 0;",
+      "export": "\nexport function c38Probe(): number {\n  return 1;\n}\n"
+    },
+    {
       "id": "BurntSushi/ripgrep",
       "file": "crates/matcher/src/lib.rs",
       "comment": "\n// c22: comment-only edit\n",

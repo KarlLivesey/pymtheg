@@ -158,6 +158,56 @@ const kinds = ["comment", "blank", "duplicate", "delete", "statement"];
 const statement = { go: "_ = 0", rust: "let _ = 0;", typescript: "void 0;" }[
   repo.language
 ];
+// C-38 (`--weighted`, TypeScript): mostly edits another file cannot see (a
+// comment line, a no-op statement in a function body), which may take the
+// scoped path, and some it can (a new export, a deleted line), each undone
+// by the next step so no syntax error outlives it.
+const weighted = flags.includes("--weighted");
+if (weighted && repo.language !== "typescript")
+  throw Error("--weighted is for TypeScript pins");
+let revertNext;
+function typescriptEdit(step, file, source) {
+  if (revertNext) {
+    const back = revertNext;
+    revertNext = undefined;
+    return { ...back, kind: "revert", line: 0 };
+  }
+  const lines = source.split("\n");
+  const roll = random();
+  const at = Math.floor(random() * lines.length);
+  if (roll < 0.8 && roll >= 0.35) {
+    const bodies = lines
+      .map((line, index) =>
+        /(\)|=>)\s*(:[^{}]*)?\{$/.test(line.trimEnd()) &&
+        !/^\s*(export\s+)?(default\s+)?(declare\s+)?(abstract\s+)?(class|interface|enum|namespace|module|type|switch)\b/.test(
+          line,
+        ) &&
+        !/^\s*switch\b/.test(line)
+          ? index
+          : -1,
+      )
+      .filter((index) => index >= 0);
+    if (bodies.length) {
+      const line = pick(bodies);
+      lines.splice(line + 1, 0, "void 0;");
+      return { file, kind: "body", line: line + 2, text: lines.join("\n") };
+    }
+  }
+  if (roll < 0.8) {
+    lines.splice(at, 0, "// c38 random edit");
+    return { file, kind: "comment", line: at + 1, text: lines.join("\n") };
+  }
+  revertNext = { file, text: source };
+  if (roll < 0.9)
+    return {
+      file,
+      kind: "export",
+      line: lines.length,
+      text: source + `\nexport const c38Random${step} = ${step};\n`,
+    };
+  lines.splice(at, 1);
+  return { file, kind: "delete", line: at + 1, text: lines.join("\n") };
+}
 const steps =
   resume && existsSync(outArg)
     ? JSON.parse(readFileSync(outArg, "utf8")).steps
@@ -337,7 +387,11 @@ for (let step = 0; step < expectedSteps; step++) {
   let edit;
   let at = 0;
   if (repo.language === "go") edit = goEdit(step, file, original);
-  else {
+  else if (weighted) {
+    // A revert restores the file of the step before, not the one picked.
+    edit = typescriptEdit(step, file, original);
+    at = edit.line - 1;
+  } else {
     const lines = original.split("\n");
     let kind = pick(kinds);
     at = Math.floor(random() * lines.length);
@@ -402,6 +456,13 @@ for (let step = 0; step < expectedSteps; step++) {
     wallMs: measured.wallMs,
     failed: measured.report?.failedCount,
     resolvedFiles: measured.counts?.["resolve.go.decisionFiles"] ?? 0,
+    ...(weighted
+      ? {
+          scoped: measured.typescript?.scoped ?? 0,
+          extracted: measured.typescript?.extracted ?? 0,
+          cpuMs: measured.cpuMs,
+        }
+      : {}),
     ...(noEdit ? { noEdit } : {}),
   });
   console.log(

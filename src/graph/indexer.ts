@@ -10,6 +10,7 @@ import {
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import { count, stage } from "./work.js";
 import type {
+  AnalysisPath,
   AnalyzedFile,
   ContextFile,
   GraphFile,
@@ -49,6 +50,8 @@ export interface IndexReport {
   resolutionErrors: { module: string; message: string }[];
   /** Notes from opted-in toolchain routes; absent when no module made one. */
   toolchains?: { module: string; note: Json }[];
+  /** Per module that reported one: the analysis path and why (C-38). */
+  analysisPaths?: ({ module: string } & AnalysisPath)[];
 }
 export interface IndexOptions {
   excludeDirectories?: readonly string[];
@@ -331,6 +334,10 @@ export async function indexProject(
         await writeParsed(file);
       }
     }
+    // Edited files whose writes wait for their module's analysis: the run
+    // claims the store now, as writing them first would (C-22, C-38).
+    if ([...deferred.values()].some((pending) => pending.length))
+      await store.claimIndexRun?.();
   });
   // Written: release every captured text and parse result (C-2). Only the
   // context files and which captures failed are needed from here on.
@@ -431,6 +438,15 @@ export async function indexProject(
             ...changedContexts.filter((path) => needsContext(module, path)),
             ...checkedInputs.changed,
           ],
+          // Only an incremental module has a path to report; others may
+          // clone their context into a worker, where a function cannot go.
+          ...(module.incrementalAnalysis && {
+            notePath: (note: AnalysisPath) =>
+              (report.analysisPaths ??= []).push({
+                module: module.id,
+                ...note,
+              }),
+          }),
         }),
       );
       if ("resolutionFiles" in output) {
@@ -456,8 +472,11 @@ export async function indexProject(
         validateResult(file.text, item.result);
         seen.add(item.path);
       }
+      // A validated scoped result keeps the stored results of the files it
+      // does not name, as it does for a module with a parser (C-38).
       if (
         !module.parse &&
+        !scope &&
         files.some((file) => !unreadable.has(file.path) && !seen.has(file.path))
       )
         throw Error(

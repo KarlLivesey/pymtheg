@@ -973,6 +973,26 @@ An unfinished run or a direct graph write requires recovery. The opt-in
 toolchain route uses a full pass. The same file tree produces the same
 graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
+TypeScript can reuse every other file's stored result after a one-file edit
+that other files cannot see. The edited file is then extracted again in
+the projects that own it, and nothing else is. What other files can see is
+compared between the old and new text in every program that loads the
+file: its tokens outside function bodies (in a JavaScript file, inside
+them too), what whole-program scans read inside them (returns, writes,
+initialisers, module references), and the inferred types, with every
+declaration they reach. A body-local named declaration reached by an
+inferred type uses the full analysis. Other files' target facts follow the
+file's moved declarations. Anything else uses the full analysis: a changed
+surface, an added, removed or renamed file, a config, manifest or
+dependency change, a declaration file, `declare global` or `declare
+module`, a script, a file renamed for the compiler, a compiler limit, a
+failed file a binding reads, a file that reads object producers, an
+unfinished run or a missing completion record. A broken config elsewhere,
+retried on every index, does not block it. The same file tree produces the
+same graph after a fresh or incremental index. The index report names the
+path taken and why a scoped analysis was declined. Seeded edits scoped
+49–65%; real single-file commits on zustand 2 of 30. [C-38](changes/C-38.md)
+
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing
 `.pymtheg/settings.json` (which must keep its `version: 1` and `scenarios`; a

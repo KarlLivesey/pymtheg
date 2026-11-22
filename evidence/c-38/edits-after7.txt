@@ -1,0 +1,32 @@
+excalidraw/excalidraw cold: wall 113518 ms, cpu 143888 ms, rss 2589 MiB, parsed 0, complete true
+excalidraw/excalidraw warm: wall 1128 ms, cpu 1378 ms, rss 159 MiB, parsed 0, complete true
+excalidraw/excalidraw comment: wall 38720 ms, cpu 58468 ms, rss 2794 MiB, parsed 0, complete true
+excalidraw/excalidraw comment-revert equals cold: yes
+excalidraw/excalidraw body: wall 92912 ms, cpu 86084 ms, rss 2361 MiB, parsed 0, complete true
+excalidraw/excalidraw body-revert equals cold: yes
+excalidraw/excalidraw export: wall 71340 ms, cpu 116066 ms, rss 2237 MiB, parsed 0, complete true
+excalidraw/excalidraw export-revert equals cold: yes
+honojs/hono cold: wall 75093 ms, cpu 60642 ms, rss 1239 MiB, parsed 0, complete true
+honojs/hono warm: wall 677 ms, cpu 834 ms, rss 136 MiB, parsed 0, complete true
+honojs/hono comment: wall 15358 ms, cpu 23223 ms, rss 873 MiB, parsed 0, complete true
+honojs/hono comment-revert equals cold: yes
+honojs/hono body: wall 24014 ms, cpu 31054 ms, rss 916 MiB, parsed 0, complete true
+honojs/hono body-revert equals cold: yes
+honojs/hono export: wall 29091 ms, cpu 46394 ms, rss 1124 MiB, parsed 0, complete true
+honojs/hono export-revert equals cold: yes
+excalidraw_excalidraw.body-revert  cpu 80.5  wall 71.2  rss 2238  programs 1  extracted 1  scoped 1  surfaces 18  changed 185  failed 0  declined {}
+excalidraw_excalidraw.body  cpu 86.1  wall 92.9  rss 2361  programs 1  extracted 1  scoped 1  surfaces 18  changed 185  failed 0  declined {}
+excalidraw_excalidraw.cold  cpu 143.9  wall 113.5  rss 2589  programs 17  extracted 835  scoped 0  surfaces 0  changed 733  failed 0  declined {"no previous facts":1}
+excalidraw_excalidraw.comment-revert  cpu 54.4  wall 35.1  rss 2186  programs 1  extracted 1  scoped 1  surfaces 18  changed 1  failed 0  declined {}
+excalidraw_excalidraw.comment  cpu 58.5  wall 38.7  rss 2794  programs 1  extracted 1  scoped 1  surfaces 18  changed 1  failed 0  declined {}
+excalidraw_excalidraw.export-revert  cpu 116.4  wall 70.5  rss 2901  programs 17  extracted 835  scoped 0  surfaces 0  changed 1  failed 0  declined {"syntactic surface":1}
+excalidraw_excalidraw.export  cpu 116.1  wall 71.3  rss 2237  programs 17  extracted 835  scoped 0  surfaces 0  changed 1  failed 0  declined {"syntactic surface":1}
+excalidraw_excalidraw.warm  cpu 1.4  wall 1.1  rss 159  programs 0  extracted 0  scoped 0  surfaces 0  changed 0  failed 0  declined {}
+honojs_hono.body-revert  cpu 25.0  wall 19.0  rss 944  programs 2  extracted 2  scoped 1  surfaces 16  changed 17  failed 0  declined {}
+honojs_hono.body  cpu 31.1  wall 24.0  rss 916  programs 2  extracted 2  scoped 1  surfaces 16  changed 17  failed 0  declined {}
+honojs_hono.cold  cpu 60.6  wall 75.1  rss 1239  programs 24  extracted 650  scoped 0  surfaces 0  changed 460  failed 0  declined {"no previous facts":1}
+honojs_hono.comment-revert  cpu 25.7  wall 14.6  rss 898  programs 2  extracted 2  scoped 1  surfaces 16  changed 1  failed 0  declined {}
+honojs_hono.comment  cpu 23.2  wall 15.4  rss 873  programs 2  extracted 2  scoped 1  surfaces 16  changed 1  failed 0  declined {}
+honojs_hono.export-revert  cpu 45.1  wall 27.1  rss 1058  programs 24  extracted 650  scoped 0  surfaces 0  changed 1  failed 0  declined {"syntactic surface":1}
+honojs_hono.export  cpu 46.4  wall 29.1  rss 1124  programs 24  extracted 650  scoped 0  surfaces 0  changed 1  failed 0  declined {"syntactic surface":1}
+honojs_hono.warm  cpu 0.8  wall 0.7  rss 136  programs 0  extracted 0  scoped 0  surfaces 0  changed 0  failed 0  declined {}

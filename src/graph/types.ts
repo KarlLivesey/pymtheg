@@ -229,6 +229,18 @@ export interface ProjectAnalysisContext {
   previousFiles?: ReadonlyMap<string, GraphFile>;
   /** Includes deleted context paths. Analysis runs even when this list is empty. */
   changedContextFiles: readonly string[];
+  /** Reports which analysis path ran and why a cheaper one was not used. */
+  notePath?: (note: AnalysisPath) => void;
+}
+/**
+ * The analysis path a module took for one index (C-38), shown in the index
+ * report: `reused` built no program, `scoped` extracted only the edited
+ * files, `full` analysed every file; `declined` lists, in order, why a
+ * scoped analysis was not used.
+ */
+export interface AnalysisPath {
+  path: "reused" | "scoped" | "full";
+  declined?: readonly string[];
 }
 export interface AnalyzedFile {
   path: string;
@@ -385,6 +397,8 @@ export interface GraphStorage {
    * the store, or throws without writing.
    */
   beginIndexRun?(): StorageResult<boolean>;
+  /** Writes the run's mark at once if it has not written yet (C-38). */
+  claimIndexRun?(): StorageResult<void>;
   /** Module versions whose completed decisions this run found in its opening snapshot. */
   completedAnalysis?(): StorageResult<ReadonlyMap<string, string>>;
   /** An incomplete run retains its mark. A successful owned run records reusable module decisions. */

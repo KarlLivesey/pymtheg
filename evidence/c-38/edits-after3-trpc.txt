@@ -1,0 +1,4 @@
+trpc_trpc.cold  cpu 102.4  wall 214.5  rss 1109  programs 55  extracted 1347  scoped 0  surfaces 0  changed 1353  failed 6  declined {"no previous facts":1}
+trpc_trpc.comment-revert  cpu 18.5  wall 12.5  rss 772  programs 1  extracted 1  scoped 1  surfaces 18  changed 7  failed 6  declined {}
+trpc_trpc.comment  cpu 19.4  wall 13.2  rss 780  programs 1  extracted 1  scoped 1  surfaces 18  changed 7  failed 6  declined {}
+trpc_trpc.warm  cpu 6.9  wall 7.7  rss 412  programs 0  extracted 0  scoped 0  surfaces 0  changed 6  failed 6  declined {}

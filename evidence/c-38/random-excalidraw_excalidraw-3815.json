@@ -1,0 +1,408 @@
+{
+ "id": "excalidraw/excalidraw",
+ "seed": 3815,
+ "expectedSteps": 20,
+ "steps": [
+  {
+   "step": 0,
+   "file": "packages/excalidraw/components/TTDDialog/Chat/useChatAgent.ts",
+   "kind": "comment",
+   "line": 14,
+   "equal": true,
+   "differences": [],
+   "wallMs": 33367,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 56041,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1248
+   }
+  },
+  {
+   "step": 1,
+   "file": "packages/excalidraw/tests/arrowBinding.test.tsx",
+   "kind": "comment",
+   "line": 409,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13629,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 27350,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1311
+   }
+  },
+  {
+   "step": 2,
+   "file": "packages/excalidraw/tests/viewport.test.ts",
+   "kind": "delete",
+   "line": 50,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13689,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 25709,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1213
+   }
+  },
+  {
+   "step": 3,
+   "file": "packages/excalidraw/tests/viewport.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12709,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 23828,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1106
+   }
+  },
+  {
+   "step": 4,
+   "file": "packages/excalidraw/actions/actionProperties.tsx",
+   "kind": "comment",
+   "line": 1794,
+   "equal": true,
+   "differences": [],
+   "wallMs": 37504,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 64716,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1152
+   }
+  },
+  {
+   "step": 5,
+   "file": "packages/excalidraw/components/ColorPicker/TopPicks.tsx",
+   "kind": "body",
+   "line": 53,
+   "equal": true,
+   "differences": [],
+   "wallMs": 32133,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 55333,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1175
+   }
+  },
+  {
+   "step": 6,
+   "file": "packages/excalidraw/components/Stats/MultiAngle.tsx",
+   "kind": "comment",
+   "line": 82,
+   "equal": true,
+   "differences": [],
+   "wallMs": 39230,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 61153,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1227
+   }
+  },
+  {
+   "step": 7,
+   "file": "packages/element/src/groups.ts",
+   "kind": "body",
+   "line": 245,
+   "equal": true,
+   "differences": [],
+   "wallMs": 33321,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 56005,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1228
+   }
+  },
+  {
+   "step": 8,
+   "file": "packages/excalidraw/components/Sidebar/SidebarTabTriggers.tsx",
+   "kind": "body",
+   "line": 10,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30431,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 54118,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1299
+   }
+  },
+  {
+   "step": 9,
+   "file": "excalidraw-app/data/cacheMermaidChunks.ts",
+   "kind": "delete",
+   "line": 39,
+   "equal": true,
+   "differences": [],
+   "wallMs": 16671,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 31971,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1231
+   }
+  },
+  {
+   "step": 10,
+   "file": "excalidraw-app/data/cacheMermaidChunks.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 18317,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 30684,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1220
+   }
+  },
+  {
+   "step": 11,
+   "file": "packages/excalidraw/components/TTDDialog/utils/TTDstreamFetch.test.ts",
+   "kind": "comment",
+   "line": 405,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12091,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 25032,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1265
+   }
+  },
+  {
+   "step": 12,
+   "file": "packages/excalidraw/tests/tooltip.test.tsx",
+   "kind": "export",
+   "line": 253,
+   "equal": true,
+   "differences": [],
+   "wallMs": 69224,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 835,
+   "cpuMs": 112299,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1162
+   }
+  },
+  {
+   "step": 13,
+   "file": "packages/excalidraw/tests/tooltip.test.tsx",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 67060,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 835,
+   "cpuMs": 119661,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1302
+   }
+  },
+  {
+   "step": 14,
+   "file": "packages/excalidraw/components/Sidebar/SidebarTabTriggers.tsx",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29563,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 53384,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1161
+   }
+  },
+  {
+   "step": 15,
+   "file": "packages/common/src/emitter.ts",
+   "kind": "body",
+   "line": 35,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31120,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 47286,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1337
+   }
+  },
+  {
+   "step": 16,
+   "file": "packages/element/tests/sortElements.test.ts",
+   "kind": "comment",
+   "line": 47,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14234,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 26068,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1168
+   }
+  },
+  {
+   "step": 17,
+   "file": "examples/with-nextjs/src/app/layout.tsx",
+   "kind": "body",
+   "line": 6,
+   "equal": true,
+   "differences": [],
+   "wallMs": 79038,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 837,
+   "cpuMs": 123523,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1246
+   }
+  },
+  {
+   "step": 18,
+   "file": "excalidraw-app/data/cacheMermaidChunks.ts",
+   "kind": "comment",
+   "line": 23,
+   "equal": true,
+   "differences": [],
+   "wallMs": 17372,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 32817,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1329
+   }
+  },
+  {
+   "step": 19,
+   "file": "packages/excalidraw/components/Sidebar/Sidebar.tsx",
+   "kind": "comment",
+   "line": 71,
+   "equal": true,
+   "differences": [],
+   "wallMs": 41724,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 61475,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1221
+   }
+  }
+ ],
+ "equal": true
+}

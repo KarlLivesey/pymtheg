@@ -1,0 +1,254 @@
+[
+ {
+  "pin": "honojs_hono",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 97.53,
+  "cpuS": 102.8,
+  "peakMiB": 1438,
+  "equality": {
+   "rows": {
+    "graph_files": 460,
+    "graph_contexts": 5757,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5773,
+    "graph_links": 72340,
+    "graph_candidates": 63,
+    "graph_library_targets": 34386,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "round": 0,
+  "build": "after",
+  "wallS": 96.07,
+  "cpuS": 96.3,
+  "peakMiB": 1394,
+  "equality": {
+   "rows": {
+    "graph_files": 460,
+    "graph_contexts": 5757,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5773,
+    "graph_links": 72340,
+    "graph_candidates": 63,
+    "graph_library_targets": 34386,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 76.37,
+  "cpuS": 93,
+  "peakMiB": 1780,
+  "equality": {
+   "rows": {
+    "graph_files": 460,
+    "graph_contexts": 5757,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5773,
+    "graph_links": 72340,
+    "graph_candidates": 63,
+    "graph_library_targets": 34386,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "trpc_trpc",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 364.24,
+  "cpuS": 340.4,
+  "peakMiB": 2910,
+  "equality": {
+   "rows": {
+    "graph_files": 1353,
+    "graph_contexts": 49316,
+    "graph_parse_failures": 0,
+    "graph_symbols": 17804,
+    "graph_links": 107470,
+    "graph_candidates": 14,
+    "graph_library_targets": 48626,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "trpc_trpc",
+  "round": 0,
+  "build": "after",
+  "wallS": 366.55,
+  "cpuS": 337.8,
+  "peakMiB": 3071,
+  "equality": {
+   "rows": {
+    "graph_files": 1353,
+    "graph_contexts": 49316,
+    "graph_parse_failures": 0,
+    "graph_symbols": 17804,
+    "graph_links": 107470,
+    "graph_candidates": 14,
+    "graph_library_targets": 48626,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "trpc_trpc",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 339.94,
+  "cpuS": 320.4,
+  "peakMiB": 2884,
+  "equality": {
+   "rows": {
+    "graph_files": 1353,
+    "graph_contexts": 49316,
+    "graph_parse_failures": 0,
+    "graph_symbols": 17804,
+    "graph_links": 107470,
+    "graph_candidates": 14,
+    "graph_library_targets": 48626,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "vitejs_vite",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 145.55,
+  "cpuS": 109.7,
+  "peakMiB": 1554,
+  "equality": {
+   "rows": {
+    "graph_files": 1697,
+    "graph_contexts": 11892,
+    "graph_parse_failures": 2,
+    "graph_symbols": 10186,
+    "graph_links": 55576,
+    "graph_candidates": 152,
+    "graph_library_targets": 25037,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "vitejs_vite",
+  "round": 0,
+  "build": "after",
+  "wallS": 162.41,
+  "cpuS": 112.3,
+  "peakMiB": 1734,
+  "equality": {
+   "rows": {
+    "graph_files": 1697,
+    "graph_contexts": 11892,
+    "graph_parse_failures": 2,
+    "graph_symbols": 10186,
+    "graph_links": 55576,
+    "graph_candidates": 152,
+    "graph_library_targets": 25037,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "vitejs_vite",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 121.02,
+  "cpuS": 112.4,
+  "peakMiB": 1781,
+  "equality": {
+   "rows": {
+    "graph_files": 1697,
+    "graph_contexts": 11892,
+    "graph_parse_failures": 2,
+    "graph_symbols": 10186,
+    "graph_links": 55576,
+    "graph_candidates": 152,
+    "graph_library_targets": 25037,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "excalidraw_excalidraw",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 206.63,
+  "cpuS": 200.7,
+  "peakMiB": 2706,
+  "equality": {
+   "rows": {
+    "graph_files": 733,
+    "graph_contexts": 7226,
+    "graph_parse_failures": 0,
+    "graph_symbols": 13405,
+    "graph_links": 104519,
+    "graph_candidates": 392,
+    "graph_library_targets": 40475,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "excalidraw_excalidraw",
+  "round": 0,
+  "build": "after",
+  "wallS": 181.71,
+  "cpuS": 189.6,
+  "peakMiB": 3113,
+  "equality": {
+   "rows": {
+    "graph_files": 733,
+    "graph_contexts": 7226,
+    "graph_parse_failures": 0,
+    "graph_symbols": 13405,
+    "graph_links": 104519,
+    "graph_candidates": 392,
+    "graph_library_targets": 40475,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "excalidraw_excalidraw",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 192.99,
+  "cpuS": 193,
+  "peakMiB": 2774,
+  "equality": {
+   "rows": {
+    "graph_files": 733,
+    "graph_contexts": 7226,
+    "graph_parse_failures": 0,
+    "graph_symbols": 13405,
+    "graph_links": 104519,
+    "graph_candidates": 392,
+    "graph_library_targets": 40475,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]

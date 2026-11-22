@@ -3267,3 +3267,47 @@ link names a container only if that container is a symbol. One link
 without a source rejects a module's whole output, so a namespace that is
 no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).
+
+### TypeScript re-index extracts only the edited file when others cannot see the edit (C-38)
+
+**Decided (C-38).** The TypeScript module takes part in C-27's scoped
+analysis. For one edited file it compares, between the previous and the
+current text, what another file's analysis can read of it. There is no
+stored fingerprint: the old text is in the store, and both are compared in
+the same run.
+- **Syntactic:** its tokens outside function bodies (comments left out,
+  JSDoc kept), plus, inside bodies, what the whole-program scans read
+  without the checker (returns, writes, initialisers, module references).
+  In a JavaScript file every token and JSDoc of every body as well: the
+  binder declares members from bodies there.
+- **Checker:** the inferred type of each declaration outside bodies, as
+  printed and with every declaration it reaches, in a program with each
+  text, in every program whose stored `loadedBy` names it. For a
+  signature, also its inferred type predicate (`x is A`) and `this`
+  type. A named
+  declaration inside a body reached by one, or a printed type cut at a
+  million characters, means the full analysis.
+
+The index report (`sync.report.analysisPaths`, and one line of the text
+output) names the path each module took, `reused`, `scoped` or `full`,
+and in order why a scoped analysis was not used.
+
+When both match, the file is extracted alone in each project that owns it,
+after the same warm-up as a full analysis. Every other stored result is
+kept. Other files' target facts move with the file's re-keyed declarations
+(identity and ordinal, as the store's IDs). A scoped attempt must not
+depend on what other files asked first, so it is not used when:
+- the file's extraction reads object producers, whose memo is shared and
+  whose cut lookups depend on order;
+- a program it relies on asks for a failed file that a binding reads;
+- any compiler limit, drop, rebuild, rename, tie mismatch or exception
+  occurs.
+
+Every check is counted, never timed, and every refusal runs the full
+analysis. A run whose parsed writes wait for analysis (C-27) writes its
+run mark before analysing, so a run that begins meanwhile takes over
+(C-22). **Trade:** the scoped path still builds and warms the owning
+projects' programs and builds two programs per loading project. Module
+version 45. **Rules out:** a stored per-file type fingerprint, whose
+printed form would depend on the order types were created in.
+See [C-38](changes/C-38.md).

@@ -88,7 +88,10 @@ test("warm Go/Rust/JS/TS content failures skip indexing, remain named, and each 
       }
       const recertified = await run();
       assert.equal(recertified.sync.mode, "updated");
-      assert.equal(recertified.sync.report.indexed, 1);
+      // bad.js is recertified. The direct write also cleared the analysis
+      // completion record, so the TypeScript module, which reuses stored
+      // results only under it (C-27, C-38), restores its clean file too.
+      assert.equal(recertified.sync.report.indexed, 2);
       assert.equal(recertified.sync.complete, true);
       assert.equal((await run()).sync.mode, "unchanged");
       const fixes = {

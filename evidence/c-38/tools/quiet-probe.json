@@ -1,0 +1,6 @@
+{
+  "tsconfig.json": "{\"compilerOptions\":{\"strict\":true,\"target\":\"ES2022\",\"module\":\"ESNext\",\"moduleResolution\":\"Bundler\"},\"include\":[\"src\"]}",
+  "src/broken.ts": "export const = ;\n",
+  "src/f.ts": "export function f(): string {\n  return 'f';\n}\n",
+  "src/g.ts": "import { f } from \"./f\";\nf().toUpperCase();\n"
+}
