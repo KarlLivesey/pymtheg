@@ -392,6 +392,11 @@ export interface GraphStorage {
     incomplete?: boolean,
     completed?: ReadonlyMap<string, string>,
   ): StorageResult<void>;
+  /**
+   * Runs `action` with its writes grouped into fewer, bounded commits
+   * (C-37). Each write still succeeds or fails on its own.
+   */
+  writeBatch?<T>(action: () => Promise<T>): Promise<T>;
   failedFiles?(): StorageResult<FailedFile[]>;
   /** parseFailure distinguishes cacheable parser failures from retryable project failures. */
   replaceFile(file: GraphFile, parseFailure?: boolean): StorageResult<void>;

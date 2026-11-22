@@ -29,11 +29,13 @@ const write = (root, files) => {
     writeFileSync(join(root, path), text);
   }
 };
-const killAt = (root, n) =>
+const killAt = (root, n, batchRows) =>
   new Promise((resolve) => {
-    const process_ = spawn(process.execPath, [child, root, String(n)], {
-      stdio: ["ignore", "pipe", "inherit"],
-    });
+    const process_ = spawn(
+      process.execPath,
+      [child, root, String(n), ...(batchRows ? [String(batchRows)] : [])],
+      { stdio: ["ignore", "pipe", "inherit"] },
+    );
     let out = "";
     process_.stdout.on("data", (data) => (out += data));
     process_.on("exit", (code, signal) => resolve({ code, signal, out }));
@@ -44,7 +46,7 @@ const killAt = (root, n) =>
  * after its nth write on a fresh copy, then checks one normal re-index
  * against a cold index. Returns the number of write boundaries tried.
  */
-async function everyKillPoint(files, edit) {
+async function everyKillPoint(files, edit, batchRows) {
   const base = mkdtempSync(join(tmpdir(), "c22-kill-"));
   try {
     const start = join(base, "start");
@@ -68,14 +70,14 @@ async function everyKillPoint(files, edit) {
     // How many writes the re-index makes when nothing kills it.
     const whole = join(base, "whole");
     cpSync(start, whole, { recursive: true });
-    const unkilled = await killAt(whole, 0);
+    const unkilled = await killAt(whole, 0, batchRows);
     const writes = Number(/^not killed (\d+)/.exec(unkilled.out)?.[1]);
     assert.ok(writes > 0, unkilled.out);
     assert.deepEqual(compareRows(storeRows(graph(whole)), cold), []);
     for (let n = 1; n <= writes; n++) {
       const root = join(base, `kill-${n}`);
       cpSync(start, root, { recursive: true });
-      const killed = await killAt(root, n);
+      const killed = await killAt(root, n, batchRows);
       assert.equal(killed.signal, "SIGKILL", `kill ${n}: ${killed.out}`);
       // Only a run whose completion record committed (its last write) is
       // reported complete.
@@ -190,3 +192,41 @@ test("Rust: a re-index killed after any write is repaired by the next one", asyn
   assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
   t.diagnostic(`write boundaries: ${tried}`);
 });
+
+// C-37: the same edits with write batches of a few rows, so each run has
+// several batch boundaries (a batch commits once it reaches the budget, and
+// the rest at the end of its scope). Every boundary is a kill point.
+for (const [language, files, edit] of [
+  [
+    "TypeScript",
+    {
+      "package.json": JSON.stringify({ name: "fixture", private: true }),
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { strict: true },
+        include: ["src"],
+      }),
+      "src/a.ts": tsA,
+      "src/b.ts":
+        'import { hello, other } from "./a";\n\nexport const b = hello() + other();\n',
+      "src/c.ts":
+        'import { other } from "./a";\n\nexport const c = other() + 1;\n',
+    },
+    { "src/a.ts": "// moved\n" + tsA },
+  ],
+  [
+    "Go",
+    {
+      "go.mod": "module example.com/m\n\ngo 1.22\n",
+      "a/a.go": "package a\n\nfunc Hello() error { return nil }\n",
+      "b/b.go":
+        'package b\n\nimport "example.com/m/a"\n\nfunc B() error { return a.Hello() }\n',
+      "b/c.go": "package b\n\nfunc C() error { return B() }\n",
+    },
+    { "b/shadow.go": "package b\n\ntype error = int\n" },
+  ],
+])
+  test(`${language}: a re-index in small write batches killed at any boundary is repaired by the next one`, async (t) => {
+    const tried = await everyKillPoint(files, edit, 5);
+    assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
+    t.diagnostic(`write boundaries: ${tried}`);
+  });

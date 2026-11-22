@@ -280,7 +280,45 @@ export class SqliteGraphStore implements GraphStorage {
       } = {
     state: "idle",
   };
+  /**
+   * C-37: rows a batched write may add before it commits, as SQLite counts
+   * direct changes (total_changes()). Tests lower it to put batch boundaries
+   * inside small fixtures.
+   */
+  static writeBatchRows = 20_000;
+  /** Inside writeBatch: writes share one transaction until the budget is met. */
+  private batching = false;
+  /** The total_changes() at which the open batch transaction began. */
+  private batchOpen: number | undefined;
+  /** Writes that have succeeded in the open batch. */
+  private batchWrites = 0;
+  /**
+   * C-37: runs `action` with its graph writes grouped into transactions of
+   * about writeBatchRows rows (each one write, so a batch can end up to one
+   * write over). A batch is one commit: the run's ownership checks, mark and
+   * data-version bookkeeping happen at its BEGIN and COMMIT, as for any
+   * other commit, and another writer waits for at most one batch. Each write
+   * in a batch is its own savepoint, so a write that fails leaves the
+   * earlier ones in place, as their own commits did. A batch only forms
+   * under the write-ahead log, where readers are never blocked; with a
+   * rollback journal each write commits on its own as before. The open
+   * batch commits when `action` ends, also when it throws.
+   */
+  async writeBatch<T>(action: () => Promise<T>): Promise<T> {
+    if (this.batching) return await action();
+    this.batching = true;
+    try {
+      return await action();
+    } finally {
+      this.batching = false;
+      if (this.batchOpen !== undefined) this.commitTransaction();
+    }
+  }
+  private totalChanges(): number {
+    return Number(this.db.prepare("SELECT total_changes() AS n").get()!.n);
+  }
   private transaction(action: () => void): void {
+    if (this.batchOpen !== undefined) return this.batchedWrite(action);
     this.beforeWrite();
     // C-35: the invalidation triggers write, so each graph write statement in
     // a transaction keeps a statement journal. SQLite keeps it in a temporary
@@ -329,7 +367,50 @@ export class SqliteGraphStore implements GraphStorage {
         // its own, so it publishes no completion.
         if (this.commandDataVersion() !== run.version) run.interleaved = true;
       }
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    if (this.batching && this.writeAheadLog) {
+      this.batchOpen = this.totalChanges();
+      this.batchWrites = 0;
+      return this.batchedWrite(action);
+    }
+    try {
       action();
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    this.commitTransaction();
+  }
+  /** One write inside the open batch, then its commit once the budget is met. */
+  private batchedWrite(action: () => void): void {
+    this.db.exec("SAVEPOINT graph_write");
+    try {
+      action();
+    } catch (error) {
+      // A batch with no write yet holds only its opening (the run's mark):
+      // it is undone whole, as that write's own transaction was.
+      if (this.batchWrites === 0) {
+        this.batchOpen = undefined;
+        this.db.exec("ROLLBACK");
+      } else this.db.exec("ROLLBACK TO graph_write; RELEASE graph_write");
+      throw error;
+    }
+    this.db.exec("RELEASE graph_write");
+    this.batchWrites++;
+    if (
+      this.totalChanges() - this.batchOpen! >=
+      SqliteGraphStore.writeBatchRows
+    )
+      this.commitTransaction();
+  }
+  /** Commits the open write transaction and records it for the run. */
+  private commitTransaction(): void {
+    this.batchOpen = undefined;
+    const run = this.indexRun;
+    try {
       // Read under the write lock, before the commit: this connection's own
       // commit does not change it, another connection's later one does.
       const version =
@@ -340,7 +421,7 @@ export class SqliteGraphStore implements GraphStorage {
         run.version = version!;
       }
     } catch (error) {
-      this.db.exec("ROLLBACK");
+      if (this.db.isTransaction) this.db.exec("ROLLBACK");
       throw error;
     }
   }
