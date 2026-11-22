@@ -1227,6 +1227,12 @@ export class StudioService {
         );
         planDocument = { path: sourceContractsPath, text: json(catalogue) };
       }
+      // D22: an expected revision an empty project cannot have fails before
+      // the first write initialises anything.
+      if (request.expectedRevision !== null && !(await this.architecture()))
+        throw new ArchitectureConflict(
+          "Architecture changed. Refresh before retaining this code version.",
+        );
       const store = (await this.architecture(true))!;
       return retainObservation(
         store,

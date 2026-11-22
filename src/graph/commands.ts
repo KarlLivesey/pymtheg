@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, realpath, stat } from "node:fs/promises";
 import {
   checkpointSchema,
   checkpointFrom,
@@ -40,7 +40,7 @@ import {
 import { readLocalTrust } from "../project/local-trust.js";
 import { readWorkspace } from "../project/workspace.js";
 import { trustAnswerHow } from "../project/trust.js";
-import { dirname, join, sep } from "node:path";
+import { dirname, join } from "node:path";
 
 export type GraphCommand = "index" | "status" | QueryCommand;
 export interface GraphProgress {
@@ -249,16 +249,9 @@ export async function executeGraph(
       // Defence in depth (D22): a tool path that resolves inside the
       // checkout is the repository's code; it is never run, even when the
       // user's own configuration names it. The route stays off.
-      const project = await realpath(root);
       for (const [key, setting] of Object.entries(toolchains)) {
         if (typeof setting !== "string") continue;
-        let tool = setting;
-        try {
-          tool = await realpath(setting);
-        } catch {
-          /* missing: the route reports it */
-        }
-        if (tool === project || tool.startsWith(project + sep)) {
+        if (await insideCheckout(setting, root)) {
           delete toolchains[key];
           insidePaths.push(key);
         }
@@ -819,5 +812,37 @@ export async function executeGraph(
     return response;
   } finally {
     stageSync("command.sqliteClose", () => store?.close());
+  }
+}
+
+/**
+ * Whether a tool path lies inside the checkout, by file identity: each
+ * directory from the tool's resolved location up to the file-system root is
+ * compared with the checkout root by device and inode, so neither spelling,
+ * symlinks nor a case-insensitive or normalising file system can hide it.
+ */
+async function insideCheckout(tool: string, root: string): Promise<boolean> {
+  let rootInfo;
+  try {
+    rootInfo = await stat(root);
+  } catch {
+    return false;
+  }
+  let dir: string;
+  try {
+    dir = dirname(await realpath(tool));
+  } catch {
+    dir = dirname(tool);
+  }
+  for (;;) {
+    try {
+      const info = await stat(dir);
+      if (info.dev === rootInfo.dev && info.ino === rootInfo.ino) return true;
+    } catch {
+      /* an unreadable level: keep walking up */
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return false;
+    dir = parent;
   }
 }

@@ -11,6 +11,7 @@ import {
   cpSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   realpathSync,
   statSync,
   symlinkSync,
@@ -935,5 +936,91 @@ test("a test process that lost its isolated configuration folder refuses to writ
       "@modelcontextprotocol/client/stdio"
     );
     assert.ok(DEFAULT_INHERITED_ENV_VARS.includes("PYMTHEG_CONFIG_HOME"));
+  });
+});
+
+test("a corrupt answers file is moved aside, user-only, not silently replaced; the folder is kept user-only", async () => {
+  await scratch(async (base) => {
+    const root = join(base, "a");
+    await initializeWorkspace(root);
+    const file = trustFile();
+    mkdirSync(dirname(file), { recursive: true });
+    await writeFile(file, "{ not json");
+    chmodSync(dirname(file), 0o755);
+    await writeLocalTrust(root, "trusted");
+    const aside = readdirSync(dirname(file)).filter((n) =>
+      n.startsWith("trust.json.corrupt-"),
+    );
+    assert.ok(aside.length >= 1);
+    const kept = join(dirname(file), aside.at(-1));
+    assert.equal(await readFile(kept, "utf8"), "{ not json");
+    assert.equal(statSync(kept).mode & 0o777, 0o600);
+    assert.equal(statSync(dirname(file)).mode & 0o777, 0o700);
+    assert.equal(await checkoutTrust(root), "trusted");
+    // A wrong-typed entry is set aside the same way; the valid entries stay.
+    const answers = JSON.parse(await readFile(file, "utf8"));
+    answers.checkouts["/somewhere/else"] = { project: 1, trust: "maybe" };
+    await writeFile(file, JSON.stringify(answers));
+    const other = join(base, "b");
+    await initializeWorkspace(other, undefined, { trust: "source-only" });
+    assert.equal(await checkoutTrust(root), "trusted");
+    assert.equal(await checkoutTrust(other), "source-only");
+    assert.ok(
+      readdirSync(dirname(file)).filter((n) =>
+        n.startsWith("trust.json.corrupt-"),
+      ).length > aside.length,
+    );
+  });
+});
+
+test(
+  "a lock left by a reused pid (another start time) is taken over",
+  { skip: process.platform !== "linux" && "start times come from /proc" },
+  async () => {
+    await scratch(async (root) => {
+      await initializeWorkspace(root);
+      mkdirSync(dirname(trustFile()), { recursive: true });
+      // This process's pid, with a start time it does not have.
+      await writeFile(
+        join(dirname(trustFile()), "trust.json.lock"),
+        `${process.pid} 1 stale-token`,
+      );
+      await writeLocalTrust(root, "trusted");
+      assert.equal(await checkoutTrust(root), "trusted");
+    });
+  },
+);
+
+test("a tool path reaching the checkout through a symlink chain, or a checkout opened through a symlinked parent, is refused", async () => {
+  await scratch(async (root) => {
+    const real = join(root, "real");
+    const project = join(real, "project");
+    cpSync(GO_FIXTURE, project, { recursive: true });
+    await initializeWorkspace(project, undefined, trusted);
+    const marker = join(root, "ran.txt");
+    mkdirSync(join(project, "bin"));
+    await writeFile(
+      join(project, "bin", "go"),
+      `#!/bin/sh\necho ran > '${marker}'\nexit 1\n`,
+    );
+    chmodSync(join(project, "bin", "go"), 0o755);
+    // A chain of links outside the checkout ending in its bin folder.
+    symlinkSync(join(project, "bin"), join(root, "hop1"));
+    symlinkSync(join(root, "hop1"), join(root, "hop2"));
+    // The same checkout opened through a symlinked parent.
+    symlinkSync(real, join(root, "alias"));
+    const answers = JSON.parse(await readFile(trustFile(), "utf8"));
+    answers.checkouts[realpathSync(project)].toolchain = {
+      go: join(root, "hop2", "go"),
+    };
+    await writeFile(trustFile(), JSON.stringify(answers));
+    for (const opened of [project, join(root, "alias", "project")]) {
+      const response = await executeGraph({ command: "index", root: opened });
+      assert.ok(
+        response.warnings.some((w) => w.code === "tool-path-inside-checkout"),
+        opened,
+      );
+      assert.equal(existsSync(marker), false);
+    }
   });
 });

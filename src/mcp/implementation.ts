@@ -185,8 +185,14 @@ export function registerImplementationTools(
         })
         .strict(),
     },
-    async ({ reviewed, trust, ...args }, ctx) =>
-      output({
+    async ({ reviewed, trust, ...args }, ctx) => {
+      // A link names a retained revision, plan and observation, which a
+      // project never initialised cannot have: refuse without initialising.
+      if (!(await workspace.initialised()))
+        throw Error(
+          "This project is not initialised, so it has no plan record or observed code to link. Observe code or create a requirement first.",
+        );
+      return output({
         revision: revisionReceipt(
           await workspace.writeWithTrust(trust, () =>
             workspace.access.linkImplementation(args, ctx.mcpReq.signal),
@@ -195,7 +201,8 @@ export function registerImplementationTools(
         reviewed,
         meaning:
           "Explicit review recorded for this pair. Code presence is not a correctness proof.",
-      }),
+      });
+    },
   );
   server.registerTool(
     "unlink_implementation",

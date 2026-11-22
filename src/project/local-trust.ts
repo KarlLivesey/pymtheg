@@ -19,6 +19,7 @@
 import { randomUUID } from "node:crypto";
 import {
   chmod,
+  link,
   mkdir,
   readFile,
   realpath,
@@ -65,15 +66,32 @@ const object = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
 /** Every well-formed entry; an unreadable or corrupt file has none. */
-async function readAll(): Promise<Record<string, Entry>> {
+/**
+ * Every well-formed entry, and whether the file was whole: absent, or every
+ * part of it well formed. An unreadable or corrupt file has no entries.
+ */
+async function readFileEntries(): Promise<{
+  entries: Record<string, Entry>;
+  whole: boolean;
+}> {
+  let text: string;
+  try {
+    text = await readFile(trustFile(), "utf8");
+  } catch (error) {
+    return {
+      entries: {},
+      whole: (error as NodeJS.ErrnoException).code === "ENOENT",
+    };
+  }
   let value: unknown;
   try {
-    value = JSON.parse(await readFile(trustFile(), "utf8"));
+    value = JSON.parse(text);
   } catch {
-    return {};
+    return { entries: {}, whole: false };
   }
   if (!object(value) || value.schema !== schema || !object(value.checkouts))
-    return {};
+    return { entries: {}, whole: false };
+  let whole = true;
   const entries: Record<string, Entry> = {};
   for (const [path, entry] of Object.entries(value.checkouts)) {
     if (
@@ -81,12 +99,17 @@ async function readAll(): Promise<Record<string, Entry>> {
       !object(entry) ||
       typeof entry.project !== "string" ||
       !projectTrustValues.includes(entry.trust as ProjectTrust)
-    )
+    ) {
+      whole = false;
       continue;
+    }
     let toolchain: Record<string, boolean | string> | undefined;
     if (entry.toolchain !== undefined) {
       // A wrong-typed tool setting makes the whole entry unanswered.
-      if (!object(entry.toolchain)) continue;
+      if (!object(entry.toolchain)) {
+        whole = false;
+        continue;
+      }
       toolchain = {};
       let valid = true;
       for (const [key, setting] of Object.entries(entry.toolchain)) {
@@ -97,7 +120,10 @@ async function readAll(): Promise<Record<string, Entry>> {
           valid = false;
         else toolchain[key] = setting;
       }
-      if (!valid) continue;
+      if (!valid) {
+        whole = false;
+        continue;
+      }
     }
     entries[path] = {
       project: entry.project,
@@ -106,7 +132,10 @@ async function readAll(): Promise<Record<string, Entry>> {
       recorded: typeof entry.recorded === "string" ? entry.recorded : "",
     };
   }
-  return entries;
+  return { entries, whole };
+}
+async function readAll(): Promise<Record<string, Entry>> {
+  return (await readFileEntries()).entries;
 }
 
 async function projectId(root: string): Promise<string | undefined> {
@@ -155,19 +184,26 @@ async function update(
     );
   const directory = userConfigDirectory();
   await mkdir(directory, { recursive: true, mode: 0o700 });
+  // The tool's own folder (never a parent) is kept user-only.
+  await chmod(directory, 0o700);
   const lock = join(directory, "trust.json.lock");
+  const mine = `${process.pid} ${await startTime(process.pid)} ${randomUUID()}`;
   for (let attempt = 0; ; attempt++) {
     try {
-      await writeFile(lock, String(process.pid), { flag: "wx", mode: 0o600 });
+      await writeFile(lock, mine, { flag: "wx", mode: 0o600 });
       break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const owner = Number(await readFile(lock, "utf8").catch(() => "0"));
+      const [pid = "0", started = ""] = (
+        await readFile(lock, "utf8").catch(() => "0")
+      ).split(" ");
+      const owner = Number(pid);
       let alive = false;
       try {
         if (owner > 0) {
           process.kill(owner, 0);
-          alive = true;
+          // A reused pid has another start time (where the system says).
+          alive = !started || (await startTime(owner)) === started;
         }
       } catch {
         /* gone */
@@ -179,7 +215,13 @@ async function update(
     }
   }
   try {
-    const entries = await readAll();
+    const { entries, whole } = await readFileEntries();
+    if (!whole) {
+      const aside = await setAside();
+      process.stderr.write(
+        `Pymtheg: the trust answers file was unreadable or not well formed; it was moved to ${aside} and a new one written with its valid entries.\n`,
+      );
+    }
     change(entries);
     const staged = join(directory, `.trust.${randomUUID()}.tmp`);
     await writeFile(staged, json({ schema, checkouts: entries }), {
@@ -190,6 +232,32 @@ async function update(
     await rename(staged, trustFile());
   } finally {
     await unlink(lock).catch(() => {});
+  }
+}
+
+/** The process's start time on Linux (/proc), else empty: the lock's pid check. */
+async function startTime(pid: number): Promise<string> {
+  try {
+    const stat = await readFile(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19] ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Moves a bad answers file aside (trust.json.corrupt-<n>, user-only). */
+async function setAside(): Promise<string> {
+  for (let n = 1; ; n++) {
+    const aside = `${trustFile()}.corrupt-${n}`;
+    try {
+      await link(trustFile(), aside);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EEXIST") continue;
+      throw error;
+    }
+    await chmod(aside, 0o600);
+    await unlink(trustFile());
+    return aside;
   }
 }
 

@@ -2,11 +2,12 @@
 import { LinkJobs } from "./links-jobs.js";
 import { GraphJobs } from "./graph-jobs.js";
 import {
+  checkoutTrust,
   findWorkspace,
   initializeWorkspace,
   readWorkspace,
 } from "../project/workspace.js";
-import { trustQuestion } from "../project/trust.js";
+import { trustAnswerHow, trustQuestion } from "../project/trust.js";
 import type { ProjectTrust } from "../shared/config.js";
 import { ProjectInventories, type InventoryQuery } from "./inventories.js";
 import { agentLimits } from "./limits.js";
@@ -170,6 +171,15 @@ export class AgentWorkspace {
     return {
       ...page,
       initialised: page.workspace !== null,
+      // D22: the trust that applies on this machine, and how to answer it.
+      ...(page.workspace
+        ? await (async () => {
+            const trust = await checkoutTrust(this.root);
+            return trust === "unanswered"
+              ? { trust, trustAnswer: trustAnswerHow }
+              : { trust };
+          })()
+        : {}),
       ...(page.workspace === null
         ? {
             initialisation:
