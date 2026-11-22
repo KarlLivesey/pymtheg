@@ -51,7 +51,11 @@ test("isolated-home puts both folders in the run's scratch and keeps folders alr
   assert.ok(config.startsWith(join(scratch, "pym-config-")), config);
   assert.ok(cache.startsWith(join(scratch, "pym-cache-")), cache);
   assert.deepEqual(
-    run({ ...env, PYMTHEG_CONFIG_HOME: "/kept/a", PYMTHEG_CACHE_HOME: "/kept/b" }),
+    run({
+      ...env,
+      PYMTHEG_CONFIG_HOME: "/kept/a",
+      PYMTHEG_CACHE_HOME: "/kept/b",
+    }),
     ["/kept/a", "/kept/b"],
   );
 });
