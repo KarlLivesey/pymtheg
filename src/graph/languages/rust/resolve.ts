@@ -769,7 +769,7 @@ export function resolveRust(
     if (origin.nested) return false;
     if (!helperReady) return true;
     const key = JSON.stringify([origin, lookupMode()]),
-      cached = helperCache.get(key);
+      cached = lazyHit(helperCache, "helper", key);
     if (cached !== undefined) return cached;
     if (helperBusy.has(JSON.stringify(origin))) {
       // C-36: the answer of a helper already being decided depends on the
@@ -780,9 +780,9 @@ export function resolveRust(
       return true;
     }
     helperBusy.add(JSON.stringify(origin));
-    const helperCuts = reentries;
-    let shadow = false;
     try {
+      return lazyCompute(helperCache, "helper", key, () => {
+    let shadow = false;
       for (const own of ownerPlace(origin.file, origin.scope)) {
         let loc: Place | null = own;
         while (loc) {
@@ -833,20 +833,62 @@ export function resolveRust(
           loc = loc.parent;
         }
       }
-      if (reentries === helperCuts) helperCache.set(key, shadow);
       clearIncompleteLookups();
       return shadow;
+      });
     } finally {
       helperBusy.delete(JSON.stringify(origin));
     }
+  }
+  /**
+   * C-36: the rule every lazily filled cache follows. An answer is stored
+   * only if it does not depend on the caller: no helper re-entry occurred
+   * while computing it, and it was not computed inside an import expansion
+   * or a macro import of the caller (`importExpansions`,
+   * `activeMacroImports`), whose cuts and textual-macro answers belong to
+   * the caller's stack. The scope-read trace of the computation is stored
+   * with it and replayed on a hit, as a lookup memo hit replays its own, so
+   * the retry decision is the same for a hit and a fresh computation.
+   */
+  // Lookup state the lazy caches read, declared before setup uses them.
+  const auditedLookupReads = new WeakMap<Found, ScopeRead[]>();
+  const modeBit = { proven: 1, assumed: 2 } as const;
+  let scopeChanges = 0;
+  const rootScopeReads: ScopeRead[] = [];
+  const internedScopeReads = new Map<string, Map<string, ScopeRead>>();
+  let scopeReads: ScopeRead[] | undefined;
+  const activeMacroImports: GraphLink[] = [];
+  const importExpansions = new Map<string, number[]>();
+  const lazyTraces = new Map<string, ScopeTrace | undefined>();
+  function lazyHit<T>(cache: Map<string, T>, name: string, key: string) {
+    const hit = cache.get(key);
+    if (hit !== undefined) recordReads(lazyTraces.get(`${name}\u0000${key}`));
+    return hit;
+  }
+  function lazyCompute<T>(
+    cache: Map<string, T>,
+    name: string,
+    key: string,
+    compute: () => T,
+  ): T {
+    const free = !importExpansions.size && !activeMacroImports.length;
+    const cuts = reentries;
+    const { result, trace } = lookupReads(compute);
+    if (free && reentries === cuts) {
+      cache.set(key, result);
+      const traceKey = `${name}\u0000${key}`;
+      if (trace !== undefined) lazyTraces.set(traceKey, trace);
+      else lazyTraces.delete(traceKey);
+    }
+    return result;
   }
   const attributeShadowCache = new Map<string, boolean>();
   function shadowFromParents(origin: AttributeOrigin): boolean {
     if (origin.helper) return helperShadowed(origin);
     const key = JSON.stringify([origin, lookupMode()]),
-      cached = attributeShadowCache.get(key);
+      cached = lazyHit(attributeShadowCache, "attribute", key);
     if (cached !== undefined) return cached;
-    const shadowCuts = reentries;
+    return lazyCompute(attributeShadowCache, "attribute", key, () => {
     const head = origin.name.split("::")[0]!,
       rule = attributeRules.get(head);
     let result = false;
@@ -885,8 +927,8 @@ export function resolveRust(
           parent = parent.parent;
         }
       }
-    if (reentries === shadowCuts) attributeShadowCache.set(key, result);
     return result;
+    });
   }
   let attributeContextReady = false;
   let helperReady = false;
@@ -896,10 +938,9 @@ export function resolveRust(
   const itemPresenceCache = new Map<string, string[]>();
   function itemPresence(item: GraphSymbol | GraphLink): string[] {
     const presenceKey = `${item.id}|${lookupMode()}`;
-    const cached = itemPresenceCache.get(presenceKey);
+    const cached = lazyHit(itemPresenceCache, "presence", presenceKey);
     if (cached) return cached;
-    const presenceCuts = reentries;
-    const attributes = [
+    return lazyCompute(itemPresenceCache, "presence", presenceKey, () => [
       ...new Set([
         ...((data(item).opaqueItemAttributes ?? []) as string[]),
         ...("kind" in item && item.kind === "module" && !data(item).unit
@@ -919,10 +960,7 @@ export function resolveRust(
           (p) => p.opaqueAttributes ?? [],
         ),
       ]),
-    ].sort();
-    if (reentries === presenceCuts)
-      itemPresenceCache.set(presenceKey, attributes);
-    return attributes;
+    ].sort());
   }
   const possible = (conditions: readonly string[]): boolean => {
     const key = JSON.stringify(conditions);
@@ -1303,8 +1341,10 @@ export function resolveRust(
   }
   if (markConditions)
     for (const link of ctx.links)
-      if (decided(link.file) && contextOf(link)?.implicit.length)
-        markConditions(link, conditionsFor(link));
+      if (contextOf(link)?.implicit.length) {
+        const gates = conditionsFor(link);
+        if (decided(link.file)) markConditions(link, gates);
+      }
   const failedByScope = new Map<string, string[]>(),
     failedByCrate = new Map<string, string[]>();
   for (const loc of places)
@@ -1444,7 +1484,6 @@ export function resolveRust(
       }
     }
   }
-  const activeMacroImports: GraphLink[] = [];
   type TextMacro = {
     symbol?: GraphSymbol;
     conditions?: string[];
@@ -1807,12 +1846,6 @@ export function resolveRust(
   // A cached ordinary lookup is reusable as long as every macro guard it
   // visited gives the same answer. Names and origins are needed only for
   // the offline blocker census.
-  const auditedLookupReads = new WeakMap<Found, ScopeRead[]>();
-  const modeBit = { proven: 1, assumed: 2 } as const;
-  let scopeChanges = 0;
-  const rootScopeReads: ScopeRead[] = [];
-  const internedScopeReads = new Map<string, Map<string, ScopeRead>>();
-  let scopeReads: ScopeRead[] | undefined;
   function scopeTraceOf(found: Found): ScopeTrace | undefined {
     return scopeAudit ? auditedLookupReads.get(found) : found.scopeChanges;
   }
@@ -1870,7 +1903,6 @@ export function resolveRust(
     typeof trace === "number" ? trace : 0;
   const auditReads = (trace: ScopeTrace | undefined): ScopeRead[] =>
     Array.isArray(trace) ? trace : [];
-  const importExpansions = new Map<string, number[]>();
   // Incomplete results are reusable only with the same active guards and
   // expansion limits. A cycle cut here can be a real route in another search.
   let incompleteLookups = new LookupMemo<Found>();
@@ -4631,11 +4663,14 @@ export function resolveRust(
   memo.clear();
   unprovedImports.clear();
   clearIncompleteLookups();
+  // C-36: setup computes every symbol's presence and conditions, as a cold
+  // pass does, so the caches it fills are the same whatever the decision
+  // scope; only the callbacks are limited to the decided files.
   if (markPresence)
     for (const symbol of symbols) {
-      if (!decided(symbol.file)) continue;
       const attributes = itemPresence(symbol);
-      markPresence(symbol, attributes, conditionsFor(symbol));
+      const gates = conditionsFor(symbol);
+      if (decided(symbol.file)) markPresence(symbol, attributes, gates);
     }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
   const unknownImpls = new Map<string, GraphSymbol[]>(),
@@ -5432,8 +5467,9 @@ export function resolveRust(
   function traitRisk(scope: string, place: Place): TraitRisk {
     const mode = lookupMode();
     const key = `${place.file}|${place.crate.root}|${place.local}|${scope}|${mode}`;
-    const cached = riskCache.get(key);
+    const cached = lazyHit(riskCache, "risk", key);
     if (cached) return cached;
+    return lazyCompute(riskCache, "risk", key, () => {
     // C-36: the risk is the union over every scope the glob imports reach.
     // A union does not depend on where the walk entered a glob chain or
     // cycle, so the cached answer is the same whichever caller asks first.
@@ -5445,13 +5481,12 @@ export function resolveRust(
       standardGlob: false,
       glob: false,
     };
-    const riskCuts = reentries;
     const visited = new Set<string>();
     const visit = (scope: string, place: Place) => {
       const at = `${place.file}|${place.crate.root}|${place.local}|${scope}|${mode}`;
       if (visited.has(at)) return;
       visited.add(at);
-      const known = riskCache.get(at);
+      const known = lazyHit(riskCache, "risk", at);
       if (known) {
         risk.other ||= known.other;
         risk.standardGlob ||= known.standardGlob;
@@ -5526,8 +5561,8 @@ export function resolveRust(
       }
     };
     visit(scope, place);
-    if (reentries === riskCuts) riskCache.set(key, risk);
     return risk;
+    });
   }
   let checkoutTraitMethodNames: Set<string> | undefined;
   /**
@@ -5543,12 +5578,11 @@ export function resolveRust(
     unknown: boolean;
   } {
     const outsideKey = `${t.id}|${lookupMode()}`;
-    const cached = outsideCache.get(outsideKey);
+    const cached = lazyHit(outsideCache, "outside", outsideKey);
     if (cached) return cached;
-    const outsideCuts = reentries;
-    const answer = implementedOutsideUncached(t);
-    if (reentries === outsideCuts) outsideCache.set(outsideKey, answer);
-    return answer;
+    return lazyCompute(outsideCache, "outside", outsideKey, () =>
+      implementedOutsideUncached(t),
+    );
   }
   function implementedOutsideUncached(t: GraphSymbol): {
     names: Set<string>;
@@ -6052,11 +6086,12 @@ export function resolveRust(
       recordReads(scopeTraceOf(cached));
       return cached;
     }
+    const free = !importExpansions.size && !activeMacroImports.length;
     const pathCuts = reentries;
     const answer = lookupWithReads(() =>
       pathCallTargetsUncached(name, selfPath, scope, d, targetName, file, loc),
     );
-    if (reentries === pathCuts) pathCallCache.set(key, answer);
+    if (free && reentries === pathCuts) pathCallCache.set(key, answer);
     return answer;
   }
   function pathCallTargetsUncached(
@@ -6133,9 +6168,9 @@ export function resolveRust(
     // check; other recipes carry their own scopes.
     const text = JSON.stringify(r);
     const key = `${site.file}|${text.includes(`"k":"m"`) ? site.scope : ""}|${placeId(loc)}|${text}|${lookupMode()}`;
-    const cached = typingCache.get(key);
+    const cached = lazyHit(typingCache, "typing", key);
     if (cached) return cached;
-    const typingCuts = reentries;
+    return lazyCompute(typingCache, "typing", key, () => {
     let result: Typing;
     // C-36: the limit is the length of this recipe's own chain, not the depth
     // at which it is met, so a cached answer does not depend on its caller.
@@ -6282,8 +6317,8 @@ export function resolveRust(
     }
     if (!isGap(result) && r.im === true && result.borrow === "owned")
       result = { ...result, mutable: false };
-    if (reentries === typingCuts) typingCache.set(key, result);
     return result;
+    });
   }
   /** The number of receiver recipes nested inside . */
   function chainLength(r: Data): number {
