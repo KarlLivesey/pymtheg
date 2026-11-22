@@ -1134,10 +1134,10 @@ export function typescriptModule(
           scoped = candidate.retriedOnly
             ? retriedOnly(candidate.retried)
             : scopedAnalysis(
-            candidate.path,
-            candidate.previous,
-            candidate.retried,
-          );
+                candidate.path,
+                candidate.previous,
+                candidate.retried,
+              );
         } catch {
           declined("an exception");
         }

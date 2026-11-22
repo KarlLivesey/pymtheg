@@ -144,7 +144,10 @@ test("TypeScript: a killed scoped re-index is repaired by the next one", async (
     },
     // A body edit below a new leading comment: only a.ts is extracted, and
     // b.ts and c.ts keep their facts with a.ts's moved keys (C-38).
-    { "src/a.ts": "// moved\n" + tsA.replace("  return 1;", "  void 0;\n  return 1;") },
+    {
+      "src/a.ts":
+        "// moved\n" + tsA.replace("  return 1;", "  void 0;\n  return 1;"),
+    },
   );
   assert.equal(scoped, 1, "the unkilled re-index took the scoped path");
   assert.ok(writes >= 3, `write boundaries tried: ${writes}`);

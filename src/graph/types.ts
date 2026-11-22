@@ -385,6 +385,8 @@ export interface GraphStorage {
    * the store, or throws without writing.
    */
   beginIndexRun?(): StorageResult<boolean>;
+  /** Writes the run's mark at once if it has not written yet (C-38). */
+  claimIndexRun?(): StorageResult<void>;
   /** Module versions whose completed decisions this run found in its opening snapshot. */
   completedAnalysis?(): StorageResult<ReadonlyMap<string, string>>;
   /** An incomplete run retains its mark. A successful owned run records reusable module decisions. */

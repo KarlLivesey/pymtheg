@@ -403,8 +403,7 @@ test("TypeScript re-index equals cold: a file of two tied projects", async () =>
 test("TypeScript re-index equals cold: a file another project loads under other options", async () => {
   // The test project reads src/f.ts without strict null checks: the edit
   // is compared in both programs.
-  const f =
-    "export function f(x?: string) {\n  return x;\n}\n" + TOUCH;
+  const f = "export function f(x?: string) {\n  return x;\n}\n" + TOUCH;
   await equalAfterEdits(
     {
       "tsconfig.json": tsconfig(),
@@ -663,7 +662,8 @@ test("TypeScript re-index equals cold: an object-producer lookup cut by its dept
   // lookup's depth limit. A cut lookup's answer can depend on what other
   // files' lookups cached in a full analysis (a cached `v20` would answer
   // it), so the edited file is not extracted alone (object-producers.ts).
-  let chain = "function make() {\n  return { m() {} };\n}\nconst v0 = make();\n";
+  let chain =
+    "function make() {\n  return { m() {} };\n}\nconst v0 = make();\n";
   for (let i = 1; i <= 40; i++) chain += `const v${i} = v${i - 1};\n`;
   const f = chain + "v40.m();\nexport { v20 };\n" + TOUCH;
   const before = producerStatistics.cuts;

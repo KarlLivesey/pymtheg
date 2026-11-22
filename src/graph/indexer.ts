@@ -331,6 +331,10 @@ export async function indexProject(
         await writeParsed(file);
       }
     }
+    // Edited files whose writes wait for their module's analysis: the run
+    // claims the store now, as writing them first would (C-22, C-38).
+    if ([...deferred.values()].some((pending) => pending.length))
+      await store.claimIndexRun?.();
   });
   // Written: release every captured text and parse result (C-2). Only the
   // context files and which captures failed are needed from here on.
