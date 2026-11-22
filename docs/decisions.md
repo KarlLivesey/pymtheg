@@ -3189,3 +3189,28 @@ link names a container only if that container is a symbol. One link
 without a source rejects a module's whole output, so a namespace that is
 no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).
+
+### C-41 TypeScript type-literal members as call targets
+
+**Decided (C-41).** Members of a type literal written in a type position
+outside bodies are graph symbols: the type of a module-level declaration or
+of a class or interface member, nested union, intersection, array, tuple and
+type-argument positions (each place in the identity), and a named
+parameter's written type when the function is a symbol. A call links to
+such a member only when the receiver's own declaration writes a type that
+holds the literal (directly, or through aliases, parentheses, `readonly`,
+intersections and written unions). The checker can reduce a computed union
+of identical literals to one of them, which would be a wrong definite link;
+a written type is never reduced so. An inferred receiver type stays
+`local`. Members of a literal bound to a name are now checked against
+their producers too, unless the receiver's value is direct (a module, an
+object literal, a `const` bound to one, or a property of such a value).
+When the producers can be followed they decide; when they cannot, the
+checker's answer stands, as under C-7. Destructured bindings, locals,
+parameters, local types and object literals in call arguments get no
+symbols. **Trade:** about 3,740 calls whose receiver type comes through a
+generic's inference stay `local`, and an anchored member reached through
+an element access the producers cannot follow keeps the checker's single
+declaration. **Rules out:** a definite link from a type computed from
+expressions to one of several literal members. See
+[C-41](changes/C-41.md).

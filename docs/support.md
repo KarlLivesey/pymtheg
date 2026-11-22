@@ -801,7 +801,20 @@ accept the arguments.
   Multiple visible producers supply candidate declarations when each has a
   graph anchor. Opaque producers stay unresolved (`object-producer-unverified`).
   Several visible producers with missing anchors stay unresolved
-  (`multiple-object-producers`).
+  (`multiple-object-producers`). A member of a literal bound to a name is
+  checked against its producers too when the receiver's value can choose
+  (a conditional, a reassigned `let`): several give candidates. When the
+  producers cannot be followed (an element access, a call's result), the
+  checker's single declaration stands
+  ([C-41](changes/C-41.md)).
+- **Type-literal members:** members of a type literal written outside
+  bodies are symbols, including nested union, intersection, array, tuple
+  and type-argument positions and a named parameter's written type. A call
+  links to one only when the receiver's declaration writes a type holding
+  that literal; a written union gives candidates. A receiver whose type is
+  inferred (a computed union, a generic's result) stays unresolved
+  (`local`). Index signatures and mapped types have no member to link
+  ([C-41](changes/C-41.md)).
   Factory fallthrough and bare returns can contribute `undefined`, including
   after `await`. Static object destructuring follows named properties,
   renames, nested patterns, and defaults that can run. Passing a produced

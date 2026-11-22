@@ -1,0 +1,74 @@
+[
+ {
+  "pin": "excalidraw/excalidraw",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 214.4,
+  "cpuS": 199.4,
+  "peakMiB": 2843
+ },
+ {
+  "pin": "excalidraw/excalidraw",
+  "round": 0,
+  "build": "after",
+  "wallS": 168.9,
+  "cpuS": 207.1,
+  "peakMiB": 2994
+ },
+ {
+  "pin": "excalidraw/excalidraw",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 192.53,
+  "cpuS": 205.1,
+  "peakMiB": 3102
+ },
+ {
+  "pin": "reduxjs/redux-toolkit",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 98.12,
+  "cpuS": 115.9,
+  "peakMiB": 1703
+ },
+ {
+  "pin": "reduxjs/redux-toolkit",
+  "round": 0,
+  "build": "after",
+  "wallS": 108.72,
+  "cpuS": 114.3,
+  "peakMiB": 1974
+ },
+ {
+  "pin": "reduxjs/redux-toolkit",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 98.69,
+  "cpuS": 112.7,
+  "peakMiB": 2369
+ },
+ {
+  "pin": "vitest-dev/vitest",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 196.47,
+  "cpuS": 251,
+  "peakMiB": 3219
+ },
+ {
+  "pin": "vitest-dev/vitest",
+  "round": 0,
+  "build": "after",
+  "wallS": 169.7,
+  "cpuS": 236.2,
+  "peakMiB": 3090
+ },
+ {
+  "pin": "vitest-dev/vitest",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 211.12,
+  "cpuS": 249.4,
+  "peakMiB": 2781
+ }
+]
