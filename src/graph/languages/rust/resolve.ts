@@ -851,6 +851,13 @@ export function resolveRust(
    * the retry decision is the same for a hit and a fresh computation.
    */
   // Lookup state the lazy caches read, declared before setup uses them.
+  let activeLookup:
+    | {
+        trace: LookupTrace;
+        seen: Set<string>;
+        expansion: ImportExpansion | undefined;
+      }
+    | undefined;
   const auditedLookupReads = new WeakMap<Found, ScopeRead[]>();
   const modeBit = { proven: 1, assumed: 2 } as const;
   let scopeChanges = 0;
@@ -859,11 +866,51 @@ export function resolveRust(
   let scopeReads: ScopeRead[] | undefined;
   const activeMacroImports: GraphLink[] = [];
   const importExpansions = new Map<string, number[]>();
-  const lazyTraces = new Map<string, ScopeTrace | undefined>();
+  /** Scope-read traces of stored lazy answers, per cache, by the same key. */
+  const lazyTraces = new WeakMap<object, Map<string, ScopeTrace>>();
   function lazyHit<T>(cache: Map<string, T>, name: string, key: string) {
     const hit = cache.get(key);
-    if (hit !== undefined) recordReads(lazyTraces.get(`${name}\u0000${key}`));
+    if (hit !== undefined) recordReads(lazyTraces.get(cache)?.get(key));
     return hit;
+  }
+  /** Lazy computations under way, by cache and key. */
+  const lazyBusy = new Set<string>();
+  /**
+   * Runs a lazy computation from nothing: the caller's import expansions and
+   * macro imports are set aside for its duration and restored after, so its
+   * cuts are met within itself. A computation of a key already under way is
+   * a re-entry: like a helper re-entry it counts as a cut, answers for the
+   * caller's stack (with the caller's state) and is not stored, and neither
+   * is the computation it re-entered.
+   */
+  function lazyFresh<T>(
+    id: string,
+    compute: () => T,
+  ): { result: T; trace?: ScopeTrace; clean: boolean } {
+    if (lazyBusy.has(id)) {
+      cycleCuts++;
+      reentries++;
+      if (activeLookup) activeLookup.trace.valid = false;
+      return { ...lookupReads(compute), clean: false };
+    }
+    const expansions = [...importExpansions];
+    const macroImports = activeMacroImports.splice(0);
+    importExpansions.clear();
+    lazyBusy.add(id);
+    const cuts = reentries;
+    try {
+      const { result, trace } = lookupReads(compute);
+      return {
+        result,
+        ...(trace !== undefined ? { trace } : {}),
+        clean: reentries === cuts,
+      };
+    } finally {
+      lazyBusy.delete(id);
+      importExpansions.clear();
+      for (const [k, v] of expansions) importExpansions.set(k, v);
+      activeMacroImports.splice(0, activeMacroImports.length, ...macroImports);
+    }
   }
   function lazyCompute<T>(
     cache: Map<string, T>,
@@ -871,14 +918,14 @@ export function resolveRust(
     key: string,
     compute: () => T,
   ): T {
-    const free = !importExpansions.size && !activeMacroImports.length;
-    const cuts = reentries;
-    const { result, trace } = lookupReads(compute);
-    if (free && reentries === cuts) {
+    const traceKey = `${name}\u0000${key}`;
+    const { result, trace, clean } = lazyFresh(traceKey, compute);
+    if (clean) {
       cache.set(key, result);
-      const traceKey = `${name}\u0000${key}`;
-      if (trace !== undefined) lazyTraces.set(traceKey, trace);
-      else lazyTraces.delete(traceKey);
+      let traces = lazyTraces.get(cache);
+      if (!traces) lazyTraces.set(cache, (traces = new Map()));
+      if (trace !== undefined) traces.set(key, trace);
+      else traces.delete(key);
     }
     return result;
   }
@@ -1910,13 +1957,6 @@ export function resolveRust(
   let observedImportProofs = new Set<string>();
   let lookupRevision = 0;
   let lookupFactsFinal = false;
-  let activeLookup:
-    | {
-        trace: LookupTrace;
-        seen: Set<string>;
-        expansion: ImportExpansion | undefined;
-      }
-    | undefined;
   function clearIncompleteLookups() {
     incompleteLookups.clear();
     observedIncompleteGuards.clear();
@@ -6086,12 +6126,11 @@ export function resolveRust(
       recordReads(scopeTraceOf(cached));
       return cached;
     }
-    const free = !importExpansions.size && !activeMacroImports.length;
-    const pathCuts = reentries;
-    const answer = lookupWithReads(() =>
+    const { result, trace, clean } = lazyFresh(`path\u0000${key}`, () =>
       pathCallTargetsUncached(name, selfPath, scope, d, targetName, file, loc),
     );
-    if (free && reentries === pathCuts) pathCallCache.set(key, answer);
+    const answer = trace ? attachScopeTrace(result, trace) : result;
+    if (clean) pathCallCache.set(key, answer);
     return answer;
   }
   function pathCallTargetsUncached(
