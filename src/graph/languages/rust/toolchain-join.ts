@@ -120,6 +120,8 @@ export interface JoinFacts {
 export interface JoinOutcome {
   /** Per file, per parsed link index: the checkout symbol the toolchain names. */
   answers: Map<string, Map<number, string>>;
+  /** With `explain`: every parsed link's join outcome, by file, in link order. */
+  reasons?: Map<string, string[]>;
   /** Why links took no answer, and answers not applied (library, generated). */
   counts: Record<string, number>;
   documents: number;
@@ -198,6 +200,8 @@ export function joinScip(
   documents: readonly ScipDocument[],
   files: readonly JoinFile[],
   facts: JoinFacts,
+  /** Also return each link's outcome (for measurement). */
+  explain = false,
 ): JoinOutcome {
   const counts: Record<string, number> = {};
   const count = (key: string) => (counts[key] = (counts[key] ?? 0) + 1);
@@ -267,6 +271,7 @@ export function joinScip(
   };
   // ---- every parsed link
   const answers = new Map<string, Map<number, string>>();
+  const reasons = explain ? new Map<string, string[]>() : undefined;
   for (const f of files) {
     const t = texts.get(f.path)!;
     const list = occurrences.get(f.path);
@@ -340,7 +345,12 @@ export function joinScip(
         return "answer";
       })();
       count(why);
+      if (reasons) {
+        let list = reasons.get(f.path);
+        if (!list) reasons.set(f.path, (list = []));
+        list[index] = why;
+      }
     });
   }
-  return { answers, counts, documents: seen.size };
+  return { answers, counts, documents: seen.size, ...(reasons ? { reasons } : {}) };
 }

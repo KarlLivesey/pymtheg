@@ -13,6 +13,8 @@ import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { storedReasons } from "../../scripts/sweep/coverage-refresh-data.mjs";
 import { storedLibraryIdentity } from "../../scripts/sweep/coverage-rules.mjs";
+import { c19, funnel } from "./funnel.mjs";
+import { readdirSync } from "node:fs";
 
 const [dist, pin, out, wrapper, timeLog, work] = process.argv.slice(2);
 const load = (path) => import(pathToFileURL(resolve(dist, path)).href);
@@ -124,6 +126,14 @@ const result = {
   errors: { sourceOnly: [...off.report.analysisErrors, ...off.report.resolutionErrors].map((e) => e.message).slice(0, 3),
     route: [...on.report.analysisErrors, ...on.report.resolutionErrors].map((e) => e.message).slice(0, 3) },
 };
+// Where the open links go, from the route's own cached index.
+const cacheDir = join(work, "toolchain", "rust");
+const stem = existsSync(cacheDir) ? readdirSync(cacheDir).find((n) => /^scip-[0-9a-f]{32}\.scip$/.test(n)) : undefined;
+if (stem) {
+  const facts = JSON.parse(readFileSync(join(cacheDir, stem.replace(/\.scip$/, ".json")), "utf8")).facts;
+  result.funnel = await funnel(load, off.path, on.path, "c43-measure", join(cacheDir, stem), facts);
+}
+result.c19 = c19(basename(pin).split("_").slice(1).join("_").toLowerCase());
 writeFileSync(out, JSON.stringify(result, null, 1));
 console.log(JSON.stringify({ pin: result.pin, state: result.state, reason: result.reason, sourceOnly: result.sourceOnly.level2Percent,
   route: result.route.level2Percent, decided: R.toolchainDecided, agreement: result.agreement, check: result.check, ra: result.analyzerRun }));
