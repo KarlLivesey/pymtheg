@@ -81,6 +81,8 @@ export const taintStatistics = {
     largestCauses: number;
     exhausted: boolean;
     stoppedBy?: string;
+    /** The heap in use when the walk ended (bytes). */
+    heapUsed: number;
   }[],
 };
 /** Phase counters of the walk in progress (C-52 diagnosis). */
@@ -523,6 +525,7 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
         largestCauses: largest,
         exhausted: !result || unknownTaints.has(result),
         ...(lastStop ? { stoppedBy: lastStop } : {}),
+        heapUsed: process.memoryUsage().heapUsed,
       });
     }
   }

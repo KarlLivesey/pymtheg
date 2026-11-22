@@ -19,6 +19,13 @@ const { taintStatistics } = await load("graph/languages/typescript/taint.js");
 const modules = registry?.defaultModules?.() ?? [typescript];
 const store = new SqliteGraphStore(storePath, "c52");
 const started = performance.now();
+// Progress on stderr: each walk as it ends, with the heap in use.
+let logged = 0;
+const progress = setInterval(() => {
+  for (; logged < taintStatistics.log.length; logged++) console.error("walk", JSON.stringify(taintStatistics.log[logged]));
+  console.error("heap", Math.round(process.memoryUsage().heapUsed / 1048576), "MiB");
+}, 60000);
+progress.unref();
 const report = await indexProject(root, new LanguageRegistry(modules), store);
 const wallMs = performance.now() - started;
 store.close();
