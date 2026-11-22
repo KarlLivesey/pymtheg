@@ -1,0 +1,21 @@
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 37:35.53
+	Maximum resident set size (kbytes): 5349584
+1 start heap 16 rss 127  
+119 go analyze input heap 297 rss 1029  
+133 go analyze returned heap 310 rss 1304 1335 109
+218 rust analyze input heap 32 rss 1287  
+218 rust analyze returned heap 32 rss 1287 0 0
+218 typescript analyze input heap 123 rss 1318  
+1889 typescript analyze returned heap 487 rss 3556 27190 298
+2088 go resolve input heap 1456 rss 3558  
+2099 go resolve returned heap 1391 rss 3560  
+2117 go resolution write begins heap 841 rss 3524  
+2216 go resolution write ended heap 842 rss 3524  
+2217 rust resolution write begins heap 50 rss 3501  
+2217 rust resolution write ended heap 49 rss 3501  
+2230 typescript resolve input heap 824 rss 3511  
+2232 typescript resolution write begins heap 50 rss 3500  
+2251 typescript resolution write ended heap 50 rss 3500  
+2253 indexed heap 45 rss 3498  
+
+[exited with code 0]

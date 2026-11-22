@@ -1,0 +1,54 @@
+Heap snapshot of a slice of microsoft/TypeScript (3,000 of the 26,639 test files), taken after the TypeScript analysis and its writes, before the fix:
+self size by type and constructor:
+  77.3 MiB  765759  array
+  69.5 MiB  560644  string
+  58.0 MiB  400177  object:NodeObject
+  46.3 MiB  421  native
+  40.6 MiB  861909  object:Object
+  28.4 MiB  195259  code
+  26.1 MiB  517332  hidden
+  25.9 MiB  226510  object:IdentifierObject
+  24.1 MiB  185860  object:SymbolObject
+  20.4 MiB  669851  object:Array
+  8.2 MiB  97937  object:TokenObject
+  6.1 MiB  201014  sliced string
+  6.0 MiB  196145  concatenated string
+  3.8 MiB  124090  object:Map
+  3.7 MiB  56341  object:system / Context
+  2.8 MiB  61122  object:NodeLinks
+  2.3 MiB  43123  closure:
+  2.1 MiB  69308  object:SymbolLinks
+  2.1 MiB  30494  object:TypeObject
+  1.6 MiB  17325  object shape
+path to closure:checkAssignmentOperatorWorker:
+  synthetic --element:[1]--> synthetic
+  synthetic --element:[10]--> synthetic
+  synthetic --internal:20--> object:process
+  object:process --property:getBuiltinModule--> closure:getBuiltinModule
+  closure:getBuiltinModule --internal:context--> object:system / Context
+  object:system / Context --context:$Module--> closure:Module
+  closure:Module --property:register--> closure:register
+  closure:register --internal:context--> object:system / Context
+  object:system / Context --context:cascadedLoader--> object:ModuleLoader
+  object:ModuleLoader --property:loadCache--> object:LoadCache
+  object:LoadCache --internal:table--> array
+  array --internal:248--> object:Object
+  object:Object --property:javascript--> object:ModuleJob
+  object:ModuleJob --property:module--> object:ModuleWrap
+  object:ModuleWrap --internal:2--> hidden
+  hidden --hidden:[4]--> object:Generator
+  object:Generator --internal:context--> object:system / Context
+  object:system / Context --context:libCache--> object:Map
+  object:Map --internal:table--> array
+  array --internal:140--> object:SourceFileObject
+  object:SourceFileObject --property:nextContainer--> object:NodeObject
+  object:NodeObject --property:nextContainer--> object:NodeObject
+  object:NodeObject --property:symbol--> object:SymbolObject
+  object:SymbolObject --property:parent--> object:SymbolObject
+  object:SymbolObject --property:links--> object:SymbolLinks
+  object:SymbolLinks --property:type--> object:TypeObject
+  object:TypeObject --property:checker--> object:Object
+  object:Object --property:getNodeCount--> closure:getNodeCount
+  closure:getNodeCount --internal:context--> object:system / Context
+  object:system / Context --context:deferredDiagnosticsCallbacks--> object:Array
+  object:Array --element:[3760]--> closure:checkAssignmentOperatorWorker
