@@ -49,10 +49,14 @@ function bodiesWithin(node: ts.Node): ts.Block[] {
 
 /**
  * A node's tokens, comments left out (JSDoc kept), with the bodies of the
- * functions inside it (itself included) shown as `{}`.
+ * functions inside it (itself included) shown as `{}` unless `everything`.
  */
-function tokens(node: ts.Node, source: ts.SourceFile): string {
-  const bodies = new Set<ts.Node>(bodiesWithin(node));
+function tokens(
+  node: ts.Node,
+  source: ts.SourceFile,
+  everything = false,
+): string {
+  const bodies = new Set<ts.Node>(everything ? [] : bodiesWithin(node));
   const out: string[] = [];
   const visit = (child: ts.Node): void => {
     if (bodies.has(child)) {
@@ -169,8 +173,17 @@ export function syntacticSurface(
   };
   visit(source);
   if (!open) return undefined;
-  // Outside function bodies: every token.
-  parts.push(`shallow ${tokens(source, source)}`);
+  // Outside function bodies: every token. In a JavaScript file every token
+  // and every JSDoc, bodies included: the binder declares members from
+  // statements inside bodies there (`this.x =`, expando and CommonJS
+  // assignments, `Object.defineProperty`, JSDoc tags), so any token change
+  // in a body is a change of what other files can read.
+  const javascript =
+    scriptKind(path) === ts.ScriptKind.JS ||
+    scriptKind(path) === ts.ScriptKind.JSX;
+  parts.push(
+    `${javascript ? "all" : "shallow"} ${tokens(source, source, javascript)}`,
+  );
   return parts.join("\n");
 }
 
@@ -198,6 +211,74 @@ export function checkerSurface(
     ts.TypeFormatFlags.UseStructuralFallback;
   const out: string[] = [];
   let left = steps;
+  const step = () => {
+    if (--left < 0) throw new SurfaceLimit();
+  };
+  /** Where a declaration is, or a refusal when a body of this file holds it. */
+  const where = (declaration: ts.Node): string => {
+    if (declaration.getSourceFile() !== source)
+      return `${declaration.getSourceFile().fileName}@${declaration.pos}`;
+    // A declaration inside a function body (a local class, interface,
+    // function, object literal): its members are not compared, and its
+    // printed name can stand for different declarations (C-38 review).
+    if (inBody(declaration)) throw new SurfaceLimit();
+    return `here:${placeOf(declaration)}`;
+  };
+  const seen = new Set<ts.Type>();
+  /**
+   * The declarations a type reaches: its symbol and alias, type arguments,
+   * union and intersection members, signatures, base types, and for a type
+   * this file declares or an anonymous type, its properties.
+   */
+  const reach = (type: ts.Type, into: string[]): void => {
+    if (seen.has(type)) return;
+    seen.add(type);
+    step();
+    const symbols = [type.aliasSymbol, type.getSymbol()].filter(
+      (symbol): symbol is ts.Symbol => !!symbol,
+    );
+    for (const symbol of symbols)
+      for (const declaration of symbol.declarations ?? [])
+        into.push(where(declaration));
+    for (const argument of type.aliasTypeArguments ?? []) reach(argument, into);
+    if (type.isUnionOrIntersection())
+      for (const part of type.types) reach(part, into);
+    if (!(type.flags & ts.TypeFlags.Object)) return;
+    const object = type as ts.ObjectType;
+    if (object.objectFlags & ts.ObjectFlags.Reference)
+      for (const argument of checker.getTypeArguments(type as ts.TypeReference))
+        reach(argument, into);
+    for (const kind of [ts.SignatureKind.Call, ts.SignatureKind.Construct])
+      for (const signature of checker.getSignaturesOfType(type, kind)) {
+        step();
+        if (signature.declaration) into.push(where(signature.declaration));
+        for (const parameter of signature.parameters)
+          reach(checker.getTypeOfSymbol(parameter), into);
+        reach(checker.getReturnTypeOfSignature(signature), into);
+      }
+    const declaredHere = symbols.some((symbol) =>
+      symbol.declarations?.some((d) => d.getSourceFile() === source),
+    );
+    if (!declaredHere && symbols.length) return;
+    if (object.objectFlags & (ts.ObjectFlags.Class | ts.ObjectFlags.Interface))
+      for (const base of checker.getBaseTypes(type as ts.InterfaceType) ?? [])
+        reach(base, into);
+    for (const property of checker.getPropertiesOfType(type)) {
+      step();
+      for (const declaration of property.declarations ?? [])
+        into.push(where(declaration));
+      reach(checker.getTypeOfSymbol(property), into);
+    }
+  };
+  /** A type as printed, with the declarations it reaches. */
+  const describe = (type: ts.Type): string => {
+    const printed = checker.typeToString(type, undefined, flags);
+    // An elided type is not a proof of anything.
+    if (printed.includes("...")) throw new SurfaceLimit();
+    const reached: string[] = [];
+    reach(type, reached);
+    return `${printed} {${reached.join(" ")}}`;
+  };
   const visit = (node: ts.Node): void => {
     if (--left < 0) throw new SurfaceLimit();
     if (ts.isFunctionLike(node)) {
@@ -206,7 +287,7 @@ export function checkerSurface(
       );
       if (signature && !annotated(node))
         out.push(
-          `${ts.SyntaxKind[node.kind]} ${checker.typeToString(checker.getReturnTypeOfSignature(signature), undefined, flags)}`,
+          `${ts.SyntaxKind[node.kind]} ${describe(checker.getReturnTypeOfSignature(signature))}`,
         );
       // Its parameters and type parameters, not its body.
       for (const parameter of (node as ts.SignatureDeclaration).parameters)
@@ -224,7 +305,7 @@ export function checkerSurface(
       !annotated(node)
     )
       out.push(
-        `${ts.SyntaxKind[node.kind]} ${checker.typeToString(checker.getTypeAtLocation(node.name), undefined, flags)}`,
+        `${ts.SyntaxKind[node.kind]} ${describe(checker.getTypeAtLocation(node.name))}`,
       );
     ts.forEachChild(node, visit);
   };
@@ -239,6 +320,52 @@ export function checkerSurface(
 }
 
 class SurfaceLimit extends Error {}
+
+/**
+ * A declaration's place in its file without positions: its named ancestors,
+ * and for unnamed ones the kind and the index among siblings of that kind.
+ */
+function placeOf(node: ts.Node): string {
+  const parts: string[] = [];
+  for (let at: ts.Node | undefined = node; at && !ts.isSourceFile(at); ) {
+    const parent: ts.Node | undefined = at.parent;
+    const name = (at as ts.NamedDeclaration).name;
+    const kind = ts.SyntaxKind[at.kind];
+    if (
+      name &&
+      (ts.isIdentifier(name) ||
+        ts.isPrivateIdentifier(name) ||
+        ts.isStringLiteralLike(name) ||
+        ts.isNumericLiteral(name))
+    )
+      parts.push(`${kind}:${name.text}`);
+    else {
+      let index = 0;
+      if (parent) {
+        let seen = 0;
+        const target = at;
+        ts.forEachChild(parent, (child) => {
+          if (child === target) index = seen;
+          if (child.kind === target.kind) seen++;
+        });
+      }
+      parts.push(`${kind}#${index}`);
+    }
+    at = parent;
+  }
+  return parts.reverse().join("/");
+}
+
+/** Whether a node is inside the body of a function (a block or an expression). */
+function inBody(node: ts.Node): boolean {
+  return !!ts.findAncestor(
+    node.parent,
+    (at) =>
+      !!at.parent &&
+      ts.isFunctionLike(at.parent) &&
+      (at.parent as { body?: ts.Node }).body === at,
+  );
+}
 
 /**
  * Whether a declaration's type is written out (a type annotation, or a

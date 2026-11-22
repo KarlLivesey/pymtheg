@@ -244,6 +244,10 @@ const SHAPES = [
   {
     name: "a JavaScript file with JSDoc types",
     file: "src/f.js",
+    // In a JavaScript file every token of a body is compared (the binder
+    // declares members from bodies there): a body edit is not scoped, a
+    // comment is.
+    bodyScoped: false,
     files: {
       "src/f.js":
         "/** @returns {string} */\nexport function f() {\n  return globalThis.value;\n}\n" +
@@ -282,6 +286,7 @@ for (const shape of SHAPES) {
   const files = { "tsconfig.json": tsconfig(shape.include), ...shape.files };
   const text = shape.files[shape.file];
   const scoped = shape.scoped ?? true;
+  const bodyScoped = shape.bodyScoped ?? scoped;
   test(`TypeScript re-index equals cold: ${shape.name}`, async () => {
     await equalAfterEdits(
       files,
@@ -291,7 +296,7 @@ for (const shape of SHAPES) {
           edit: {
             [shape.file]: text.replace("  return 0;", "  void 0;\n  return 0;"),
           },
-          scoped,
+          scoped: bodyScoped,
         },
         {
           name: "a comment that moves every declaration",
@@ -686,3 +691,169 @@ test("TypeScript re-index equals cold: an object-producer lookup cut by its dept
   );
   assert.ok(producerStatistics.cuts > before, "the fixture's lookup is cut");
 });
+
+// What a function body can contribute to what another file links to (the
+// C-38 review). Each edit changes only a body; each must leave the store
+// equal to cold. The audit in docs/changes/C-38.md lists every family.
+const BODY_CASES = [
+  // JavaScript: the binder declares members from statements in bodies.
+  {
+    name: "a JS constructor's this.x value",
+    files: {
+      "src/a.js":
+        "export class Foo {\n  constructor() {\n    this.x = 1;\n  }\n}\n",
+      "src/b.ts":
+        'import { Foo } from "./a.js";\nnew Foo().x.b.toFixed();\nnew Foo().x.toFixed();\n',
+    },
+    edit: {
+      "src/a.js":
+        "export class Foo {\n  constructor() {\n    this.x = { b: 1 };\n  }\n}\n",
+    },
+  },
+  {
+    name: "JSDoc on a this.x assignment in a JS constructor",
+    files: {
+      "src/c.js":
+        "export class Item {\n  m() {}\n}\nexport class Other {\n  n() {}\n}\n",
+      "src/a.js":
+        'import { Item, Other } from "./c.js";\nexport class Foo {\n  constructor() {\n    /** @type {Item | null} */\n    this.x = null;\n  }\n}\n',
+      "src/b.ts":
+        'import { Foo } from "./a.js";\nnew Foo().x?.m();\nnew Foo().x?.n();\n',
+    },
+    edit: {
+      "src/a.js":
+        'import { Item, Other } from "./c.js";\nexport class Foo {\n  constructor() {\n    /** @type {Other | null} */\n    this.x = null;\n  }\n}\n',
+    },
+  },
+  {
+    name: "a JS method's this.x value",
+    files: {
+      "src/c.js": "export class Item {\n  m() {}\n}\n",
+      "src/a.js":
+        'import { Item } from "./c.js";\nexport class Foo {\n  init() {\n    this.x = 1;\n  }\n}\n',
+      "src/b.js": 'import { Foo } from "./a.js";\nnew Foo().x.m();\n',
+    },
+    edit: {
+      "src/a.js":
+        'import { Item } from "./c.js";\nexport class Foo {\n  init() {\n    this.x = new Item();\n  }\n}\n',
+    },
+  },
+  {
+    name: "an ES5 constructor function's this.x value",
+    files: {
+      "src/a.js": "export function Foo() {\n  this.x = 1;\n}\n",
+      "src/b.js": 'import { Foo } from "./a.js";\nnew Foo().x.b;\n',
+    },
+    edit: { "src/a.js": "export function Foo() {\n  this.x = { b: 1 };\n}\n" },
+  },
+  {
+    name: "a JSDoc typedef inside a JS function body",
+    files: {
+      "src/a.js":
+        "export function f() {\n  /** @typedef {{ run(): void }} Task */\n  return 0;\n}\n",
+      "src/b.ts":
+        'declare const t: import("./a.js").Task;\nt.run();\n',
+    },
+    edit: {
+      "src/a.js":
+        "export function f() {\n  /** @typedef {{ stop(): void }} Task */\n  return 0;\n}\n",
+    },
+  },
+  // TypeScript: a body-local declaration escapes through an inferred type.
+  {
+    name: "a member added to a local class a function returns",
+    files: {
+      "src/f.ts":
+        "export function make() {\n  class Local {\n    a() {}\n  }\n  return new Local();\n}\n",
+      "src/g.ts": 'import { make } from "./f";\nmake().a();\nmake().b();\n',
+    },
+    edit: {
+      "src/f.ts":
+        "export function make() {\n  class Local {\n    a() {}\n    b() {}\n  }\n  return new Local();\n}\n",
+    },
+  },
+  {
+    name: "a member added to a local interface a function returns",
+    files: {
+      "src/f.ts":
+        "export function load(s: string) {\n  interface R {\n    a: number;\n  }\n  return JSON.parse(s) as R;\n}\n",
+      "src/g.ts": 'import { load } from "./f";\nload("").a;\nload("").b;\n',
+    },
+    edit: {
+      "src/f.ts":
+        "export function load(s: string) {\n  interface R {\n    a: number;\n    b: string;\n  }\n  return JSON.parse(s) as R;\n}\n",
+    },
+  },
+  {
+    name: "two same-named local classes whose members swap",
+    files: {
+      "src/f.ts":
+        "export function make(k: boolean) {\n  class Local {\n    a() {}\n  }\n  if (k) {\n    class Local {\n      b() {}\n    }\n  }\n  return new Local();\n}\n",
+      "src/g.ts": 'import { make } from "./f";\nmake(true).a();\n',
+    },
+    edit: {
+      "src/f.ts":
+        "export function make(k: boolean) {\n  class Local {\n    b() {}\n  }\n  if (k) {\n    class Local {\n      a() {}\n    }\n  }\n  return new Local();\n}\n",
+    },
+  },
+  {
+    name: "a mixin class declared in a function body",
+    files: {
+      "src/f.ts":
+        "type Ctor = new (...args: any[]) => {};\nexport function Tagged<T extends Ctor>(Base: T) {\n  class WithTag extends Base {\n    tag() {}\n  }\n  return WithTag;\n}\n",
+      "src/g.ts":
+        'import { Tagged } from "./f";\nclass A {}\nconst B = Tagged(A);\nnew B().tag();\nnew B().untag();\n',
+    },
+    edit: {
+      "src/f.ts":
+        "type Ctor = new (...args: any[]) => {};\nexport function Tagged<T extends Ctor>(Base: T) {\n  class WithTag extends Base {\n    tag() {}\n    untag() {}\n  }\n  return WithTag;\n}\n",
+    },
+  },
+  {
+    name: "a local class reached through a generic's inferred argument",
+    files: {
+      "src/f.ts":
+        "function wrap<T>(make: () => T): { value: T } {\n  return { value: make() };\n}\nexport const box = wrap(() => {\n  class L {\n    a() {}\n  }\n  return new L();\n});\n",
+      "src/g.ts": 'import { box } from "./f";\nbox.value.a();\nbox.value.b();\n',
+    },
+    edit: {
+      "src/f.ts":
+        "function wrap<T>(make: () => T): { value: T } {\n  return { value: make() };\n}\nexport const box = wrap(() => {\n  class L {\n    a() {}\n    b() {}\n  }\n  return new L();\n});\n",
+    },
+  },
+  {
+    name: "a class property initialised from a local class",
+    files: {
+      "src/f.ts":
+        "export class C {\n  p = (() => {\n    class L {\n      a() {}\n    }\n    return new L();\n  })();\n}\n",
+      "src/g.ts": 'import { C } from "./f";\nnew C().p.a();\nnew C().p.b();\n',
+    },
+    edit: {
+      "src/f.ts":
+        "export class C {\n  p = (() => {\n    class L {\n      a() {}\n      b() {}\n    }\n    return new L();\n  })();\n}\n",
+    },
+  },
+  {
+    name: "a returned value assigned through a let in the body",
+    files: {
+      "src/c.ts": "export class Item {\n  m() {}\n}\n",
+      "src/d.ts": "export class Item {\n  n() {}\n}\n",
+      "src/f.ts":
+        'import { Item } from "./c";\nimport * as D from "./d";\nexport function make() {\n  let r;\n  r = new Item();\n  return r;\n}\n',
+      "src/g.ts": 'import { make } from "./f";\nmake().m();\nmake().n();\n',
+    },
+    edit: {
+      "src/f.ts":
+        'import { Item } from "./c";\nimport * as D from "./d";\nexport function make() {\n  let r;\n  r = new D.Item();\n  return r;\n}\n',
+    },
+  },
+];
+
+for (const { name, files, edit } of BODY_CASES)
+  test(`TypeScript re-index equals cold: ${name}`, async () => {
+    await equalAfterEdits(
+      { "tsconfig.json": tsconfig(), ...files },
+      [{ name, edit, scoped: false }],
+      typescriptModule(),
+    );
+  });
