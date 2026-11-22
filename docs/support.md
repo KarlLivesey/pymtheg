@@ -860,6 +860,12 @@ accept the arguments.
   selected Node types can leave both DOM and Node targets possible for a shared
   global, type name or typed member. Two test frameworks supplying the same
   global can also produce a candidate set.
+  When the library candidates are the declarations, in several library
+  units, of one global compiler symbol (for example `console.log` or `URL`,
+  declared by the DOM library and by `@types/node`), the set is marked
+  `mergedGlobal`: it names the symbol in every unit that declares it
+  ([C-42](changes/C-42.md)). A set of different symbols, such as the arms of
+  a union receiver, is not marked.
 - **Unbuilt checkout packages:** The configured compiler emit can identify
   a unique source of a missing declaration entry. A plain `tsc` build can
   prove that mapping, including through `tsc -b` for a referenced child.

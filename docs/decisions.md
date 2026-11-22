@@ -3064,6 +3064,24 @@ uses the importer's own conditions and workspace route. Invalid extracted
 source ranges fail the affected file through the compiler session's
 containment path. [C-32](changes/C-32.md)
 
+### C-42 Merged environment globals
+
+A global declared by several environment typings, for example `URL` in the
+DOM library and in `@types/node`, is one compiler symbol: the checker merges
+the declarations. The graph keeps the link a candidate set, whose library
+candidates name each declaring unit with its own symbol path, and marks it
+`mergedGlobal`. The mark is set only when every declaration's name resolves
+to the same symbol, every declaration is in the global scope (a script file
+or `declare global`, never an ambient `declare module "x"`), there are at
+least two library units, no checkout candidate, and no synthesised target.
+Across programs the mark is kept only when every program gives the same
+set. The candidate rows are deterministic, so the identity is the same in
+every file, program and run. **Rules out:** choosing one typing as the
+target; marking different symbols (union arms) or sets that only one
+program's settings would select. Whether a merged global counts at Level 2
+is the manager's ruling; the rule is written in `coverage-rules.mjs`
+(`mergedGlobalLevel2`) as a proposal. [C-42](changes/C-42.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000

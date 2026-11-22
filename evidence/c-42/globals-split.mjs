@@ -42,10 +42,12 @@ const sites = (db) => {
 };
 const last = (symbol) => (symbol ?? "").split(".").at(-1);
 const add = (table, key, n = 1) => (table[key] = (table[key] ?? 0) + n);
-const totals = { all: {}, sw6Group: {} };
-const byUnits = {};
-const byName = {};
-const byPin = {};
+// Prototype-free tables: a name such as `toString` is a plain key.
+const table = () => Object.create(null);
+const totals = { all: table(), sw6Group: table() };
+const byUnits = table();
+const byName = table();
+const byPin = table();
 for (const [id, mainRepo] of runs[0]) {
   const headRepo = runs[1].get(id);
   if (mainRepo.outcome !== "finished" || headRepo?.outcome !== "finished") continue;
@@ -69,17 +71,15 @@ for (const [id, mainRepo] of runs[0]) {
           : "(b) different symbols with different names";
     add(totals.all, kind);
     if (sw6) add(totals.sw6Group, kind);
-    add((byPin[id] ??= {}), kind);
-    const table = (byUnits[kind] ??= {});
-    add(table, units);
-    const names2 = (byName[kind] ??= {});
-    add(names2, [...names].sort().join(" | "));
+    add((byPin[id] ??= table()), kind);
+    add((byUnits[kind] ??= table()), units);
+    add((byName[kind] ??= table()), [...names].sort().join(" | ") || "(no name)");
   }
 }
-const top = (table, n) => Object.fromEntries(Object.entries(table).sort((a, b) => b[1] - a[1]).slice(0, n));
+const top = (rows, n) => Object.fromEntries(Object.entries(rows).sort((a, b) => b[1] - a[1]).slice(0, n));
 console.log(JSON.stringify({
   totals,
   byPin,
-  byUnits: Object.fromEntries(Object.entries(byUnits).map(([kind, table]) => [kind, top(table, 25)])),
-  byName: Object.fromEntries(Object.entries(byName).map(([kind, table]) => [kind, top(table, 40)])),
+  byUnits: Object.fromEntries(Object.entries(byUnits).map(([kind, rows]) => [kind, top(rows, 25)])),
+  byName: Object.fromEntries(Object.entries(byName).map(([kind, rows]) => [kind, top(rows, 40)])),
 }, null, 1));
