@@ -104,6 +104,16 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
   const add = (k) => (buckets[k] = (buckets[k] ?? 0) + 1);
   let open = 0;
   let libraryPassingCfg = 0;
+  // Open links in files rust-analyzer did not index, by the kind of file.
+  const notIndexed = {};
+  const notIndexedFiles = new Map();
+  const fileClass = (path) => {
+    const parts = path.split("/");
+    if (parts.at(-1) === "build.rs") return "build script";
+    for (const [names, name] of [[["examples", "example"], "examples"], [["tests", "test"], "tests"], [["benches", "bench"], "benches"], [["fuzz"], "fuzz"]])
+      if (parts.slice(0, -1).some((part) => names.includes(part))) return name;
+    return "other source";
+  };
   for (const { f, facts } of facts2) {
     const reasons = joined.reasons?.get(f.path) ?? [];
     const answers = joined.answers.get(f.path);
@@ -115,6 +125,11 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
       const bucket = joinBucket(why);
       if (bucket) {
         add(bucket);
+        if (why === "none:file-not-indexed") {
+          const k = fileClass(f.path);
+          notIndexed[k] = (notIndexed[k] ?? 0) + 1;
+          notIndexedFiles.set(f.path, (notIndexedFiles.get(f.path) ?? 0) + 1);
+        }
         if (why === "unapplied:library" && !beyondTest(link.data.conditions)) libraryPassingCfg++;
         return;
       }
@@ -129,7 +144,8 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
     });
   }
   // Links in files the join never saw (failed parses) are open too.
-  return { open, buckets, libraryPassingCfg };
+  const top = [...notIndexedFiles].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([path, links]) => ({ path, links, class: fileClass(path) }));
+  return { open, buckets, libraryPassingCfg, notIndexed, notIndexedFiles: notIndexedFiles.size, notIndexedTop: top };
 }
 
 /** C-19's own figures for the pin (evidence/c-19/joins). */
