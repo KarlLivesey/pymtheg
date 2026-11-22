@@ -1,0 +1,36 @@
+[
+ {
+  "pin": "fjall-rs_fjall",
+  "answers": {
+   "main": {
+    "status": "ok",
+    "toolchain": null,
+    "trust": null
+   },
+   "branch": {
+    "status": "ok",
+    "toolchain": null,
+    "trust": null
+   }
+  },
+  "rows": 16870,
+  "differences": []
+ },
+ {
+  "pin": "cberner_redb",
+  "answers": {
+   "main": {
+    "status": "ok",
+    "toolchain": null,
+    "trust": null
+   },
+   "branch": {
+    "status": "ok",
+    "toolchain": null,
+    "trust": null
+   }
+  },
+  "rows": 88687,
+  "differences": []
+ }
+]

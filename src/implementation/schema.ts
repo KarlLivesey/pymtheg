@@ -30,7 +30,8 @@ export const observedGraphSchema = z
       .object({
         label: z.string(),
         gitCommit: z.string().nullable(),
-        dirty: z.boolean(),
+        // D22: unknown when Git was not asked (an untrusted folder) or failed.
+        dirty: z.union([z.boolean(), z.literal("unknown")]),
       })
       .strict(),
     reader: z.object({ id: z.string(), version: z.string() }).strict(),

@@ -6,6 +6,10 @@
 # rows written and CPU.
 #   scripts/store-cost/one-edit.sh <dist> <pin dir> <work dir> <file> <out dir>
 set -eu
+# The user's Pymtheg configuration and cache go to fresh folders in the
+# scratch, never the account's real ones (scripts/isolated-home.mjs).
+export PYMTHEG_CONFIG_HOME="${PYMTHEG_CONFIG_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-config-XXXXXX")}"
+export PYMTHEG_CACHE_HOME="${PYMTHEG_CACHE_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-cache-XXXXXX")}"
 dist=$1 pin=$2 work=$3 file=$4 out=$5
 here=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$out" "$(dirname "$work")"

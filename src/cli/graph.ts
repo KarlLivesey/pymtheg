@@ -33,6 +33,15 @@ export function formatGraph(response: GraphResponse): string {
     lines.push(
       `Indexed ${response.sync.report.indexed}; unchanged ${response.sync.report.unchanged}; removed ${response.sync.report.removed}`,
     );
+  // D22: the trust that applies on this machine (never prompted here).
+  if (response.trust)
+    lines.push(
+      response.trust === "trusted"
+        ? "Trust: trusted on this machine (build tools may run on this project)"
+        : response.trust === "source-only"
+          ? "Trust: source only (Pymtheg starts no program on its behalf; it only reads the repository's files and writes its own .pymtheg/ files)"
+          : `Trust: unanswered. ${response.trustAnswer ?? ""}`,
+    );
   // The opt-in toolchain route (absent when off).
   const toolchain = response.toolchain?.go;
   if (toolchain)
