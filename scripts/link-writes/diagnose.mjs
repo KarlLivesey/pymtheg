@@ -8,6 +8,7 @@
 // (inserted, or rewritten in place), so it can say how many links were
 // written more than once and what differed between the writes.
 //   node scripts/link-writes/diagnose.mjs <dist> <root> <graph.sqlite> <out.json>
+import "../isolated-home.mjs";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
