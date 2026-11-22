@@ -578,6 +578,11 @@ class VirtualFileSystem {
 export const CONTEXT_PATTERNS = [
   "*tsconfig*.json",
   "*jsconfig*.json",
+  // Shared configs that other configs extend by package name (C-39):
+  // `astro/tsconfigs/strict`, `@turbo/tsconfig/library.json`,
+  // `@repo/typescript-config/nextjs.json`.
+  "**/*tsconfig*/*.json",
+  "**/typescript-config/*.json",
   "package.json",
   "pnpm-workspace.yaml",
   ...entryBuildContext,
@@ -749,11 +754,9 @@ export function projectModel(
     fileExists,
     readFile(name) {
       const text = readFile(name);
-      if (
-        text !== undefined &&
-        !fs.files.has(real(name)) &&
-        hasNodeModulesSegment(name)
-      )
+      // A package-name `extends` read through `node_modules`: an installed
+      // file, or a captured checkout file behind a workspace link (C-39).
+      if (text !== undefined && hasNodeModulesSegment(name))
         installedConfigRead = true;
       return text;
     },

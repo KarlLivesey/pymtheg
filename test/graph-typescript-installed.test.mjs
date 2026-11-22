@@ -1485,3 +1485,173 @@ test("a merged-member call keeps one identity for a same-package directory augme
     assert.equal(target(call("main.ts", "c.setOption")).unit, "cm-extra");
   });
 });
+
+// C-39: a library target in a program with an unread (failed) file.
+async function unreadLayout(write, broken) {
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: { strict: true, types: [] },
+      include: ["src"],
+    }),
+  );
+  await write("node_modules/kit/package.json", manifest("kit", "1.0.0"));
+  await write(
+    "node_modules/kit/index.d.ts",
+    "export interface Box { open(): void }\nexport declare const box: Box;\n",
+  );
+  await write(
+    "node_modules/kit-augment/package.json",
+    manifest("kit-augment", "1.0.0"),
+  );
+  await write(
+    "node_modules/kit-augment/index.d.ts",
+    'import "kit";\ndeclare module "kit" { interface Box { open(n: number): void } }\nexport {};\n',
+  );
+  await write("src/main.ts", 'import { box } from "kit";\nbox.open();\n');
+  if (broken !== undefined) await write("src/broken.ts", broken);
+}
+const openTarget = (call) => {
+  const link = call("src/main.ts", "box.open");
+  return link.resolution === "library" &&
+    link.libraries.length === 1 &&
+    link.libraries[0].symbol
+    ? [link.libraries[0].unit, link.libraries[0].symbol]
+    : "not definite";
+};
+
+test("an unread file that cannot change a library target keeps it, as without that file", async () => {
+  const expected = ["kit", "Box.prototype.open"];
+  for (const [broken, freeRequire] of [
+    [undefined, false],
+    ["let = ;\n", false],
+    ['import "kit";\nconst value = ;\n', false],
+    // A free `require` in an ES module runs the bundler differential pass,
+    // which must reach the same decision.
+    ["let = ;\n", true],
+  ]) {
+    const { request, read, write } = await project();
+    await unreadLayout(write, broken);
+    if (freeRequire)
+      await write(
+        "src/main.ts",
+        'import { box } from "kit";\nbox.open();\nexport const loader = typeof require;\n',
+      );
+    await request("index");
+    read((store, call) => {
+      if (broken !== undefined)
+        assert.equal(store.getFile("src/broken.ts").result.status, "failed");
+      assert.deepEqual(openTarget(call), expected, JSON.stringify(broken));
+    });
+  }
+});
+
+test("an unread file that could change a library target withholds it", async () => {
+  const cases = {
+    "augments the library":
+      'declare module "kit" { interface Box { open(n: number): void } }\nlet = ;\n',
+    "declares a clashing global": "var box = 1;\nlet = ;\n",
+    "imports a package the program lacks": 'import "kit-augment";\nlet = ;\n',
+    "has a triple-slash reference":
+      '/// <reference types="kit-augment" />\nlet = ;\n',
+  };
+  for (const [variant, broken] of Object.entries(cases)) {
+    const { request, read, write } = await project();
+    await unreadLayout(write, broken);
+    await request("index");
+    read((store, call) => {
+      assert.equal(
+        store.getFile("src/broken.ts").result.status,
+        "failed",
+        variant,
+      );
+      assert.equal(openTarget(call), "not definite", variant);
+    });
+  }
+});
+
+test("a receiver whose type comes from an unread file stays withheld", async () => {
+  const { request, read, write } = await project();
+  await unreadLayout(write, undefined);
+  await write(
+    "src/broken.ts",
+    'import type { Box } from "kit";\nexport const thing: Box = null!;\nlet = ;\n',
+  );
+  await write(
+    "src/use.ts",
+    'import { thing } from "./broken";\nthing.open();\n',
+  );
+  await request("index");
+  read((store, call) => {
+    const link = call("src/use.ts", "thing.open");
+    assert.ok(
+      !(
+        link.resolution === "library" &&
+        link.libraries.length === 1 &&
+        link.libraries[0].symbol
+      ),
+      JSON.stringify(link),
+    );
+  });
+});
+
+test("a config extended by package name through an installed workspace link is read; an absent one stays incomplete", async () => {
+  const cases = {
+    "workspace config package": {
+      extendsName: "@scope/tsconfig/library.json",
+      link: ["packages/app/node_modules/@scope/tsconfig", "../../../tsconfig"],
+      files: {
+        "packages/tsconfig/package.json": JSON.stringify({ name: "@scope/tsconfig", version: "0.0.0" }),
+        "packages/tsconfig/library.json": JSON.stringify({ compilerOptions: { strict: true, types: [] } }),
+      },
+      complete: true,
+    },
+    "exports-mapped shared configs": {
+      extendsName: "astro/tsconfigs/strict",
+      link: ["packages/app/node_modules/astro", "../../astro"],
+      files: {
+        "packages/astro/package.json": JSON.stringify({
+          name: "astro",
+          version: "0.0.0",
+          exports: { "./tsconfigs/*": "./tsconfigs/*.json" },
+        }),
+        "packages/astro/tsconfigs/base.json": JSON.stringify({ compilerOptions: { types: [] } }),
+        "packages/astro/tsconfigs/strict.json": JSON.stringify({
+          extends: "./base.json",
+          compilerOptions: { strict: true },
+        }),
+      },
+      complete: true,
+    },
+    "absent package": { extendsName: "@scope/missing/library.json", files: {}, complete: false },
+  };
+  for (const [variant, { extendsName, link, files, complete }] of Object.entries(cases)) {
+    const { root, request, read, write } = await project();
+    await write("node_modules/kit/package.json", manifest("kit", "1.0.0"));
+    await write("node_modules/kit/index.d.ts", "export interface Box { open(): void }\nexport declare const box: Box;\n");
+    for (const [path, text] of Object.entries(files)) await write(path, text);
+    await write(
+      "packages/app/tsconfig.json",
+      JSON.stringify({ extends: extendsName, include: ["src"] }),
+    );
+    await write("packages/app/src/a.ts", 'import { box } from "kit";\nbox.open();\n');
+    if (link) {
+      await mkdir(dirname(join(root, link[0])), { recursive: true });
+      await symlink(link[1], join(root, link[0]));
+    }
+    await request("index");
+    read((store, call) => {
+      const file = store.getFile("packages/app/src/a.ts").result;
+      const missing = file.diagnostics.some(({ message }) => message.includes("node_modules is never captured"));
+      const open = call("packages/app/src/a.ts", "box.open");
+      if (complete) {
+        assert.equal(missing, false, variant);
+        assert.equal(open.resolution, "library", variant);
+        assert.equal(open.libraries[0].symbol, "Box.prototype.open", variant);
+      } else {
+        assert.equal(missing, true, variant);
+        assert.equal(open.data.reason, "incomplete-config", variant);
+      }
+    });
+  }
+});

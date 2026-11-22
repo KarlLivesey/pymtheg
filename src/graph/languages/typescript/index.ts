@@ -119,7 +119,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `44+typescript-${ts.version}`;
+const MODULE_VERSION = `45+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -944,6 +944,34 @@ export function mergeTied(
  * tests pass `options` (see TypeScriptModuleOptions) to inject limits and
  * faults without changing any global state.
  */
+/**
+ * What an unread file's raw text could contribute to a program if it were
+ * read (C-39). `specifiers` is absent when the text could add declarations
+ * beyond its own spelled names: any `declare`, `global`, `namespace` or
+ * `module` token, a triple-slash reference, or an `import`/`require` without
+ * a literal specifier. Otherwise it lists every literal module specifier.
+ */
+export function unreadFacts(text: string): {
+  tokens: ReadonlySet<string>;
+  specifiers?: readonly string[];
+} {
+  const tokens = new Set(text.match(/[A-Za-z_$][\w$]*/g) ?? []);
+  if (
+    /\/\/\/\s*<reference\b/.test(text) ||
+    ["declare", "global", "namespace", "module"].some((name) =>
+      tokens.has(name),
+    )
+  )
+    return { tokens };
+  const specifiers = [
+    ...text.matchAll(
+      /(?:\bfrom|\bimport|\brequire\s*\(|\bimport\s*\()\s*(['"])([^'"\n]*)\1/g,
+    ),
+  ].map((match) => match[2]!);
+  const uses = (text.match(/\b(?:import|require)\b/g) ?? []).length;
+  return specifiers.length >= uses ? { tokens, specifiers } : { tokens };
+}
+
 export function typescriptModule(
   hooks: TypeScriptModuleOptions = {},
 ): LanguageModule {
@@ -956,6 +984,7 @@ export function typescriptModule(
     dependencyInputs: true,
     analyze(context) {
       const files = context.files.filter(readable);
+      const sourceTexts = new Map(files.map((file) => [file.path, file.text]));
       // Unchanged snapshot: stored facts came from a complete analysis of these
       // exact sources and contexts by this module version, so they are reused
       // without building a program. The core retries a failed file whose content
@@ -1345,6 +1374,7 @@ export function typescriptModule(
                 moduleKind: (target) => moduleKind(session, target),
                 anyFailed: unseen.size > 0,
                 failedNames,
+                unseenInert: (names) => unseenInert(session, names),
               },
               libraries,
             );
@@ -1465,6 +1495,38 @@ export function typescriptModule(
         for (const path of [...unseen].sort())
           for (const name of namesOf(path))
             failedNames.set(name, [...(failedNames.get(name) ?? []), path]);
+        // Whether the program's unread files are inert for a library target
+        // named by `names` (C-39, extract.ts `unseenInert`).
+        const inertFacts = new Map<
+          string,
+          { tokens: ReadonlySet<string>; specifiers?: readonly string[] }
+        >();
+        const unseenInert = (
+          session: Session,
+          names: readonly string[],
+        ): boolean => {
+          for (const path of unseen) {
+            let facts = inertFacts.get(path);
+            if (!facts) {
+              facts = unreadFacts(sourceTexts.get(path) ?? "");
+              inertFacts.set(path, facts);
+            }
+            if (!facts.specifiers) return false;
+            if (names.some((name) => facts!.tokens.has(name))) return false;
+            const program = session.program;
+            for (const specifier of facts.specifiers) {
+              const resolved = ts.resolveModuleName(
+                specifier,
+                toVirtual(path),
+                group.options,
+                session.host,
+              ).resolvedModule?.resolvedFileName;
+              if (resolved !== undefined && !program.getSourceFile(resolved))
+                return false;
+            }
+          }
+          return true;
+        };
         /** A file the compiler threw on while extracting: unseen from now on. */
         const markUnseen = (path: string) => {
           if (unseen.has(path)) return;
@@ -1643,6 +1705,7 @@ export function typescriptModule(
                   | undefined;
                 if (
                   data.reason === "invalid-code" ||
+                  data.unreadChecked === true ||
                   (outside?.length &&
                     outside.every(
                       (fact) =>

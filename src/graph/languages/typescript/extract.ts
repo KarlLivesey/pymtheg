@@ -97,6 +97,11 @@ export interface RenameContext {
    * with those files: an unseen declaration can only introduce such a name.
    */
   failedNames: ReadonlyMap<string, readonly string[]>;
+  /**
+   * Whether every unread file of this program is inert for these names
+   * (C-39; index.ts `unreadFacts`). Absent: treat unread files as unknown.
+   */
+  unseenInert?: (names: readonly string[]) => boolean;
 }
 /** One structural judgement per program (its checker), shared by its files. */
 const judges = new WeakMap<ts.TypeChecker, Judge>();
@@ -173,6 +178,12 @@ interface Targets {
   /** Unresolved with no declaration found anywhere (not even outside the project). */
   noAnswer?: boolean;
   competingTypes?: readonly string[];
+  /**
+   * C-39: every library fact was kept in a program with an unread file
+   * because the unread text cannot change it (`unreadCannotChange`); the
+   * module then does not mark the link `no-unseen-declarations`.
+   */
+  unreadChecked?: boolean;
   /**
    * Why there is no complete target set: external, local, no-symbol,
    * missing-module, external-package, unresolved-alias, computed-specifier.
@@ -753,6 +764,30 @@ export function extractFile(
     }
     return capturedFrameworkGlobals.get(name) ?? [];
   }
+  /**
+   * C-39: an unread file of this program could change a library target only
+   * by a declaration that spells one of the names involved (the reference,
+   * its receiver chain, the target's owner and member), by a `declare`,
+   * `global`, `namespace` or `module` block, a triple-slash reference, or an
+   * import of a module the program does not already contain. The taint
+   * checks (namedCauses, structural) still decide bindings and receivers
+   * that reach the unread file.
+   */
+  function unreadCannotChange(found: Lookup, target: LibraryTarget): boolean {
+    if (!context.unseenInert || limited) return false;
+    const names = new Set<string>();
+    if (found.name !== undefined) names.add(found.name);
+    if (found.at && ts.isIdentifier(found.at)) names.add(found.at.text);
+    const collect = (node: ts.Node) => {
+      if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node))
+        names.add(node.text);
+      ts.forEachChild(node, collect);
+    };
+    if (found.receiver) collect(found.receiver);
+    for (const part of (target.symbol ?? "").split(/[^A-Za-z0-9_$]+/))
+      if (part && part !== "prototype") names.add(part);
+    return context.unseenInert([...names]);
+  }
   /** The selected property in a same-file, immutable function alias. */
   function selectedMemberAlias(found: Lookup): Targets | undefined {
     const declaration = found.symbol?.valueDeclaration;
@@ -876,6 +911,9 @@ export function extractFile(
     let viaAlias = false;
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
+    // C-39: library facts kept by the unread-file check, and any not checked.
+    let unreadChecked = false;
+    let uncheckedLibrary = false;
     let missingGlobalTypes = false;
     let installedType = false;
     let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
@@ -1101,19 +1139,28 @@ export function extractFile(
             ts.isSourceFile(declaration) &&
             firstAlias &&
             installedNamespaceBinding(firstAlias, source);
+          const candidate =
+            !incompleteConfig &&
+            !namespace &&
+            (importer.targetOf(declaration, unit, checker) ??
+              (globals.hasInstalledTypes &&
+                receiver &&
+                importer.installedUnit(source) === unit &&
+                importer.returnedMemberTarget(declaration, unit, checker)));
+          // C-13 withholds library targets in a program with an unread file;
+          // C-39 keeps one when the unread text cannot change it.
+          const checked =
+            !!candidate &&
+            context.anyFailed &&
+            unreadCannotChange(found, candidate);
+          if (checked) unreadChecked = true;
+          else if (namespace && context.anyFailed) uncheckedLibrary = true;
           const proved =
             !incompleteConfig &&
             (namespace ||
-              (!context.anyFailed &&
-                (importer.targetOf(declaration, unit, checker) ??
-                  (globals.hasInstalledTypes &&
-                    receiver &&
-                    importer.installedUnit(source) === unit &&
-                    importer.returnedMemberTarget(
-                      declaration,
-                      unit,
-                      checker,
-                    )))));
+              (candidate && (!context.anyFailed || checked)
+                ? candidate
+                : undefined));
           if (proved) {
             if (meaning === "type" && importer.installedUnit(source))
               installedType = true;
@@ -1270,6 +1317,13 @@ export function extractFile(
         receiver,
         declarations,
         ...(libraries && { libraryFacts: libraries }),
+        ...(libraries?.length &&
+        context.anyFailed &&
+        unreadChecked &&
+        !uncheckedLibrary &&
+        !targets.length
+          ? { unreadChecked: true }
+          : {}),
         ...(unbuiltEntry && { unbuiltEntry }),
         ...(viaSpecifier && { viaSpecifier }),
       };
@@ -2234,6 +2288,7 @@ export function extractFile(
       if (entry) facts.unbuiltEntry = { ...entry };
     }
     if (found.competingTypes) facts.competingTypes = [...found.competingTypes];
+    if (found.unreadChecked && facts.libraryFacts) facts.unreadChecked = true;
     links.push({
       sourceKey,
       kind,
@@ -3224,7 +3279,8 @@ export function extractFile(
           { jsx: true },
         );
       }
-    } else if (ts.isTypeReferenceNode(node)) {
+    } else if (ts.isTypeReferenceNode(node) && !ts.isConstTypeReference(node)) {
+      // `x as const` and `<const>x` are const assertions, not references.
       const name = node.typeName;
       const at = ts.isQualifiedName(name) ? name.right : name;
       const lookupResult = lookup(at);

@@ -3049,6 +3049,22 @@ uses the importer's own conditions and workspace route. Invalid extracted
 source ranges fail the affected file through the compiler session's
 containment path. [C-32](changes/C-32.md)
 
+### C-39 Library targets beside an unread file; const assertions
+
+C-13 withheld every installed library target in a program that contains a
+failed file, because an unread file might declare something that changes the
+checker's answer. TypeScript binds, merges, shadows and augments by name. So
+an unread file can change a library target only by spelling one of the names
+involved, by adding declarations outside its own names (`declare`, `global`,
+`namespace`, `module`, a triple-slash reference), or by importing a module
+the program does not otherwise load. The library target is kept when none of
+these hold for any unread file, as decided from the file's raw text and the
+program's module resolution. The existing taint checks still decide bindings
+and receivers that reach the unread file. Such a kept link carries no
+`no-unseen-declarations` assumption, because it has been checked. A const
+assertion is not a reference and stores no link.
+[C-39](changes/C-39.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000
