@@ -181,8 +181,8 @@ export function openWriteAheadLog(
   // cold cli/cli on disk spent 54 s in commits at 10,000 pages, 44 s at
   // 50,000 and 26 s at 100,000 (Vector 87, 83 and 56 s). The log is at most
   // the threshold plus one transaction, which a run keeps to about one
-  // batch: at 100,000 pages it peaked at 474 MiB on cli/cli (a 463 MiB
-  // store), 499 MiB on Vector (921 MiB) and 424 MiB on restic (130 MiB).
+  // batch: at 100,000 pages it peaked at 553 MiB on cli/cli (a 463 MiB
+  // store), 499 MiB on Vector (921 MiB) and 376 MiB on restic (130 MiB).
   // After a checkpoint the log is cut back to 64 MiB, so a long-lived
   // connection does not keep the largest log on disk. A completed run's
   // record is committed with a full sync, which makes the log up to it

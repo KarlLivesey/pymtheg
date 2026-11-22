@@ -243,7 +243,7 @@ answer the CLI command `pymtheg graph` (below), the MCP tools `code_graph` and
 `graph_result`, and requirement links (`pymtheg link`, MCP `requirement_links`).
 No Studio screen uses them; `observe` still uses the older TypeScript/JavaScript
 reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 4, with an
-empty `graph.sqlite-turnstile` beside it that its writers lock to take turns
+empty `graph.sqlite-turnstile` beside it (created only where the store uses the write-ahead log) that its writers lock to take turns
 (C-37); a schema-3
 (0.1.0) graph is migrated in place when opened for writing (its rows are kept
 unchanged) and read as having no library targets when opened read-only. Any

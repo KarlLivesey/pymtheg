@@ -126,7 +126,7 @@ is created by initialization or a document preview.
 | `.pymtheg/shared/drafts.sqlite`               | Unsaved Studio buffers and form/context drafts                                                                         | Authored, local                                           |
 | `.pymtheg/local/writer.json`                  | This installation's writer identity and author label                                                                   | Local only; ignores itself; never copy to another machine |
 | `.pymtheg/rebuildable/graph.sqlite`           | Code graph cache                                                                                                       | Rebuildable; ignores itself                               |
-| `.pymtheg/rebuildable/graph.sqlite-turnstile` | Empty lock file: writers of the graph take turns through it (C-37)                                                     | Rebuildable; never written, only locked                   |
+| `.pymtheg/rebuildable/graph.sqlite-turnstile` | Empty lock file: writers of the graph take turns through it (C-37)                                                     | Rebuildable; never written, only locked; present only where the store uses the write-ahead log |
 | `.pymtheg/rebuildable/runs.sqlite`            | The three most recent Studio runs                                                                                      | Rebuildable; ignores itself                               |
 
 Deleting `.pymtheg/rebuildable/` loses nothing that cannot be regenerated.
