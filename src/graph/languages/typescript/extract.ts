@@ -870,7 +870,8 @@ export function extractFile(
       return { targets: [], reason: found.reason ?? "no-symbol", receiver };
     const facts = new Map<string, TargetFact>();
     let libraryFacts:
-      Map<string | ts.Symbol | ts.Declaration, LibraryTarget> | undefined;
+      | Map<string | ts.Symbol | ts.Declaration, LibraryTarget>
+      | undefined;
     let external = 0;
     let local = 0;
     let viaAlias = false;
@@ -1562,7 +1563,7 @@ export function extractFile(
         }
     };
     try {
-      for (let node: ts.Node | undefined = receiver; node;) {
+      for (let node: ts.Node | undefined = receiver; node; ) {
         if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
           const symbol = checker.getSymbolAtLocation(node);
           symbolCauses(symbol, "receiver");
