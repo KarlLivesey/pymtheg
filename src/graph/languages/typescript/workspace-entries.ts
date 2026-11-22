@@ -399,6 +399,7 @@ export function entryProvenance(
   captured: ReadonlySet<string>,
 ) {
   const compiler = program as ts.Program & {
+    // program-reader: module-resolution (scoped.ts PROGRAM_READERS)
     forEachResolvedModule(
       callback: (
         resolution: ts.ResolvedModuleWithFailedLookupLocations,
@@ -441,6 +442,7 @@ export function entryProvenance(
   >();
   const outgoing = new Map<string, string[]>();
   const reachable = new Set<string>();
+  // program-reader: module-resolution (scoped.ts PROGRAM_READERS)
   compiler.forEachResolvedModule(
     ({ resolvedModule: resolved }, _name, _mode, from) => {
       const file =

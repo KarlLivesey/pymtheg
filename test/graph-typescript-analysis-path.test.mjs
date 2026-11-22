@@ -44,8 +44,9 @@ test("the index report names the analysis path and the decline reasons", async (
       return response.sync.report.analysisPaths;
     };
     assert.deepEqual(await index(), [
-      { module: "typescript", path: "full", declined: ["no previous facts"] },
+      { module: "typescript", path: "full", note: "no previous index" },
     ]);
+    assert.match(text, /^Analysis typescript: full \(no previous index\)$/m);
     // A body-only edit: scoped, nothing declined.
     await write(
       "src/f.ts",

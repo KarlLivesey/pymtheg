@@ -241,6 +241,8 @@ export interface ProjectAnalysisContext {
 export interface AnalysisPath {
   path: "reused" | "scoped" | "full";
   declined?: readonly string[];
+  /** Why the path needs no reason, such as "no previous index". */
+  note?: string;
 }
 export interface AnalyzedFile {
   path: string;

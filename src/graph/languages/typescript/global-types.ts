@@ -262,6 +262,7 @@ export const nodeCanDeclare = (owner: string) =>
   nodeGlobals.has(owner) || nodeWebTypes.has(owner);
 
 type NodeReceiver = { type: ts.Type; name: string };
+// program-reader: checker-caches (scoped.ts PROGRAM_READERS)
 const receiverCache = new WeakMap<
   ts.TypeChecker,
   WeakMap<ts.Type, NodeReceiver[]>
@@ -384,6 +385,7 @@ type TypeResolution = {
 };
 type VisitTypeResolution = (resolution: TypeResolution, name: string) => void;
 
+// program-reader: global-types (scoped.ts PROGRAM_READERS)
 const programTypes = new WeakMap<
   ts.Program,
   {
@@ -556,6 +558,7 @@ export function globalTypeAvailability(
   };
   let hasNode = false;
   let hasInstalledTypes = false;
+  // program-reader: global-types (scoped.ts PROGRAM_READERS)
   for (const source of program.getSourceFiles()) {
     const path = fromVirtual(source.fileName);
     const installed =
@@ -582,6 +585,7 @@ export function globalTypeAvailability(
     if (path !== undefined && program.getSourceFile(path)) available.add(name);
     else unavailable.add(name);
   };
+  // program-reader: module-resolution (scoped.ts PROGRAM_READERS)
   compiler.forEachResolvedTypeReferenceDirective(read);
   compiler.getAutomaticTypeDirectiveResolutions()?.forEach(read);
   const node = (name: string) => name === "node" || name === "@types/node";

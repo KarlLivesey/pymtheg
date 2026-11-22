@@ -36,7 +36,7 @@ export function formatGraph(response: GraphResponse): string {
   // Which analysis path each module took, and why a cheaper one was not used.
   for (const path of response.sync.report?.analysisPaths ?? [])
     lines.push(
-      `Analysis ${path.module}: ${path.path}${path.declined?.length ? ` (scoped declined: ${path.declined.join("; ")})` : ""}`,
+      `Analysis ${path.module}: ${path.path}${path.note ? ` (${path.note})` : ""}${path.declined?.length ? ` (scoped declined: ${path.declined.join("; ")})` : ""}`,
     );
   // The opt-in toolchain route (absent when off).
   const toolchain = response.toolchain?.go;

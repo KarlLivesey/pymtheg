@@ -21,6 +21,7 @@ import typescript, {
   typescriptModule,
 } from "../dist/graph/languages/typescript/index.js";
 import { producerStatistics } from "../dist/graph/languages/typescript/object-producers.js";
+import { surfaceTesting } from "../dist/graph/languages/typescript/scoped.js";
 import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 
 const cold = new LanguageRegistry([typescript]);
@@ -44,7 +45,7 @@ async function equalAfterEdits(files, steps, module) {
   const registry = new LanguageRegistry([module]);
   let n = 0;
   try {
-    const compare = async (name, scoped, reused) => {
+    const compare = async (name, scoped, reused, differs) => {
       const before = statistics.scoped;
       const reusedBefore = statistics.reused;
       await indexProject(root, registry, incremental);
@@ -67,16 +68,16 @@ async function equalAfterEdits(files, steps, module) {
       } finally {
         store.close();
       }
-      assert.deepEqual(
-        compareRows(storeRows(incrementalPath), storeRows(coldPath)),
-        [],
-        `after ${name}`,
-      );
+      const rows = compareRows(storeRows(incrementalPath), storeRows(coldPath));
+      // `differs`: a test that leaves a surface part out shows the store
+      // then differs from cold (the part is needed).
+      if (differs) assert.notDeepEqual(rows, [], `after ${name}: differs`);
+      else assert.deepEqual(rows, [], `after ${name}`);
     };
     await compare("first index");
     for (const step of steps) {
       for (const [path, text] of Object.entries(step.edit)) write(path, text);
-      await compare(step.name, step.scoped, step.reused);
+      await compare(step.name, step.scoped, step.reused, step.differs);
       step.check?.(incremental);
     }
   } finally {
@@ -1017,6 +1018,201 @@ test("TypeScript re-index equals cold: inferred types with rest parameters and s
     typescriptModule(),
   );
 });
+
+// C-38 review round 3: each program-wide reader's contribution to the
+// edited file's surface (scoped.ts PROGRAM_READERS). With the part, the edit
+// takes the full path and equals cold; without it (surfaceTesting.omit), it
+// takes the scoped path and the store differs from cold.
+const READER_CASES = [
+  {
+    reader: "object-producers",
+    part: "assign",
+    name: "a value assigned in a body that another file's producer lookup follows",
+    files: {
+      "src/a.ts": [
+        'const mockClient = { send() { return "mock"; } };',
+        'const testClient = { send() { return "test"; } };',
+        "export function createClient(mock: boolean) {",
+        '  let client = { send() { return "real"; } };',
+        "  if (mock) client = mockClient;",
+        "  return client;",
+        "}",
+        "",
+      ].join("\n"),
+      "src/b.ts":
+        'import { createClient } from "./a";\ncreateClient(true).send();\n',
+    },
+    edit: {
+      "src/a.ts": [
+        'const mockClient = { send() { return "mock"; } };',
+        'const testClient = { send() { return "test"; } };',
+        "export function createClient(mock: boolean) {",
+        '  let client = { send() { return "real"; } };',
+        "  if (mock) client = testClient;",
+        "  return client;",
+        "}",
+        "",
+      ].join("\n"),
+    },
+  },
+  {
+    reader: "object-producers",
+    part: "assign",
+    name: "a spread assigned in a body replaced by the object itself",
+    files: {
+      "src/a.ts": [
+        "const base = { run() { return 1; } };",
+        "export function make(flag: boolean) {",
+        "  let obj = { run() { return 2; } };",
+        "  if (flag) obj = { ...base };",
+        "  return obj;",
+        "}",
+        "",
+      ].join("\n"),
+      "src/b.ts": 'import { make } from "./a";\nmake(true).run();\n',
+    },
+    edit: {
+      "src/a.ts": [
+        "const base = { run() { return 1; } };",
+        "export function make(flag: boolean) {",
+        "  let obj = { run() { return 2; } };",
+        "  if (flag) obj = base;",
+        "  return obj;",
+        "}",
+        "",
+      ].join("\n"),
+    },
+  },
+  {
+    reader: "object-producers",
+    part: "implicit-return",
+    name: "a trailing throw replaced by a call (strict off: the end becomes reachable)",
+    tsconfig: JSON.stringify({
+      compilerOptions: {
+        strict: false,
+        target: "ES2022",
+        module: "ESNext",
+        moduleResolution: "Bundler",
+      },
+      include: ["src"],
+    }),
+    files: {
+      "src/a.ts": [
+        "declare function fail(): void;",
+        "export function make(flag: boolean) {",
+        "  if (flag) return { run() { return 1; } };",
+        '  throw new Error("no");',
+        "}",
+        "",
+      ].join("\n"),
+      "src/b.ts":
+        'import { make } from "./a";\nconst made = make(true) ?? { run() { return 3; } };\nmade.run();\n',
+    },
+    edit: {
+      "src/a.ts": [
+        "declare function fail(): void;",
+        "export function make(flag: boolean) {",
+        "  if (flag) return { run() { return 1; } };",
+        "  fail();",
+        "}",
+        "",
+      ].join("\n"),
+    },
+  },
+  {
+    reader: "node-evidence",
+    part: "node-name",
+    name: "an unbound process added in a body (Node's targets for the program)",
+    tsconfig: JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: "ES2022",
+        module: "ESNext",
+        moduleResolution: "Bundler",
+        lib: ["ES2022", "DOM"],
+        types: [],
+      },
+      include: ["src"],
+    }),
+    files: {
+      "src/a.ts":
+        "export function warn(msg: string): void {\n  console.log(msg);\n}\n",
+      "src/b.ts": [
+        'import { warn } from "./a";',
+        'setTimeout(() => warn("x"), 1);',
+        'new URL("https://example.com");',
+        'console.log("y");',
+        'void fetch("https://example.com");',
+        "",
+      ].join("\n"),
+    },
+    edit: {
+      "src/a.ts":
+        'export function warn(msg: string): void {\n  if (process.env.NODE_ENV !== "production") console.log(msg);\n  console.log(msg);\n}\n',
+    },
+  },
+  {
+    reader: "global-types",
+    part: "types",
+    // A package the directive adds also changes the program's files, which
+    // the loading-program check catches without the part.
+    alsoCaughtBy: "loaded-by",
+    name: "a /// <reference types> directive added (a global for the program)",
+    tsconfig: JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        target: "ES2022",
+        module: "ESNext",
+        moduleResolution: "Bundler",
+        types: [],
+      },
+      include: ["src"],
+    }),
+    files: {
+      "node_modules/@types/fake/package.json":
+        '{"name":"@types/fake","version":"1.0.0","types":"index.d.ts"}',
+      "node_modules/@types/fake/index.d.ts":
+        "declare function fakeGlobal(): void;\n",
+      "src/a.ts": "export function a() {\n  return 1;\n}\n",
+      "src/b.ts": 'import { a } from "./a";\na();\nfakeGlobal();\n',
+    },
+    edit: {
+      "src/a.ts":
+        '/// <reference types="fake" />\nexport function a() {\n  return 1;\n}\n',
+    },
+  },
+];
+
+for (const {
+  reader,
+  part,
+  name,
+  files,
+  edit,
+  tsconfig: config,
+  alsoCaughtBy,
+} of READER_CASES) {
+  test(`TypeScript re-index equals cold: ${name} (${reader})`, async () => {
+    await equalAfterEdits(
+      { "tsconfig.json": config ?? tsconfig(), ...files },
+      [{ name, edit, scoped: false }],
+      typescriptModule(),
+    );
+  });
+  if (!alsoCaughtBy)
+    test(`without its ${part} surface part, ${reader} is stale: ${name}`, async () => {
+      surfaceTesting.omit.add(part);
+      try {
+        await equalAfterEdits(
+          { "tsconfig.json": config ?? tsconfig(), ...files },
+          [{ name, edit, scoped: true, differs: true }],
+          typescriptModule(),
+        );
+      } finally {
+        surfaceTesting.omit.delete(part);
+      }
+    });
+}
 
 for (const { name, files, edit } of BODY_CASES)
   test(`TypeScript re-index equals cold: ${name}`, async () => {

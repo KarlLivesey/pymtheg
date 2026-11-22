@@ -262,7 +262,7 @@ for (const [language, files, edit] of [
   // so some kill points fall inside an open batch, before its commit.
   for (const rows of [5, 40])
     test(`${language}: a re-index in write batches of ${rows} rows killed at any boundary is repaired by the next one`, async (t) => {
-      const tried = await everyKillPoint(files, edit, rows);
+      const { writes: tried } = await everyKillPoint(files, edit, rows);
       assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
       t.diagnostic(`write boundaries: ${tried}`);
     });

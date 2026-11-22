@@ -236,6 +236,7 @@ export function objectProducers(
       }
       ts.forEachChild(node, scan);
     };
+    // program-reader: object-producers (scoped.ts PROGRAM_READERS)
     for (const file of program.getSourceFiles())
       if (!file.isDeclarationFile) scan(file);
     return (writes = { bindings, properties, openProperties });

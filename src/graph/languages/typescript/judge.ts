@@ -264,6 +264,7 @@ export function createJudge(input: JudgeInput): Judge {
   function globalInterface(name: string): ts.Symbol | undefined {
     if (globals.has(name)) return globals.get(name);
     let found: ts.Symbol | undefined;
+    // program-reader: default-lib (scoped.ts PROGRAM_READERS)
     for (const source of program.getSourceFiles()) {
       if (!program.isSourceFileDefaultLibrary(source)) continue;
       for (const statement of source.statements)

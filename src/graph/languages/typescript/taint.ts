@@ -46,6 +46,7 @@ export interface TaintInput {
   failedNames: ReadonlyMap<string, readonly string[]>;
 }
 
+// program-reader: failed-file-walk (scoped.ts PROGRAM_READERS)
 const memo = new WeakMap<ts.TypeChecker, Taint>();
 /**
  * The most steps one program's taint walk may take: a node visited while
@@ -58,6 +59,7 @@ const memo = new WeakMap<ts.TypeChecker, Taint>();
  */
 export const TAINT_BUDGET = 8_000_000;
 /** Budgets other than TAINT_BUDGET, per checker (a test passes one in). */
+// program-reader: failed-file-walk (scoped.ts PROGRAM_READERS)
 const budgetFor = new WeakMap<ts.TypeChecker, number>();
 /** Sets this checker's walk budget (tests use a small one; see index.ts). */
 export function setTaintBudget(checker: ts.TypeChecker, steps: number): void {
@@ -609,6 +611,7 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
     return unknown;
   }
   function walk(): Taint {
+    // program-reader: failed-file-walk (scoped.ts PROGRAM_READERS)
     const sources = program.getSourceFiles().filter((source) => {
       const path = fromVirtual(source.fileName);
       return path !== undefined && captured.has(path) && !invalid(path);

@@ -99,12 +99,16 @@ export interface RenameContext {
   failedNames: ReadonlyMap<string, readonly string[]>;
 }
 /** One structural judgement per program (its checker), shared by its files. */
+// program-reader: failed-file-walk (scoped.ts PROGRAM_READERS)
 const judges = new WeakMap<ts.TypeChecker, Judge>();
+// program-reader: node-evidence (scoped.ts PROGRAM_READERS)
 const programNodeEvidence = new WeakMap<ts.Program, boolean>();
+// program-reader: test-setups (scoped.ts PROGRAM_READERS)
 const programTestSetups = new WeakMap<
   ts.Program,
   { units: ReadonlySet<string>; competitors: ReadonlySet<string> }
 >();
+// program-reader: object-producers (scoped.ts PROGRAM_READERS)
 const producerReaders = new WeakMap<
   ts.Program,
   ReturnType<typeof objectProducers>
@@ -636,6 +640,7 @@ export function extractFile(
       return undefined;
     }
     if (found.construct || insideWith(at)) return undefined;
+    // program-reader: test-setups (scoped.ts PROGRAM_READERS)
     let setups = programTestSetups.get(program);
     if (!setups) {
       const units = new Set(globals.missingTestFrameworks);
@@ -718,6 +723,7 @@ export function extractFile(
     // compiler symbols, with an unqualified lookup selecting only the first.
     if (!capturedFrameworkGlobals) {
       const globals = new Map<string, LibraryTarget[]>();
+      // program-reader: test-globals (scoped.ts PROGRAM_READERS)
       for (const source of program.getSourceFiles()) {
         const unit = importer.declarationUnit(source);
         if (unit?.ecosystem !== "npm" || !isTestFramework(unit.unit)) continue;
@@ -1212,6 +1218,7 @@ export function extractFile(
       }
     }
     if (!external && !local && verifyObjectProducers) {
+      // program-reader: object-producers (scoped.ts PROGRAM_READERS)
       let producers = producerReaders.get(program);
       if (!producers) {
         producers = objectProducers(
@@ -3402,6 +3409,7 @@ export function extractFile(
         throw error;
       }
     };
+    // program-reader: node-evidence (scoped.ts PROGRAM_READERS)
     let expected = programNodeEvidence.get(program);
     if (expected === undefined) {
       const sources = program.getSourceFiles().filter((source) => {

@@ -28,6 +28,12 @@ const syntax = ts as typeof ts & {
   getAssignmentTargetKind(node: ts.Node): number;
 };
 
+/**
+ * Tests only: surface parts left out, to show that each program-wide
+ * reader's contribution is needed (test/graph-typescript-readers.test.mjs).
+ */
+export const surfaceTesting = { omit: new Set<string>() };
+
 /** The body blocks of function-like nodes in `node` (itself included), outermost only. */
 function bodiesWithin(node: ts.Node): ts.Block[] {
   const found: ts.Block[] = [];
@@ -107,17 +113,34 @@ export function syntacticSurface(
     true,
     scriptKind(path),
   );
-  const parts: string[] = [
-    `hashbang ${/^#!.*/.exec(text)?.[0] ?? ""}`,
-    // The module's own test of a CommonJS file (index.ts `moduleKind`).
-    `commonjs ${/(^|[^.\w$])(module\.exports|exports\.[\w$]+)\s*=/.test(text)}`,
-  ];
+  const parts: string[] = [];
+  /** One record of a named part (PROGRAM_READERS names the parts). */
+  const add = (part: SurfacePart, text: string) => {
+    if (!surfaceTesting.omit.has(part)) parts.push(`${part} ${text}`);
+  };
+  add("hashbang", /^#!.*/.exec(text)?.[0] ?? "");
+  // The module's own test of a CommonJS file (index.ts `moduleKind`).
+  add(
+    "commonjs",
+    String(/(^|[^.\w$])(module\.exports|exports\.[\w$]+)\s*=/.test(text)),
+  );
   for (const reference of source.referencedFiles)
-    parts.push(`path ${reference.fileName}`);
+    add("path", reference.fileName);
   for (const reference of source.typeReferenceDirectives)
-    parts.push(`types ${reference.fileName} ${reference.resolutionMode ?? ""}`);
+    add("types", `${reference.fileName} ${reference.resolutionMode ?? ""}`);
   for (const reference of source.libReferenceDirectives)
-    parts.push(`lib ${reference.fileName}`);
+    add("lib", reference.fileName);
+  // Comment pragmas the compiler reads (`@jsxImportSource`, `@jsx`,
+  // `@jsxFrag`, `@jsxRuntime`, `@ts-nocheck`): a block comment that is
+  // not JSDoc can still add a file to the program.
+  for (const [name, value] of (
+    source as ts.SourceFile & { pragmas?: Map<string, unknown> }
+  ).pragmas ?? [])
+    for (const one of [value].flat())
+      add(
+        "pragma",
+        `${name} ${JSON.stringify((one as { arguments?: unknown }).arguments ?? null)}`,
+      );
   let open = true;
   // Inside function bodies: what the whole-program scans read
   // (object-producers.ts, extract.ts, global-types.ts) without the checker.
@@ -133,42 +156,60 @@ export function syntacticSurface(
       return;
     }
     if (ts.isImportTypeNode(node))
-      parts.push(`import-type ${tokens(node.argument, source)}`);
+      add("import-type", tokens(node.argument, source));
     else if (ts.isCallExpression(node)) {
       const callee = node.expression;
       if (
         callee.kind === ts.SyntaxKind.ImportKeyword ||
         (ts.isIdentifier(callee) && callee.text === "require")
       )
-        parts.push(`call-module ${tokens(node, source)}`);
+        add("call-module", tokens(node, source));
       else if (
         ts.isPropertyAccessExpression(callee) &&
         ts.isIdentifier(callee.expression) &&
         (callee.expression.text === "Object" ||
           callee.expression.text === "Reflect")
       )
-        parts.push(`reflect ${tokens(node, source)}`);
+        add("reflect", tokens(node, source));
     } else if (ts.isReturnStatement(node))
-      parts.push(
-        `return ${node.expression ? tokens(node.expression, source) : ""}`,
-      );
+      add("return", node.expression ? tokens(node.expression, source) : "");
     else if (ts.isArrowFunction(node) && !ts.isBlock(node.body))
-      parts.push(`arrow ${tokens(node.body, source)}`);
+      add("arrow", tokens(node.body, source));
     else if (ts.isVariableDeclaration(node) && node.initializer)
-      parts.push(
-        `initializer ${tokens(node.name, source)} = ${tokens(node.initializer, source)}`,
+      add(
+        "initializer",
+        `${tokens(node.name, source)} = ${tokens(node.initializer, source)}`,
       );
     else if (ts.isDeleteExpression(node))
-      parts.push(`delete ${tokens(node.expression, source)}`);
+      add("delete", tokens(node.expression, source));
+    // An assignment, with its value: object-producers.ts follows a binding
+    // or property through the values assigned to it (`binding`,
+    // `knownWrites`), from every file of the program.
+    else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+      node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+    )
+      add("assign", tokens(node, source));
     if (
       (ts.isIdentifier(node) ||
         ts.isPropertyAccessExpression(node) ||
         ts.isElementAccessExpression(node)) &&
       syntax.getAssignmentTargetKind(node)
     )
-      parts.push(
-        `write ${syntax.getAssignmentTargetKind(node)} ${tokens(node, source)}`,
+      add(
+        "write",
+        `${syntax.getAssignmentTargetKind(node)} ${tokens(node, source)}`,
       );
+    // Names the program-wide Node evidence probe reads from every file
+    // (extract.ts): an unbound `process`, `__dirname`, `__filename` or
+    // CommonJS `require` anywhere adds Node's library targets to every
+    // file of the program.
+    if (
+      ts.isIdentifier(node) &&
+      ["process", "__dirname", "__filename", "require"].includes(node.text)
+    )
+      add("node-name", node.text);
     ts.forEachChild(node, visit);
   };
   visit(source);
@@ -181,11 +222,164 @@ export function syntacticSurface(
   const javascript =
     scriptKind(path) === ts.ScriptKind.JS ||
     scriptKind(path) === ts.ScriptKind.JSX;
-  parts.push(
-    `${javascript ? "all" : "shallow"} ${tokens(source, source, javascript)}`,
-  );
+  add(javascript ? "all" : "shallow", tokens(source, source, javascript));
   return parts.join("\n");
 }
+
+/**
+ * Every place where the TypeScript module, producing one file's result, reads
+ * other files other than through the checker: a loop over a program's source
+ * files, its resolved modules or type directives, or a cache keyed by
+ * program or checker. Each such line in the module carries a
+ * `// program-reader: <name>` marker naming its entry here, and
+ * test/graph-typescript-readers.test.mjs fails on an unmarked one, so a new
+ * reader cannot be added without saying what the scoped path compares for it.
+ * `surface` lists the parts of the edited file's surfaces that hold
+ * everything the reader reads of it (values, not only targets); `declines`
+ * says when the scoped path is not used because of it; `outside` says why
+ * the edited file's text cannot reach it.
+ */
+export const PROGRAM_READERS: Record<
+  string,
+  {
+    where: string;
+    reads: string;
+    feeds: string;
+    surface?: readonly SurfacePart[];
+    declines?: string;
+    outside?: string;
+  }
+> = {
+  "object-producers": {
+    where:
+      "object-producers.ts knownWrites, returned, binding; extract.ts producerReaders",
+    reads:
+      "every file's writes with their values (assignments, ++, for-of, destructuring), property writes, Object.assign/defineProperty/Reflect.set, delete, returns and whether a function's end is reachable, initialisers and binding defaults, function declarations",
+    feeds:
+      "another file's object-literal member links (candidates, unverified)",
+    surface: [
+      "write",
+      "assign",
+      "reflect",
+      "delete",
+      "return",
+      "arrow",
+      "initializer",
+      "implicit-return",
+      "shallow",
+    ],
+    declines:
+      "the edited file makes a lookup the depth limit or a cycle cut (its answers depend on order)",
+  },
+  "node-evidence": {
+    where: "extract.ts programNodeEvidence",
+    reads:
+      "every file's hashbang, import and export specifiers, require and import() calls, import types, and unbound process, __dirname, __filename and require",
+    feeds: "whether every file of the program gets Node's library targets",
+    surface: ["hashbang", "shallow", "call-module", "import-type", "node-name"],
+  },
+  "global-types": {
+    where: "global-types.ts programTypes",
+    reads:
+      "every file's /// <reference> directives and hashbang, the program's resolved type directives",
+    feeds: "which test-framework and runtime globals the program has",
+    surface: ["types", "path", "lib", "hashbang"],
+  },
+  "test-setups": {
+    where: "extract.ts programTestSetups",
+    reads:
+      "every file's side-effect imports (top-level statements) and require calls",
+    feeds: "the test framework units of bare test globals",
+    surface: ["shallow", "call-module"],
+  },
+  "test-globals": {
+    where: "extract.ts capturedTestGlobals",
+    reads: "the declarations of installed test-framework packages",
+    feeds: "the library targets of test globals",
+    outside: "only installed declaration files, never a checkout source",
+  },
+  "module-resolution": {
+    where:
+      "workspace-entries.ts entryProvenance; global-types.ts resolved type directives",
+    reads: "the program's resolved modules and type directives",
+    feeds: "unbuilt-entry provenance, library units",
+    surface: ["shallow", "call-module", "import-type", "path", "types"],
+  },
+  "failed-file-walk": {
+    where: "taint.ts memo, budgetFor, the walk; extract.ts judges",
+    reads:
+      "every valid file's declarations and what they refer to, toward failed files",
+    feeds: "invalid-code and taint reasons of every file",
+    declines:
+      "a loading program reads a failed file that is not quiet (a quiet one leaves the walk empty before and after)",
+  },
+  "default-lib": {
+    where: "judge.ts globalInterface",
+    reads: "the compiler's default library files",
+    feeds: "container element types in the failed-file judge",
+    outside: "default library files only",
+  },
+  "warm-up": {
+    where: "index.ts warmProgram",
+    reads: "every file through the checker, in program order",
+    feeds: "the checker's caches (the order W2-D fixes)",
+    surface: ["inferred"],
+  },
+  "checker-caches": {
+    where: "global-types.ts receiverCache",
+    reads: "the checker's types of receivers",
+    feeds: "Node library receivers",
+    surface: ["inferred"],
+  },
+  "own-file": {
+    where: "index.ts failNonReturning, the syntactic diagnostics pass",
+    reads: "each file's own flow graph and syntax",
+    feeds: "that file's own failure",
+    declines: "the edited file's failures change (new failures)",
+  },
+  "compiler-limits": {
+    where: "index.ts the stack-limit and binder reproduction",
+    reads: "which file the binder was in when the compiler stopped",
+    feeds: "a compiler-limit failure",
+    declines:
+      "a program reached a compiler limit (a stored result it cannot stand on)",
+  },
+  renames: {
+    where: "index.ts the free require/module renames",
+    reads: "each file's free require and module names",
+    feeds: "the neutral program for the bundler assumption",
+    declines: "the edited file is renamed for the compiler",
+  },
+  "loaded-by": {
+    where: "index.ts loadedBy",
+    reads: "which files each program loads",
+    feeds: "the stored loadedBy of every result",
+    declines: "the loading programs are unknown or change",
+  },
+};
+
+/** The named parts of the two surfaces (see PROGRAM_READERS). */
+export type SurfacePart =
+  | "hashbang"
+  | "commonjs"
+  | "path"
+  | "types"
+  | "lib"
+  | "pragma"
+  | "import-type"
+  | "call-module"
+  | "reflect"
+  | "return"
+  | "arrow"
+  | "initializer"
+  | "delete"
+  | "assign"
+  | "write"
+  | "node-name"
+  | "shallow"
+  | "all"
+  | "inferred"
+  | "implicit-return";
 
 /** Nodes the checker surface reads per program before it gives up (counted). */
 export const SURFACE_STEPS = 200_000;
@@ -284,6 +478,13 @@ export function checkerSurface(
         into.push(where(declaration));
       reach(checker.getTypeOfSymbol(property), into);
     }
+    // Index signatures: `{ [k: string]: Local }` reaches `Local`.
+    for (const info of checker.getIndexInfosOfType(type)) {
+      step();
+      if (info.declaration) into.push(where(info.declaration));
+      reach(info.keyType, into);
+      reach(info.type, into);
+    }
   };
   /** A type as printed, with the declarations it reaches. */
   const describe = (type: ts.Type): string => {
@@ -293,7 +494,10 @@ export function checkerSurface(
     // million characters, where the text is also cut and ends in `...`.
     // That last is not a proof of anything. A `...` inside the text is a
     // rest parameter, a spread binding or a variadic tuple.
-    if (printed.length >= 1e6 || printed.endsWith("..."))
+    // The printer stops expanding once its own length estimate passes a
+    // million characters; the text can then be shorter than that and need
+    // not end in `...`. Half that is far above any measured type.
+    if (printed.length >= 500_000 || printed.endsWith("..."))
       throw new SurfaceLimit();
     const reached: string[] = [];
     reach(type, reached);
@@ -346,8 +550,24 @@ export function checkerSurface(
       );
     ts.forEachChild(node, visit);
   };
+  /**
+   * Whether each function's end is reachable, as the binder decides it
+   * (`HasImplicitReturn`): object-producers.ts reads it from every file of
+   * the program (`returned`: an implicit return contributes `undefined`),
+   * and an edit inside a body (a trailing `throw` replaced by a call) can
+   * change it.
+   */
+  const implicitReturns = (node: ts.Node): void => {
+    step();
+    if (ts.isFunctionLike(node) && (node as { body?: ts.Node }).body)
+      out.push(
+        `implicit-return ${placeOf(node)} ${!!(node.flags & ts.NodeFlags.HasImplicitReturn)}`,
+      );
+    ts.forEachChild(node, implicitReturns);
+  };
   try {
     visit(source);
+    if (!surfaceTesting.omit.has("implicit-return")) implicitReturns(source);
   } catch (error) {
     if (error instanceof SurfaceLimit || error instanceof RangeError)
       return undefined;

@@ -153,14 +153,6 @@ export const statistics = {
   declined: {} as Record<string, number>,
 };
 
-/** This analysis's decline reasons, in order, for its index report. */
-let declines: string[] = [];
-/** Counts why a scoped analysis was not used; the full analysis follows. */
-const declined = (reason: string): undefined => {
-  statistics.declined[reason] = (statistics.declined[reason] ?? 0) + 1;
-  declines.push(reason);
-};
-
 /** A program's name in `loadedBy`: its config, or "(inferred)". */
 const groupName = (group: ProjectGroup) => group.config ?? "(inferred)";
 
@@ -315,6 +307,7 @@ function openSession(
     program: ts.Program,
     checker: ts.TypeChecker,
   ): ({ path: string; blame: string | undefined } & Thrown) | undefined => {
+    // program-reader: warm-up (scoped.ts PROGRAM_READERS)
     const owned = fullWarmup ? undefined : new Set(program.getRootFileNames());
     for (const source of program.getSourceFiles()) {
       const path = fromVirtual(source.fileName);
@@ -373,6 +366,7 @@ function openSession(
   /** Source files already checked for non-returning flow. */
   const flowChecked = new WeakSet<ts.SourceFile>();
   /** Fails the captured files whose flow analysis would not return; true if any. */
+  // program-reader: own-file (scoped.ts PROGRAM_READERS)
   const failNonReturning = (program: ts.Program): boolean => {
     let failedAny = false;
     for (const source of program.getSourceFiles()) {
@@ -430,6 +424,7 @@ function openSession(
         // The binder completes a file by setting classifiableNames; the
         // file it was inside when the stack ran out (or the compiler
         // threw) has locals but not that. Otherwise, reproduce file by file.
+        // program-reader: compiler-limits (scoped.ts PROGRAM_READERS)
         const unfinished = (lastProgram?.getSourceFiles() ?? [])
           .filter((source) => {
             const state = source as ts.SourceFile & {
@@ -1012,11 +1007,20 @@ export function typescriptModule(
     dependencyInputs: true,
     incrementalAnalysis: true,
     analyze(context) {
-      declines = [];
+      /** This analysis's decline reasons, in order, for its index report. */
+      const declines: string[] = [];
+      /** Counts why a scoped analysis was not used; the full analysis follows. */
+      const declined = (reason: string): undefined => {
+        statistics.declined[reason] = (statistics.declined[reason] ?? 0) + 1;
+        declines.push(reason);
+      };
+      /** A first index: no file has a stored analysis yet. */
+      let firstIndex = false;
       const note = (path: AnalysisPath["path"]) =>
         context.notePath?.({
           path,
           ...(declines.length && { declined: [...declines] }),
+          ...(firstIndex && { note: "no previous index" }),
         });
       const files = context.files.filter(readable);
       // Unchanged snapshot: stored facts came from a complete analysis of these
@@ -1200,6 +1204,21 @@ export function typescriptModule(
           }
         | undefined {
         const previousFiles = context.previousFiles;
+        if (
+          !previousFiles &&
+          files.every(
+            (file) =>
+              (file.result.data as { analyzer?: unknown } | undefined)
+                ?.analyzer === undefined,
+          )
+        ) {
+          // Nothing to stand on: the analysis is full, and the report says
+          // there was no previous index rather than a declined reason.
+          statistics.declined["no previous facts"] =
+            (statistics.declined["no previous facts"] ?? 0) + 1;
+          firstIndex = true;
+          return undefined;
+        }
         if (!previousFiles || context.changedContextFiles.length)
           return declined("no previous facts");
         // The core retries every failed file whose failure is not certified
@@ -1594,6 +1613,7 @@ export function typescriptModule(
             // syntax in a JS file, TS8xxx).
             (program, fail) => {
               let failedAny = false;
+              // program-reader: own-file (scoped.ts PROGRAM_READERS)
               for (const source of program.getSourceFiles()) {
                 const path = fromVirtual(source.fileName);
                 if (path === undefined || !captured.has(path)) continue;
@@ -1626,6 +1646,7 @@ export function typescriptModule(
               );
             continue;
           }
+          // program-reader: module-resolution (scoped.ts PROGRAM_READERS)
           const provenance = new WeakMap<
             ts.Program,
             ReturnType<typeof entryProvenance>
@@ -2017,6 +2038,7 @@ export function typescriptModule(
           // neutral program with it renamed to an undeclared name; a link whose
           // outcome differs there rests on the assumption.
           const assumedTexts = new Map<string, string>();
+          // program-reader: renames (scoped.ts PROGRAM_READERS)
           for (const source of normal.program.getSourceFiles()) {
             const path = fromVirtual(source.fileName);
             if (path === undefined || !captured.has(path)) continue;
@@ -2027,6 +2049,7 @@ export function typescriptModule(
                 neutralizeAssumed(source.text, offsets, model.fresh.uncertain),
               );
           }
+          // program-reader: loaded-by (scoped.ts PROGRAM_READERS)
           loadedBy.set(
             group,
             new Set(
