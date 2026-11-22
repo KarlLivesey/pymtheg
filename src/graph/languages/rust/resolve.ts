@@ -1901,6 +1901,27 @@ export function resolveRust(
   };
   const isDescendant = (scope: string, parent: string) =>
     !parent || scope === parent || scope.startsWith(parent + "::");
+  // C-24: an item visible from a module is visible from every module inside
+  // it, so only the outermost accessors on a glob chain constrain it. Keeping
+  // just those (deduplicated, in a fixed order) bounds the chain, so a glob
+  // cycle still repeats its lookup key and is cut.
+  const insideOf = (inner: Place, outer: Place) =>
+    inner.crate.root === outer.crate.root &&
+    isDescendant(inner.scope, outer.scope);
+  function globAccessors(globModule: Place, accessor: Place): Place[] {
+    const kept: Place[] = [];
+    for (const via of [...(accessor.viaGlobs ?? []), accessor]) {
+      if (insideOf(via, globModule) || kept.some((k) => insideOf(via, k)))
+        continue;
+      for (let i = kept.length - 1; i >= 0; i--)
+        if (insideOf(kept[i]!, via)) kept.splice(i, 1);
+      kept.push(via);
+    }
+    const order = (p: Place) => `${p.crate.root}|${p.scope}`;
+    return kept.sort((a, b) =>
+      order(a) < order(b) ? -1 : order(a) > order(b) ? 1 : 0,
+    );
+  }
   const visibleThroughGlobs = (
     visibility: string,
     owner: Place,
@@ -2536,7 +2557,7 @@ export function resolveRust(
         ? {
             ...loc,
             conditions: accessFrom.conditions ?? [],
-            viaGlobs: [...(accessFrom.viaGlobs ?? []), accessFrom],
+            viaGlobs: globAccessors(loc, accessFrom),
           }
         : loc;
       const perGlob = globs.map((l) => {
