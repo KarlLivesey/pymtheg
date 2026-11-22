@@ -3176,3 +3176,34 @@ full Rust pass. The scoped resolve pass rebuilds every link from the stored
 records in the store's id order, so it decides with the exact input the
 analysis checked. The C-22 cold equality rule and run ownership apply.
 [C-36](changes/C-36.md)
+
+### C-26 Non-returning analysis: a deterministic check before any deadline
+
+A file whose analysis would not return fails with a reason. Where the cause
+can be decided from the source, it is, with no clock. TypeScript 5.9's
+`getTypeAtFlowNode` follows single-successor flow steps in an uncounted loop.
+After binding, the module follows the same steps from every flow node of a
+captured file. A file where they repeat a node fails ("its control-flow
+analysis would not return", with line and column) under C-13's containment
+and cap. On microsoft/TypeScript it flags exactly the three
+`unreachableFlowAfterThrowing*` conformance tests, and nothing on the seven
+identity pins. Under a stopped taint walk the judge's dependence graphs are
+not explored, for cost: on microsoft/TypeScript that search exhausted the
+heap. So a link whose receiver reaches a failed file only at depth is
+stored `taint-budget-exhausted` instead of `invalid-code` with a cause.
+Links that touch the failed file directly keep `invalid-code`. Both are
+unresolved, and within the budget nothing changes.
+A file the compiler throws on in a later project is failed for the store.
+Earlier projects' links into it become `target-unavailable`, and their other
+links are flagged `no-unseen-declarations`. The cap counts compiler failures
+a program imports. **Trade:** other non-returning work (another compiler
+loop, exponential type work, a Go or Rust loop) still has no bound. A
+wall-clock watchdog in a worker is the only general bound. It is not built
+until a case needs it, because it would make results depend on the machine
+for the files it stops. Each result records a digest of the module's
+failed files (`failedFilesDigest`), not the map: a map of N failed files in
+each of M separately stored results is N x M in the store. A `contains`
+link names a container only if that container is a symbol. One link
+without a source rejects a module's whole output, so a namespace that is
+no symbol passes its members to the next container out. **Rules out:**
+time limits where a deterministic property exists. See [C-26](changes/C-26.md).

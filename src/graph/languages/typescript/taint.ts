@@ -70,6 +70,16 @@ const exhaustedFor = new WeakSet<ts.TypeChecker>();
 /** Whether this checker's taint walk stopped at the budget (its taint is unknown). */
 export const taintExhausted = (checker: ts.TypeChecker) =>
   exhaustedFor.has(checker);
+/** Taints of walks that stopped at the budget (see `taintUnknown`). */
+const unknownTaints = new WeakSet<Taint>();
+/**
+ * Whether this taint is unknown (its walk stopped at the budget). Then only
+ * direct bindings of a failed file are answered; every other link of the
+ * program is reported `taint-budget-exhausted` (index.ts), including links
+ * whose receiver reaches a failed file at depth, which the judge does not
+ * search for then (cost; see judge.ts).
+ */
+export const taintUnknown = (taint: Taint) => unknownTaints.has(taint);
 /** Checkers whose walk is skipped: treated as having reached the budget. */
 const skipFor = new WeakSet<ts.TypeChecker>();
 /**
@@ -594,6 +604,7 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
     exhaustedFor.add(checker);
     const causes = new DirectCauses(direct);
     const unknown: Taint = { seeds: causes, all: causes, weak: new Map() };
+    unknownTaints.add(unknown);
     memo.set(checker, unknown);
     return unknown;
   }
