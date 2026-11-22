@@ -161,59 +161,139 @@ export class SqliteGraphStore implements GraphStorage {
         this.db.prepare("PRAGMA cache_size").get()?.cache_size === -2000
       )
         this.db.exec(`PRAGMA cache_size=-${cacheKiB}`);
-      this.db.exec(`PRAGMA foreign_keys=ON;
-        CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL);`);
-      this.db
-        .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('schema','4')")
-        .run();
-      const schema = this.db
-        .prepare("SELECT value FROM graph_meta WHERE key='schema'")
-        .get()?.value;
-      if (schema !== "3" && schema !== "4")
-        throw Error("Unsupported graph schema; rebuild the index");
-      // Schema 3 (0.1.0) differs only by the library-target table and the
-      // triggers that derive resolution. Its rows stay valid unchanged: none
-      // has a library target. Migrate in place instead of re-indexing.
-      if (schema === "3")
-        this.transaction(() => {
-          this.db.exec(`DROP TRIGGER IF EXISTS graph_target_changed;
-            DROP TRIGGER IF EXISTS graph_candidate_removed;
-            UPDATE graph_meta SET value='4' WHERE key='schema';`);
-          this.db.exec(libraryTables);
-        });
-      this.db.exec(graphTables);
-      this.findFileStatusIndex();
-      this.libraryKnown = true;
-      // Path-only markers from early W2-M builds have unknown provenance. Adding
-      // nullable columns makes them cache misses until a successful parse stamps them.
-      const markerColumns = new Set(
-        this.db
-          .prepare("PRAGMA table_info(graph_parse_failures)")
-          .all()
-          .map((row) => row.name),
-      );
-      if (
-        ["hash", "module", "version"].some((name) => !markerColumns.has(name))
-      )
-        this.transaction(() => {
-          for (const name of ["hash", "module", "version"])
-            if (!markerColumns.has(name))
-              this.db.exec(
-                `ALTER TABLE graph_parse_failures ADD COLUMN ${name} TEXT`,
-              );
-        });
-      this.installInvalidationTriggers();
-      this.db
-        .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('project',?)")
-        .run(projectId ?? randomUUID());
+      this.db.exec("PRAGMA foreign_keys=ON");
+      this.turnstileFile = `${path}-turnstile`;
+      // C-37: an open that finds its schema and identity in place writes
+      // nothing, so a query opened writable takes no write lock. Otherwise
+      // the schema work passes the turnstile like any other write.
+      const inPlace =
+        this.schemaCurrent() &&
+        !!this.db.prepare("SELECT 1 FROM graph_meta WHERE key='project'").get();
+      const entered = !inPlace && this.enterTurnstile();
+      try {
+        if (inPlace) {
+          this.findFileStatusIndex();
+          this.libraryKnown = true;
+        } else {
+          this.db.exec(
+            "CREATE TABLE IF NOT EXISTS graph_meta(key TEXT PRIMARY KEY,value TEXT NOT NULL)",
+          );
+          this.db
+            .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('schema','4')")
+            .run();
+          const schema = this.db
+            .prepare("SELECT value FROM graph_meta WHERE key='schema'")
+            .get()?.value;
+          if (schema !== "3" && schema !== "4")
+            throw Error("Unsupported graph schema; rebuild the index");
+          // Schema 3 (0.1.0) differs only by the library-target table and the
+          // triggers that derive resolution. Its rows stay valid unchanged: none
+          // has a library target. Migrate in place instead of re-indexing.
+          if (schema === "3")
+            this.transaction(() => {
+              this.db.exec(`DROP TRIGGER IF EXISTS graph_target_changed;
+              DROP TRIGGER IF EXISTS graph_candidate_removed;
+              UPDATE graph_meta SET value='4' WHERE key='schema';`);
+              this.db.exec(libraryTables);
+            });
+          this.db.exec(graphTables);
+          this.findFileStatusIndex();
+          this.libraryKnown = true;
+          // Path-only markers from early W2-M builds have unknown provenance. Adding
+          // nullable columns makes them cache misses until a successful parse stamps them.
+          const markerColumns = new Set(
+            this.db
+              .prepare("PRAGMA table_info(graph_parse_failures)")
+              .all()
+              .map((row) => row.name),
+          );
+          if (
+            ["hash", "module", "version"].some(
+              (name) => !markerColumns.has(name),
+            )
+          )
+            this.transaction(() => {
+              for (const name of ["hash", "module", "version"])
+                if (!markerColumns.has(name))
+                  this.db.exec(
+                    `ALTER TABLE graph_parse_failures ADD COLUMN ${name} TEXT`,
+                  );
+            });
+          this.installInvalidationTriggers();
+          this.db
+            .prepare("INSERT OR IGNORE INTO graph_meta VALUES ('project',?)")
+            .run(projectId ?? randomUUID());
+        }
+      } finally {
+        if (entered) this.leaveTurnstile();
+      }
       this.projectId = this.db
         .prepare("SELECT value FROM graph_meta WHERE key='project'")
         .get()!.value as string;
       if (projectId !== undefined && projectId !== this.projectId)
         throw Error("Graph belongs to a different project");
     } catch (error) {
+      this.turnstile?.close();
       this.db.close();
       throw error;
+    }
+  }
+  /**
+   * C-37: the turnstile, a lock-only database beside the store. Every write
+   * of this store takes it before it asks for the write lock and leaves it
+   * once it has the lock, and a batch is begun the same way. A writer waiting
+   * for the write lock therefore holds the turnstile, so the batching run
+   * cannot begin its next batch: the waiter gets the write lock when the
+   * current batch commits. SQLite's own file lock is the turnstile, so it
+   * works across processes and is released when its holder dies. Undefined
+   * until first needed; null where it cannot be opened, and then no batch
+   * forms (each write commits on its own).
+   */
+  private turnstile: DatabaseSync | null | undefined;
+  private turnstileFile: string | undefined;
+  private turnstileDepth = 0;
+  private enterTurnstile(): boolean {
+    if (this.turnstileFile === undefined) return false;
+    if (this.turnstile === undefined)
+      try {
+        this.turnstile = openDatabase(this.turnstileFile);
+      } catch {
+        this.turnstile = null;
+      }
+    if (!this.turnstile) return false;
+    if (this.turnstileDepth === 0) this.turnstile.exec("BEGIN IMMEDIATE");
+    this.turnstileDepth++;
+    return true;
+  }
+  private leaveTurnstile(): void {
+    if (--this.turnstileDepth === 0) this.turnstile!.exec("ROLLBACK");
+  }
+  /** Whether a writable open would find nothing to create or migrate. */
+  private schemaCurrent(): boolean {
+    try {
+      const schema = this.db
+        .prepare("SELECT value FROM graph_meta WHERE key='schema'")
+        .get()?.value;
+      const names = new Set(
+        this.db
+          .prepare("SELECT name FROM sqlite_master")
+          .all()
+          .map((row) => row.name),
+      );
+      const columns = new Set(
+        this.db
+          .prepare("PRAGMA table_info(graph_parse_failures)")
+          .all()
+          .map((row) => row.name),
+      );
+      return (
+        schema === "4" &&
+        graphObjects.every((name) => names.has(name)) &&
+        names.has("graph_index_dirty_graph_files_INSERT") &&
+        ["hash", "module", "version"].every((name) => columns.has(name))
+      );
+    } catch {
+      return false;
     }
   }
   private installInvalidationTriggers(): void {
@@ -300,32 +380,65 @@ export class SqliteGraphStore implements GraphStorage {
    * about writeBatchRows rows (each one write, so a batch can end up to one
    * write over). A batch is one commit: the run's ownership checks, mark and
    * data-version bookkeeping happen at its BEGIN and COMMIT, as for any
-   * other commit, and another writer waits for at most one batch. A write
+   * other commit. Each batch begins through the turnstile, so a writer that
+   * is waiting stops the next batch from beginning: it waits for at most the
+   * batch in progress. A write
    * that fails undoes the open batch with it: the store is then the state
    * after the run's earlier commits, as after a crash, and the run's mark
    * (from its first commit) makes the next run redo the work. Savepoints
    * per write would keep the others, but made each link insert inside them
    * several times slower (C-37 measurements). A batch only forms
-   * under the write-ahead log, where readers are never blocked; with a
-   * rollback journal each write commits on its own as before. The open
-   * batch commits when `action` ends, also when it throws.
+   * under the write-ahead log, where readers are never blocked, and with a
+   * turnstile; otherwise each write commits on its own as before (C-6). The
+   * open batch commits when `action` ends, also when it throws; then an
+   * error of that commit does not replace the action's own.
    */
   async writeBatch<T>(action: () => Promise<T>): Promise<T> {
     if (this.batching) return await action();
     this.batching = true;
+    let failed = false;
     try {
       return await action();
+    } catch (error) {
+      failed = true;
+      throw error;
     } finally {
       this.batching = false;
-      if (this.batchOpen !== undefined) this.commitTransaction();
+      if (this.batchOpen !== undefined)
+        try {
+          this.commitTransaction();
+        } catch (error) {
+          if (!failed) throw error;
+        }
     }
   }
+  private changes: StatementSync | undefined;
   private totalChanges(): number {
-    return Number(this.db.prepare("SELECT total_changes() AS n").get()!.n);
+    this.changes ??= this.db.prepare("SELECT total_changes() AS n");
+    return Number(this.changes.get()!.n);
+  }
+  /**
+   * Undoes the open write transaction. SQLite may already have rolled it
+   * back itself (a full disk, an I/O error); then there is nothing to undo,
+   * and the error that caused it is the one the caller reports.
+   */
+  private rollback(): void {
+    this.batchOpen = undefined;
+    if (this.db.isTransaction)
+      try {
+        this.db.exec("ROLLBACK");
+      } catch {
+        // The original error is reported.
+      }
+  }
+  /** A write that fails before it reaches SQL undoes the open batch too. */
+  private failedWrite(): void {
+    if (this.batchOpen !== undefined) this.rollback();
   }
   private transaction(action: () => void): void {
     if (this.batchOpen !== undefined) return this.batchedWrite(action);
     this.beforeWrite();
+    const entered = this.enterTurnstile();
     // C-35: the invalidation triggers write, so each graph write statement in
     // a transaction keeps a statement journal. SQLite keeps it in a temporary
     // file once it outgrows a small buffer, which cost hundreds of
@@ -336,12 +449,16 @@ export class SqliteGraphStore implements GraphStorage {
     // be held in memory whole, keep their temporary files. A statement
     // journal only undoes one statement and is never used to recover from a
     // crash; it holds at most the pages one statement changes.
-    this.db.exec("PRAGMA temp_store=MEMORY");
     try {
-      this.db.exec("BEGIN IMMEDIATE");
-    } catch (error) {
-      this.db.exec("PRAGMA temp_store=DEFAULT");
-      throw error;
+      this.db.exec("PRAGMA temp_store=MEMORY");
+      try {
+        this.db.exec("BEGIN IMMEDIATE");
+      } catch (error) {
+        this.db.exec("PRAGMA temp_store=DEFAULT");
+        throw error;
+      }
+    } finally {
+      if (entered) this.leaveTurnstile();
     }
     try {
       this.db.exec("PRAGMA temp_store=DEFAULT");
@@ -374,17 +491,17 @@ export class SqliteGraphStore implements GraphStorage {
         if (this.commandDataVersion() !== run.version) run.interleaved = true;
       }
     } catch (error) {
-      this.db.exec("ROLLBACK");
+      this.rollback();
       throw error;
     }
-    if (this.batching && this.writeAheadLog) {
+    if (this.batching && this.writeAheadLog && this.turnstile) {
       this.batchOpen = this.totalChanges();
       return this.batchedWrite(action);
     }
     try {
       action();
     } catch (error) {
-      this.db.exec("ROLLBACK");
+      this.rollback();
       throw error;
     }
     this.commitTransaction();
@@ -394,8 +511,7 @@ export class SqliteGraphStore implements GraphStorage {
     try {
       action();
     } catch (error) {
-      this.batchOpen = undefined;
-      this.db.exec("ROLLBACK");
+      this.rollback();
       throw error;
     }
     if (
@@ -419,7 +535,7 @@ export class SqliteGraphStore implements GraphStorage {
         run.version = version!;
       }
     } catch (error) {
-      if (this.db.isTransaction) this.db.exec("ROLLBACK");
+      this.rollback();
       throw error;
     }
   }
@@ -584,17 +700,14 @@ export class SqliteGraphStore implements GraphStorage {
       .sort((a, b) => compare(a.path, b.path));
   }
   replaceFile(file: GraphFile, parseFailure = false): void {
-    if (
-      !file.path ||
-      file.path.startsWith("/") ||
-      file.path.includes("\\") ||
-      file.path
-        .split("/")
-        .some((part) => !part || part === "." || part === "..")
-    )
-      throw Error("Expected project-relative POSIX path");
-    validateResult(file.text, file.result);
-    const facts = fileFacts(this.projectId, file);
+    let facts: ReturnType<typeof fileFacts>;
+    try {
+      this.validateFile(file);
+      facts = fileFacts(this.projectId, file);
+    } catch (error) {
+      this.failedWrite();
+      throw error;
+    }
     const sql = this.writer();
     count("store.filesWritten");
     count("store.symbolRowsWritten", facts.symbols.length);
@@ -643,6 +756,18 @@ export class SqliteGraphStore implements GraphStorage {
         }
       for (const link of facts.links) this.insertLink(link, sql);
     });
+  }
+  private validateFile(file: GraphFile): void {
+    if (
+      !file.path ||
+      file.path.startsWith("/") ||
+      file.path.includes("\\") ||
+      file.path
+        .split("/")
+        .some((part) => !part || part === "." || part === "..")
+    )
+      throw Error("Expected project-relative POSIX path");
+    validateResult(file.text, file.result);
   }
   private insertLink(
     link: GraphLink,
@@ -694,7 +819,12 @@ export class SqliteGraphStore implements GraphStorage {
     if (this.indexRun.state !== "idle") this.transaction(remove);
     else {
       this.beforeWrite();
-      remove();
+      const entered = this.enterTurnstile();
+      try {
+        remove();
+      } finally {
+        if (entered) this.leaveTurnstile();
+      }
     }
   }
   findSymbols(query: SymbolQuery = {}): GraphSymbol[] {
@@ -1135,28 +1265,7 @@ export class SqliteGraphStore implements GraphStorage {
     try {
       this.db.exec("BEGIN");
       try {
-        const schema = this.db
-          .prepare("SELECT value FROM graph_meta WHERE key='schema'")
-          .get()?.value;
-        const names = new Set(
-          this.db
-            .prepare("SELECT name FROM sqlite_master")
-            .all()
-            .map((row) => row.name),
-        );
-        const columns = new Set(
-          this.db
-            .prepare("PRAGMA table_info(graph_parse_failures)")
-            .all()
-            .map((row) => row.name),
-        );
-        if (
-          schema !== "4" ||
-          !graphObjects.every((name) => names.has(name)) ||
-          !names.has("graph_index_dirty_graph_files_INSERT") ||
-          !["hash", "module", "version"].every((name) => columns.has(name))
-        )
-          return null;
+        if (!this.schemaCurrent()) return null;
         return {
           state: this.graphCommandState(),
           analysis: this.readCompletedAnalysis(),
@@ -1180,9 +1289,14 @@ export class SqliteGraphStore implements GraphStorage {
     )
       return;
     this.beforeWrite();
-    this.db
-      .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
-      .run();
+    const entered = this.enterTurnstile();
+    try {
+      this.db
+        .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
+        .run();
+    } finally {
+      if (entered) this.leaveTurnstile();
+    }
   }
   /**
    * C-22: whether an index run began writing and did not finish. Its writes
@@ -1584,6 +1698,7 @@ export class SqliteGraphStore implements GraphStorage {
       // and the store is left with a rollback journal, as at rest before C-6.
       if (this.writeAheadLog && this.db.isOpen) closeWriteAheadLog(this.db);
     } finally {
+      this.turnstile?.close();
       this.db.close();
     }
   }
