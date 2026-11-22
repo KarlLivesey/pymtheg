@@ -24,7 +24,7 @@ test("assumed Level 2 links remain in the total and are counted separately", () 
   assert.equal(score.assumedLevel2, 5);
 });
 
-test("the committed sweep and TypeScript replay regenerate the coverage plan byte for byte", () => {
+test("the committed sweep and TypeScript refresh regenerate the coverage plan byte for byte", () => {
   const root = fileURLToPath(new URL("../..", import.meta.url));
   const checkedIn = readFileSync(join(root, "docs/coverage-plan.md"));
   const scratch = mkdtempSync(join(tmpdir(), "pymtheg-coverage-plan-"));
@@ -32,14 +32,13 @@ test("the committed sweep and TypeScript replay regenerate the coverage plan byt
   const attempts = join(scratch, "attempts.md");
   const itemChanges = join(scratch, "items.md");
   const input = "evidence/sw-4/coverage-plan-input.json.gz";
-  const replay = "evidence/sw-5/coverage-plan-input.json.gz";
+  const replay = "evidence/sw-6/coverage-plan-input.json.gz";
   writeFileSync(plan, "Placeholder\n");
   try {
     execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", input,
       "--plan", plan, "--attempts", attempts, "--item-changes", itemChanges], { cwd: root });
     execFileSync(process.execPath, ["scripts/sweep/coverage.mjs", "--results", replay, "--plan", plan], { cwd: root });
-    execFileSync(process.execPath, ["evidence/c-25/plan-refresh.mjs",
-      "evidence/c-25/coverage-plan-input.json.gz", plan], { cwd: root });
+    execFileSync(process.execPath, ["evidence/sw-6/plan-sw6.mjs", plan], { cwd: root });
     assert.ok(readFileSync(plan).equals(checkedIn), "regenerated coverage plan differs");
     assert.ok(readFileSync(attempts).equals(readFileSync(join(root, "evidence/sw-4/attempts.md"))), "regenerated attempt report differs");
     assert.ok(readFileSync(itemChanges).equals(readFileSync(join(root, "evidence/sw-4/items.md"))), "regenerated item report differs");
@@ -66,6 +65,20 @@ test("SW-5 replays every SW-4 installed fallback and preserves the other observa
   assert.deepEqual(after.modes.installed.repos.filter(({ measuredCommit }) => !measuredCommit), before.modes.installed.repos.filter(usable));
   assert.deepEqual(after.modes.installed.repos.filter(({ measuredCommit }) => measuredCommit).map(({ id }) => id),
     before.modes.installed.repos.filter((repo) => !usable(repo)).map(({ id }) => id));
+});
+
+test("SW-6 refreshes every installed TypeScript pin and preserves the other observations", () => {
+  const archive = (chunk) => JSON.parse(gunzipSync(readFileSync(new URL(`../../evidence/${chunk}/coverage-plan-input.json.gz`, import.meta.url))));
+  const before = archive("sw-5");
+  const after = archive("sw-6");
+  assert.deepEqual(after.modes.bare, before.modes.bare);
+  assert.deepEqual(after.modes["go-toolchain"], before.modes["go-toolchain"]);
+  assert.deepEqual(after.samples, before.samples);
+  const pins = JSON.parse(readFileSync(new URL("../../sweep/repos.json", import.meta.url), "utf8"))
+    .filter(({ language }) => language === "typescript").map(({ id }) => id).sort();
+  assert.deepEqual(after.modes.installed.repos.map(({ id }) => id).sort(), pins);
+  assert.deepEqual([...new Set(after.modes.installed.repos.map(({ measuredCommit }) => measuredCommit))],
+    ["2dc05bebd4d38fc44075c98637a58c15bd614ba3"]);
 });
 
 import { cargoPathLocations, checkoutLocation, npmPathLocation, yarnArchivePackages } from "./coverage-locations.mjs";

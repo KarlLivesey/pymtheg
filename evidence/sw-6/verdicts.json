@@ -1,0 +1,148 @@
+{
+ "note": "Hand-entered verdicts for SW-6's remaining TypeScript groups, from the 10 fixed-seed sites per group in remaining-sites.json and the mechanical splits in candidate-split.json and failed-program-split.json. Splits marked 'estimate' come from the 10-site reading only.",
+ "groups": [
+  {
+   "reason": "local",
+   "shape": "The checker selects a declaration in the checkout that has no graph symbol. Five of the ten sites call a member of an object literal or a type literal (`api.util.invalidateTags`, `actionDecreaseFontSize.keyTest`, `signal1.resolve`, `api.persistence.removeSavedEnvironmentSecret`, an inline `AppRouterInputs` type). The other five call a local or destructured binding (`setCount`, `handleSubmit`, `unregisterRight`, `useFixture`, `subscription`).",
+   "provable": "Members: yes. The declaration is proved and needs a graph anchor of its own (a real declared member, not padding). Local bindings: only by tracing the value to its origin.",
+   "split": [
+    {
+     "part": "members of object or type literals (estimate, 5 of 10 sites)",
+     "share": 0.5,
+     "provable": true
+    },
+    {
+     "part": "calls of local or destructured bindings (estimate, 5 of 10 sites)",
+     "share": 0.5,
+     "provable": false
+    }
+   ]
+  },
+  {
+   "reason": "(unit only)",
+   "shape": "Imports: the module link of an import (`import { Fragment } from \"react\"`) names a module, which has no symbol by definition. Calls: a library member call that names only the package (`screen.getByRole`, `fireEvent.click`, `it.each`, `assert.equal` from `assert/strict`).",
+   "provable": "Imports: no, a definitional ceiling under Level 2. Calls: yes, from the installed declarations the checker selects.",
+   "split": [
+    {
+     "part": "imports (module links)",
+     "kind": "imports",
+     "provable": false
+    },
+    {
+     "part": "calls and other member links",
+     "kindNot": "imports",
+     "provable": true
+    }
+   ]
+  },
+  {
+   "reason": "no-symbol",
+   "shape": "The compiler binds nothing at the site (C-28). Four of the ten sites are Puppeteer `page.*` calls whose `page` type comes from `puppeteer-core/internal/*` build output. Two are Dexie calls through its self-import of `dexie`. Two are `it.each(...)(…)` / `describe.each(...)(…)` returned callables. One is a Nest `expect` that no config declares, and one a yargs fluent chain.",
+   "provable": "Not at the site. Recoverable only by fixing the upstream cause (build-output mapping for Puppeteer, about 7,532 links). Returned callables and undeclared globals are ceilings.",
+   "split": [
+    {
+     "part": "Puppeteer, downstream of missing build output",
+     "pin": "puppeteer/puppeteer",
+     "provable": "assumption route"
+    },
+    {
+     "part": "other pins",
+     "pinNot": "puppeteer/puppeteer",
+     "provable": false
+    }
+   ]
+  },
+  {
+   "reason": "external",
+   "shape": "A declaration outside the checkout with no named library target. In programs that contain a failed file, C-13 withholds every library target: `lines.push`, `process.argv.slice`, `Object.defineProperty`, `.map`, `String(…)` and Vitest matchers in the sample. The rest includes 2,719 `as const` assertions stored as `references` links to `const`.",
+   "provable": "In failed-file programs: yes, where the target does not depend on the failed file (the taint judge can decide this). `as const` links are a defect: they should not be links at all.",
+   "split": [
+    {
+     "part": "in a program with a failed file (C-13 withholding)",
+     "failed": true,
+     "provable": true
+    },
+    {
+     "part": "other",
+     "failed": false,
+     "provable": "partly"
+    }
+   ]
+  },
+  {
+   "reason": "(candidate set)",
+   "shape": "Several declarations. Most are one global name declared by several environment typings (DOM, `@types/node`, `bun-types`): `Response`, `URL`, `console.log`, `AbortController`, `WebSocket`.",
+   "provable": "Not as one declaration. Crediting a global declared by several typings would need a policy ruling. Checkout-only sets are real alternatives.",
+   "split": [
+    {
+     "part": "one global name, several library typings",
+     "shape": "one name declared by several library typings",
+     "provable": "policy"
+    },
+    {
+     "part": "checkout candidates only",
+     "shape": "checkout candidates only",
+     "provable": false
+    },
+    {
+     "part": "other library or mixed sets",
+     "shapes": [
+      "library candidates with different names",
+      "checkout and library candidates"
+     ],
+     "provable": false
+    }
+   ]
+  },
+  {
+   "reason": "incomplete-config",
+   "shape": "The owning config `extends` a config by package name, and the module records the extended settings as missing. In Turborepo, each example is its own pnpm workspace with its own lockfile, so the root install does not link it; the extended `@repo/typescript-config/*.json` is in the checkout, named by the example's `pnpm-workspace.yaml`. In Astro, the examples are installed and linked (`examples/ssr/node_modules/astro` points to `packages/astro`), and `astro/tsconfigs/strict` is in the checkout, but the module still records it as missing (a defect: the file is reached through the installed workspace link and its name does not match the `*tsconfig*.json` context pattern). Redux Toolkit's Expo examples extend `expo/tsconfig.base`, which is not installed.",
+   "provable": "Turborepo and Astro: yes, the extended config is in the checkout. Redux Toolkit's Expo examples: no, missing material.",
+   "split": [
+    {
+     "part": "Turborepo example workspaces (config package in the checkout, workspace not installed)",
+     "pin": "vercel/turborepo",
+     "provable": true
+    },
+    {
+     "part": "Astro (config reached through an installed workspace link)",
+     "pin": "withastro/astro",
+     "provable": true
+    },
+    {
+     "part": "other pins (uninstalled external packages)",
+     "pinsNot": [
+      "vercel/turborepo",
+      "withastro/astro"
+     ],
+     "provable": false
+    }
+   ]
+  },
+  {
+   "reason": "any-receiver",
+   "shape": "The receiver is typed `any`: untyped JavaScript (Mermaid's d3 `svgDraw.js`, yargs' chai `should`), minified build fixtures in Turborepo, untyped helpers.",
+   "provable": "Mostly no. There is no static type. A small part may be recoverable by tracing the value's origin."
+  },
+  {
+   "reason": "workspace-entry-unavailable",
+   "shape": "A sibling workspace package's entry is build output that is not present. Vitest's own tests import `vitest`, whose declarations are a rollup (C-25 withholds rollups); Changesets, Dexie, tRPC and Vite have similar entries.",
+   "provable": "Only with the build output, or with an assumption-marked source mapping (C-25 extended to rollups)."
+  },
+  {
+   "reason": "external-package",
+   "shape": "A package that is not installed. Dexie's tests import `QUnit` (the package is `qunit`) and its own built `dexie`; test fixtures name fixture packages that are not installed.",
+   "provable": "No. Missing material."
+  },
+  {
+   "reason": "workspace-build-output-missing",
+   "shape": "Exports reached through a workspace package's missing build output: Astro fixtures' `astro/config`, Puppeteer's internal paths.",
+   "provable": "Only through an assumption-marked source mapping."
+  },
+  {
+   "reason": "missing-module",
+   "shape": "Imports of CSS, Vue or generated files (Mermaid's generated Langium `ast.js`).",
+   "provable": "No. These are non-TypeScript assets or generated files."
+  }
+ ]
+}
