@@ -970,9 +970,21 @@ export function projectModel(
         toVirtual(config.path),
       );
       if (!group.failure) {
+        // A base reached by package name was read. Its settings are complete
+        // unless it was unreadable (6053/5083) or its JSON has syntax errors
+        // (1xxx diagnostics in another file): then the compiler drops what
+        // it cannot parse, and the marker stays.
         if (
           installedConfigRead &&
-          !parsed.errors.some(({ code }) => code === 6053 || code === 5083)
+          !parsed.errors.some(
+            ({ code, file }) =>
+              code === 6053 ||
+              code === 5083 ||
+              (code >= 1000 &&
+                code < 2000 &&
+                file !== undefined &&
+                file.fileName !== toVirtual(config.path)),
+          )
         )
           group.limitations = group.limitations.filter(
             (note) =>

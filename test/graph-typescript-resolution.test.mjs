@@ -1495,40 +1495,45 @@ test("writes to a module binding withhold only the affected member names", async
 });
 
 test("written imports can be independent of source or compiler configuration gaps", async () => {
-  await project(
-    {
-      "package.json": '{"dependencies":{"package":"^1"}}',
-      "broken.ts": "export function broken( {",
-      "use.ts": `import { join } from 'node:path';
+  // broken.ts is a failed module (its first export ends before the error).
+  // Spelling `Promise` there makes the unread text able to change
+  // Promise.resolve, which then stays withheld (C-39).
+  for (const spellsPromise of [false, true])
+    await project(
+      {
+        "package.json": '{"dependencies":{"package":"^1"}}',
+        "broken.ts": `export const ok = 1;\nexport function broken( {${spellsPromise ? " // Promise" : ""}`,
+        "use.ts": `import { join } from 'node:path';
         import { build as run } from 'package';
         import { broken } from './broken';
         join('a', 'b'); run(); broken(); Promise.resolve(1);`,
-      "partial/tsconfig.json": '{"extends":"@missing/base"}',
-      "partial/use.ts": `import { readFile } from 'node:fs/promises';
+        "partial/tsconfig.json": '{"extends":"@missing/base"}',
+        "partial/use.ts": `import { readFile } from 'node:fs/promises';
         import { parse } from 'package'; readFile('x'); parse();`,
-    },
-    async (graph, report) => {
-      clean(report);
-      const call = (file, name) => graph.link(file, name, "calls");
-      assert.equal(libraryTarget(call("use.ts", "join")).symbol, "join");
-      assert.equal(libraryTarget(call("use.ts", "run")).symbol, "build");
-      assert.equal(call("use.ts", "broken").data.reason, "invalid-code");
-      // broken.ts spells neither name, so the unread text cannot change
-      // the standard Promise.resolve (C-39).
-      assert.equal(
-        libraryTarget(call("use.ts", "resolve")).symbol,
-        "Promise.resolve",
-      );
-      assert.equal(
-        libraryTarget(call("partial/use.ts", "readFile")).symbol,
-        "readFile",
-      );
-      assert.equal(
-        call("partial/use.ts", "parse").data.reason,
-        "incomplete-config",
-      );
-    },
-  );
+      },
+      async (graph, report) => {
+        clean(report);
+        const call = (file, name) => graph.link(file, name, "calls");
+        assert.equal(libraryTarget(call("use.ts", "join")).symbol, "join");
+        assert.equal(libraryTarget(call("use.ts", "run")).symbol, "build");
+        assert.equal(call("use.ts", "broken").data.reason, "invalid-code");
+        if (spellsPromise)
+          assert.equal(call("use.ts", "resolve").resolution, "unresolved");
+        else
+          assert.equal(
+            libraryTarget(call("use.ts", "resolve")).symbol,
+            "Promise.resolve",
+          );
+        assert.equal(
+          libraryTarget(call("partial/use.ts", "readFile")).symbol,
+          "readFile",
+        );
+        assert.equal(
+          call("partial/use.ts", "parse").data.reason,
+          "incomplete-config",
+        );
+      },
+    );
 });
 
 test("relative imports resolve to the module; a missing relative file stays unresolved", async () => {

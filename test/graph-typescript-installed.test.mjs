@@ -14,6 +14,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { executeGraph } from "../dist/graph/commands.js";
 import typescript from "../dist/graph/languages/typescript/index.js";
+import { registryRange } from "../dist/graph/languages/typescript/workspace.js";
 import { LanguageRegistry, SqliteGraphStore } from "../dist/graph/index.js";
 
 const fixtures = fileURLToPath(
@@ -1486,6 +1487,45 @@ test("a merged-member call keeps one identity for a same-package directory augme
   });
 });
 
+// C-39: the compiler's semver parser throws on some published ranges.
+test("a manifest range the compiler cannot parse does not fail the importing file", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "package.json",
+    JSON.stringify({ dependencies: { "drizzle-orm": "^1.0.0-beta.9-8d6992" } }),
+  );
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: { strict: true, types: [] },
+      include: ["src"],
+    }),
+  );
+  await write(
+    "node_modules/drizzle-orm/package.json",
+    manifest("drizzle-orm", "1.0.0-beta.9-8d6992"),
+  );
+  await write(
+    "node_modules/drizzle-orm/index.d.ts",
+    "export declare function sql(): void;\n",
+  );
+  await write("src/main.ts", 'import { sql } from "drizzle-orm";\nsql();\n');
+  // A registry range the parser cannot read is "unknown", never a throw.
+  assert.equal(registryRange("^1.0.0-beta.9-8d6992"), "unknown");
+  assert.equal(registryRange("^1.2.3"), "known");
+  assert.equal(registryRange("latest"), "known");
+  assert.equal(registryRange("github:owner/repo"), false);
+  await request("index");
+  read((store, call) => {
+    assert.notEqual(store.getFile("src/main.ts").result.status, "failed");
+    const link = target(call("src/main.ts", "sql"));
+    assert.equal(link.unit, "drizzle-orm");
+    assert.equal(link.symbol, "sql");
+    // The version comes from the installed package, not from the range.
+    assert.equal(link.versionSource, "node_modules/drizzle-orm/package.json");
+  });
+});
+
 // C-39: a library target in a program with an unread (failed) file.
 async function unreadLayout(write, broken) {
   await write(
@@ -1524,11 +1564,13 @@ test("an unread file that cannot change a library target keeps it, as without th
   const expected = ["kit", "Box.prototype.open"];
   for (const [broken, freeRequire] of [
     [undefined, false],
-    ["let = ;\n", false],
+    // Failed files that are provably modules: module syntax ends before
+    // the first parse error.
+    ["export {};\nlet = ;\n", false],
     ['import "kit";\nconst value = ;\n', false],
     // A free `require` in an ES module runs the bundler differential pass,
     // which must reach the same decision.
-    ["let = ;\n", true],
+    ["export {};\nlet = ;\n", true],
   ]) {
     const { request, read, write } = await project();
     await unreadLayout(write, broken);
@@ -1551,6 +1593,7 @@ test("an unread file that could change a library target withholds it", async () 
     "augments the library":
       'declare module "kit" { interface Box { open(n: number): void } }\nlet = ;\n',
     "declares a clashing global": "var box = 1;\nlet = ;\n",
+    "is a script that spells no name": "let = ;\n",
     "imports a package the program lacks": 'import "kit-augment";\nlet = ;\n',
     "has a triple-slash reference":
       '/// <reference types="kit-augment" />\nlet = ;\n',
@@ -1568,6 +1611,104 @@ test("an unread file that could change a library target withholds it", async () 
       assert.equal(openTarget(call), "not definite", variant);
     });
   }
+});
+
+// C-39: a failed file that may be a script can merge into any global
+// interface without spelling a name at the reference; only a failed file
+// that is provably a module can be ruled out by its words.
+async function domLayout(write, files) {
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: { strict: true, lib: ["es2022", "dom"], types: [] },
+      include: ["src"],
+    }),
+  );
+  for (const [path, text] of Object.entries(files)) await write(path, text);
+}
+const definiteSymbol = (link) =>
+  link.resolution === "library" &&
+  link.libraries.length === 1 &&
+  link.libraries[0].symbol
+    ? link.libraries[0].symbol
+    : "not definite";
+
+test("a failed file that may be a script withholds library targets, though it spells no name at the reference", async () => {
+  const canvas =
+    'const c = document.createElement("canvas");\nc.getContext("2d");\nexport {};\n';
+  const cases = {
+    // Custom elements: the merge retypes the element (tsc binds MyElement.focus).
+    "a script .d.ts merging HTMLElementTagNameMap": {
+      files: {
+        "src/my-el.ts":
+          "export class MyElement extends HTMLElement { focus(): void {} }\n",
+        "src/elements.d.ts":
+          'interface HTMLElementTagNameMap { "my-el": import("./my-el").MyElement; }\nlet = ;\n',
+        "src/main.ts":
+          'const node = document.createElement("my-el");\nnode.focus();\nexport {};\n',
+      },
+      broken: "src/elements.d.ts",
+      site: "node.focus",
+    },
+    // A new overload retypes the result (tsc binds OffscreenCanvas.getContext).
+    "a script merging an overload into Document": {
+      files: {
+        "src/globals.ts":
+          'interface Document { createElement(tagName: "canvas"): OffscreenCanvas; }\nlet = ;\n',
+        "src/main.ts": canvas,
+      },
+      broken: "src/globals.ts",
+      site: "c.getContext",
+    },
+    "a module whose only export follows the error": {
+      files: {
+        "src/other.ts": "let = ;\nexport const z = 1;\n",
+        "src/main.ts": canvas,
+      },
+      broken: "src/other.ts",
+      site: "c.getContext",
+    },
+    "a module with an escaped identifier": {
+      files: {
+        "src/other.ts": "export {};\nconst \\u0061 = 1;\nlet = ;\n",
+        "src/main.ts": canvas,
+      },
+      broken: "src/other.ts",
+      site: "c.getContext",
+    },
+  };
+  for (const [variant, { files, broken, site }] of Object.entries(cases)) {
+    const { request, read, write } = await project();
+    await domLayout(write, files);
+    await request("index");
+    read((store, call) => {
+      assert.equal(store.getFile(broken).result.status, "failed", variant);
+      assert.equal(
+        definiteSymbol(call("src/main.ts", site)),
+        "not definite",
+        variant,
+      );
+    });
+  }
+});
+
+test("a failed module unrelated to the reference keeps the library target", async () => {
+  const { request, read, write } = await project();
+  await domLayout(write, {
+    "src/other.ts": "export const z = 1;\nlet = ;\n",
+    "src/main.ts":
+      'const c = document.createElement("canvas");\nc.getContext("2d");\nexport {};\n',
+  });
+  await request("index");
+  read((store, call) => {
+    assert.equal(store.getFile("src/other.ts").result.status, "failed");
+    const link = call("src/main.ts", "c.getContext");
+    assert.equal(
+      definiteSymbol(link),
+      "HTMLCanvasElement.prototype.getContext",
+    );
+    assert.equal(link.data.unreadChecked, true);
+  });
 });
 
 test("a receiver whose type comes from an unread file stays withheld", async () => {
@@ -1633,6 +1774,20 @@ test("a config extended by package name through an installed workspace link is r
     "absent package": {
       extendsName: "@scope/missing/library.json",
       files: {},
+      complete: false,
+    },
+    // tsc reports 1005 and drops what it cannot parse: settings are missing.
+    "workspace config package with a JSON syntax error": {
+      extendsName: "@scope/tsconfig/library.json",
+      link: ["packages/app/node_modules/@scope/tsconfig", "../../../tsconfig"],
+      files: {
+        "packages/tsconfig/package.json": JSON.stringify({
+          name: "@scope/tsconfig",
+          version: "0.0.0",
+        }),
+        "packages/tsconfig/library.json":
+          '{ "compilerOptions": { "strict": true "types": [] } }',
+      },
       complete: false,
     },
   };

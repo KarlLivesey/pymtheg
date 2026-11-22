@@ -946,21 +946,34 @@ export function mergeTied(
  */
 /**
  * What an unread file's raw text could contribute to a program if it were
- * read (C-39). `specifiers` is absent when the text could add declarations
- * beyond its own spelled names: any `declare`, `global`, `namespace` or
- * `module` token, a triple-slash reference, or an `import`/`require` without
- * a literal specifier. Otherwise it lists every literal module specifier.
+ * read (C-39). `specifiers` is absent when the text could add or merge a
+ * declaration that no spelled name reveals:
+ * - the file is not provably a module (`provablyModule`): every top-level
+ *   declaration of a script is global, and a global interface merge
+ *   (`interface HTMLElementTagNameMap`, `interface Document`) changes types
+ *   without spelling the reference's names;
+ * - any `declare`, `global`, `namespace` or `module` token (a module reaches
+ *   the global scope or another module only through these);
+ * - a triple-slash reference;
+ * - any `\\u` escape, which a word scan cannot read;
+ * - an `import`/`require` without a literal specifier.
+ * Otherwise it lists every literal module specifier.
  */
-export function unreadFacts(text: string): {
+export function unreadFacts(
+  text: string,
+  path = "unread.ts",
+): {
   tokens: ReadonlySet<string>;
   specifiers?: readonly string[];
 } {
   const tokens = new Set(text.match(/[A-Za-z_$][\w$]*/g) ?? []);
   if (
+    text.includes("\\u") ||
     /\/\/\/\s*<reference\b/.test(text) ||
     ["declare", "global", "namespace", "module"].some((name) =>
       tokens.has(name),
-    )
+    ) ||
+    !provablyModule(text, path)
   )
     return { tokens };
   const specifiers = [
@@ -970,6 +983,43 @@ export function unreadFacts(text: string): {
   ].map((match) => match[2]!);
   const uses = (text.match(/\b(?:import|require)\b/g) ?? []).length;
   return specifiers.length >= uses ? { tokens, specifiers } : { tokens };
+}
+
+/**
+ * Whether a file is a module, not a script, as written (C-39). True for a
+ * non-declaration `.mts`, `.cts`, `.mjs` or `.cjs` file (always a module),
+ * or when the compiler's parse of the text has a top-level `import` or
+ * `export` statement that ends before the first parse diagnostic. Error
+ * recovery after that point cannot remove it, and any `import` or `export`
+ * makes the whole file a module. A file whose module syntax appears only
+ * after an error, or not at all (a script, a `.d.ts` without it), is not
+ * provably a module.
+ */
+export function provablyModule(text: string, path: string): boolean {
+  if (/\.[mc][tj]s$/.test(path) && !/\.d\.[mc]ts$/.test(path)) return true;
+  const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest);
+  const parsed = (
+    source as unknown as { parseDiagnostics?: readonly ts.Diagnostic[] }
+  ).parseDiagnostics;
+  const firstError = Math.min(
+    text.length,
+    ...(parsed ?? []).map((diagnostic) => diagnostic.start ?? 0),
+  );
+  return source.statements.some(
+    (statement) =>
+      statement.end <= firstError &&
+      (ts.isImportDeclaration(statement) ||
+        ts.isExportDeclaration(statement) ||
+        ts.isExportAssignment(statement) ||
+        (ts.isImportEqualsDeclaration(statement) &&
+          ts.isExternalModuleReference(statement.moduleReference)) ||
+        (ts.canHaveModifiers(statement) &&
+          !!ts
+            .getModifiers(statement)
+            ?.some(
+              (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+            ))),
+  );
 }
 
 export function typescriptModule(
@@ -1508,7 +1558,7 @@ export function typescriptModule(
           for (const path of unseen) {
             let facts = inertFacts.get(path);
             if (!facts) {
-              facts = unreadFacts(sourceTexts.get(path) ?? "");
+              facts = unreadFacts(sourceTexts.get(path) ?? "", path);
               inertFacts.set(path, facts);
             }
             if (!facts.specifiers) return false;
