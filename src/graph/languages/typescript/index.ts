@@ -987,7 +987,7 @@ export function unreadFacts(
   if (
     text.includes("\\u") ||
     /\/\/\/\s*</.test(text) ||
-    /@jsx(?:ImportSource|Runtime)\b/.test(text) ||
+    /@jsx(?:ImportSource|Runtime)\b/i.test(text) ||
     ["declare", "global", "namespace", "module"].some((name) =>
       tokens.has(name),
     )

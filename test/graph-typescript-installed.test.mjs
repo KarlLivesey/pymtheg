@@ -1748,6 +1748,24 @@ test("module detection, JSX runtimes and resolution modes decide whether an unre
       site: "c.getContext",
       expected: "not definite",
     },
+    // The compiler reads pragma names without regard to letter case.
+    "an unread .tsx with the pragma in another letter case": {
+      files: {
+        "tsconfig.json": config({ jsx: "react-jsx" }),
+        "node_modules/pkg/package.json": JSON.stringify({
+          name: "pkg",
+          version: "1.0.0",
+          exports: { "./jsx-runtime": { types: "./jsx-runtime.d.ts" } },
+        }),
+        "node_modules/pkg/jsx-runtime.d.ts": `export {};\ndeclare global { ${overload} }\nexport declare function jsx(...args: any[]): any;\n`,
+        "src/view.tsx":
+          "/** @jsximportsource pkg */\nexport const v = 1;\nlet = ;\n",
+        "src/main.ts": canvas,
+      },
+      broken: "src/view.tsx",
+      site: "c.getContext",
+      expected: "not definite",
+    },
     // A dual-format package: the program loads the require typings, the
     // unread ES module would load the import typings.
     "an unread ES module importing the other format of a dual package": {
