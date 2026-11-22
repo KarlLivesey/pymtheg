@@ -2796,8 +2796,7 @@ or one transaction per phase: W3-P1 measured readers and second writers locked
 out, and under a write-ahead log batches of 64 were no faster), and
 `synchronous=OFF` (the database itself may be corrupted by a power loss).
 See [C-6](changes/C-6.md).
-**Superseded in part by C-37:** one commit per file and the checkpoint every
-10,000 pages (see below).
+**Superseded in part by C-37:** one commit per file (see below).
 
 ### C-9 Rust library paths
 
@@ -3194,26 +3193,30 @@ time limits where a deterministic property exists. See [C-26](changes/C-26.md).
 
 ### C-37 Graph index writes commit in bounded batches
 
-**Decided (C-37):** under the write-ahead log, an index run's file writes
-(parse results and analysed results) share one transaction until about
-50,000 rows are written (SQLite's direct changes, a fixed count), then
-commit; the rest commits at the end of each write phase. Every batch is one
-commit with the run's checks at its start: the unfinished-run mark at the
-first, and at each one the proof that no other run has written since. A
-write that fails undoes its open batch; the store is then its earlier
-commits, as after a crash. The log checkpoints every 100,000 pages and is
-cut back to 64 MiB afterwards. With a rollback journal each write still
-commits alone. This supersedes C-6's one commit per file and checkpoint
-every 10,000 pages; its write-ahead log, `synchronous=NORMAL` and the fully
-synced completion record are unchanged. **Why:** on disk, repeated commits
-rewrote the same index pages into the log and each checkpoint copied them
-again (cli/cli wrote 8.9 GiB for a 463 MiB store). **Bound:** another
-writer waits for at most one batch, a fixed row count; one module's
-resolution write, a single transaction before and after, remains the
-longest hold. Readers are never blocked under the write-ahead log. A run
-overtaken between two batches stops at the next batch. **Trade:** a run
-cut short loses up to one batch more of progress, which its mark makes the
-next run redo; the log can reach about 400 MB during a cold index. **Rules
-out:** savepoints per write (several times slower inserts), batches bounded
-by time, and batching under a rollback journal (a batch larger than the
-page cache would lock readers out). See [C-37](changes/C-37.md).
+**Decided (C-37):** under the write-ahead log, an index run's writes (parse
+results, analysed results and each module's resolution write) share one
+transaction until about 50,000 rows are written (SQLite's direct changes, a
+fixed count), then commit; the rest commits at the end of each write phase.
+Every batch is one commit with the run's checks at its start: the
+unfinished-run mark at the first, and at each one the proof that no other
+run has written since. Every store write, and every batch, first takes a
+turnstile, a lock-only database beside the store (`graph.sqlite-turnstile`,
+SQLite's own file lock), and leaves it once it holds the write lock. A
+writable open that finds its schema and identity in place writes nothing.
+A write that fails undoes its open batch; the store is then its earlier
+commits, as after a crash. With a rollback journal, or where the turnstile
+cannot be opened, each write still commits alone. This supersedes C-6's one
+commit per file; its write-ahead log, checkpoint every 10,000 pages,
+`synchronous=NORMAL` and the fully synced completion record are unchanged.
+**Why:** on disk, repeated commits rewrote the same index pages into the
+log (cli/cli wrote 9.23 GiB for a 463 MiB store). **Bound:** a writer that
+waits holds the turnstile, so the run finishes at most the batch in progress
+before the writer has the write lock (a counted test proves it); a dead
+holder's lock is released by the operating system. Readers are never
+blocked under the write-ahead log. A run overtaken between two batches
+stops at the next batch. **Trade:** a run cut short loses up to one batch
+more of progress, which its mark makes the next run redo. **Rules out:**
+savepoints per write (several times slower inserts), batches bounded by
+time, batching under a rollback journal (a batch larger than the page cache
+would lock readers out), and longer checkpoint intervals (no faster with
+batches; the log grows by the interval). See [C-37](changes/C-37.md).
