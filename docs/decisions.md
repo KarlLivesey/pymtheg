@@ -2361,6 +2361,17 @@ wrong results in real shapes. Lesson recorded by the manager under D18 (13
 November 2026): measure a cheap, same-class fix on the corpus before asking for
 it.
 
+### D19: coverage is judged with dependencies installed
+
+**Decided (Karl, 21 November 2026):** "we will assume in 99% of cases
+dependencies are installed". The coverage goal for a language is judged on a
+checkout whose dependencies are installed; the bare-checkout figure is still
+reported, as a secondary number. This confirms the manager's earlier choice for
+TypeScript (C-20). **Why:** people index the project they are working in, and a
+working checkout has its dependencies. **Rules out:** ranking work that only
+helps a bare checkout above work that helps an installed one; reporting the
+bare figure as the headline.
+
 ### E4: unseen code does not rebind `derive` or standard macros (Rust)
 
 **Decided (ruling E4, W2-C, 12 November 2026; the build plan names no author, and
