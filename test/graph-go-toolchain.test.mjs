@@ -115,6 +115,7 @@ test("the setting: only this machine's trusted answer turns Go on; graph.toolcha
   );
   assert.deepEqual(graphToolchains({ version: 1, scenarios: {} }, trusted), {
     go: true,
+    rust: true,
   });
   assert.deepEqual(
     graphToolchains(
@@ -125,7 +126,7 @@ test("the setting: only this machine's trusted answer turns Go on; graph.toolcha
       },
       trusted,
     ),
-    {},
+    { rust: true },
   );
   assert.deepEqual(graphConfig({ toolchain: { go: "/usr/lib/go/bin/go" } }), {
     toolchain: { go: "/usr/lib/go/bin/go" },

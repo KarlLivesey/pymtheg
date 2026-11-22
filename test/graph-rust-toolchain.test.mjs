@@ -33,6 +33,7 @@ import { setRunControls } from "../dist/graph/languages/rust/toolchain-route.js"
 import { toolchainState } from "../dist/graph/command-toolchain.js";
 import { executeGraph } from "../dist/graph/commands.js";
 import { graphConfig, graphToolchains } from "../dist/shared/config.js";
+import { initializeWorkspace } from "../dist/project/workspace.js";
 import { controlledClock } from "./controlled-clock.mjs";
 
 const FIXTURE = fileURLToPath(
@@ -364,33 +365,21 @@ async function gateCase(answer, overrides = {}, behaviour = {}) {
 
 // ---------------------------------------------------------------- settings
 
-test("settings: trusted runs the Rust route, an explicit setting wins either way, and a relative path is refused", () => {
-  const config = (graph) => ({
-    version: 1,
-    scenarios: {},
-    graph: graphConfig(graph),
-  });
-  assert.deepEqual(graphToolchains(config({ trust: "trusted" })), {
-    go: true,
-    rust: true,
-  });
+test("settings: this machine's trusted answer runs the Rust route; committed settings only turn it off; tool paths are local", () => {
+  // C-44: only the local answer grants trust (D22).
+  const config = (graph) => ({ version: 1, scenarios: {}, graph: graphConfig(graph) });
+  const trusted = { trust: "trusted" };
+  assert.deepEqual(graphToolchains(config({}), trusted), { go: true, rust: true });
+  assert.deepEqual(graphToolchains(config({ trust: "trusted" }), undefined), {});
+  assert.deepEqual(graphToolchains(config({ toolchain: { rust: true } }), undefined), {});
+  assert.deepEqual(graphToolchains(config({ toolchain: { rust: false } }), trusted), { go: true });
+  // A committed path is never used; a local one is.
+  assert.deepEqual(graphToolchains(config({ toolchain: { rust: "/repo/ra" } }), trusted), { go: true, rust: true });
   assert.deepEqual(
-    graphToolchains(config({ trust: "trusted", toolchain: { rust: false } })),
-    { go: true },
+    graphToolchains(config({}), { ...trusted, toolchain: { rust: "/opt/ra/rust-analyzer" } }),
+    { go: true, rust: "/opt/ra/rust-analyzer" },
   );
-  assert.deepEqual(
-    graphToolchains(
-      config({
-        trust: "source-only",
-        toolchain: { rust: "/opt/ra/rust-analyzer" },
-      }),
-    ),
-    { rust: "/opt/ra/rust-analyzer" },
-  );
-  assert.deepEqual(graphToolchains(config({ toolchain: { rust: true } })), {
-    rust: true,
-  });
-  assert.deepEqual(graphToolchains(config({ trust: "source-only" })), {});
+  assert.deepEqual(graphToolchains(config({ trust: "source-only" }), trusted), {});
   assert.throws(
     () => graphConfig({ toolchain: { rust: "rust-analyzer" } }),
     /graph.toolchain.rust must be true, false or an absolute path to rust-analyzer/,
@@ -983,24 +972,17 @@ test("off: no setting stores no toolchain data and the same rows as an index bef
 test("graph answers report the Rust route's state beside Go's", async () => {
   await scratch(async (root) => {
     const project = join(root, "project");
-    writeProject(project, {
-      ...GATES,
-      ".pymtheg/settings.json": JSON.stringify({
-        version: 1,
-        scenarios: {},
-        graph: { toolchain: { rust: join(root, "none", "rust-analyzer") } },
-      }),
-    });
+    writeProject(project, GATES);
+    // Trusted on this machine, with a local rust-analyzer path that does not exist.
+    await initializeWorkspace(project, undefined, { trust: "trusted" });
+    const local = join(project, ".pymtheg/local/trust.json");
+    const answer = JSON.parse(readFileSync(local, "utf8"));
+    writeFileSync(local, JSON.stringify({ ...answer, toolchain: { go: false, rust: join(root, "none", "rust-analyzer") } }));
     const response = await executeGraph({ command: "index", root: project });
-    assert.deepEqual(Object.keys(response.toolchain).sort(), [
-      "rust",
-      "setting",
-    ]);
+    assert.equal(response.trust, "trusted");
+    assert.deepEqual(Object.keys(response.toolchain).sort(), ["rust", "setting"]);
     assert.equal(response.toolchain.rust.state, "unavailable");
-    assert.match(
-      response.toolchain.rust.reason,
-      /none\/rust-analyzer does not exist$/,
-    );
+    assert.match(response.toolchain.rust.reason, /none\/rust-analyzer does not exist$/);
   });
 });
 
