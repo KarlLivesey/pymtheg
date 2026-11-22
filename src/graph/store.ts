@@ -293,16 +293,17 @@ export class SqliteGraphStore implements GraphStorage {
   private batching = false;
   /** The total_changes() at which the open batch transaction began. */
   private batchOpen: number | undefined;
-  /** Writes that have succeeded in the open batch. */
-  private batchWrites = 0;
   /**
    * C-37: runs `action` with its graph writes grouped into transactions of
    * about writeBatchRows rows (each one write, so a batch can end up to one
    * write over). A batch is one commit: the run's ownership checks, mark and
    * data-version bookkeeping happen at its BEGIN and COMMIT, as for any
-   * other commit, and another writer waits for at most one batch. Each write
-   * in a batch is its own savepoint, so a write that fails leaves the
-   * earlier ones in place, as their own commits did. A batch only forms
+   * other commit, and another writer waits for at most one batch. A write
+   * that fails undoes the open batch with it: the store is then the state
+   * after the run's earlier commits, as after a crash, and the run's mark
+   * (from its first commit) makes the next run redo the work. Savepoints
+   * per write would keep the others, but made each link insert inside them
+   * several times slower (C-37 measurements). A batch only forms
    * under the write-ahead log, where readers are never blocked; with a
    * rollback journal each write commits on its own as before. The open
    * batch commits when `action` ends, also when it throws.
@@ -376,7 +377,6 @@ export class SqliteGraphStore implements GraphStorage {
     }
     if (this.batching && this.writeAheadLog) {
       this.batchOpen = this.totalChanges();
-      this.batchWrites = 0;
       return this.batchedWrite(action);
     }
     try {
@@ -389,20 +389,13 @@ export class SqliteGraphStore implements GraphStorage {
   }
   /** One write inside the open batch, then its commit once the budget is met. */
   private batchedWrite(action: () => void): void {
-    this.db.exec("SAVEPOINT graph_write");
     try {
       action();
     } catch (error) {
-      // A batch with no write yet holds only its opening (the run's mark):
-      // it is undone whole, as that write's own transaction was.
-      if (this.batchWrites === 0) {
-        this.batchOpen = undefined;
-        this.db.exec("ROLLBACK");
-      } else this.db.exec("ROLLBACK TO graph_write; RELEASE graph_write");
+      this.batchOpen = undefined;
+      this.db.exec("ROLLBACK");
       throw error;
     }
-    this.db.exec("RELEASE graph_write");
-    this.batchWrites++;
     if (
       this.totalChanges() - this.batchOpen! >=
       SqliteGraphStore.writeBatchRows

@@ -3,7 +3,7 @@
 // one commit with the run's ownership checks at its start, so a run that
 // another run overtook between two batches writes nothing more; readers are
 // not blocked by an open batch and see the last commit; a write that fails
-// inside a batch leaves the earlier writes, as their own commits did.
+// inside a batch undoes that batch and leaves the earlier commits.
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -114,7 +114,7 @@ test("a run overtaken between two batches writes nothing more", async () => {
   }
 });
 
-test("a write that fails inside a batch leaves the earlier writes; a failed first write leaves nothing", async () => {
+test("a write that fails inside a batch undoes the open batch; earlier batches stay", async () => {
   const base = mkdtempSync(join(tmpdir(), "c37-batch-"));
   const path = join(base, "graph.sqlite");
   const store = new SqliteGraphStore(path, "c37");
@@ -123,28 +123,34 @@ test("a write that fails inside a batch leaves the earlier writes; a failed firs
   db.exec(`CREATE TRIGGER c37_refuse BEFORE INSERT ON graph_symbols
     WHEN NEW.file='bad.syn' BEGIN SELECT RAISE(ABORT,'refused'); END`);
   db.close();
-  const invalid = record("bad.syn");
   try {
     store.beginIndexRun();
-    await withBudget(1000, () =>
+    // The first batch fails: nothing is committed, not even the run's mark.
+    await withBudget(30, () =>
       assert.rejects(
         store.writeBatch(async () => {
-          store.replaceFile(invalid);
+          store.replaceFile(record("a.syn"));
+          store.replaceFile(record("bad.syn"));
         }),
         /refused/,
       ),
     );
-    // Nothing was committed, not even the run's mark.
     assert.deepEqual(paths(path), []);
     assert.equal(store.unfinishedIndexRun(), false);
-    await withBudget(1000, () =>
-      store.writeBatch(async () => {
-        store.replaceFile(record("a.syn"));
-        assert.throws(() => store.replaceFile(invalid), /refused/);
-        store.replaceFile(record("b.syn"));
-      }),
+    // a and b commit as one batch; c's batch is undone with the failure.
+    await withBudget(30, () =>
+      assert.rejects(
+        store.writeBatch(async () => {
+          store.replaceFile(record("a.syn"));
+          store.replaceFile(record("b.syn"));
+          store.replaceFile(record("c.syn"));
+          store.replaceFile(record("bad.syn"));
+        }),
+        /refused/,
+      ),
     );
     assert.deepEqual(paths(path), ["a.syn", "b.syn"]);
+    // The run's mark from its first commit stays: the next run redoes it.
     assert.equal(store.unfinishedIndexRun(), true);
   } finally {
     store.close();
