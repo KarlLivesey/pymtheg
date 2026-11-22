@@ -644,10 +644,13 @@ export async function indexProject(
       });
       result = { resolutions: [], links: [] };
     }
+    // C-37: a large resolution write commits in batches too.
     await stage(`resolve.${module.id}.write`, () =>
-      prepared
-        ? store.replaceAnalysis(module.id, result, prepared)
-        : store.replaceAnalysis(module.id, result),
+      batched(async () =>
+        prepared
+          ? store.replaceAnalysis(module.id, result, prepared)
+          : store.replaceAnalysis(module.id, result),
+      ),
     );
   };
   // The modules that own at least one stored file, after analysis.

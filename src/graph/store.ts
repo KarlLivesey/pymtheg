@@ -252,16 +252,19 @@ export class SqliteGraphStore implements GraphStorage {
   private turnstile: DatabaseSync | null | undefined;
   private turnstileFile: string | undefined;
   private turnstileDepth = 0;
-  private enterTurnstile(): boolean {
-    if (this.turnstileFile === undefined) return false;
+  private openTurnstile(): DatabaseSync | null {
+    if (this.turnstileFile === undefined) return null;
     if (this.turnstile === undefined)
       try {
         this.turnstile = openDatabase(this.turnstileFile);
       } catch {
         this.turnstile = null;
       }
-    if (!this.turnstile) return false;
-    if (this.turnstileDepth === 0) this.turnstile.exec("BEGIN IMMEDIATE");
+    return this.turnstile;
+  }
+  private enterTurnstile(): boolean {
+    if (!this.openTurnstile()) return false;
+    if (this.turnstileDepth === 0) this.turnstile!.exec("BEGIN IMMEDIATE");
     this.turnstileDepth++;
     return true;
   }
@@ -1007,50 +1010,66 @@ export class SqliteGraphStore implements GraphStorage {
     current: readonly GraphLink[],
     desired: readonly GraphLink[],
     sql: (sql: string) => StatementSync,
+    write: (step: () => void) => void,
   ): void {
     const byId = new Map(current.map((link) => [link.id, link]));
-    for (const link of desired) {
-      const before = byId.get(link.id);
-      if (before && before.data !== link.data)
-        sql("UPDATE graph_links SET body=? WHERE id=?").run(
-          JSON.stringify(link),
+    for (const link of desired)
+      write(() => {
+        const before = byId.get(link.id);
+        if (before && before.data !== link.data)
+          sql("UPDATE graph_links SET body=? WHERE id=?").run(
+            JSON.stringify(link),
+            link.id,
+          );
+        // An unresolved link has no target rows. The library insert triggers
+        // the class update, so there are no old relationships to clear.
+        if (
+          before?.resolution === "unresolved" &&
+          link.resolution === "library"
+        ) {
+          this.insertLibraries(link, sql);
+          return;
+        }
+        if (
+          before?.targetId === link.targetId &&
+          JSON.stringify(before.candidates.map((item) => item.id)) ===
+            JSON.stringify(link.candidates.map((item) => item.id)) &&
+          before.resolution === link.resolution &&
+          JSON.stringify(before.libraries ?? []) ===
+            JSON.stringify(link.libraries ?? [])
+        )
+          return;
+        count("store.linkTargetsRewritten");
+        sql("UPDATE graph_links SET target=? WHERE id=?").run(
+          link.targetId,
           link.id,
         );
-      // An unresolved link has no target rows. The library insert triggers
-      // the class update, so there are no old relationships to clear.
-      if (
-        before?.resolution === "unresolved" &&
-        link.resolution === "library"
-      ) {
-        this.insertLibraries(link, sql);
-        continue;
-      }
-      if (
-        before?.targetId === link.targetId &&
-        JSON.stringify(before.candidates.map((item) => item.id)) ===
-          JSON.stringify(link.candidates.map((item) => item.id)) &&
-        before.resolution === link.resolution &&
-        JSON.stringify(before.libraries ?? []) ===
-          JSON.stringify(link.libraries ?? [])
-      )
-        continue;
-      count("store.linkTargetsRewritten");
-      sql("UPDATE graph_links SET target=? WHERE id=?").run(
-        link.targetId,
-        link.id,
-      );
-      sql("DELETE FROM graph_candidates WHERE link=?").run(link.id);
-      for (const candidate of link.candidates)
-        sql("INSERT INTO graph_candidates VALUES (?,?,?)").run(
-          link.id,
-          candidate.id,
-          link.kind,
-        );
-      if (before?.libraries || link.libraries) {
-        sql("DELETE FROM graph_library_targets WHERE link=?").run(link.id);
-        this.insertLibraries(link, sql);
-      }
-    }
+        sql("DELETE FROM graph_candidates WHERE link=?").run(link.id);
+        for (const candidate of link.candidates)
+          sql("INSERT INTO graph_candidates VALUES (?,?,?)").run(
+            link.id,
+            candidate.id,
+            link.kind,
+          );
+        if (before?.libraries || link.libraries) {
+          sql("DELETE FROM graph_library_targets WHERE link=?").run(link.id);
+          this.insertLibraries(link, sql);
+        }
+      });
+  }
+  /**
+   * C-37: a write of many rows, one module's resolution, as steps of one
+   * link each. Inside a batch scope (under the write-ahead log, with the
+   * turnstile) each step is one write of the batches, which commit at the
+   * row budget, so no transaction of a run holds the write lock for more
+   * than about one batch. Otherwise every step shares one transaction, as
+   * before.
+   */
+  private inSteps(writes: (write: (step: () => void) => void) => void): void {
+    this.beforeWrite();
+    if (this.batching && this.writeAheadLog && this.openTurnstile())
+      writes((step) => this.transaction(step));
+    else this.transaction(() => writes((step) => step()));
   }
   resolveLinks(resolutions: readonly LinkResolution[]): void {
     const current = this.links();
@@ -1067,10 +1086,10 @@ export class SqliteGraphStore implements GraphStorage {
     const desired = current.map((link) =>
       decider.decide(link, decisions.get(link.id)),
     );
-    if (!sameLinks(current, desired))
-      this.transaction(() =>
-        this.writeTargets(current, desired, this.writer()),
-      );
+    if (!sameLinks(current, desired)) {
+      const sql = this.writer();
+      this.inSteps((write) => this.writeTargets(current, desired, sql, write));
+    }
   }
   replaceAnalysis(
     module: string,
@@ -1153,7 +1172,7 @@ export class SqliteGraphStore implements GraphStorage {
     count("store.linksCompared", current.length);
     if (sameLinks(current, desired)) return;
     const sql = this.writer();
-    this.transaction(() => {
+    this.inSteps((write) => {
       const wanted = new Map(desired.map((link) => [link.id, link]));
       const previous = new Map(current.map((link) => [link.id, link]));
       for (const link of current)
@@ -1161,20 +1180,22 @@ export class SqliteGraphStore implements GraphStorage {
           link.origin === "analysis" &&
           (!wanted.has(link.id) ||
             JSON.stringify(link) !== JSON.stringify(wanted.get(link.id)))
-        ) {
-          count("store.linkRowsDeleted");
-          sql("DELETE FROM graph_links WHERE id=?").run(link.id);
-        }
+        )
+          write(() => {
+            count("store.linkRowsDeleted");
+            sql("DELETE FROM graph_links WHERE id=?").run(link.id);
+          });
       for (const link of desired)
         if (
           link.origin === "analysis" &&
           JSON.stringify(previous.get(link.id)) !== JSON.stringify(link)
         )
-          this.insertLink(link, sql);
+          write(() => this.insertLink(link, sql));
       this.writeTargets(
         current,
         desired.filter((link) => link.origin === "parse"),
         sql,
+        write,
       );
     });
   }
