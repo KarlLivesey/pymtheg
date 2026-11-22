@@ -2376,6 +2376,53 @@ there is no further symbol to name. **Rules out:** crediting a member link
 that names only its package (`vi.fn`, `screen.getByRole`): it has a symbol
 to name, and it stays Level 1.
 
+### D21: the opt-in Rust route may use rust-analyzer
+
+**Decided (Karl, 22 November 2026):** "This is fine you are allowed to use the
+languages official builder for these I stated this ages ago". This lifts the
+one restriction D17 left ("`rust-analyzer` unless Karl asks") and was given in
+answer to three stated consequences: opted-in projects have their build
+scripts and procedural macros run, as a build would; the route needs the
+crates present; and the Rust coverage goal is judged with the route switched
+on, as D19 does for installed dependencies. Everything else in D17 stands:
+explicit per-project opt-in, offline by default, one recorded build
+configuration, the project never written, no claim of a security boundary.
+The measured shape is in [C-19](changes/C-19.md): answers are taken only for
+links the source-only route leaves open, under the strict join and the gates
+(no answers under a cfg condition other than `test`; trait methods stay
+candidate sets); an edit re-indexes source-only at once and no stale toolchain
+answer is shown as definite. **Why:** the owner's standing rule is that a
+language's own build chain is an allowed dependency; source-only Rust stays
+near 43% because most open links need type inference. **Rules out:** running
+the route on a project that has not opted in; reporting the opted-in figure
+without also giving the source-only one.
+
+### D22: init asks once whether the repository is trusted
+
+**Decided (Karl, 22 November 2026):** "When the user runs init it should ask
+them of source only or build tools allowed (in general) for this aka do you
+trust the repo", and then: "you generally trust a repo because you're gonna
+want to build whatever's on there. So it's not usually a problem. But yeah, it
+should be like a. Hey, do you trust the repo, much like how chat agents" ask
+it. So the opt-in of D17 becomes one project-wide answer given at `init`,
+covering every language, put as a trust question in the manner of coding
+agents: **trusted** (each language's official tooling may run on the project,
+which runs its build scripts and macros as a build would) or **source only**
+(nothing of the project is ever run). As implemented by the manager: trusting
+is the preselected answer of the prompt, since that is the usual case. Over
+MCP the question is still asked (Karl, same day: it "should still respond with
+something saying like, do you trust this repo and like maybe that model might
+have a pre-existing instruction to approve it"): an initialisation without the
+answer does not guess; it returns the trust question to the calling model,
+which answers from its user or its standing instructions and calls again.
+Studio setup shows the same question. Only a command-line init with no
+terminal and no flag records source only, and says so; the answer is stored in the project
+configuration, shown in answers, and can be changed later; the per-language
+settings of D17 remain as overrides. **Why:** running a toolchain on a project
+is as trusted as building it (D17), and that is a single judgement about the
+repository, not one per language. **Rules out:** running build tools on a
+project whose owner was never asked.
+
 ### D19: coverage is judged with dependencies installed
 
 **Decided (Karl, 21 November 2026):** "we will assume in 99% of cases
