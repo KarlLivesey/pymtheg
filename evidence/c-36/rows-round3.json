@@ -4,9 +4,9 @@
    "pin": "BurntSushi_ripgrep",
    "round": 0,
    "build": "main",
-   "wallS": 39.93,
-   "cpuS": 49.3,
-   "peakMiB": 908,
+   "wallS": 101.42,
+   "cpuS": 54.6,
+   "peakMiB": 848,
    "equality": {
     "rows": {
      "graph_files": 102,
@@ -25,9 +25,9 @@
    "pin": "BurntSushi_ripgrep",
    "round": 0,
    "build": "after",
-   "wallS": 41.36,
-   "cpuS": 47.3,
-   "peakMiB": 924,
+   "wallS": 71.71,
+   "cpuS": 49.8,
+   "peakMiB": 937,
    "equality": {
     "rows": {
      "graph_files": 102,
@@ -48,9 +48,9 @@
    "pin": "actix_actix-web",
    "round": 0,
    "build": "main",
-   "wallS": 92.2,
-   "cpuS": 111.9,
-   "peakMiB": 1325,
+   "wallS": 196.3,
+   "cpuS": 126.8,
+   "peakMiB": 1368,
    "equality": {
     "rows": {
      "graph_files": 329,
@@ -69,9 +69,9 @@
    "pin": "actix_actix-web",
    "round": 0,
    "build": "after",
-   "wallS": 90.14,
-   "cpuS": 108.8,
-   "peakMiB": 1348,
+   "wallS": 219.76,
+   "cpuS": 128,
+   "peakMiB": 1414,
    "equality": {
     "rows": {
      "graph_files": 329,
@@ -92,9 +92,9 @@
    "pin": "cberner_redb",
    "round": 0,
    "build": "main",
-   "wallS": 84.27,
-   "cpuS": 90.4,
-   "peakMiB": 1215,
+   "wallS": 108.79,
+   "cpuS": 101.2,
+   "peakMiB": 1112,
    "equality": {
     "rows": {
      "graph_files": 98,
@@ -113,9 +113,9 @@
    "pin": "cberner_redb",
    "round": 0,
    "build": "after",
-   "wallS": 70.82,
-   "cpuS": 86.1,
-   "peakMiB": 1240,
+   "wallS": 135.49,
+   "cpuS": 99.9,
+   "peakMiB": 1068,
    "equality": {
     "rows": {
      "graph_files": 98,
@@ -136,9 +136,9 @@
    "pin": "crossbeam-rs_crossbeam",
    "round": 0,
    "build": "main",
-   "wallS": 36.38,
-   "cpuS": 45.2,
-   "peakMiB": 891,
+   "wallS": 36.6,
+   "cpuS": 45.8,
+   "peakMiB": 881,
    "equality": {
     "rows": {
      "graph_files": 115,
@@ -157,9 +157,9 @@
    "pin": "crossbeam-rs_crossbeam",
    "round": 0,
    "build": "after",
-   "wallS": 35.29,
-   "cpuS": 44.3,
-   "peakMiB": 910,
+   "wallS": 44.97,
+   "cpuS": 48.7,
+   "peakMiB": 877,
    "equality": {
     "rows": {
      "graph_files": 115,
@@ -180,9 +180,9 @@
    "pin": "fjall-rs_fjall",
    "round": 0,
    "build": "main",
-   "wallS": 15.61,
-   "cpuS": 21.6,
-   "peakMiB": 610,
+   "wallS": 18.54,
+   "cpuS": 22.2,
+   "peakMiB": 605,
    "equality": {
     "rows": {
      "graph_files": 120,
@@ -201,9 +201,9 @@
    "pin": "fjall-rs_fjall",
    "round": 0,
    "build": "after",
-   "wallS": 13.89,
-   "cpuS": 20.2,
-   "peakMiB": 613,
+   "wallS": 15.48,
+   "cpuS": 21.9,
+   "peakMiB": 598,
    "equality": {
     "rows": {
      "graph_files": 120,
@@ -224,9 +224,9 @@
    "pin": "helix-editor_helix",
    "round": 0,
    "build": "main",
-   "wallS": 90.18,
-   "cpuS": 113.6,
-   "peakMiB": 1354,
+   "wallS": 147.7,
+   "cpuS": 152.1,
+   "peakMiB": 1246,
    "equality": {
     "rows": {
      "graph_files": 269,
@@ -245,9 +245,9 @@
    "pin": "helix-editor_helix",
    "round": 0,
    "build": "after",
-   "wallS": 133.09,
-   "cpuS": 126.3,
-   "peakMiB": 1302,
+   "wallS": 188.09,
+   "cpuS": 157.6,
+   "peakMiB": 1521,
    "equality": {
     "rows": {
      "graph_files": 269,
@@ -268,9 +268,9 @@
    "pin": "rust-embedded_cortex-m",
    "round": 0,
    "build": "main",
-   "wallS": 7.5,
-   "cpuS": 10.3,
-   "peakMiB": 410,
+   "wallS": 8.69,
+   "cpuS": 11.4,
+   "peakMiB": 407,
    "equality": {
     "rows": {
      "graph_files": 132,
@@ -289,9 +289,9 @@
    "pin": "rust-embedded_cortex-m",
    "round": 0,
    "build": "after",
-   "wallS": 8.52,
-   "cpuS": 11.1,
-   "peakMiB": 398,
+   "wallS": 9.13,
+   "cpuS": 12,
+   "peakMiB": 410,
    "equality": {
     "rows": {
      "graph_files": 132,
@@ -312,9 +312,9 @@
    "pin": "rustls_rustls",
    "round": 0,
    "build": "main",
-   "wallS": 118.1,
-   "cpuS": 144.8,
-   "peakMiB": 1522,
+   "wallS": 192.55,
+   "cpuS": 155.2,
+   "peakMiB": 1414,
    "equality": {
     "rows": {
      "graph_files": 172,
@@ -333,9 +333,9 @@
    "pin": "rustls_rustls",
    "round": 0,
    "build": "after",
-   "wallS": 137.23,
-   "cpuS": 166,
-   "peakMiB": 1491,
+   "wallS": 212.6,
+   "cpuS": 182.2,
+   "peakMiB": 1454,
    "equality": {
     "rows": {
      "graph_files": 172,
@@ -356,9 +356,9 @@
    "pin": "serde-rs_serde",
    "round": 0,
    "build": "main",
-   "wallS": 33.74,
-   "cpuS": 46.4,
-   "peakMiB": 889,
+   "wallS": 49.75,
+   "cpuS": 52.7,
+   "peakMiB": 906,
    "equality": {
     "rows": {
      "graph_files": 208,
@@ -377,9 +377,9 @@
    "pin": "serde-rs_serde",
    "round": 0,
    "build": "after",
-   "wallS": 42.29,
-   "cpuS": 54.8,
-   "peakMiB": 897,
+   "wallS": 59.8,
+   "cpuS": 56.7,
+   "peakMiB": 895,
    "equality": {
     "rows": {
      "graph_files": 208,
@@ -400,9 +400,9 @@
    "pin": "tokio-rs_axum",
    "round": 0,
    "build": "main",
-   "wallS": 46.56,
-   "cpuS": 60.6,
-   "peakMiB": 992,
+   "wallS": 79.17,
+   "cpuS": 64.8,
+   "peakMiB": 1015,
    "equality": {
     "rows": {
      "graph_files": 310,
@@ -421,9 +421,9 @@
    "pin": "tokio-rs_axum",
    "round": 0,
    "build": "after",
-   "wallS": 49.14,
-   "cpuS": 64.2,
-   "peakMiB": 1020,
+   "wallS": 90.28,
+   "cpuS": 63.6,
+   "peakMiB": 982,
    "equality": {
     "rows": {
      "graph_files": 310,
