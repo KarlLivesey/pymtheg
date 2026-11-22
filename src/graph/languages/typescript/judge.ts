@@ -195,8 +195,6 @@ export function createJudge(input: JudgeInput): Judge {
   let spent = 0;
   let depth = 0;
   let entries = 0;
-  /** Whether a structural judgement (`expression`, `tainted`) is running. */
-  let judging = false;
   const charge = (steps: number) => {
     spent += steps;
     if (spent > budget) throw new JudgeLimit("steps");
@@ -219,7 +217,6 @@ export function createJudge(input: JudgeInput): Judge {
       if (entries++ === 0) {
         spent = 0;
         depth = 0;
-        judging = true;
         judgeStatistics.judgements++;
       }
       try {
@@ -229,20 +226,18 @@ export function createJudge(input: JudgeInput): Judge {
           judgeStatistics.exhausted++;
         throw error;
       } finally {
-        if (--entries === 0) {
-          judging = false;
+        if (--entries === 0)
           judgeStatistics.maxSteps = Math.max(judgeStatistics.maxSteps, spent);
-        }
       }
     };
   }
   const library = (node: ts.Node) =>
     program.isSourceFileDefaultLibrary(node.getSourceFile());
-  // A stack overflow is not an answer (its point depends on the engine):
-  // it ends the judgement as a bound does.
+  // A stack overflow is not an answer (its point depends on the engine): it
+  // ends the judgement, or the dependence graph's answer, as a bound does.
   const overflow = (error: unknown) => {
     if (error instanceof JudgeLimit) throw error;
-    if (judging && error instanceof RangeError) throw new JudgeLimit("depth");
+    if (error instanceof RangeError) throw new JudgeLimit("depth");
   };
   const symbolAt = (node: ts.Node): ts.Symbol | undefined => {
     try {
@@ -391,10 +386,104 @@ export function createJudge(input: JudgeInput): Judge {
   };
 
   // ---------------- taint of a judgement ----------------
-  function tainted(judged: Judged, seen = new Set<Judged>()): boolean {
+  // C-47: a judgement's identity for the cycle check in `tainted`. A literal,
+  // function or object judged again for the same node or symbol, with the
+  // same `self` and type parameters bound to the same judgements, has the same
+  // taint; each pass builds a new environment, so object identity alone never
+  // repeated (Arg -> ArgParser -> opts: P & Arg<T, P> -> Arg …).
+  const ids = new WeakMap<object, number>();
+  let nextId = 1;
+  const idOf = (value: object | undefined): number => {
+    if (!value) return 0;
+    let id = ids.get(value);
+    if (id === undefined) ids.set(value, (id = nextId++));
+    return id;
+  };
+  // A bound value is compared by its own key, so a reference judged again
+  // (`DefaultContext<Arg<T, P>>`, a new literal each time) still matches. The
+  // keys end at the original, non-recursive bindings; a value whose key is
+  // being computed falls back to its identity.
+  const keys = new WeakMap<Judged, string>();
+  const computingKey = new Set<Judged>();
+  function cycleKey(judged: Judged): Judged | string {
+    switch (judged.k) {
+      case "clean":
+        return "clean";
+      case "failed":
+        return `failed:${judged.why}`;
+      case "opaque":
+        return `opaque:${judged.why}`;
+      case "checked":
+        return `checked:${idOf(judged.type)}`;
+      case "static":
+        return `static:${idOf(judged.symbol)}`;
+      case "objectLiteral":
+        return `objectLiteral:${idOf(judged.node)}`;
+      case "union":
+      case "tuple":
+        break;
+      default:
+        break;
+    }
+    const known = keys.get(judged);
+    if (known !== undefined) return known;
+    if (computingKey.has(judged)) return `#${idOf(judged)}`;
+    computingKey.add(judged);
+    try {
+      const valueKey = (value: Judged): string => {
+        const key = cycleKey(value);
+        return typeof key === "string" ? `(${key})` : `#${idOf(key)}`;
+      };
+      if (judged.k === "union" || judged.k === "tuple") {
+        const parts =
+          judged.k === "union"
+            ? judged.parts.map(valueKey).sort()
+            : [...judged.elements, judged.rest ?? CLEAN].map(valueKey);
+        const key = `${judged.k}[${parts.join(",")}]`;
+        keys.set(judged, key);
+        return key;
+      }
+      if (
+        judged.k !== "literal" &&
+        judged.k !== "function" &&
+        judged.k !== "object"
+      )
+        return judged;
+      const anchor =
+        judged.k === "literal"
+          ? judged.node
+          : judged.k === "function"
+            ? judged.decls[0]
+            : judged.symbol;
+      const bindings = [...judged.env]
+        .map(([symbol, value]) => `${idOf(symbol)}=${valueKey(value())}`)
+        .sort()
+        .join(",");
+      const self = "self" in judged && judged.self ? valueKey(judged.self) : "";
+      const key = `${judged.k}:${idOf(anchor)}:${self}:${bindings}`;
+      keys.set(judged, key);
+      return key;
+    } finally {
+      computingKey.delete(judged);
+    }
+  }
+  // C-47: the checks in progress, across nested `tainted` calls (a type-level
+  // computation starts its own). Re-entering one is a cycle: the answer comes
+  // from the other parts of the outer check.
+  const inProgressTaint = new Set<Judged | string>();
+  function tainted(judged: Judged, seen = new Set<Judged | string>()): boolean {
     charge(1);
-    if (seen.has(judged)) return false;
-    seen.add(judged);
+    const key = cycleKey(judged);
+    if (seen.has(key) || inProgressTaint.has(key)) return false;
+    seen.add(key);
+    inProgressTaint.add(key);
+    try {
+      return taintedParts(judged, seen);
+    } finally {
+      inProgressTaint.delete(key);
+    }
+  }
+  function taintedParts(judged: Judged, seen: Set<Judged | string>): boolean {
     switch (judged.k) {
       case "clean":
       case "checked":

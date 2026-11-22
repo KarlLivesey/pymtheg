@@ -46,7 +46,13 @@ import {
   taintOf,
   type Taint,
 } from "./taint.js";
-import { createJudge, JudgeLimit, type Judge, type Judged } from "./judge.js";
+import {
+  createJudge,
+  JUDGE_BOUND_REASON,
+  JudgeLimit,
+  type Judge,
+  type Judged,
+} from "./judge.js";
 import {
   objectProducers,
   propertyWrite,
@@ -1429,11 +1435,34 @@ export function extractFile(
     try {
       files = judgeOf(taint).reaches(receiver);
     } catch (error) {
-      if (!isLimit(error)) throw error;
-      return undefined;
+      // C-47: an overflow is not "does not reach": the dependence is unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      const causes = causesOf(programFailedFiles());
+      return (
+        causes && {
+          causes,
+          via: `the receiver's dependence on the failed files is unknown: ${JUDGE_BOUND_REASON}`,
+        }
+      );
     }
     const causes = causesOf(files);
     return causes && { causes, via: "the receiver depends on the failed file" };
+  }
+  /** C-47: every failed file of this program, and every file a failed name is declared in. */
+  let failedInProgram: string[] | undefined;
+  function programFailedFiles(): string[] {
+    if (!failedInProgram) {
+      const files = new Set<string>();
+      for (const source of program.getSourceFiles()) {
+        const path = fromVirtual(source.fileName);
+        if (path !== undefined && context.moduleKind(path) === "invalid")
+          files.add(path);
+      }
+      for (const list of context.failedNames.values())
+        for (const file of list) files.add(file);
+      failedInProgram = [...files].sort();
+    }
+    return failedInProgram;
   }
   function judgeOf(taint: Taint): Judge {
     const known = judges.get(checker);
@@ -2795,15 +2824,26 @@ export function extractFile(
             !(declaration as { body?: ts.Node }).body,
         );
         const judge = judgeOf(taint);
-        const files = causesOf(
-          signatures.flatMap((signature) =>
-            judge.signatureDependsOnFailed(signature),
-          ),
-        );
+        let unknown = false;
+        let files: Causes | undefined;
+        try {
+          files = causesOf(
+            signatures.flatMap((signature) =>
+              judge.signatureDependsOnFailed(signature),
+            ),
+          );
+        } catch (error) {
+          // C-47: an overflow is not "depends on none": the dependence is unknown.
+          if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+          files = causesOf(programFailedFiles());
+          unknown = true;
+        }
         if (files)
           found = invalid(
             files,
-            "overloaded callee whose parameter types depend on the failed file",
+            unknown
+              ? `overloaded callee whose parameter types' dependence on the failed files is unknown: ${JUDGE_BOUND_REASON}`
+              : "overloaded callee whose parameter types depend on the failed file",
           );
       }
     }

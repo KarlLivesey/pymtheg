@@ -701,7 +701,7 @@ async function fixtureFiles(name) {
 }
 
 test(
-  "a structural judgement that does not end fails its link with the judge's bound as the reason",
+  "a recursive generic type beside a failed file is judged once per binding; the judge's bound is the backstop",
   { timeout: 120_000 },
   async () => {
     const files = await fixtureFiles("graph-typescript-judge-bound");
@@ -709,32 +709,89 @@ test(
       result.links
         .filter((l) => l.cause?.via?.includes("judge-budget-exhausted"))
         .map((l) => [l.file, l.text, l.reason, l.cause.file]);
-    const first = await indexFiles(files);
-    assert.deepEqual(Object.keys(failedReasons(first)), [
+    // The cycle Arg -> ArgParser -> opts: P & Arg<T, P> -> Arg is cut by the
+    // judgement's own cycle check: the link is judged, not bounded.
+    const judged = await indexFiles(files);
+    assert.deepEqual(Object.keys(failedReasons(judged)), [
       "src/parser/index.ts",
     ]);
-    assert.deepEqual(bound(first), [
-      [
-        "src/args.ts",
-        "defaults.options",
-        "invalid-code",
-        "src/parser/index.ts",
-      ],
-    ]);
+    assert.deepEqual(bound(judged), []);
+    const options = judged.links.find(
+      (l) => l.file === "src/args.ts" && l.text === "defaults.options",
+    );
+    assert.equal(options.reason, "local");
+    // With a budget of one step the same judgement stops at the bound and
+    // fails the link with the bound as the reason.
+    const stopped = await indexFiles(files, {
+      module: typescriptModule({ judgeSteps: 1 }),
+    });
+    assert.ok(
+      bound(stopped).some(
+        ([file, text, reason, cause]) =>
+          file === "src/args.ts" &&
+          text === "defaults.options" &&
+          reason === "invalid-code" &&
+          cause === "src/parser/index.ts",
+      ),
+      JSON.stringify(bound(stopped)),
+    );
     // A second, independent index gives the same links.
-    const second = await indexFiles(files);
+    const again = await indexFiles(files, {
+      module: typescriptModule({ judgeSteps: 1 }),
+    });
     assert.deepEqual(
-      second.links.map((l) => [
+      again.links.map((l) => [l.file, l.text, l.resolution, l.reason, l.cause]),
+      stopped.links.map((l) => [
         l.file,
         l.text,
         l.resolution,
         l.reason,
         l.cause,
       ]),
-      first.links.map((l) => [l.file, l.text, l.resolution, l.reason, l.cause]),
     );
   },
 );
+
+// C-47: a stack overflow at any point of the failed-file checks is never a
+// clean answer. The injected overflow is placed on each lookup of `conf` in
+// turn (the order of the module's checker calls is fixed).
+test("a stack overflow in the failed-file checks never makes a link clean", async () => {
+  const files = {
+    "broken.ts": "export const conf = { run() {} };\nconst = ;\n",
+    "dep.ts":
+      'import { conf } from "./broken";\nexport function make() { return conf; }\n',
+    "use.ts": 'import { make } from "./dep";\nmake().run(); // depth-call\n',
+  };
+  const outcomes = [];
+  for (let k = 1; k <= 4; k++) {
+    let seen = 0;
+    const result = await indexFiles(files, {
+      module: typescriptModule({
+        checkerFault: (_method, node) => {
+          if (
+            node?.getSourceFile?.().fileName.endsWith("dep.ts") &&
+            node.getText() === "conf" &&
+            ++seen === k
+          )
+            throw new RangeError("Maximum call stack size exceeded");
+        },
+      }),
+    });
+    const run = linkOn(result, "use.ts", "// depth-call", "run");
+    assert.equal(run.resolution, "unresolved", `overflow at lookup ${k}`);
+    outcomes.push([k, run.reason, run.cause?.via ?? null]);
+  }
+  assert.deepEqual(outcomes, [
+    [1, "taint-budget-exhausted", null],
+    [
+      2,
+      "invalid-code",
+      "callee make; the structural judgement reached its bound (judge-budget-exhausted)",
+    ],
+    [3, "invalid-code", "callee make; binding conf"],
+    [4, "invalid-code", "callee make; binding conf"],
+  ]);
+});
 
 test("loops whose flow analysis returns are not failed", async () => {
   const result = await indexFiles({

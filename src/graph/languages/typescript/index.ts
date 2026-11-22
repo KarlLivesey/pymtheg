@@ -25,6 +25,7 @@ import { libraryKey, libraryReader } from "./library.js";
 import type { ProjectGroup } from "./project.js";
 import type { Renamed } from "./rename.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
+import { setJudgeBudget } from "./judge.js";
 import { neutralizeAssumed } from "./untrusted.js";
 import { entryProvenance } from "./workspace-entries.js";
 import { unbuiltEntryAssumption } from "./entry-build.js";
@@ -58,6 +59,8 @@ const exhaustedSessions = new WeakSet<object>();
 export interface TypeScriptModuleOptions {
   /** The taint walk's step budget (taint.ts; TAINT_BUDGET otherwise). */
   taintSteps?: number;
+  /** C-47: the structural judgement's step budget (judge.ts JUDGE_BUDGET). */
+  judgeSteps?: number;
   /** The program budget in characters (project.ts; MAX_PROGRAM_SOURCE otherwise). */
   programCharacters?: number;
   /** Called before every checker call the module makes; may throw. */
@@ -228,6 +231,8 @@ function openSession(
       const checker = attributed(program.getTypeChecker(), hooks.checkerFault);
       if (hooks.taintSteps !== undefined)
         setTaintBudget(checker, hooks.taintSteps);
+      if (hooks.judgeSteps !== undefined)
+        setJudgeBudget(checker, hooks.judgeSteps);
       return { program, checker };
     } catch (error) {
       lastProgram = program;
