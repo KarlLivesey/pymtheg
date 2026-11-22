@@ -919,12 +919,21 @@ test("a test process that lost its isolated configuration folder refuses to writ
   await scratch(async (root) => {
     await initializeWorkspace(root);
     const { PYMTHEG_CONFIG_HOME: _home, ...env } = process.env;
-    const result = spawnSync(process.execPath, [cli, "init", root, "--trust"], { encoding: "utf8", input: "", env: { ...env, PYMTHEG_TEST: "1" } });
+    const result = spawnSync(process.execPath, [cli, "init", root, "--trust"], {
+      encoding: "utf8",
+      input: "",
+      env: { ...env, PYMTHEG_TEST: "1" },
+    });
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr + result.stdout, /refusing to write the real trust answers from a test run/);
+    assert.match(
+      result.stderr + result.stdout,
+      /refusing to write the real trust answers from a test run/,
+    );
     // Every test process here runs isolated, and MCP servers inherit it.
     assert.equal(process.env.PYMTHEG_TEST, "1");
-    const { DEFAULT_INHERITED_ENV_VARS } = await import("@modelcontextprotocol/client/stdio");
+    const { DEFAULT_INHERITED_ENV_VARS } = await import(
+      "@modelcontextprotocol/client/stdio"
+    );
     assert.ok(DEFAULT_INHERITED_ENV_VARS.includes("PYMTHEG_CONFIG_HOME"));
   });
 });
