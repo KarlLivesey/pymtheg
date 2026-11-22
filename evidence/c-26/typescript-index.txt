@@ -3,8 +3,25 @@ microsoft/TypeScript at 21ba970871efd2766ee46813d0bb67253e7878fa, cold
 (tools/heap-index.sh). Dev server, Node 24.21.0, shared and loaded by other
 runs; times are observations.
 
-Final: C-26 merged with main d3d07f0 (C-22 to C-31, SW-5)
----------------------------------------------------------
+Final: C-26 merged with main 2dc05be (C-22 to C-34, SW-5, D19)
+---------------------------------------------------------------
+
+--max-old-space-size=12000
+  peak RSS 8,597,616 KiB, wall 3,813 s, exit 2 (finished; failed files)
+  analysisErrors [], resolutionErrors []
+  counts, failed files and taint: identical to the run below (d3d07f0):
+  files 32,448, symbols 274,386, links 993,013, failed 12,477; the same
+  12,418 / 44 / 3 / 3 / 4 / 5 split and the same three non-returning files;
+  138,466 taint-budget-exhausted.
+
+Default heap (about 4 GB)
+  peak RSS 5,194,320 KiB, wall 3,652 s, signal 6: heap limit reached.
+
+Neither run's progress reader got past inventory, so their stages were not
+stamped; the stage times below are from the d3d07f0 run.
+
+C-26 merged with main d3d07f0 (C-22 to C-31, SW-5)
+---------------------------------------------------
 
 --max-old-space-size=12000
   peak RSS 7,987,916 KiB, wall 5,519 s, exit 2 (finished; failed files)
