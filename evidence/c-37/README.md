@@ -22,4 +22,10 @@ digests are deterministic.
   slower.
 - `edits.json`: one-file edits on restic and cli/cli, three rounds of main
   and this change, with statement counts.
+- `review.json.gz`: the review fixes. Main against this head on four pins
+  on disk and in memory; this head beside the reviewed head `3756b30`; and
+  every run with a second writer beside it, by checkpoint interval and
+  with resolution writes in one transaction or cut at the budget.
+- `waits.txt`: the second writer's waits in those runs, in seconds and in
+  index commits inside each wait, with any "database is locked".
 - `checks.json`: the test suite and the equality proofs.

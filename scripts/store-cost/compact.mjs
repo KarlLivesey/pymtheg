@@ -23,6 +23,8 @@ for (const argument of process.argv.slice(2)) {
     longestHoldMs: r.longestHoldMs,
     holds: r.holds,
     longHolds: r.longHolds,
+    maxWalBytes: r.maxWalBytes,
+    commits: r.commitTimes?.length,
     io: r.io,
     databaseBytes: r.databaseBytes,
     report: r.report,
