@@ -122,6 +122,7 @@ import {
   isLocalCallable,
   isScopedDeclaration,
   keyOf,
+  MODULE_KEY,
   kindOf,
   nameOf,
   objectMember,
@@ -869,8 +870,7 @@ export function extractFile(
       return { targets: [], reason: found.reason ?? "no-symbol", receiver };
     const facts = new Map<string, TargetFact>();
     let libraryFacts:
-      | Map<string | ts.Symbol | ts.Declaration, LibraryTarget>
-      | undefined;
+      Map<string | ts.Symbol | ts.Declaration, LibraryTarget> | undefined;
     let external = 0;
     let local = 0;
     let viaAlias = false;
@@ -1562,7 +1562,7 @@ export function extractFile(
         }
     };
     try {
-      for (let node: ts.Node | undefined = receiver; node; ) {
+      for (let node: ts.Node | undefined = receiver; node;) {
         if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
           const symbol = checker.getSymbolAtLocation(node);
           symbolCauses(symbol, "receiver");
@@ -2378,7 +2378,7 @@ export function extractFile(
         ? // A file that cannot be read has failed: no target, its file the cause.
           invalid([file], "import of the failed file")
         : {
-            targets: [{ file, key: "module@0" }],
+            targets: [{ file, key: MODULE_KEY }],
             // A target whose analysis failed has no facts to link to.
             ...(kind === "unavailable" ? { reason: "target-unavailable" } : {}),
           }
@@ -3158,7 +3158,7 @@ export function extractFile(
                 captured.has(target) &&
                 uncertainReason(node.expression.getStart(file)) ===
                   "dynamic-scope"
-                  ? [{ file: target, key: "module@0" }]
+                  ? [{ file: target, key: MODULE_KEY }]
                   : [],
               reason: uncertainReason(node.expression.getStart(file)),
             },
@@ -3589,16 +3589,31 @@ export function extractFile(
         "The TypeScript checker exhausted its stack on some lookups; those links are unresolved (compiler-limit)",
     });
   // Facts of a renamed file report the original names (see rename.ts).
+  // Keys hold identities, so they are restored too: this file's own keys
+  // when it was renamed, and target keys always, since a target file in
+  // this program may have been renamed. The fresh names are chosen per
+  // program, so only restored keys agree across programs and runs.
+  const fresh = context.fresh;
   if (context.renamed) {
-    const fresh = context.fresh;
     for (const symbol of symbols) {
+      symbol.key = restoreNames(symbol.key, fresh);
       symbol.name = restoreNames(symbol.name, fresh);
       symbol.identity = restoreNames(symbol.identity, fresh);
     }
-    for (const item of links)
+    for (const item of links) {
+      if (item.sourceKey !== null)
+        item.sourceKey = restoreNames(item.sourceKey, fresh);
       item.targetName = restoreNames(item.targetName, fresh);
+    }
     for (const diagnostic of diagnostics)
       diagnostic.message = restoreNames(diagnostic.message, fresh);
+  }
+  for (const item of links) {
+    const targets = (item.data as { targets?: unknown } | undefined)?.targets;
+    if (Array.isArray(targets))
+      for (const target of targets as { key?: unknown }[])
+        if (typeof target.key === "string")
+          target.key = restoreNames(target.key, fresh);
   }
 
   return {

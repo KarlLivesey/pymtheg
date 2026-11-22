@@ -11,10 +11,15 @@ if (!root || !scratch) throw Error("usage: install.mjs <checkout> <scratch>");
 const setup = await installation(root, scratch);
 if (!setup.command)
   throw Error(`install unavailable: ${JSON.stringify(setup)}`);
-const result = spawnSync(setup.command, setup.args, {
-  cwd: root,
-  env: setup.env,
-  stdio: ["ignore", "inherit", "inherit"],
-});
+// The sweep runs `corepack <manager@version> <args>`: keep the prefix.
+const result = spawnSync(
+  setup.command,
+  [...(setup.prefix ?? []), ...setup.args],
+  {
+    cwd: root,
+    env: setup.env,
+    stdio: ["ignore", "inherit", "inherit"],
+  },
+);
 console.log(`${setup.manager}: exit ${result.status}`);
 process.exitCode = result.status ?? 1;

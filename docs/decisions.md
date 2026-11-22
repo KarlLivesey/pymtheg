@@ -3267,3 +3267,20 @@ link names a container only if that container is a symbol. One link
 without a source rejects a module's whole output, so a namespace that is
 no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).
+
+### TypeScript symbol keys are name paths, not offsets (C-49)
+
+**Decided (C-49):** a TypeScript symbol's key is its kind and identity
+(`function:splitPath`, `method:Box.open`), with `~n` for the n-th later
+declaration of the same kind and identity in the file, in source order (the
+same order the core numbers ordinals by), and `module` for the file. Keys
+are computed from the file's syntax alone and are unique only within the
+file; in a JavaScript file the compiler saw with renamed module-system
+names, keys report the original names, like identities. **Why:** keys were
+`kind@offset`, and links store their targets by key, so a body edit
+rewrote the stored rows of every file linking into a later declaration of
+the edited file without changing any fact. **Unchanged:** symbol ids,
+ordinals and requirement links (which store identity and ordinal, never a
+key); no migration is needed. **Trade:** inserting or removing a same-named
+sibling still renumbers the later ones, as their ordinals already did.
+See [C-49](changes/C-49.md).

@@ -118,8 +118,13 @@ test("TypeScript: a re-index killed after any write is repaired by the next one"
       "src/c.ts":
         'import { other } from "./a";\n\nexport const c = other() + 1;\n',
     },
-    // Moves every declaration of a.ts: the other files' recorded facts change.
-    { "src/a.ts": "// moved\n" + tsA },
+    // Moves every declaration of a.ts and renames one export the other files
+    // import, so their recorded facts change (moving alone no longer changes
+    // them: keys are name paths, C-49).
+    {
+      "src/a.ts":
+        "// moved\n" + tsA.replace("function other", "function renamed"),
+    },
   );
   assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
   t.diagnostic(`write boundaries: ${tried}`);
