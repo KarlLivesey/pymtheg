@@ -131,7 +131,11 @@ test("the setting: only this machine's trusted answer turns Go on; graph.toolcha
     toolchain: { go: "/usr/lib/go/bin/go" },
   });
   assert.throws(() => graphConfig({ toolchain: { go: "go" } }), /absolute/);
-  assert.throws(() => graphConfig({ toolchain: { rust: true } }), /Unknown/);
+  // C-43: rust is a route too; other names are still unknown.
+  assert.deepEqual(graphConfig({ toolchain: { rust: true } }), {
+    toolchain: { rust: true },
+  });
+  assert.throws(() => graphConfig({ toolchain: { python: true } }), /Unknown/);
 });
 
 test("opt-in off: no toolchain fact anywhere, the same with no, empty or false settings", async () => {
