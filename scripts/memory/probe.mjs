@@ -7,6 +7,7 @@
 // before and after each resolution write. Needs --expose-gc. Counts and
 // sizes are deterministic; heap figures are as V8 reports them.
 //   node --expose-gc [--max-old-space-size=N] scripts/memory/probe.mjs <dist> <root> <graph.sqlite> <out.json>
+import "../isolated-home.mjs";
 import { writeFileSync } from "node:fs";
 import { writeHeapSnapshot } from "node:v8";
 import { resolve } from "node:path";

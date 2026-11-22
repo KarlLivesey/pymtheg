@@ -5,6 +5,7 @@
 // cold store row for row (a free equality check of the incremental path).
 // Each index runs in a fresh process (index-once.mjs), as the CLI does.
 //   node scripts/reindex/measure.mjs <dist> <scratch> <repo id> <out dir> [--profile edit,...] [--cold-store FILE | --store-dir DIR] [--edits edit,...] [--seed-checkpoint]
+import "../isolated-home.mjs";
 import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
