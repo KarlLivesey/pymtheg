@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
-import {
-  executeGraph,
-  type GraphCommand,
-  type GraphResponse,
-} from "../graph/commands.js";
+import { type GraphCommand, type GraphResponse } from "../graph/commands.js";
+import { runGraphInWorker } from "./graph-runner.js";
 import type { Located } from "../graph/command-locations.js";
 import type { GraphLibrary, GraphLink, GraphSymbol } from "../graph/types.js";
 const quote = (value: unknown) => JSON.stringify(value);
@@ -211,7 +208,8 @@ export async function graphCommand(
         throw Error("Unknown graph option " + arg);
       else positional.push(arg);
     }
-    const response = await executeGraph(
+    // C-50: the command runs in a worker; an abort terminates it.
+    const response = await runGraphInWorker(
       {
         command: positional[0] as GraphCommand,
         args: positional.slice(1),

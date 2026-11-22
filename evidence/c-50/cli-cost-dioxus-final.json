@@ -1,0 +1,87 @@
+[
+ {
+  "pin": "dioxus",
+  "round": 0,
+  "build": "main",
+  "edited": "examples/01-app-demos/bluetooth-scanner/src/main.rs",
+  "cold": {
+   "exit": 0,
+   "wallS": 600.66,
+   "cpuS": 676.9,
+   "peakMiB": 3066,
+   "responseBytes": 21392
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 466.56,
+   "cpuS": 537.4,
+   "peakMiB": 3020,
+   "responseBytes": 21392
+  }
+ },
+ {
+  "pin": "dioxus",
+  "round": 0,
+  "build": "head",
+  "edited": "examples/01-app-demos/bluetooth-scanner/src/main.rs",
+  "cold": {
+   "exit": 0,
+   "wallS": 605.17,
+   "cpuS": 682.4,
+   "peakMiB": 3087,
+   "responseBytes": 21392
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 460.69,
+   "cpuS": 530.4,
+   "peakMiB": 3025,
+   "responseBytes": 21397
+  }
+ },
+ {
+  "pin": "dioxus",
+  "round": 1,
+  "build": "main",
+  "edited": "examples/01-app-demos/bluetooth-scanner/src/main.rs",
+  "cold": {
+   "exit": 0,
+   "wallS": 604.09,
+   "cpuS": 676.2,
+   "peakMiB": 3090,
+   "responseBytes": 21392
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 429.52,
+   "cpuS": 497.3,
+   "peakMiB": 3046,
+   "responseBytes": 21392
+  }
+ },
+ {
+  "pin": "dioxus",
+  "round": 1,
+  "build": "head",
+  "edited": "examples/01-app-demos/bluetooth-scanner/src/main.rs",
+  "cold": {
+   "exit": 0,
+   "wallS": 556.49,
+   "cpuS": 632.2,
+   "peakMiB": 3078,
+   "responseBytes": 21392
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 462.89,
+   "cpuS": 529.9,
+   "peakMiB": 3045,
+   "responseBytes": 21392
+  }
+ },
+ {
+  "pin": "dioxus",
+  "equal": true,
+  "differences": []
+ }
+]

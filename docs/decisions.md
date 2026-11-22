@@ -3138,6 +3138,18 @@ uses the importer's own conditions and workspace route. Invalid extracted
 source ranges fail the affected file through the compiler session's
 containment path. [C-32](changes/C-32.md)
 
+### C-50 The CLI's graph command runs in a worker
+
+A CLI `graph` command runs in a worker thread. The main thread relays
+progress and handles SIGINT and SIGTERM. A cancel that finds the worker
+inside a language module's synchronous code terminates it; the store is
+left as a killed run leaves it, and the next index repairs it. Anywhere
+else, the cancel is acknowledged at the command's next checkpoint, as
+before. The worker and the coordinator use a cancel flag and a section in
+shared memory (the shape of C-48), so no clock decides which. **Rules
+out:** an index run that only SIGKILL can stop; a wall-clock deadline in
+place of deterministic bounds. [C-50](changes/C-50.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000

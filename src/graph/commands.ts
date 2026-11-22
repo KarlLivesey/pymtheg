@@ -111,6 +111,16 @@ export interface GraphExecutionOptions {
   progress?: ((progress: GraphProgress) => void) | undefined;
   /** Tests/embedders may supply a registry; the CLI always discovers production modules. */
   registry?: LanguageRegistry;
+  /**
+   * C-50 (the shape of C-48's hook): told when a language module's
+   * synchronous code begins (true) and ends (false). Between those, the
+   * module may run for long without passing a cancellation checkpoint, so a
+   * caller that must cancel promptly ends the work another way. A call that
+   * returns a promise ends the section when it returns: while it is awaited,
+   * the event loop runs and the abort signal reaches the module. The hook
+   * may throw to refuse the call (a cancellation set before it).
+   */
+  onModuleCall?: (inside: boolean) => void;
 }
 const arity: Record<GraphCommand, number> = {
   index: 0,
@@ -352,6 +362,18 @@ export async function executeGraph(
           (dirty.has(file.path) || retry.has(file.path)) &&
           registry.modules.find((m) => m.id === file.module)?.parse,
       ).length;
+      // A module's synchronous code, announced to `onModuleCall` (C-50).
+      const inModule = <T>(call: () => T | Promise<T>): Promise<T> => {
+        let pending: T | Promise<T>;
+        options.onModuleCall?.(true);
+        try {
+          signal.throwIfAborted();
+          pending = call();
+        } finally {
+          options.onModuleCall?.(false);
+        }
+        return Promise.resolve(pending);
+      };
       const tracked = new LanguageRegistry(
         registry.modules.map((module) => ({
           ...module,
@@ -362,7 +384,7 @@ export async function executeGraph(
                 ) => {
                   signal.throwIfAborted();
                   try {
-                    return await module.parse!(source);
+                    return await inModule(() => module.parse!(source));
                   } finally {
                     options.progress?.({
                       phase: "parse",
@@ -387,7 +409,7 @@ export async function executeGraph(
                     total: context.files.length,
                     module: module.id,
                   });
-                  const result = await module.analyze!(context);
+                  const result = await inModule(() => module.analyze!(context));
                   options.progress?.({
                     phase: "analyze",
                     done: context.files.length,
@@ -410,7 +432,7 @@ export async function executeGraph(
                     total: context.files.length,
                     module: module.id,
                   });
-                  const result = await module.resolve!(context);
+                  const result = await inModule(() => module.resolve!(context));
                   options.progress?.({
                     phase: "resolve",
                     done: context.files.length,
