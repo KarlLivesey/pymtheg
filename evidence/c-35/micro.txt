@@ -1,0 +1,28 @@
+C-35 micro-benchmark: node scripts/store-cost/micro.mjs <main dist> /dev/shm/c35 <files> 60
+Production schema, one transaction per file, 60 symbols and 60 links per file.
+Store on memory-backed storage; the temporary directory on the server's disk.
+Microseconds per row; observations on a shared server.
+
+400 files:
+production: symbol 590.3 µs/row, link 229.1 µs/row
+no-dirty-triggers: symbol 20.5 µs/row, link 11.0 µs/row
+no-foreign-keys: symbol 686.4 µs/row, link 283.1 µs/row
+no-secondary: symbol 5.4 µs/row, link 6.6 µs/row
+production: symbol 596.7 µs/row, link 201.7 µs/row
+
+400 files, second session:
+production: symbol 803.8 µs/row, link 236.5 µs/row
+no-dirty-triggers: symbol 19.5 µs/row, link 10.7 µs/row
+no-foreign-keys: symbol 811.2 µs/row, link 452.5 µs/row
+no-secondary: symbol 7.1 µs/row, link 8.8 µs/row
+temp-memory: symbol 34.1 µs/row, link 17.7 µs/row
+production: symbol 626.1 µs/row, link 242.5 µs/row
+
+300 files:
+production: symbol 354.5 µs/row, link 155.9 µs/row
+no-dirty-triggers: symbol 19.1 µs/row, link 10.7 µs/row
+no-foreign-keys: symbol 341.7 µs/row, link 125.9 µs/row
+no-secondary: symbol 5.2 µs/row, link 6.4 µs/row
+temp-memory: symbol 29.9 µs/row, link 16.1 µs/row
+temp-memory-at-begin: symbol 28.4 µs/row, link 15.4 µs/row
+production: symbol 395.2 µs/row, link 103.3 µs/row
