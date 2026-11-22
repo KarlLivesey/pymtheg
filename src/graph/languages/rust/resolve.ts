@@ -319,6 +319,16 @@ export interface RustDecisionScope {
   decisionCuts?: number;
   runCuts?: number;
 }
+/**
+ * C-36, for the differential fuzzer only (scripts/reindex/fuzz-order.mjs):
+ * the order in which the first decision loop visits the links, as a
+ * permutation of their indexes. The loop's outputs are put back in link
+ * order afterwards, so only the order in which the caches fill changes.
+ * Unset in production.
+ */
+export const rustDecisionOrder: {
+  permute?: ((count: number) => readonly number[]) | undefined;
+} = {};
 // A proc-macro declaration has one captured function identity, an exported
 // macro name, and a function-value facet available only inside its own crate.
 const acceptsAt = (
@@ -402,20 +412,27 @@ export function resolveRust(
    * C-36: the global lookup mode that `find` keys its memo by. A lazily
    * cached answer computed under one mode is not reused under another.
    */
-  const lookupMode = (): string =>
-    JSON.stringify([
-      scopeMode,
-      macroIdentityKey(),
-      libraryLookup
-        ? [
-            libraryAttributeStart,
-            libraryImportScope,
-            libraryProbe,
-            protectModuleImports,
-            activeMacroImports.at(-1)?.id,
-          ]
-        : null,
-    ]);
+  // A free-form part of a key, length-prefixed so the key is injective.
+  const keyPart = (v: string | undefined): string =>
+    v === undefined ? "-" : `${v.length}:${v}`;
+  /**
+   * The lookup mode, as a cache key: the scope mode, the macro-identity probe
+   * and, in a library lookup, its settings. Built by concatenation (C-36
+   * round 4: it is part of every lazy cache key); equal keys mean equal
+   * modes, as with the JSON key it replaces.
+   */
+  const lookupMode = (): string => {
+    let key = `${scopeMode}|${macroIdentityProbe ? 1 : 0}|${
+      macroIdentityFlavor
+        ? `${macroIdentityFlavor}|${keyPart(macroIdentityPrelude)}`
+        : "-"
+    }`;
+    if (libraryLookup)
+      key += `|L${libraryAttributeStart ?? "-"}|${keyPart(libraryImportScope)}|${
+        libraryProbe ? 1 : 0
+      }${protectModuleImports ? 1 : 0}|${keyPart(activeMacroImports.at(-1)?.id)}`;
+    return key;
+  };
   const namespaceParents = new WeakMap<Place, number>();
   let nextNamespaceParent = 0;
   function parentIdentity(loc: Place): number {
@@ -507,32 +524,19 @@ export function resolveRust(
   let capturedMacroExports: Map<string, Set<string>> | undefined;
   let capturedHelperExports: Map<string, Set<string>> | undefined;
   let buildingHelperExports = false;
-  function readableMacroUseBinds(
-    head: string,
-    file: string,
-    scope: string,
-    imports: readonly MacroUseImport[],
-    helpersOnly = false,
-  ): boolean {
-    if (helpersOnly && buildingHelperExports) return true;
-    if (!imports.length) return false;
-    head = head.split("::")[0]!;
-    const manifests = new Set(
-      ownerPlace(file, scope).flatMap((own) =>
-        imports.flatMap((request) => {
-          if (request.names && !request.names.includes(head)) return [];
-          const manifest = own.crate.deps.get(request.crate);
-          return manifest &&
-            packages.some((c) => c.kind === "lib" && c.manifest === manifest)
-            ? [manifest]
-            : [];
-        }),
-      ),
-    );
-    if (!manifests.size) return false;
-    let captured = helpersOnly ? capturedHelperExports : capturedMacroExports;
-    if (!captured) {
-      if (helpersOnly) buildingHelperExports = true;
+  /**
+   * The captured exports of every library crate: with `helpersOnly`, the
+   * names that can bind an inferred derive helper. A pure function of the
+   * snapshot's symbols, places, imports and attribute rules, all fixed
+   * before setup's first lookup. While the helper map is being built,
+   * `readableMacroUseBinds` answers helper questions with `true` and no
+   * lazy answer is stored (`lazyCompute`). C-36: setup ends by building
+   * both maps afresh, in both passes, so no decision reads a map built
+   * part-way through setup.
+   */
+  function captureExports(helpersOnly: boolean): Map<string, Set<string>> {
+    if (helpersOnly) buildingHelperExports = true;
+    try {
       const libs = new Map(
         packages.filter((c) => c.kind === "lib").map((c) => [c.root, c]),
       );
@@ -744,7 +748,7 @@ export function resolveRust(
             }
           }
       }
-      captured = new Map(
+      return new Map(
         packages
           .filter((c) => c.kind === "lib")
           .map((c) => [
@@ -752,11 +756,36 @@ export function resolveRust(
             exports.get(key(c.manifest, "")) ?? new Set<string>(),
           ]),
       );
-      if (helpersOnly) {
-        capturedHelperExports = captured;
-        buildingHelperExports = false;
-      } else capturedMacroExports = captured;
+    } finally {
+      if (helpersOnly) buildingHelperExports = false;
     }
+  }
+  function readableMacroUseBinds(
+    head: string,
+    file: string,
+    scope: string,
+    imports: readonly MacroUseImport[],
+    helpersOnly = false,
+  ): boolean {
+    if (helpersOnly && buildingHelperExports) return true;
+    if (!imports.length) return false;
+    head = head.split("::")[0]!;
+    const manifests = new Set(
+      ownerPlace(file, scope).flatMap((own) =>
+        imports.flatMap((request) => {
+          if (request.names && !request.names.includes(head)) return [];
+          const manifest = own.crate.deps.get(request.crate);
+          return manifest &&
+            packages.some((c) => c.kind === "lib" && c.manifest === manifest)
+            ? [manifest]
+            : [];
+        }),
+      ),
+    );
+    if (!manifests.size) return false;
+    const captured = helpersOnly
+      ? (capturedHelperExports ??= captureExports(true))
+      : (capturedMacroExports ??= captureExports(false));
     for (const manifest of manifests)
       if (captured.get(manifest)?.has(head)) return true;
     return false;
@@ -833,7 +862,6 @@ export function resolveRust(
             loc = loc.parent;
           }
         }
-        clearIncompleteLookups();
         return shadow;
       });
     } finally {
@@ -851,6 +879,8 @@ export function resolveRust(
    * the retry decision is the same for a hit and a fresh computation.
    */
   // Lookup state the lazy caches read, declared before setup uses them.
+  /** The deepest lookup stack reached so far (see `lookupHeights`). */
+  let deepestLookup = 0;
   let activeLookup:
     | {
         trace: LookupTrace;
@@ -868,9 +898,22 @@ export function resolveRust(
   const importExpansions = new Map<string, number[]>();
   /** Scope-read traces of stored lazy answers, per cache, by the same key. */
   const lazyTraces = new WeakMap<object, Map<string, ScopeTrace>>();
+  /**
+   * Heights of stored lazy answers, per cache, by the same key: how deep the
+   * lookups of the computation went. Each of its lookups starts with an empty
+   * stack, so this is the depth a fresh computation reaches whatever the
+   * caller.
+   */
+  const lazyHeights = new WeakMap<object, Map<string, number>>();
   function lazyHit<T>(cache: Map<string, T>, name: string, key: string) {
     const hit = cache.get(key);
-    if (hit !== undefined) recordReads(lazyTraces.get(cache)?.get(key));
+    if (hit !== undefined) {
+      recordReads(lazyTraces.get(cache)?.get(key));
+      deepestLookup = Math.max(
+        deepestLookup,
+        lazyHeights.get(cache)?.get(key) ?? 0,
+      );
+    }
     return hit;
   }
   /** Lazy computations under way, by cache and key. */
@@ -886,27 +929,41 @@ export function resolveRust(
   function lazyFresh<T>(
     id: string,
     compute: () => T,
-  ): { result: T; trace?: ScopeTrace; clean: boolean } {
+  ): { result: T; trace?: ScopeTrace; clean: boolean; height: number } {
     if (lazyBusy.has(id)) {
       cycleCuts++;
       reentries++;
       if (activeLookup) activeLookup.trace.valid = false;
-      return { ...lookupReads(compute), clean: false };
+      return { ...lookupReads(compute), clean: false, height: 0 };
     }
     const expansions = [...importExpansions];
     const macroImports = activeMacroImports.splice(0);
+    // The caller's lookup is set aside as well: the computation's lookups
+    // are not its children, so they neither absorb into its trace nor
+    // invalidate it. Only an answer that depends on the caller (a re-entry)
+    // invalidates it, below.
+    const lookup = activeLookup;
+    activeLookup = undefined;
+    const outerDeepest = deepestLookup;
+    deepestLookup = 0;
     importExpansions.clear();
     lazyBusy.add(id);
     const cuts = reentries;
+    let clean = false;
     try {
       const { result, trace } = lookupReads(compute);
+      clean = reentries === cuts;
       return {
         result,
         ...(trace !== undefined ? { trace } : {}),
-        clean: reentries === cuts,
+        clean,
+        height: deepestLookup,
       };
     } finally {
       lazyBusy.delete(id);
+      deepestLookup = Math.max(outerDeepest, deepestLookup);
+      activeLookup = lookup;
+      if (!clean && lookup) lookup.trace.valid = false;
       importExpansions.clear();
       for (const [k, v] of expansions) importExpansions.set(k, v);
       activeMacroImports.splice(0, activeMacroImports.length, ...macroImports);
@@ -919,13 +976,20 @@ export function resolveRust(
     compute: () => T,
   ): T {
     const traceKey = `${name}\u0000${key}`;
-    const { result, trace, clean } = lazyFresh(traceKey, compute);
-    if (clean) {
+    // An answer computed while the helper exports are being built read
+    // their placeholder answer, so it is never stored.
+    const building = buildingHelperExports;
+    const { result, trace, clean, height } = lazyFresh(traceKey, compute);
+    if (clean && !building && !buildingHelperExports) {
       cache.set(key, result);
       let traces = lazyTraces.get(cache);
       if (!traces) lazyTraces.set(cache, (traces = new Map()));
       if (trace !== undefined) traces.set(key, trace);
       else traces.delete(key);
+      let heights = lazyHeights.get(cache);
+      if (!heights) lazyHeights.set(cache, (heights = new Map()));
+      if (height) heights.set(key, height);
+      else heights.delete(key);
     }
     return result;
   }
@@ -1884,7 +1948,6 @@ export function resolveRust(
   // used, so whether a lookup reaches the limit never depends on what other
   // lookups happened to memoise first.
   const lookupHeights = new WeakMap<Found, number>();
-  let deepestLookup = 0;
   type ScopeRead = {
     key: string;
     name: string;
@@ -4706,6 +4769,11 @@ export function resolveRust(
   memo.clear();
   unprovedImports.clear();
   clearIncompleteLookups();
+  // C-36: the captured exports are built here, afresh and in both passes,
+  // after every fact they read is fixed; a map built earlier in setup is
+  // dropped.
+  capturedMacroExports = captureExports(false);
+  capturedHelperExports = captureExports(true);
   // C-36: setup computes every symbol's presence and conditions, as a cold
   // pass does, so the caches it fills are the same whatever the decision
   // scope; only the callbacks are limited to the decided files.
@@ -6088,6 +6156,8 @@ export function resolveRust(
     });
   }
   const pathCallCache = new Map<string, Found>();
+  /** C-36: the height of each stored path-call answer, as for lazy answers. */
+  const pathCallHeights = new Map<string, number>();
   /** A path call's callable targets: a value name or an associated item. */
   function pathCallTargets(
     name: string,
@@ -6127,13 +6197,19 @@ export function resolveRust(
     const cached = pathCallCache.get(key);
     if (cached) {
       recordReads(scopeTraceOf(cached));
+      deepestLookup = Math.max(deepestLookup, pathCallHeights.get(key) ?? 0);
       return cached;
     }
-    const { result, trace, clean } = lazyFresh(`path\u0000${key}`, () =>
+    const building = buildingHelperExports;
+    const { result, trace, clean, height } = lazyFresh(`path\u0000${key}`, () =>
       pathCallTargetsUncached(name, selfPath, scope, d, targetName, file, loc),
     );
     const answer = trace ? attachScopeTrace(result, trace) : result;
-    if (clean) pathCallCache.set(key, answer);
+    if (clean && !building && !buildingHelperExports) {
+      pathCallCache.set(key, answer);
+      if (height) pathCallHeights.set(key, height);
+      else pathCallHeights.delete(key);
+    }
     return answer;
   }
   function pathCallTargetsUncached(
@@ -7942,7 +8018,10 @@ export function resolveRust(
   if (!scopeAudit && !libraryAudit && opaqueOrigins.size)
     prepareIsolatedScopeEffects();
   const decisionCuts = cycleCuts;
-  for (const l of ctx.links) {
+  const permutation = rustDecisionOrder.permute?.(ctx.links.length);
+  for (const l of permutation
+    ? permutation.map((i) => ctx.links[i]!)
+    : ctx.links) {
     if (!decided(l.file)) continue;
     const original = data(l);
     const selected = scopeAudit?.includes(l);
@@ -8100,8 +8179,21 @@ export function resolveRust(
       });
     }
   }
+  if (permutation) {
+    // Back to link order: later phases visit these in the order they were found.
+    const rank = new Map(ctx.links.map((l, i) => [l.id, i]));
+    const byLink = (id: string) => rank.get(id) ?? -1;
+    resolutions.sort((a, b) => byLink(a.linkId) - byLink(b.linkId));
+    librarySites.sort((a, b) => byLink(a.link.id) - byLink(b.link.id));
+    if (missing) {
+      const entries = [...missing].sort((a, b) => byLink(a[0]) - byLink(b[0]));
+      missing.clear();
+      for (const [k, v] of entries) missing.set(k, v);
+    }
+  }
   if (derived) macroBodyCalls(derived);
   pathCallCache.clear();
+  pathCallHeights.clear();
   typingCache.clear();
   const macroAssessments = new Map<OpaqueOrigin, BlockingMacro[]>();
   function assessMacro(origin: OpaqueOrigin): BlockingMacro[] {

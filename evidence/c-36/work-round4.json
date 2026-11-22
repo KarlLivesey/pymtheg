@@ -1,0 +1,16 @@
+{
+ "comment": "C-36 round 4: resolver work counters on a cold index, main (origin/main, 635e90c) against the round-4 head. Counters were inserted the same way in each tree by an experiment-only patch: lookups = calls of find(), lookupComputes = calls of lookupPath() (memo misses), lazyComputes = lazy computations started (main's resolver has no lazy-cache rule, so none are counted there), cuts = cycle cuts and helper or lazy re-entries, replays = lazy and path-call hits, each replaying its stored scope reads and height, setAside = entries the lazy computations set aside and restored (one caller lookup plus the open import expansions and macro imports). One process each, in-thread, run side by side; counts do not depend on load. cpuS are observations on a shared server.",
+ "dioxus": {
+  "main": { "lookups": 25742334, "lookupComputes": 6295164, "lazyComputes": 0, "cuts": 4885481, "replays": 0, "setAside": 0, "cpuS": 647.4 },
+  "round4": { "lookups": 27473872, "lookupComputes": 6422433, "lazyComputes": 220335, "cuts": 4951286, "replays": 15742059, "setAside": 319396, "cpuS": 699.2 }
+ },
+ "helix": {
+  "main": { "lookups": 1015835, "lookupComputes": 394920, "lazyComputes": 0, "cuts": 175695, "replays": 0, "setAside": 0, "cpuS": 141.2 },
+  "round4": { "lookups": 1021145, "lookupComputes": 387880, "lazyComputes": 91227, "cuts": 184539, "replays": 641204, "setAside": 107978, "cpuS": 140.2 }
+ },
+ "round3": {
+  "comment": "From work-round3.json, same counters on the round-3 head (main was then 60d4f2b; its dioxus counts equal 635e90c's).",
+  "dioxus": { "lookups": 27506987, "lookupComputes": 6434838, "lazyComputes": 215298, "cuts": 4948477 },
+  "helix": { "lookups": 1040383, "lookupComputes": 403622, "lazyComputes": 90998, "cuts": 175630 }
+ }
+}

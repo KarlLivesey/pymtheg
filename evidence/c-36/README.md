@@ -47,3 +47,18 @@ this branch. Before the review, main was `db29fc7`.
   that decide one sampled file. The samples rank paths by SHA-256 of
   `c36-probe:<path>`.
 - [Checks](checks.json) records the build, type, format and test results.
+
+Round 4 (main `635e90c`):
+
+- [Edits](edits-round4.json): `measure.mjs` on ripgrep, redb, fjall, helix and
+  dioxus, main and the head side by side. Every revert equalled that build's
+  cold store.
+- [Rows](rows-round4.json): every row of a cold index, main against the head,
+  on ten pins (`rows-round4.sh`). No differences.
+- [Seeded edits](seeded-round4.json): 80 ripgrep edits, seeds 36411 and
+  36412, `--scoped-mix`; all equal to cold.
+- [Work counters](work-round4.json): dioxus and helix cold, main against the
+  head, with the round-4 replay and set-aside counts.
+- [Fuzz runs](fuzz-round4.json): `scripts/reindex/fuzz-order.mjs` counts for
+  the 5,000-edit run on the head, the runs on `d96a8ba` and the six
+  mutations.
