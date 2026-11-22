@@ -1,0 +1,182 @@
+{
+ "pin": "helix-editor_helix",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 230
+ },
+ "sourceOnly": {
+  "links": 90583,
+  "level2": 40673,
+  "assumed": 2491,
+  "proven": 38182,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 44.9,
+  "withModuleLinksPercent": 44.9
+ },
+ "route": {
+  "links": 90583,
+  "level2": 52069,
+  "assumed": 2491,
+  "proven": 38182,
+  "toolchainDecided": 11396,
+  "libraryModuleLinks": 0,
+  "level2Percent": 57.48,
+  "withModuleLinksPercent": 57.48,
+  "toolchainDecidedPercent": 12.58
+ },
+ "decided": {
+  "definite:definite": 13924,
+  "definite:unresolved": 11396,
+  "withheld:cfg-link": 586,
+  "withheld:cfg-variant": 50
+ },
+ "join": {
+  "filter:import-names-module": 152,
+  "answer": 25956,
+  "unapplied:library": 33027,
+  "none:kind-not-joined": 8315,
+  "none:local": 14427,
+  "unapplied:generated": 1119,
+  "none:trait-declaration": 1558,
+  "none:no-name-site": 274,
+  "none:no-graph-symbol": 473,
+  "none:no-occurrence-at-site": 1020,
+  "filter:collision": 52,
+  "filter:extern-crate": 37,
+  "none:file-not-indexed": 3899,
+  "filter:kind-incompatible": 2
+ },
+ "agreement": {
+  "confirmed": 13924,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 90583,
+  "linksAfter": 90583,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": {
+  "wallS": 112.7,
+  "cpuS": 1096.2,
+  "peakMiB": 2460
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 93.9,
+   "cpuS": 115.4
+  },
+  "route": {
+   "wallS": 223.1,
+   "cpuS": 139.8
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 49651,
+  "buckets": {
+   "credited": 11396,
+   "no identity: library item": 23187,
+   "gate: trait-method declaration": 1558,
+   "no answer: no-name-site": 220,
+   "gate: kind/namespace": 51,
+   "no identity: local binding": 7954,
+   "no identity: generated item": 505,
+   "no identity: declaration without a graph symbol": 473,
+   "gate: known error classes": 40,
+   "gate: cfg-variant guard": 50,
+   "no answer: no-occurrence-at-site": 843,
+   "gate: cfg condition other than test": 80,
+   "no answer: file-not-indexed": 3294
+  },
+  "libraryPassingCfg": 22556,
+  "notIndexed": {
+   "other source": 508,
+   "tests": 2786
+  },
+  "notIndexedFiles": 21,
+  "notIndexedTop": [
+   {
+    "path": "helix-term/tests/test/commands/write.rs",
+    "links": 864,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/auto_pairs.rs",
+    "links": 553,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/commands.rs",
+    "links": 365,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/movement.rs",
+    "links": 278,
+    "class": "tests"
+   },
+   {
+    "path": "helix-tui/src/backend/crossterm.rs",
+    "links": 232,
+    "class": "other source"
+   },
+   {
+    "path": "helix-tui/src/widgets/list.rs",
+    "links": 193,
+    "class": "other source"
+   },
+   {
+    "path": "helix-term/tests/test/commands/insert.rs",
+    "links": 176,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/helpers.rs",
+    "links": 135,
+    "class": "tests"
+   },
+   {
+    "path": "tests/indent/rust.rs",
+    "links": 127,
+    "class": "tests"
+   },
+   {
+    "path": "helix-lsp-types/src/inline_completion.rs",
+    "links": 83,
+    "class": "other source"
+   },
+   {
+    "path": "helix-term/tests/test/commands/movement.rs",
+    "links": 81,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/splits.rs",
+    "links": 71,
+    "class": "tests"
+   }
+  ]
+ },
+ "c19": {
+  "links": 90583,
+  "level2": 40237,
+  "gainCheckout": 19518,
+  "gainLibrary": 25034,
+  "gatedPercent": 90.96,
+  "gatedLinks": 82390,
+  "percentCheckoutOnly": 65.97,
+  "trait": 1558,
+  "underCfg": 846,
+  "generated": 505
+ }
+}

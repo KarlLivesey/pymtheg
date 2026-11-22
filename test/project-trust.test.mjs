@@ -922,8 +922,9 @@ test("a hostile committed .pymtheg/local/.gitignore is rewritten before anything
 });
 
 test("a failed first link write (an unknown record) on a never-initialised project creates nothing", async () => {
-  const { createCodeLink, removeCodeLink } =
-    await import("../dist/architecture/code-links.js");
+  const { createCodeLink, removeCodeLink } = await import(
+    "../dist/architecture/code-links.js"
+  );
   await scratch(async (root) => {
     await writeFile(join(root, "a.go"), "package p\nfunc Save() {}\n");
     const added = await createCodeLink({
@@ -953,8 +954,9 @@ test("a test process that lost its isolated configuration folder refuses to writ
     );
     // Every test process here runs isolated, and MCP servers inherit it.
     assert.equal(process.env.PYMTHEG_TEST, "1");
-    const { DEFAULT_INHERITED_ENV_VARS } =
-      await import("@modelcontextprotocol/client/stdio");
+    const { DEFAULT_INHERITED_ENV_VARS } = await import(
+      "@modelcontextprotocol/client/stdio"
+    );
     assert.ok(DEFAULT_INHERITED_ENV_VARS.includes("PYMTHEG_CONFIG_HOME"));
   });
 });
@@ -1148,7 +1150,7 @@ function child(args) {
   let buffer = "";
   proc.stdout.on("data", (chunk) => {
     buffer += chunk;
-    for (let i; (i = buffer.indexOf("\n")) >= 0;) {
+    for (let i; (i = buffer.indexOf("\n")) >= 0; ) {
       const line = buffer.slice(0, i);
       buffer = buffer.slice(i + 1);
       lines.push(line);
@@ -1257,8 +1259,9 @@ test(
   needsGo,
   async () => {
     const { createHash } = await import("node:crypto");
-    const { HELPER_SOURCE, installation } =
-      await import("../dist/graph/languages/go/toolchain.js");
+    const { HELPER_SOURCE, installation } = await import(
+      "../dist/graph/languages/go/toolchain.js"
+    );
     await scratch(async (root) => {
       const project = join(root, "project");
       cpSync(GO_FIXTURE, project, { recursive: true });
@@ -1344,8 +1347,9 @@ test("the test guards: no real configuration or cache from a test run, whatever 
       answer.stderr + answer.stdout,
       /refusing to write the real trust answers/,
     );
-    const { toolchainWorkDirectory } =
-      await import("../dist/project/local-trust.js");
+    const { toolchainWorkDirectory } = await import(
+      "../dist/project/local-trust.js"
+    );
     const saved = process.env.PYMTHEG_CACHE_HOME;
     delete process.env.PYMTHEG_CACHE_HOME;
     try {

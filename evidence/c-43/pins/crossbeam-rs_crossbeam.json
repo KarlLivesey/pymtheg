@@ -1,0 +1,133 @@
+{
+ "pin": "crossbeam-rs_crossbeam",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 112
+ },
+ "sourceOnly": {
+  "links": 34081,
+  "level2": 19138,
+  "assumed": 0,
+  "proven": 19138,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 56.15,
+  "withModuleLinksPercent": 56.15
+ },
+ "route": {
+  "links": 34081,
+  "level2": 25739,
+  "assumed": 0,
+  "proven": 19137,
+  "toolchainDecided": 6602,
+  "libraryModuleLinks": 0,
+  "level2Percent": 75.52,
+  "withModuleLinksPercent": 75.52,
+  "toolchainDecidedPercent": 19.37
+ },
+ "decided": {
+  "definite:unresolved": 6588,
+  "definite:definite": 3550,
+  "withheld:cfg-link": 541,
+  "withheld:cfg-variant": 69,
+  "definite:candidates": 14
+ },
+ "join": {
+  "filter:extern-crate": 34,
+  "unapplied:library": 12010,
+  "answer": 10762,
+  "none:kind-not-joined": 3314,
+  "none:no-name-site": 62,
+  "none:local": 5880,
+  "filter:import-names-module": 126,
+  "filter:collision": 591,
+  "none:trait-declaration": 227,
+  "unapplied:generated": 336,
+  "none:no-graph-symbol": 12,
+  "none:no-occurrence-at-site": 599,
+  "filter:kind-incompatible": 1,
+  "none:file-not-indexed": 113
+ },
+ "agreement": {
+  "confirmed": 3550,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 34081,
+  "linksAfter": 34081,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": {
+  "wallS": 38.4,
+  "cpuS": 51.3,
+  "peakMiB": 1253
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 32.6,
+   "cpuS": 41.8
+  },
+  "route": {
+   "wallS": 74.8,
+   "cpuS": 42.6
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 14929,
+  "buckets": {
+   "gate: known error classes": 185,
+   "no identity: library item": 6449,
+   "credited": 6601,
+   "no answer: no-name-site": 42,
+   "gate: trait-method declaration": 227,
+   "no identity: local binding": 310,
+   "gate: kind/namespace": 39,
+   "gate: cfg condition other than test": 405,
+   "no identity: declaration without a graph symbol": 12,
+   "gate: cfg-variant guard": 61,
+   "no identity: generated item": 54,
+   "no answer: no-occurrence-at-site": 456,
+   "no answer: kind-not-joined": 6,
+   "no answer: file-not-indexed": 82
+  },
+  "libraryPassingCfg": 6155,
+  "notIndexed": {
+   "other source": 82
+  },
+  "notIndexedFiles": 2,
+  "notIndexedTop": [
+   {
+    "path": "crossbeam-utils/src/atomic/seq_lock_wide.rs",
+    "links": 42,
+    "class": "other source"
+   },
+   {
+    "path": "crossbeam-utils/src/alloc_helper.rs",
+    "links": 40,
+    "class": "other source"
+   }
+  ]
+ },
+ "c19": {
+  "links": 34081,
+  "level2": 17452,
+  "gainCheckout": 7454,
+  "gainLibrary": 8272,
+  "gatedPercent": 94.18,
+  "gatedLinks": 32099,
+  "percentCheckoutOnly": 73.08,
+  "trait": 227,
+  "underCfg": 852,
+  "generated": 42
+ }
+}

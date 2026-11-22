@@ -1,0 +1,2958 @@
+{
+ "pins": [
+  {
+   "pin": "embassy-rs_embassy",
+   "state": "unavailable",
+   "reason": "no Cargo.toml at the project root",
+   "links": 515233,
+   "sourceOnly": {
+    "links": 515233,
+    "level2": 174016,
+    "assumed": 268,
+    "proven": 173748,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 33.77,
+    "withModuleLinksPercent": 33.77
+   },
+   "route": {
+    "links": 515233,
+    "level2": 174016,
+    "assumed": 268,
+    "proven": 173748,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 33.77,
+    "withModuleLinksPercent": 33.77,
+    "toolchainDecidedPercent": 0
+   },
+   "agreement": {
+    "confirmed": 0,
+    "differs": 0,
+    "percent": null
+   },
+   "check": {
+    "linksBefore": 515233,
+    "linksAfter": 515233,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "c19": null,
+   "analyzerRun": null,
+   "index": {
+    "sourceOnly": {
+     "wallS": 1788.5,
+     "cpuS": 1837.1
+    },
+    "route": {
+     "wallS": 1740.3,
+     "cpuS": 1817.5
+    }
+   },
+   "decided": {},
+   "join": {}
+  },
+  {
+   "pin": "DioxusLabs_dioxus",
+   "state": "partial",
+   "reason": "build script of atk-sys did not finish",
+   "links": 150404,
+   "sourceOnly": {
+    "links": 150404,
+    "level2": 73311,
+    "assumed": 3668,
+    "proven": 69643,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 48.74,
+    "withModuleLinksPercent": 48.74
+   },
+   "route": {
+    "links": 150404,
+    "level2": 73311,
+    "assumed": 3668,
+    "proven": 69643,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 48.74,
+    "withModuleLinksPercent": 48.74,
+    "toolchainDecidedPercent": 0
+   },
+   "agreement": {
+    "confirmed": 0,
+    "differs": 0,
+    "percent": null
+   },
+   "check": {
+    "linksBefore": 150404,
+    "linksAfter": 150404,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 76878,
+    "buckets": {
+     "no answer: no-name-site": 864,
+     "other": 16914,
+     "no identity: library item": 43328,
+     "no identity: local binding": 8646,
+     "no identity: declaration without a graph symbol": 44,
+     "gate: trait-method declaration": 3204,
+     "no identity: generated item": 843,
+     "no answer: no-occurrence-at-site": 1028,
+     "gate: cfg-variant guard": 219,
+     "gate: cfg condition other than test": 613,
+     "gate: known error classes": 134,
+     "gate: kind/namespace": 121,
+     "no answer: kind-not-joined": 5,
+     "no answer: file-not-indexed": 915
+    },
+    "libraryPassingCfg": 40734,
+    "notIndexed": {
+     "other source": 802,
+     "fuzz": 64,
+     "tests": 49
+    },
+    "notIndexedFiles": 26,
+    "notIndexedTop": [
+     {
+      "path": "packages/logger/src/wasm/tests.rs",
+      "links": 229,
+      "class": "other source"
+     },
+     {
+      "path": "packages/logger/src/wasm.rs",
+      "links": 193,
+      "class": "other source"
+     },
+     {
+      "path": "packages/fullstack/src/payloads/msgpack.rs",
+      "links": 104,
+      "class": "other source"
+     },
+     {
+      "path": "packages/fuzz/fuzz/fuzz_targets/vdom_ops.rs",
+      "links": 64,
+      "class": "fuzz"
+     },
+     {
+      "path": "packages/native/src/prelude.rs",
+      "links": 56,
+      "class": "other source"
+     },
+     {
+      "path": "packages/fullstack/src/payloads/postcard.rs",
+      "links": 52,
+      "class": "other source"
+     },
+     {
+      "path": "packages/manganis/manganis/src/android/java.rs",
+      "links": 27,
+      "class": "other source"
+     },
+     {
+      "path": "packages/manganis/manganis/src/android/activity.rs",
+      "links": 23,
+      "class": "other source"
+     },
+     {
+      "path": "packages/manganis/manganis/src/android/callback.rs",
+      "links": 23,
+      "class": "other source"
+     },
+     {
+      "path": "packages/signals/docs/hoist/error.rs",
+      "links": 16,
+      "class": "other source"
+     },
+     {
+      "path": "packages/playwright-tests/windows-hotpatch-fullstack/src/main.rs",
+      "links": 14,
+      "class": "other source"
+     },
+     {
+      "path": "packages/playwright-tests/web-hot-patch/src/main.rs",
+      "links": 13,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 149592,
+    "level2": 68525,
+    "gainCheckout": 30330,
+    "gainLibrary": 46065,
+    "gatedPercent": 92.2,
+    "gatedLinks": 137920,
+    "percentCheckoutOnly": 66.08,
+    "trait": 3170,
+    "underCfg": 3975,
+    "generated": 859
+   },
+   "analyzerRun": {
+    "wallS": 362.3,
+    "cpuS": 1106.3,
+    "peakMiB": 9734
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 542.7,
+     "cpuS": 591.1
+    },
+    "route": {
+     "wallS": 906.6,
+     "cpuS": 598.5
+    }
+   },
+   "decided": {},
+   "join": {
+    "none:no-name-site": 887,
+    "none:kind-not-joined": 16425,
+    "answer": 40583,
+    "unapplied:library": 62123,
+    "none:local": 20739,
+    "none:no-graph-symbol": 44,
+    "filter:collision": 761,
+    "none:trait-declaration": 3204,
+    "unapplied:generated": 2683,
+    "none:no-occurrence-at-site": 1154,
+    "filter:import-names-module": 117,
+    "filter:kind-incompatible": 33,
+    "filter:extern-crate": 95,
+    "none:file-not-indexed": 1341
+   }
+  },
+  {
+   "pin": "helix-editor_helix",
+   "state": "used",
+   "links": 90583,
+   "sourceOnly": {
+    "links": 90583,
+    "level2": 40673,
+    "assumed": 2491,
+    "proven": 38182,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 44.9,
+    "withModuleLinksPercent": 44.9
+   },
+   "route": {
+    "links": 90583,
+    "level2": 52069,
+    "assumed": 2491,
+    "proven": 38182,
+    "toolchainDecided": 11396,
+    "libraryModuleLinks": 0,
+    "level2Percent": 57.48,
+    "withModuleLinksPercent": 57.48,
+    "toolchainDecidedPercent": 12.58
+   },
+   "agreement": {
+    "confirmed": 13924,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 90583,
+    "linksAfter": 90583,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 49651,
+    "buckets": {
+     "credited": 11396,
+     "no identity: library item": 23187,
+     "gate: trait-method declaration": 1558,
+     "no answer: no-name-site": 220,
+     "gate: kind/namespace": 51,
+     "no identity: local binding": 7954,
+     "no identity: generated item": 505,
+     "no identity: declaration without a graph symbol": 473,
+     "gate: known error classes": 40,
+     "gate: cfg-variant guard": 50,
+     "no answer: no-occurrence-at-site": 843,
+     "gate: cfg condition other than test": 80,
+     "no answer: file-not-indexed": 3294
+    },
+    "libraryPassingCfg": 22556,
+    "notIndexed": {
+     "other source": 508,
+     "tests": 2786
+    },
+    "notIndexedFiles": 21,
+    "notIndexedTop": [
+     {
+      "path": "helix-term/tests/test/commands/write.rs",
+      "links": 864,
+      "class": "tests"
+     },
+     {
+      "path": "helix-term/tests/test/auto_pairs.rs",
+      "links": 553,
+      "class": "tests"
+     },
+     {
+      "path": "helix-term/tests/test/commands.rs",
+      "links": 365,
+      "class": "tests"
+     },
+     {
+      "path": "helix-term/tests/test/movement.rs",
+      "links": 278,
+      "class": "tests"
+     },
+     {
+      "path": "helix-tui/src/backend/crossterm.rs",
+      "links": 232,
+      "class": "other source"
+     },
+     {
+      "path": "helix-tui/src/widgets/list.rs",
+      "links": 193,
+      "class": "other source"
+     },
+     {
+      "path": "helix-term/tests/test/commands/insert.rs",
+      "links": 176,
+      "class": "tests"
+     },
+     {
+      "path": "helix-term/tests/test/helpers.rs",
+      "links": 135,
+      "class": "tests"
+     },
+     {
+      "path": "tests/indent/rust.rs",
+      "links": 127,
+      "class": "tests"
+     },
+     {
+      "path": "helix-lsp-types/src/inline_completion.rs",
+      "links": 83,
+      "class": "other source"
+     },
+     {
+      "path": "helix-term/tests/test/commands/movement.rs",
+      "links": 81,
+      "class": "tests"
+     },
+     {
+      "path": "helix-term/tests/test/splits.rs",
+      "links": 71,
+      "class": "tests"
+     }
+    ]
+   },
+   "c19": {
+    "links": 90583,
+    "level2": 40237,
+    "gainCheckout": 19518,
+    "gainLibrary": 25034,
+    "gatedPercent": 90.96,
+    "gatedLinks": 82390,
+    "percentCheckoutOnly": 65.97,
+    "trait": 1558,
+    "underCfg": 846,
+    "generated": 505
+   },
+   "analyzerRun": {
+    "wallS": 112.7,
+    "cpuS": 1096.2,
+    "peakMiB": 2460
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 93.9,
+     "cpuS": 115.4
+    },
+    "route": {
+     "wallS": 223.1,
+     "cpuS": 139.8
+    }
+   },
+   "decided": {
+    "definite:definite": 13924,
+    "definite:unresolved": 11396,
+    "withheld:cfg-link": 586,
+    "withheld:cfg-variant": 50
+   },
+   "join": {
+    "filter:import-names-module": 152,
+    "answer": 25956,
+    "unapplied:library": 33027,
+    "none:kind-not-joined": 8315,
+    "none:local": 14427,
+    "unapplied:generated": 1119,
+    "none:trait-declaration": 1558,
+    "none:no-name-site": 274,
+    "none:no-graph-symbol": 473,
+    "none:no-occurrence-at-site": 1020,
+    "filter:collision": 52,
+    "filter:extern-crate": 37,
+    "none:file-not-indexed": 3899,
+    "filter:kind-incompatible": 2
+   }
+  },
+  {
+   "pin": "tauri-apps_tauri",
+   "state": "partial",
+   "reason": "build script of atk-sys did not finish",
+   "links": 88113,
+   "sourceOnly": {
+    "links": 88113,
+    "level2": 42580,
+    "assumed": 3401,
+    "proven": 39179,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 48.32,
+    "withModuleLinksPercent": 48.32
+   },
+   "route": {
+    "links": 88113,
+    "level2": 42580,
+    "assumed": 3401,
+    "proven": 39179,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 48.32,
+    "withModuleLinksPercent": 48.32,
+    "toolchainDecidedPercent": 0
+   },
+   "agreement": {
+    "confirmed": 0,
+    "differs": 0,
+    "percent": null
+   },
+   "check": {
+    "linksBefore": 88113,
+    "linksAfter": 88113,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 45007,
+    "buckets": {
+     "no identity: library item": 25104,
+     "gate: kind/namespace": 89,
+     "no identity: local binding": 4915,
+     "gate: trait-method declaration": 1506,
+     "no identity: generated item": 651,
+     "no answer: no-occurrence-at-site": 2866,
+     "other": 4882,
+     "gate: cfg-variant guard": 118,
+     "gate: cfg condition other than test": 643,
+     "no answer: no-name-site": 122,
+     "no answer: file-not-indexed": 4050,
+     "gate: known error classes": 33,
+     "no identity: declaration without a graph symbol": 28
+    },
+    "libraryPassingCfg": 22178,
+    "notIndexed": {
+     "other source": 3445,
+     "build script": 453,
+     "examples": 152
+    },
+    "notIndexedFiles": 37,
+    "notIndexedTop": [
+     {
+      "path": "crates/tauri-bundler/src/bundle/windows/msi/mod.rs",
+      "links": 634,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-cli/src/mobile/ios/build.rs",
+      "links": 445,
+      "class": "build script"
+     },
+     {
+      "path": "crates/tauri-cli/src/mobile/ios/mod.rs",
+      "links": 433,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri/src/plugin/mobile.rs",
+      "links": 333,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-bundler/src/bundle/macos/app.rs",
+      "links": 319,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-utils/src/html.rs",
+      "links": 236,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-bundler/src/bundle/macos/icon.rs",
+      "links": 189,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-cli/src/helpers/pbxproj.rs",
+      "links": 187,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-cli/src/mobile/ios/xcode_script.rs",
+      "links": 182,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-cli/src/mobile/ios/project.rs",
+      "links": 178,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-cli/src/mobile/ios/dev.rs",
+      "links": 177,
+      "class": "other source"
+     },
+     {
+      "path": "crates/tauri-bundler/src/bundle/macos/dmg/mod.rs",
+      "links": 76,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 88051,
+    "level2": 41918,
+    "gainCheckout": 11066,
+    "gainLibrary": 26531,
+    "gatedPercent": 83.59,
+    "gatedLinks": 73604,
+    "percentCheckoutOnly": 60.17,
+    "trait": 1502,
+    "underCfg": 4585,
+    "generated": 651
+   },
+   "analyzerRun": {
+    "wallS": 103.9,
+    "cpuS": 517.4,
+    "peakMiB": 5200
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 107.8,
+     "cpuS": 131.4
+    },
+    "route": {
+     "wallS": 228.7,
+     "cpuS": 138.7
+    }
+   },
+   "decided": {},
+   "join": {
+    "unapplied:library": 36543,
+    "none:kind-not-joined": 8335,
+    "answer": 17675,
+    "none:local": 10971,
+    "filter:import-names-module": 116,
+    "none:trait-declaration": 1506,
+    "unapplied:generated": 1442,
+    "none:no-occurrence-at-site": 3641,
+    "filter:kind-incompatible": 87,
+    "none:no-name-site": 137,
+    "none:file-not-indexed": 6996,
+    "filter:extern-crate": 38,
+    "none:no-graph-symbol": 28,
+    "filter:collision": 2
+   }
+  },
+  {
+   "pin": "actix_actix-web",
+   "state": "used",
+   "links": 86640,
+   "sourceOnly": {
+    "links": 86640,
+    "level2": 36227,
+    "assumed": 3111,
+    "proven": 33116,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 41.81,
+    "withModuleLinksPercent": 41.81
+   },
+   "route": {
+    "links": 86640,
+    "level2": 49643,
+    "assumed": 3111,
+    "proven": 33116,
+    "toolchainDecided": 13416,
+    "libraryModuleLinks": 0,
+    "level2Percent": 57.3,
+    "withModuleLinksPercent": 57.3,
+    "toolchainDecidedPercent": 15.48
+   },
+   "agreement": {
+    "confirmed": 10069,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 86640,
+    "linksAfter": 86640,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 49944,
+    "buckets": {
+     "credited": 13416,
+     "no identity: declaration without a graph symbol": 1189,
+     "gate: kind/namespace": 272,
+     "no identity: library item": 22834,
+     "no identity: generated item": 1040,
+     "no identity: local binding": 3942,
+     "gate: trait-method declaration": 1358,
+     "no answer: no-name-site": 254,
+     "gate: cfg condition other than test": 1295,
+     "no answer: no-occurrence-at-site": 1856,
+     "gate: cfg-variant guard": 30,
+     "gate: known error classes": 61,
+     "no answer: file-not-indexed": 2397
+    },
+    "libraryPassingCfg": 20387,
+    "notIndexed": {
+     "tests": 614,
+     "other source": 1783
+    },
+    "notIndexedFiles": 34,
+    "notIndexedTop": [
+     {
+      "path": "actix-web-actors/src/ws.rs",
+      "links": 804,
+      "class": "other source"
+     },
+     {
+      "path": "actix-web/src/introspection.rs",
+      "links": 756,
+      "class": "other source"
+     },
+     {
+      "path": "actix-web-actors/tests/test_ws.rs",
+      "links": 219,
+      "class": "tests"
+     },
+     {
+      "path": "actix-web-actors/src/context.rs",
+      "links": 172,
+      "class": "other source"
+     },
+     {
+      "path": "actix-web-codegen/tests/trybuild/route-custom-method.rs",
+      "links": 51,
+      "class": "tests"
+     },
+     {
+      "path": "actix-web/src/http/header/any_or_some.rs",
+      "links": 51,
+      "class": "other source"
+     },
+     {
+      "path": "actix-web-codegen/tests/trybuild/routes-ok.rs",
+      "links": 24,
+      "class": "tests"
+     },
+     {
+      "path": "actix-multipart/tests/trybuild/max-parts.rs",
+      "links": 23,
+      "class": "tests"
+     },
+     {
+      "path": "actix-web-codegen/tests/trybuild/route-ok.rs",
+      "links": 23,
+      "class": "tests"
+     },
+     {
+      "path": "actix-web-codegen/tests/trybuild/route-custom-lowercase.rs",
+      "links": 21,
+      "class": "tests"
+     },
+     {
+      "path": "actix-multipart/tests/trybuild/all-required.rs",
+      "links": 20,
+      "class": "tests"
+     },
+     {
+      "path": "actix-multipart/tests/trybuild/optional-and-list.rs",
+      "links": 20,
+      "class": "tests"
+     }
+    ]
+   },
+   "c19": {
+    "links": 86640,
+    "level2": 34923,
+    "gainCheckout": 19439,
+    "gainLibrary": 24639,
+    "gatedPercent": 84.82,
+    "gatedLinks": 73491,
+    "percentCheckoutOnly": 62.74,
+    "trait": 1358,
+    "underCfg": 4290,
+    "generated": 1040
+   },
+   "analyzerRun": {
+    "wallS": 92.3,
+    "cpuS": 274,
+    "peakMiB": 3029
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 112.1,
+     "cpuS": 117.3
+    },
+    "route": {
+     "wallS": 195.7,
+     "cpuS": 119.2
+    }
+   },
+   "decided": {
+    "definite:unresolved": 13416,
+    "definite:definite": 10069,
+    "withheld:cfg-link": 1961,
+    "withheld:cfg-variant": 37
+   },
+   "join": {
+    "answer": 25483,
+    "none:no-graph-symbol": 1189,
+    "filter:import-names-module": 488,
+    "none:kind-not-joined": 7599,
+    "unapplied:library": 33355,
+    "unapplied:generated": 1810,
+    "none:local": 9241,
+    "none:trait-declaration": 1358,
+    "none:no-name-site": 298,
+    "none:no-occurrence-at-site": 2172,
+    "filter:collision": 144,
+    "none:file-not-indexed": 3001,
+    "filter:extern-crate": 12,
+    "filter:kind-incompatible": 21
+   }
+  },
+  {
+   "pin": "cberner_redb",
+   "state": "used",
+   "links": 73731,
+   "sourceOnly": {
+    "links": 73731,
+    "level2": 35223,
+    "assumed": 110,
+    "proven": 35113,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 47.77,
+    "withModuleLinksPercent": 47.77
+   },
+   "route": {
+    "links": 73731,
+    "level2": 44116,
+    "assumed": 110,
+    "proven": 35113,
+    "toolchainDecided": 8893,
+    "libraryModuleLinks": 0,
+    "level2Percent": 59.83,
+    "withModuleLinksPercent": 59.83,
+    "toolchainDecidedPercent": 12.06
+   },
+   "agreement": {
+    "confirmed": 9882,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 73731,
+    "linksAfter": 73731,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 38394,
+    "buckets": {
+     "no identity: library item": 19167,
+     "no answer: no-name-site": 45,
+     "gate: kind/namespace": 54,
+     "no identity: local binding": 3416,
+     "credited": 8893,
+     "no answer: no-occurrence-at-site": 805,
+     "gate: trait-method declaration": 1223,
+     "gate: cfg-variant guard": 660,
+     "gate: known error classes": 106,
+     "gate: cfg condition other than test": 1627,
+     "no identity: generated item": 364,
+     "no answer: file-not-indexed": 2022,
+     "no identity: declaration without a graph symbol": 10,
+     "other": 2
+    },
+    "libraryPassingCfg": 15384,
+    "notIndexed": {
+     "other source": 517,
+     "fuzz": 1505
+    },
+    "notIndexedFiles": 8,
+    "notIndexedTop": [
+     {
+      "path": "fuzz/fuzz_targets/fuzz_redb.rs",
+      "links": 1153,
+      "class": "fuzz"
+     },
+     {
+      "path": "src/types/chrono_v0_4.rs",
+      "links": 352,
+      "class": "other source"
+     },
+     {
+      "path": "fuzz/fuzz_targets/fuzz_corruption.rs",
+      "links": 266,
+      "class": "fuzz"
+     },
+     {
+      "path": "fuzz/fuzz_targets/common.rs",
+      "links": 86,
+      "class": "fuzz"
+     },
+     {
+      "path": "crates/redb-no-std-test/src/main.rs",
+      "links": 72,
+      "class": "other source"
+     },
+     {
+      "path": "src/tree_store/page_store/file_backend/fallback.rs",
+      "links": 55,
+      "class": "other source"
+     },
+     {
+      "path": "src/legacy_types.rs",
+      "links": 27,
+      "class": "other source"
+     },
+     {
+      "path": "crates/redb-no-std-test/src/lib.rs",
+      "links": 11,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 73731,
+    "level2": 31261,
+    "gainCheckout": 15259,
+    "gainLibrary": 23621,
+    "gatedPercent": 84.59,
+    "gatedLinks": 62367,
+    "percentCheckoutOnly": 63.09,
+    "trait": 1223,
+    "underCfg": 6653,
+    "generated": 364
+   },
+   "analyzerRun": {
+    "wallS": 115.9,
+    "cpuS": 1900.1,
+    "peakMiB": 2064
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 66.1,
+     "cpuS": 83.9
+    },
+    "route": {
+     "wallS": 189,
+     "cpuS": 87.3
+    }
+   },
+   "decided": {
+    "definite:definite": 9882,
+    "definite:unresolved": 8893,
+    "withheld:cfg-variant": 662,
+    "withheld:cfg-link": 3423
+   },
+   "join": {
+    "none:kind-not-joined": 5481,
+    "unapplied:library": 27584,
+    "none:no-name-site": 46,
+    "filter:import-names-module": 86,
+    "answer": 22860,
+    "unapplied:generated": 822,
+    "none:local": 10347,
+    "none:no-occurrence-at-site": 1273,
+    "none:trait-declaration": 1223,
+    "filter:collision": 1088,
+    "none:file-not-indexed": 2779,
+    "none:no-graph-symbol": 10,
+    "filter:kind-incompatible": 17,
+    "filter:extern-crate": 1
+   }
+  },
+  {
+   "pin": "rustls_rustls",
+   "state": "used",
+   "links": 70802,
+   "sourceOnly": {
+    "links": 70802,
+    "level2": 23060,
+    "assumed": 299,
+    "proven": 22761,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 32.57,
+    "withModuleLinksPercent": 32.57
+   },
+   "route": {
+    "links": 70802,
+    "level2": 29910,
+    "assumed": 299,
+    "proven": 22761,
+    "toolchainDecided": 6850,
+    "libraryModuleLinks": 0,
+    "level2Percent": 42.24,
+    "withModuleLinksPercent": 42.24,
+    "toolchainDecidedPercent": 9.67
+   },
+   "agreement": {
+    "confirmed": 6554,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 70802,
+    "linksAfter": 70802,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 47713,
+    "buckets": {
+     "no answer: file-not-indexed": 134,
+     "no identity: library item": 18482,
+     "credited": 6850,
+     "no answer: no-name-site": 96,
+     "gate: cfg-variant guard": 6567,
+     "no identity: declaration without a graph symbol": 2173,
+     "no identity: generated item": 1263,
+     "gate: trait-method declaration": 1549,
+     "gate: kind/namespace": 176,
+     "no identity: local binding": 5166,
+     "no answer: no-occurrence-at-site": 359,
+     "gate: cfg condition other than test": 4807,
+     "gate: known error classes": 47,
+     "no answer: kind-not-joined": 44
+    },
+    "libraryPassingCfg": 13605,
+    "notIndexed": {
+     "other source": 49,
+     "fuzz": 85
+    },
+    "notIndexedFiles": 8,
+    "notIndexedTop": [
+     {
+      "path": "fuzz/fuzzers/server.rs",
+      "links": 66,
+      "class": "fuzz"
+     },
+     {
+      "path": "admin/threads-seq.rs",
+      "links": 49,
+      "class": "other source"
+     },
+     {
+      "path": "fuzz/fuzzers/client.rs",
+      "links": 4,
+      "class": "fuzz"
+     },
+     {
+      "path": "fuzz/fuzzers/deframer.rs",
+      "links": 3,
+      "class": "fuzz"
+     },
+     {
+      "path": "fuzz/fuzzers/fragment.rs",
+      "links": 3,
+      "class": "fuzz"
+     },
+     {
+      "path": "fuzz/fuzzers/message.rs",
+      "links": 3,
+      "class": "fuzz"
+     },
+     {
+      "path": "fuzz/fuzzers/persist.rs",
+      "links": 3,
+      "class": "fuzz"
+     },
+     {
+      "path": "fuzz/fuzzers/server_name.rs",
+      "links": 3,
+      "class": "fuzz"
+     }
+    ]
+   },
+   "c19": {
+    "links": 69929,
+    "level2": 19809,
+    "gainCheckout": 24234,
+    "gainLibrary": 21421,
+    "gatedPercent": 74.17,
+    "gatedLinks": 51863,
+    "percentCheckoutOnly": 62.98,
+    "trait": 1503,
+    "underCfg": 12270,
+    "generated": 1255
+   },
+   "analyzerRun": {
+    "wallS": 117.5,
+    "cpuS": 511.9,
+    "peakMiB": 2356
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 143.5,
+     "cpuS": 171
+    },
+    "route": {
+     "wallS": 279.1,
+     "cpuS": 178.5
+    }
+   },
+   "decided": {
+    "definite:unresolved": 6850,
+    "withheld:cfg-variant": 6680,
+    "definite:definite": 6554,
+    "withheld:cfg-link": 5004
+   },
+   "join": {
+    "none:file-not-indexed": 159,
+    "none:kind-not-joined": 7244,
+    "filter:import-names-module": 239,
+    "unapplied:library": 23317,
+    "answer": 25088,
+    "none:no-name-site": 117,
+    "none:no-graph-symbol": 2173,
+    "none:local": 8505,
+    "unapplied:generated": 1845,
+    "none:trait-declaration": 1550,
+    "none:no-occurrence-at-site": 415,
+    "filter:kind-incompatible": 40,
+    "filter:extern-crate": 31,
+    "filter:collision": 44
+   }
+  },
+  {
+   "pin": "clap-rs_clap",
+   "state": "used",
+   "links": 60489,
+   "sourceOnly": {
+    "links": 60489,
+    "level2": 20474,
+    "assumed": 41,
+    "proven": 20433,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 33.85,
+    "withModuleLinksPercent": 33.85
+   },
+   "route": {
+    "links": 60489,
+    "level2": 35395,
+    "assumed": 41,
+    "proven": 20433,
+    "toolchainDecided": 14921,
+    "libraryModuleLinks": 0,
+    "level2Percent": 58.51,
+    "withModuleLinksPercent": 58.51,
+    "toolchainDecidedPercent": 24.67
+   },
+   "agreement": {
+    "confirmed": 4530,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 60489,
+    "linksAfter": 60489,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 39979,
+    "buckets": {
+     "credited": 14921,
+     "no identity: library item": 12185,
+     "no identity: local binding": 2165,
+     "gate: known error classes": 454,
+     "gate: cfg-variant guard": 404,
+     "gate: cfg condition other than test": 3254,
+     "gate: kind/namespace": 21,
+     "no identity: generated item": 363,
+     "gate: trait-method declaration": 1234,
+     "no answer: no-occurrence-at-site": 2030,
+     "no answer: no-name-site": 50,
+     "no answer: file-not-indexed": 2898
+    },
+    "libraryPassingCfg": 10654,
+    "notIndexed": {
+     "other source": 1113,
+     "tests": 1785
+    },
+    "notIndexedFiles": 56,
+    "notIndexedTop": [
+     {
+      "path": "clap_complete/tests/testsuite/engine.rs",
+      "links": 750,
+      "class": "tests"
+     },
+     {
+      "path": "clap_complete/src/engine/complete.rs",
+      "links": 605,
+      "class": "other source"
+     },
+     {
+      "path": "tests/builder/env.rs",
+      "links": 346,
+      "class": "tests"
+     },
+     {
+      "path": "clap_complete/src/env/shells.rs",
+      "links": 185,
+      "class": "other source"
+     },
+     {
+      "path": "clap_complete/src/engine/custom.rs",
+      "links": 135,
+      "class": "other source"
+     },
+     {
+      "path": "tests/builder/help_env.rs",
+      "links": 125,
+      "class": "tests"
+     },
+     {
+      "path": "tests/builder/utf16.rs",
+      "links": 122,
+      "class": "tests"
+     },
+     {
+      "path": "tests/builder/cargo.rs",
+      "links": 81,
+      "class": "tests"
+     },
+     {
+      "path": "clap_complete/src/env/mod.rs",
+      "links": 78,
+      "class": "other source"
+     },
+     {
+      "path": "tests/derive/occurrences.rs",
+      "links": 54,
+      "class": "tests"
+     },
+     {
+      "path": "src/_tutorial.rs",
+      "links": 40,
+      "class": "other source"
+     },
+     {
+      "path": "src/_derive/_tutorial.rs",
+      "links": 39,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 52417,
+    "level2": 19785,
+    "gainCheckout": 16761,
+    "gainLibrary": 10837,
+    "gatedPercent": 83.1,
+    "gatedLinks": 43561,
+    "percentCheckoutOnly": 69.72,
+    "trait": 1207,
+    "underCfg": 2686,
+    "generated": 316
+   },
+   "analyzerRun": {
+    "wallS": 43.6,
+    "cpuS": 78,
+    "peakMiB": 1671
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 53.6,
+     "cpuS": 66.8
+    },
+    "route": {
+     "wallS": 114.7,
+     "cpuS": 74.7
+    }
+   },
+   "decided": {
+    "definite:unresolved": 14921,
+    "definite:definite": 4530,
+    "withheld:cfg-variant": 443,
+    "withheld:cfg-link": 3698
+   },
+   "join": {
+    "answer": 23592,
+    "none:kind-not-joined": 5897,
+    "filter:collision": 528,
+    "unapplied:library": 17445,
+    "none:local": 4553,
+    "unapplied:generated": 941,
+    "filter:import-names-module": 44,
+    "none:no-name-site": 53,
+    "none:no-occurrence-at-site": 2285,
+    "none:trait-declaration": 1234,
+    "filter:kind-incompatible": 11,
+    "none:file-not-indexed": 3868,
+    "filter:extern-crate": 2
+   }
+  },
+  {
+   "pin": "ratatui_ratatui",
+   "state": "used",
+   "links": 60424,
+   "sourceOnly": {
+    "links": 60424,
+    "level2": 25892,
+    "assumed": 1793,
+    "proven": 24099,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 42.85,
+    "withModuleLinksPercent": 42.85
+   },
+   "route": {
+    "links": 60424,
+    "level2": 39665,
+    "assumed": 1793,
+    "proven": 24099,
+    "toolchainDecided": 13773,
+    "libraryModuleLinks": 0,
+    "level2Percent": 65.64,
+    "withModuleLinksPercent": 65.64,
+    "toolchainDecidedPercent": 22.79
+   },
+   "agreement": {
+    "confirmed": 10488,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 60424,
+    "linksAfter": 60424,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 34256,
+    "buckets": {
+     "no identity: library item": 9794,
+     "gate: kind/namespace": 69,
+     "credited": 13773,
+     "no identity: generated item": 1279,
+     "gate: trait-method declaration": 1400,
+     "no identity: local binding": 4104,
+     "no identity: declaration without a graph symbol": 601,
+     "no answer: no-name-site": 141,
+     "gate: cfg-variant guard": 9,
+     "no answer: no-occurrence-at-site": 2292,
+     "no answer: file-not-indexed": 530,
+     "gate: known error classes": 25,
+     "gate: cfg condition other than test": 239
+    },
+    "libraryPassingCfg": 9496,
+    "notIndexed": {
+     "examples": 117,
+     "other source": 396,
+     "tests": 17
+    },
+    "notIndexedFiles": 8,
+    "notIndexedTop": [
+     {
+      "path": "ratatui-core/src/style/anstyle.rs",
+      "links": 348,
+      "class": "other source"
+     },
+     {
+      "path": "examples/apps/demo/src/termina.rs",
+      "links": 42,
+      "class": "examples"
+     },
+     {
+      "path": "examples/apps/demo/src/termwiz.rs",
+      "links": 38,
+      "class": "examples"
+     },
+     {
+      "path": "examples/apps/demo/src/termion.rs",
+      "links": 37,
+      "class": "examples"
+     },
+     {
+      "path": "ratatui-core/src/style/palette_conversion.rs",
+      "links": 36,
+      "class": "other source"
+     },
+     {
+      "path": "ratatui-macros/tests/ui/fails.rs",
+      "links": 12,
+      "class": "tests"
+     },
+     {
+      "path": "ratatui-widgets/src/polyfills.rs",
+      "links": 12,
+      "class": "other source"
+     },
+     {
+      "path": "ratatui-macros/tests/ui/span_semicolon.rs",
+      "links": 5,
+      "class": "tests"
+     }
+    ]
+   },
+   "c19": {
+    "links": 60424,
+    "level2": 23853,
+    "gainCheckout": 18261,
+    "gainLibrary": 12691,
+    "gatedPercent": 87.96,
+    "gatedLinks": 53148,
+    "percentCheckoutOnly": 69.7,
+    "trait": 1036,
+    "underCfg": 632,
+    "generated": 1285
+   },
+   "analyzerRun": {
+    "wallS": 70.4,
+    "cpuS": 284.8,
+    "peakMiB": 2835
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 66.2,
+     "cpuS": 83.7
+    },
+    "route": {
+     "wallS": 146.4,
+     "cpuS": 89.8
+    }
+   },
+   "decided": {
+    "definite:unresolved": 13773,
+    "definite:definite": 10488,
+    "withheld:cfg-variant": 9,
+    "withheld:cfg-link": 418
+   },
+   "join": {
+    "unapplied:library": 13763,
+    "filter:import-names-module": 145,
+    "answer": 24688,
+    "none:kind-not-joined": 5705,
+    "unapplied:generated": 2030,
+    "none:local": 8237,
+    "none:trait-declaration": 1400,
+    "none:no-graph-symbol": 601,
+    "none:no-name-site": 163,
+    "none:no-occurrence-at-site": 2450,
+    "none:file-not-indexed": 857,
+    "filter:collision": 90,
+    "filter:extern-crate": 19
+   }
+  },
+  {
+   "pin": "tree-sitter_tree-sitter",
+   "state": "used",
+   "links": 54645,
+   "sourceOnly": {
+    "links": 54645,
+    "level2": 25212,
+    "assumed": 2914,
+    "proven": 22298,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 46.14,
+    "withModuleLinksPercent": 46.14
+   },
+   "route": {
+    "links": 54645,
+    "level2": 30895,
+    "assumed": 2914,
+    "proven": 22298,
+    "toolchainDecided": 5683,
+    "libraryModuleLinks": 0,
+    "level2Percent": 56.54,
+    "withModuleLinksPercent": 56.54,
+    "toolchainDecidedPercent": 10.4
+   },
+   "agreement": {
+    "confirmed": 8252,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 54645,
+    "linksAfter": 54645,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 29425,
+    "buckets": {
+     "gate: kind/namespace": 31,
+     "no identity: library item": 13662,
+     "credited": 5683,
+     "no answer: no-occurrence-at-site": 117,
+     "gate: trait-method declaration": 1114,
+     "no identity: local binding": 6173,
+     "no identity: generated item": 745,
+     "gate: cfg-variant guard": 69,
+     "gate: cfg condition other than test": 310,
+     "no answer: no-name-site": 36,
+     "no identity: declaration without a graph symbol": 53,
+     "no answer: file-not-indexed": 1415,
+     "gate: known error classes": 17
+    },
+    "libraryPassingCfg": 12986,
+    "notIndexed": {
+     "build script": 47,
+     "other source": 916,
+     "tests": 452
+    },
+    "notIndexedFiles": 12,
+    "notIndexedTop": [
+     {
+      "path": "lib/binding_rust/bindings.rs",
+      "links": 414,
+      "class": "other source"
+     },
+     {
+      "path": "crates/cli/src/tests/wasm_language_test.rs",
+      "links": 291,
+      "class": "tests"
+     },
+     {
+      "path": "lib/binding_rust/js_loader.rs",
+      "links": 137,
+      "class": "other source"
+     },
+     {
+      "path": "lib/binding_rust/js_loader/tests.rs",
+      "links": 118,
+      "class": "other source"
+     },
+     {
+      "path": "test/fixtures/rust_wasm_web/src/rust_wasm_web.rs",
+      "links": 102,
+      "class": "tests"
+     },
+     {
+      "path": "lib/binding_rust/wasm_stdlib/memory_import.rs",
+      "links": 78,
+      "class": "other source"
+     },
+     {
+      "path": "lib/binding_rust/wasm_language.rs",
+      "links": 62,
+      "class": "other source"
+     },
+     {
+      "path": "crates/cli/src/tests/helpers/dirs.rs",
+      "links": 59,
+      "class": "tests"
+     },
+     {
+      "path": "lib/binding_rust/wasm_stdlib/memory_import_tests.rs",
+      "links": 51,
+      "class": "other source"
+     },
+     {
+      "path": "crates/cli/src/templates/build.rs",
+      "links": 47,
+      "class": "build script"
+     },
+     {
+      "path": "lib/binding_rust/wasm_stdlib.rs",
+      "links": 43,
+      "class": "other source"
+     },
+     {
+      "path": "crates/cli/src/templates/lib.rs",
+      "links": 13,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 54645,
+    "level2": 23682,
+    "gainCheckout": 13032,
+    "gainLibrary": 15362,
+    "gatedPercent": 90.3,
+    "gatedLinks": 49347,
+    "percentCheckoutOnly": 67.19,
+    "trait": 1114,
+    "underCfg": 1688,
+    "generated": 745
+   },
+   "analyzerRun": {
+    "wallS": 53.2,
+    "cpuS": 137.2,
+    "peakMiB": 1652
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 65.6,
+     "cpuS": 76.6
+    },
+    "route": {
+     "wallS": 119.8,
+     "cpuS": 82.1
+    }
+   },
+   "decided": {
+    "definite:unresolved": 5683,
+    "definite:definite": 8252,
+    "withheld:cfg-variant": 145,
+    "withheld:cfg-link": 941
+   },
+   "join": {
+    "unapplied:library": 21570,
+    "filter:import-names-module": 119,
+    "answer": 15021,
+    "none:no-occurrence-at-site": 134,
+    "none:kind-not-joined": 3962,
+    "none:trait-declaration": 1114,
+    "none:local": 9138,
+    "unapplied:generated": 1104,
+    "none:no-name-site": 52,
+    "none:no-graph-symbol": 53,
+    "none:file-not-indexed": 2274,
+    "filter:collision": 95,
+    "filter:kind-incompatible": 1
+   }
+  },
+  {
+   "pin": "tokio-rs_axum",
+   "state": "used",
+   "links": 41067,
+   "sourceOnly": {
+    "links": 41067,
+    "level2": 16583,
+    "assumed": 1144,
+    "proven": 15439,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 40.38,
+    "withModuleLinksPercent": 40.38
+   },
+   "route": {
+    "links": 41067,
+    "level2": 20284,
+    "assumed": 1144,
+    "proven": 15439,
+    "toolchainDecided": 3701,
+    "libraryModuleLinks": 0,
+    "level2Percent": 49.39,
+    "withModuleLinksPercent": 49.39,
+    "toolchainDecidedPercent": 9.01
+   },
+   "agreement": {
+    "confirmed": 2756,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 41067,
+    "linksAfter": 41067,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 24208,
+    "buckets": {
+     "no identity: library item": 6748,
+     "no identity: local binding": 1325,
+     "gate: trait-method declaration": 459,
+     "credited": 3701,
+     "no identity: declaration without a graph symbol": 611,
+     "no identity: generated item": 197,
+     "no answer: no-name-site": 81,
+     "no answer: no-occurrence-at-site": 178,
+     "gate: cfg-variant guard": 331,
+     "gate: known error classes": 44,
+     "no answer: file-not-indexed": 10376,
+     "gate: cfg condition other than test": 111,
+     "gate: kind/namespace": 34,
+     "other": 12
+    },
+    "libraryPassingCfg": 6514,
+    "notIndexed": {
+     "other source": 3712,
+     "tests": 1773,
+     "examples": 4891
+    },
+    "notIndexedFiles": 207,
+    "notIndexedTop": [
+     {
+      "path": "axum/src/extract/ws.rs",
+      "links": 648,
+      "class": "other source"
+     },
+     {
+      "path": "axum-extra/src/response/file_stream.rs",
+      "links": 605,
+      "class": "other source"
+     },
+     {
+      "path": "axum-extra/src/extract/json_deserializer.rs",
+      "links": 313,
+      "class": "other source"
+     },
+     {
+      "path": "axum/src/extract/multipart.rs",
+      "links": 306,
+      "class": "other source"
+     },
+     {
+      "path": "examples/oauth/src/main.rs",
+      "links": 300,
+      "class": "examples"
+     },
+     {
+      "path": "axum-extra/src/extract/multipart.rs",
+      "links": 293,
+      "class": "other source"
+     },
+     {
+      "path": "examples/compression/src/tests.rs",
+      "links": 241,
+      "class": "examples"
+     },
+     {
+      "path": "axum-extra/src/extract/query.rs",
+      "links": 234,
+      "class": "other source"
+     },
+     {
+      "path": "axum-extra/src/response/multipart.rs",
+      "links": 212,
+      "class": "other source"
+     },
+     {
+      "path": "axum-extra/src/response/multiple.rs",
+      "links": 183,
+      "class": "other source"
+     },
+     {
+      "path": "examples/testing/src/main.rs",
+      "links": 182,
+      "class": "examples"
+     },
+     {
+      "path": "axum-extra/src/protobuf.rs",
+      "links": 160,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 41067,
+    "level2": 16213,
+    "gainCheckout": 5515,
+    "gainLibrary": 7354,
+    "gatedPercent": 68.68,
+    "gatedLinks": 28203,
+    "percentCheckoutOnly": 52.91,
+    "trait": 459,
+    "underCfg": 429,
+    "generated": 197
+   },
+   "analyzerRun": {
+    "wallS": 32.4,
+    "cpuS": 79.9,
+    "peakMiB": 1960
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 46.7,
+     "cpuS": 57.9
+    },
+    "route": {
+     "wallS": 78.7,
+     "cpuS": 57.9
+    }
+   },
+   "decided": {
+    "definite:definite": 2756,
+    "definite:unresolved": 3701,
+    "withheld:cfg-variant": 410,
+    "withheld:cfg-link": 334
+   },
+   "join": {
+    "none:kind-not-joined": 4367,
+    "answer": 7201,
+    "unapplied:library": 9758,
+    "none:local": 3981,
+    "none:trait-declaration": 459,
+    "unapplied:generated": 580,
+    "none:no-graph-symbol": 611,
+    "filter:import-names-module": 62,
+    "none:no-name-site": 84,
+    "none:no-occurrence-at-site": 196,
+    "filter:extern-crate": 3,
+    "none:file-not-indexed": 13442,
+    "filter:collision": 42,
+    "filter:proc-macro-crate-item": 2,
+    "filter:kind-incompatible": 3
+   }
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "state": "used",
+   "links": 39819,
+   "sourceOnly": {
+    "links": 39819,
+    "level2": 26307,
+    "assumed": 1,
+    "proven": 26306,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 66.07,
+    "withModuleLinksPercent": 66.07
+   },
+   "route": {
+    "links": 39819,
+    "level2": 30502,
+    "assumed": 1,
+    "proven": 26306,
+    "toolchainDecided": 4195,
+    "libraryModuleLinks": 0,
+    "level2Percent": 76.6,
+    "withModuleLinksPercent": 76.6,
+    "toolchainDecidedPercent": 10.54
+   },
+   "agreement": {
+    "confirmed": 9724,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 39819,
+    "linksAfter": 39819,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 12255,
+    "buckets": {
+     "no identity: library item": 6027,
+     "no identity: local binding": 949,
+     "credited": 4195,
+     "gate: trait-method declaration": 625,
+     "no identity: generated item": 125,
+     "gate: kind/namespace": 9,
+     "no answer: no-occurrence-at-site": 138,
+     "no answer: no-name-site": 60,
+     "gate: cfg-variant guard": 19,
+     "gate: cfg condition other than test": 38,
+     "gate: known error classes": 8,
+     "no answer: file-not-indexed": 62
+    },
+    "libraryPassingCfg": 5786,
+    "notIndexed": {
+     "other source": 61,
+     "fuzz": 1
+    },
+    "notIndexedFiles": 2,
+    "notIndexedTop": [
+     {
+      "path": "crates/globset/src/serde_impl.rs",
+      "links": 61,
+      "class": "other source"
+     },
+     {
+      "path": "fuzz/fuzz_targets/fuzz_glob.rs",
+      "links": 1,
+      "class": "fuzz"
+     }
+    ]
+   },
+   "c19": {
+    "links": 39819,
+    "level2": 26104,
+    "gainCheckout": 5432,
+    "gainLibrary": 6620,
+    "gatedPercent": 93.36,
+    "gatedLinks": 37177,
+    "percentCheckoutOnly": 79.2,
+    "trait": 625,
+    "underCfg": 371,
+    "generated": 125
+   },
+   "analyzerRun": {
+    "wallS": 19.8,
+    "cpuS": 41.7,
+    "peakMiB": 1214
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 30.6,
+     "cpuS": 40.2
+    },
+    "route": {
+     "wallS": 55.6,
+     "cpuS": 44
+    }
+   },
+   "decided": {
+    "definite:definite": 9724,
+    "definite:unresolved": 4195,
+    "withheld:cfg-link": 263,
+    "withheld:cfg-variant": 19
+   },
+   "join": {
+    "none:kind-not-joined": 4371,
+    "answer": 14201,
+    "unapplied:library": 14105,
+    "none:local": 4619,
+    "filter:import-names-module": 42,
+    "none:trait-declaration": 625,
+    "unapplied:generated": 130,
+    "none:no-occurrence-at-site": 190,
+    "none:no-name-site": 86,
+    "filter:extern-crate": 5,
+    "none:file-not-indexed": 131,
+    "filter:collision": 41
+   }
+  },
+  {
+   "pin": "crossbeam-rs_crossbeam",
+   "state": "used",
+   "links": 34081,
+   "sourceOnly": {
+    "links": 34081,
+    "level2": 19138,
+    "assumed": 0,
+    "proven": 19138,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 56.15,
+    "withModuleLinksPercent": 56.15
+   },
+   "route": {
+    "links": 34081,
+    "level2": 25739,
+    "assumed": 0,
+    "proven": 19137,
+    "toolchainDecided": 6602,
+    "libraryModuleLinks": 0,
+    "level2Percent": 75.52,
+    "withModuleLinksPercent": 75.52,
+    "toolchainDecidedPercent": 19.37
+   },
+   "agreement": {
+    "confirmed": 3550,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 34081,
+    "linksAfter": 34081,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 14929,
+    "buckets": {
+     "gate: known error classes": 185,
+     "no identity: library item": 6449,
+     "credited": 6601,
+     "no answer: no-name-site": 42,
+     "gate: trait-method declaration": 227,
+     "no identity: local binding": 310,
+     "gate: kind/namespace": 39,
+     "gate: cfg condition other than test": 405,
+     "no identity: declaration without a graph symbol": 12,
+     "gate: cfg-variant guard": 61,
+     "no identity: generated item": 54,
+     "no answer: no-occurrence-at-site": 456,
+     "no answer: kind-not-joined": 6,
+     "no answer: file-not-indexed": 82
+    },
+    "libraryPassingCfg": 6155,
+    "notIndexed": {
+     "other source": 82
+    },
+    "notIndexedFiles": 2,
+    "notIndexedTop": [
+     {
+      "path": "crossbeam-utils/src/atomic/seq_lock_wide.rs",
+      "links": 42,
+      "class": "other source"
+     },
+     {
+      "path": "crossbeam-utils/src/alloc_helper.rs",
+      "links": 40,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 34081,
+    "level2": 17452,
+    "gainCheckout": 7454,
+    "gainLibrary": 8272,
+    "gatedPercent": 94.18,
+    "gatedLinks": 32099,
+    "percentCheckoutOnly": 73.08,
+    "trait": 227,
+    "underCfg": 852,
+    "generated": 42
+   },
+   "analyzerRun": {
+    "wallS": 38.4,
+    "cpuS": 51.3,
+    "peakMiB": 1253
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 32.6,
+     "cpuS": 41.8
+    },
+    "route": {
+     "wallS": 74.8,
+     "cpuS": 42.6
+    }
+   },
+   "decided": {
+    "definite:unresolved": 6588,
+    "definite:definite": 3550,
+    "withheld:cfg-link": 541,
+    "withheld:cfg-variant": 69,
+    "definite:candidates": 14
+   },
+   "join": {
+    "filter:extern-crate": 34,
+    "unapplied:library": 12010,
+    "answer": 10762,
+    "none:kind-not-joined": 3314,
+    "none:no-name-site": 62,
+    "none:local": 5880,
+    "filter:import-names-module": 126,
+    "filter:collision": 591,
+    "none:trait-declaration": 227,
+    "unapplied:generated": 336,
+    "none:no-graph-symbol": 12,
+    "none:no-occurrence-at-site": 599,
+    "filter:kind-incompatible": 1,
+    "none:file-not-indexed": 113
+   }
+  },
+  {
+   "pin": "alacritty_alacritty",
+   "state": "partial",
+   "reason": "build script of crossfont did not finish",
+   "links": 31393,
+   "sourceOnly": {
+    "links": 31393,
+    "level2": 15477,
+    "assumed": 252,
+    "proven": 15225,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 49.3,
+    "withModuleLinksPercent": 49.3
+   },
+   "route": {
+    "links": 31393,
+    "level2": 15477,
+    "assumed": 252,
+    "proven": 15225,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 49.3,
+    "withModuleLinksPercent": 49.3,
+    "toolchainDecidedPercent": 0
+   },
+   "agreement": {
+    "confirmed": 0,
+    "differs": 0,
+    "percent": null
+   },
+   "check": {
+    "linksBefore": 31393,
+    "linksAfter": 31393,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 15871,
+    "buckets": {
+     "gate: kind/namespace": 32,
+     "no identity: library item": 7012,
+     "no answer: no-occurrence-at-site": 239,
+     "other": 3677,
+     "gate: trait-method declaration": 739,
+     "no identity: local binding": 2326,
+     "no identity: generated item": 835,
+     "no answer: no-name-site": 41,
+     "no identity: declaration without a graph symbol": 428,
+     "gate: cfg-variant guard": 13,
+     "gate: cfg condition other than test": 54,
+     "no answer: file-not-indexed": 467,
+     "gate: known error classes": 8
+    },
+    "libraryPassingCfg": 6705,
+    "notIndexed": {
+     "other source": 467
+    },
+    "notIndexedFiles": 8,
+    "notIndexedTop": [
+     {
+      "path": "alacritty_terminal/src/tty/windows/blocking.rs",
+      "links": 186,
+      "class": "other source"
+     },
+     {
+      "path": "alacritty_terminal/src/tty/windows/child.rs",
+      "links": 75,
+      "class": "other source"
+     },
+     {
+      "path": "alacritty_terminal/src/tty/windows/conpty.rs",
+      "links": 68,
+      "class": "other source"
+     },
+     {
+      "path": "alacritty_terminal/src/tty/windows/mod.rs",
+      "links": 60,
+      "class": "other source"
+     },
+     {
+      "path": "alacritty/src/macos/locale.rs",
+      "links": 30,
+      "class": "other source"
+     },
+     {
+      "path": "alacritty/src/macos/proc.rs",
+      "links": 28,
+      "class": "other source"
+     },
+     {
+      "path": "alacritty/src/panic.rs",
+      "links": 12,
+      "class": "other source"
+     },
+     {
+      "path": "alacritty/src/macos/mod.rs",
+      "links": 8,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 30965,
+    "level2": 14852,
+    "gainCheckout": 6713,
+    "gainLibrary": 7269,
+    "gatedPercent": 89.52,
+    "gatedLinks": 27721,
+    "percentCheckoutOnly": 69.64,
+    "trait": 738,
+    "underCfg": 382,
+    "generated": 830
+   },
+   "analyzerRun": {
+    "wallS": 35.8,
+    "cpuS": 90.8,
+    "peakMiB": 1692
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 32.9,
+     "cpuS": 40.7
+    },
+    "route": {
+     "wallS": 72.4,
+     "cpuS": 40.9
+    }
+   },
+   "decided": {},
+   "join": {
+    "filter:import-names-module": 104,
+    "unapplied:library": 9986,
+    "none:kind-not-joined": 2997,
+    "answer": 9537,
+    "none:local": 4974,
+    "none:no-occurrence-at-site": 281,
+    "unapplied:generated": 1110,
+    "none:trait-declaration": 747,
+    "none:no-name-site": 70,
+    "none:no-graph-symbol": 428,
+    "filter:kind-incompatible": 2,
+    "none:file-not-indexed": 1102,
+    "filter:extern-crate": 5,
+    "filter:collision": 5
+   }
+  },
+  {
+   "pin": "serde-rs_serde",
+   "state": "used",
+   "links": 30714,
+   "sourceOnly": {
+    "links": 30714,
+    "level2": 8297,
+    "assumed": 0,
+    "proven": 8297,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 27.01,
+    "withModuleLinksPercent": 27.01
+   },
+   "route": {
+    "links": 30714,
+    "level2": 9193,
+    "assumed": 0,
+    "proven": 8297,
+    "toolchainDecided": 896,
+    "libraryModuleLinks": 0,
+    "level2Percent": 29.93,
+    "withModuleLinksPercent": 29.93,
+    "toolchainDecidedPercent": 2.92
+   },
+   "agreement": {
+    "confirmed": 585,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 30714,
+    "linksAfter": 30714,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 22417,
+    "buckets": {
+     "gate: kind/namespace": 63,
+     "no identity: library item": 10225,
+     "no answer: no-occurrence-at-site": 53,
+     "no answer: kind-not-joined": 34,
+     "gate: cfg-variant guard": 3887,
+     "no answer: no-name-site": 66,
+     "no identity: generated item": 637,
+     "gate: cfg condition other than test": 2332,
+     "no identity: local binding": 2845,
+     "gate: trait-method declaration": 908,
+     "credited": 896,
+     "no identity: declaration without a graph symbol": 12,
+     "gate: known error classes": 75,
+     "no answer: file-not-indexed": 384
+    },
+    "libraryPassingCfg": 8481,
+    "notIndexed": {
+     "other source": 24,
+     "tests": 360
+    },
+    "notIndexedFiles": 121,
+    "notIndexedTop": [
+     {
+      "path": "test_suite/tests/ui/with/incorrect_type.rs",
+      "links": 19,
+      "class": "tests"
+     },
+     {
+      "path": "test_suite/no_std/src/main.rs",
+      "links": 17,
+      "class": "other source"
+     },
+     {
+      "path": "test_suite/tests/ui/default-attribute/tuple_struct_path.rs",
+      "links": 17,
+      "class": "tests"
+     },
+     {
+      "path": "test_suite/tests/unstable/mod.rs",
+      "links": 14,
+      "class": "tests"
+     },
+     {
+      "path": "test_suite/tests/ui/default-attribute/tuple_struct.rs",
+      "links": 13,
+      "class": "tests"
+     },
+     {
+      "path": "test_suite/tests/ui/unimplemented/required_locally.rs",
+      "links": 11,
+      "class": "tests"
+     },
+     {
+      "path": "test_suite/tests/ui/deprecated/deprecated_ser_with.rs",
+      "links": 8,
+      "class": "tests"
+     },
+     {
+      "path": "serde_core/src/std_error.rs",
+      "links": 7,
+      "class": "other source"
+     },
+     {
+      "path": "test_suite/tests/ui/deprecated/deprecated_de_with.rs",
+      "links": 7,
+      "class": "tests"
+     },
+     {
+      "path": "test_suite/tests/ui/conflict/alias-enum.rs",
+      "links": 6,
+      "class": "tests"
+     },
+     {
+      "path": "test_suite/tests/ui/conflict/flatten-newtype-struct.rs",
+      "links": 6,
+      "class": "tests"
+     },
+     {
+      "path": "test_suite/tests/ui/conflict/flatten-tuple-struct.rs",
+      "links": 6,
+      "class": "tests"
+     }
+    ]
+   },
+   "c19": {
+    "links": 30714,
+    "level2": 8282,
+    "gainCheckout": 10504,
+    "gainLibrary": 10457,
+    "gatedPercent": 75.66,
+    "gatedLinks": 23239,
+    "percentCheckoutOnly": 61.16,
+    "trait": 768,
+    "underCfg": 5606,
+    "generated": 777
+   },
+   "analyzerRun": {
+    "wallS": 26,
+    "cpuS": 47.2,
+    "peakMiB": 1150
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 39.4,
+     "cpuS": 51.5
+    },
+    "route": {
+     "wallS": 64.7,
+     "cpuS": 50.7
+    }
+   },
+   "decided": {
+    "definite:definite": 585,
+    "withheld:cfg-variant": 3893,
+    "withheld:cfg-link": 2334,
+    "definite:unresolved": 896
+   },
+   "join": {
+    "filter:import-names-module": 72,
+    "unapplied:library": 10947,
+    "none:kind-not-joined": 4090,
+    "none:local": 5250,
+    "answer": 7708,
+    "none:no-occurrence-at-site": 77,
+    "none:no-name-site": 66,
+    "unapplied:generated": 669,
+    "none:trait-declaration": 908,
+    "none:no-graph-symbol": 12,
+    "filter:kind-incompatible": 3,
+    "filter:collision": 506,
+    "filter:extern-crate": 8,
+    "none:file-not-indexed": 398
+   }
+  },
+  {
+   "pin": "rust-lang_mdBook",
+   "state": "used",
+   "links": 13866,
+   "sourceOnly": {
+    "links": 13866,
+    "level2": 7263,
+    "assumed": 404,
+    "proven": 6859,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 52.38,
+    "withModuleLinksPercent": 52.38
+   },
+   "route": {
+    "links": 13866,
+    "level2": 8180,
+    "assumed": 404,
+    "proven": 6859,
+    "toolchainDecided": 917,
+    "libraryModuleLinks": 0,
+    "level2Percent": 58.99,
+    "withModuleLinksPercent": 58.99,
+    "toolchainDecidedPercent": 6.61
+   },
+   "agreement": {
+    "confirmed": 2030,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 13866,
+    "linksAfter": 13866,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 6570,
+    "buckets": {
+     "gate: trait-method declaration": 346,
+     "no identity: library item": 4595,
+     "no identity: generated item": 38,
+     "no identity: local binding": 495,
+     "credited": 917,
+     "no answer: no-name-site": 43,
+     "gate: kind/namespace": 6,
+     "gate: cfg-variant guard": 2,
+     "no answer: no-occurrence-at-site": 26,
+     "gate: known error classes": 3,
+     "gate: cfg condition other than test": 4,
+     "no answer: file-not-indexed": 95
+    },
+    "libraryPassingCfg": 4572,
+    "notIndexed": {
+     "other source": 34,
+     "tests": 61
+    },
+    "notIndexedFiles": 12,
+    "notIndexedTop": [
+     {
+      "path": "tests/testsuite/includes/all_includes/src/multiline/linear_search.rs",
+      "links": 45,
+      "class": "tests"
+     },
+     {
+      "path": "guide/src/for_developers/mdbook-wordcount/src/main.rs",
+      "links": 34,
+      "class": "other source"
+     },
+     {
+      "path": "tests/testsuite/test/failing_tests/src/test1.rs",
+      "links": 3,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/test/passing_tests/src/test2.rs",
+      "links": 3,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/includes/all_includes/src/partially-included-test-with-anchors.rs",
+      "links": 2,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/includes/all_includes/src/partially-included-test.rs",
+      "links": 2,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/includes/all_includes/src/hello_world.rs",
+      "links": 1,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/includes/all_includes/src/multiline/another-included-test.rs",
+      "links": 1,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/includes/all_includes/src/multiline/main.rs",
+      "links": 1,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/includes/all_includes/src/multiline/myfn.rs",
+      "links": 1,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/test/passing_tests/src/test1.rs",
+      "links": 1,
+      "class": "tests"
+     },
+     {
+      "path": "tests/testsuite/test/passing_tests/src/test3.rs",
+      "links": 1,
+      "class": "tests"
+     }
+    ]
+   },
+   "c19": {
+    "links": 12557,
+    "level2": 6705,
+    "gainCheckout": 1009,
+    "gainLibrary": 4597,
+    "gatedPercent": 95.25,
+    "gatedLinks": 11960,
+    "percentCheckoutOnly": 61.43,
+    "trait": 323,
+    "underCfg": 29,
+    "generated": 38
+   },
+   "analyzerRun": {
+    "wallS": 30.7,
+    "cpuS": 118.1,
+    "peakMiB": 1899
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 19.3,
+     "cpuS": 30.9
+    },
+    "route": {
+     "wallS": 59.1,
+     "cpuS": 34.7
+    }
+   },
+   "decided": {
+    "definite:definite": 2030,
+    "definite:unresolved": 917,
+    "withheld:cfg-variant": 2,
+    "withheld:cfg-link": 12
+   },
+   "join": {
+    "unapplied:library": 7316,
+    "none:kind-not-joined": 1201,
+    "none:trait-declaration": 346,
+    "none:local": 1695,
+    "answer": 2961,
+    "none:no-name-site": 45,
+    "unapplied:generated": 78,
+    "filter:import-names-module": 45,
+    "none:no-occurrence-at-site": 37,
+    "filter:kind-incompatible": 1,
+    "filter:extern-crate": 3,
+    "none:file-not-indexed": 105
+   }
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "state": "used",
+   "links": 13361,
+   "sourceOnly": {
+    "links": 13361,
+    "level2": 6072,
+    "assumed": 97,
+    "proven": 5975,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 45.45,
+    "withModuleLinksPercent": 45.45
+   },
+   "route": {
+    "links": 13361,
+    "level2": 7950,
+    "assumed": 97,
+    "proven": 5975,
+    "toolchainDecided": 1878,
+    "libraryModuleLinks": 0,
+    "level2Percent": 59.5,
+    "withModuleLinksPercent": 59.5,
+    "toolchainDecidedPercent": 14.06
+   },
+   "agreement": {
+    "confirmed": 1438,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 13361,
+    "linksAfter": 13361,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 7289,
+    "buckets": {
+     "no answer: file-not-indexed": 1589,
+     "no identity: library item": 2823,
+     "gate: trait-method declaration": 250,
+     "no identity: generated item": 86,
+     "credited": 1878,
+     "no answer: no-occurrence-at-site": 193,
+     "no identity: local binding": 425,
+     "gate: cfg-variant guard": 7,
+     "gate: cfg condition other than test": 25,
+     "no answer: no-name-site": 13
+    },
+    "libraryPassingCfg": 2721,
+    "notIndexed": {
+     "examples": 1273,
+     "other source": 316
+    },
+    "notIndexedFiles": 26,
+    "notIndexedTop": [
+     {
+      "path": "examples/axum-kv/src/main.rs",
+      "links": 268,
+      "class": "examples"
+     },
+     {
+      "path": "examples/actix-kv/src/main.rs",
+      "links": 258,
+      "class": "examples"
+     },
+     {
+      "path": "examples_disabled/tx-blob-cas/src/main.rs",
+      "links": 253,
+      "class": "other source"
+     },
+     {
+      "path": "examples/ttl-json/src/main.rs",
+      "links": 110,
+      "class": "examples"
+     },
+     {
+      "path": "examples/migration-lazy/src/main.rs",
+      "links": 88,
+      "class": "examples"
+     },
+     {
+      "path": "examples/structured/src/main.rs",
+      "links": 57,
+      "class": "examples"
+     },
+     {
+      "path": "examples_disabled/migration/src/main.rs",
+      "links": 56,
+      "class": "other source"
+     },
+     {
+      "path": "examples/tx-ssi-mpmc-queue/src/main.rs",
+      "links": 49,
+      "class": "examples"
+     },
+     {
+      "path": "examples/tx-mpmc-queue/src/main.rs",
+      "links": 47,
+      "class": "examples"
+     },
+     {
+      "path": "examples/triplestore/src/main.rs",
+      "links": 43,
+      "class": "examples"
+     },
+     {
+      "path": "examples/tx-keyspace-move/src/main.rs",
+      "links": 41,
+      "class": "examples"
+     },
+     {
+      "path": "examples/tx-ssi-keyspace-move/src/main.rs",
+      "links": 41,
+      "class": "examples"
+     }
+    ]
+   },
+   "c19": {
+    "links": 13361,
+    "level2": 5916,
+    "gainCheckout": 2336,
+    "gainLibrary": 3114,
+    "gatedPercent": 82.2,
+    "gatedLinks": 10983,
+    "percentCheckoutOnly": 61.76,
+    "trait": 250,
+    "underCfg": 134,
+    "generated": 86
+   },
+   "analyzerRun": {
+    "wallS": 15.8,
+    "cpuS": 28.8,
+    "peakMiB": 1101
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 13.1,
+     "cpuS": 19.7
+    },
+    "route": {
+     "wallS": 34.5,
+     "cpuS": 21.1
+    }
+   },
+   "decided": {
+    "definite:definite": 1438,
+    "definite:unresolved": 1878,
+    "withheld:cfg-variant": 7,
+    "withheld:cfg-link": 38
+   },
+   "join": {
+    "none:file-not-indexed": 2506,
+    "none:kind-not-joined": 1123,
+    "answer": 3361,
+    "unapplied:library": 4441,
+    "none:local": 1238,
+    "unapplied:generated": 207,
+    "none:trait-declaration": 250,
+    "none:no-occurrence-at-site": 216,
+    "none:no-name-site": 13,
+    "filter:import-names-module": 1,
+    "filter:collision": 5
+   }
+  },
+  {
+   "pin": "RustCrypto_hashes",
+   "state": "used",
+   "links": 12911,
+   "sourceOnly": {
+    "links": 12911,
+    "level2": 6414,
+    "assumed": 301,
+    "proven": 6113,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 49.68,
+    "withModuleLinksPercent": 49.68
+   },
+   "route": {
+    "links": 12911,
+    "level2": 6984,
+    "assumed": 301,
+    "proven": 6113,
+    "toolchainDecided": 570,
+    "libraryModuleLinks": 0,
+    "level2Percent": 54.09,
+    "withModuleLinksPercent": 54.09,
+    "toolchainDecidedPercent": 4.41
+   },
+   "agreement": {
+    "confirmed": 1615,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 12911,
+    "linksAfter": 12911,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 6412,
+    "buckets": {
+     "gate: known error classes": 26,
+     "no identity: library item": 2341,
+     "no identity: local binding": 778,
+     "gate: trait-method declaration": 121,
+     "no answer: no-occurrence-at-site": 79,
+     "no answer: no-name-site": 30,
+     "no identity: declaration without a graph symbol": 131,
+     "credited": 570,
+     "no identity: generated item": 20,
+     "gate: kind/namespace": 5,
+     "no answer: file-not-indexed": 2308,
+     "no answer: kind-not-joined": 2,
+     "gate: cfg-variant guard": 1
+    },
+    "libraryPassingCfg": 2317,
+    "notIndexed": {
+     "other source": 2308
+    },
+    "notIndexedFiles": 17,
+    "notIndexedTop": [
+     {
+      "path": "sha2/src/sha512/aarch64_sha3.rs",
+      "links": 578,
+      "class": "other source"
+     },
+     {
+      "path": "sha1/src/compress/aarch64_sha2.rs",
+      "links": 433,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha256/wasm32_simd128.rs",
+      "links": 203,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha256/aarch64_sha2.rs",
+      "links": 202,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha512/riscv_zknh/unroll.rs",
+      "links": 188,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha256/riscv_zknh/unroll.rs",
+      "links": 187,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha512/wasm32_simd128.rs",
+      "links": 148,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha256/soft/compact.rs",
+      "links": 83,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha512/soft/compact.rs",
+      "links": 80,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha256/riscv_zknh/compact.rs",
+      "links": 50,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha512/riscv_zknh/compact.rs",
+      "links": 50,
+      "class": "other source"
+     },
+     {
+      "path": "sha2/src/sha256/riscv_zknh.rs",
+      "links": 21,
+      "class": "other source"
+     }
+    ]
+   },
+   "c19": {
+    "links": 12911,
+    "level2": 6160,
+    "gainCheckout": 1349,
+    "gainLibrary": 2716,
+    "gatedPercent": 78.06,
+    "gatedLinks": 10078,
+    "percentCheckoutOnly": 58.16,
+    "trait": 121,
+    "underCfg": 26,
+    "generated": 20
+   },
+   "analyzerRun": {
+    "wallS": 41,
+    "cpuS": 46.5,
+    "peakMiB": 938
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 14.3,
+     "cpuS": 18.3
+    },
+    "route": {
+     "wallS": 58,
+     "cpuS": 19.3
+    }
+   },
+   "decided": {
+    "definite:definite": 1615,
+    "withheld:cfg-link": 28,
+    "definite:unresolved": 570,
+    "withheld:cfg-variant": 1
+   },
+   "join": {
+    "filter:extern-crate": 24,
+    "unapplied:library": 3827,
+    "none:kind-not-joined": 1359,
+    "answer": 2214,
+    "none:local": 2422,
+    "unapplied:generated": 220,
+    "none:trait-declaration": 121,
+    "none:no-occurrence-at-site": 125,
+    "none:no-name-site": 30,
+    "none:no-graph-symbol": 131,
+    "filter:import-names-module": 33,
+    "filter:kind-incompatible": 2,
+    "none:file-not-indexed": 2316,
+    "filter:collision": 2
+   }
+  },
+  {
+   "pin": "rust-embedded_cortex-m",
+   "state": "used",
+   "links": 5531,
+   "sourceOnly": {
+    "links": 5531,
+    "level2": 3347,
+    "assumed": 7,
+    "proven": 3340,
+    "toolchainDecided": 0,
+    "libraryModuleLinks": 0,
+    "level2Percent": 60.51,
+    "withModuleLinksPercent": 60.51
+   },
+   "route": {
+    "links": 5531,
+    "level2": 3559,
+    "assumed": 7,
+    "proven": 3340,
+    "toolchainDecided": 212,
+    "libraryModuleLinks": 0,
+    "level2Percent": 64.35,
+    "withModuleLinksPercent": 64.35,
+    "toolchainDecidedPercent": 3.83
+   },
+   "agreement": {
+    "confirmed": 560,
+    "differs": 0,
+    "percent": 100
+   },
+   "check": {
+    "linksBefore": 5531,
+    "linksAfter": 5531,
+    "lost": 0,
+    "changedLevel2": 0
+   },
+   "funnel": {
+    "open": 2171,
+    "buckets": {
+     "no identity: library item": 736,
+     "gate: kind/namespace": 6,
+     "gate: trait-method declaration": 37,
+     "gate: known error classes": 51,
+     "credited": 212,
+     "no answer: no-occurrence-at-site": 294,
+     "no answer: no-name-site": 5,
+     "gate: cfg condition other than test": 49,
+     "no identity: local binding": 99,
+     "no answer: file-not-indexed": 673,
+     "gate: cfg-variant guard": 9
+    },
+    "libraryPassingCfg": 635,
+    "notIndexed": {
+     "tests": 324,
+     "other source": 337,
+     "build script": 12
+    },
+    "notIndexedFiles": 56,
+    "notIndexedTop": [
+     {
+      "path": "testsuite/src/lib.rs",
+      "links": 140,
+      "class": "other source"
+     },
+     {
+      "path": "cortex-m/src/peripheral/sau.rs",
+      "links": 97,
+      "class": "other source"
+     },
+     {
+      "path": "cortex-m/src/cmse.rs",
+      "links": 65,
+      "class": "other source"
+     },
+     {
+      "path": "cortex-m-rt/tests/compile-fail/unsafe-init-static.rs",
+      "links": 16,
+      "class": "tests"
+     },
+     {
+      "path": "cortex-m-rt/tests/compile-fail/hard-fault-twice.rs",
+      "links": 12,
+      "class": "tests"
+     },
+     {
+      "path": "cortex-m-rt/tests/compile-fail/non-static-resource.rs",
+      "links": 12,
+      "class": "tests"
+     },
+     {
+      "path": "testsuite/build.rs",
+      "links": 12,
+      "class": "build script"
+     },
+     {
+      "path": "cortex-m-rt/tests/compile-fail/hard-fault-twice-mixed-trampoline.rs",
+      "links": 11,
+      "class": "tests"
+     },
+     {
+      "path": "cortex-m-rt/tests/compile-fail/hard-fault-hidden.rs",
+      "links": 10,
+      "class": "tests"
+     },
+     {
+      "path": "cortex-m-rt/tests/compile-fail/whitelist-1.rs",
+      "links": 9,
+      "class": "tests"
+     },
+     {
+      "path": "cortex-m-rt/tests/compile-fail/whitelist-2.rs",
+      "links": 9,
+      "class": "tests"
+     },
+     {
+      "path": "cortex-m-rt/tests/compile-fail/whitelist-3.rs",
+      "links": 9,
+      "class": "tests"
+     }
+    ]
+   },
+   "c19": {
+    "links": 5531,
+    "level2": 3047,
+    "gainCheckout": 375,
+    "gainLibrary": 1055,
+    "gatedPercent": 76.33,
+    "gatedLinks": 4222,
+    "percentCheckoutOnly": 61.87,
+    "trait": 37,
+    "underCfg": 222,
+    "generated": 0
+   },
+   "analyzerRun": {
+    "wallS": 17.8,
+    "cpuS": 37.9,
+    "peakMiB": 928
+   },
+   "index": {
+    "sourceOnly": {
+     "wallS": 10.8,
+     "cpuS": 11.8
+    },
+    "route": {
+     "wallS": 34.2,
+     "cpuS": 13.3
+    }
+   },
+   "decided": {
+    "definite:unresolved": 212,
+    "definite:definite": 560,
+    "withheld:cfg-link": 192,
+    "withheld:cfg-variant": 30
+   },
+   "join": {
+    "unapplied:library": 1508,
+    "filter:import-names-module": 27,
+    "none:kind-not-joined": 1275,
+    "none:local": 365,
+    "none:trait-declaration": 37,
+    "none:no-occurrence-at-site": 385,
+    "filter:extern-crate": 33,
+    "answer": 994,
+    "filter:collision": 27,
+    "none:no-name-site": 9,
+    "unapplied:generated": 20,
+    "none:file-not-indexed": 837
+   }
+  }
+ ],
+ "used": {
+  "pins": 15,
+  "links": 688664,
+  "sourceOnlyPercent": 43.59,
+  "routePercent": 57.22,
+  "libraryWorthPercent": 20.66
+ }
+}

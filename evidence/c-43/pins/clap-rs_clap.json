@@ -1,0 +1,180 @@
+{
+ "pin": "clap-rs_clap",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 263
+ },
+ "sourceOnly": {
+  "links": 60489,
+  "level2": 20474,
+  "assumed": 41,
+  "proven": 20433,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 33.85,
+  "withModuleLinksPercent": 33.85
+ },
+ "route": {
+  "links": 60489,
+  "level2": 35395,
+  "assumed": 41,
+  "proven": 20433,
+  "toolchainDecided": 14921,
+  "libraryModuleLinks": 0,
+  "level2Percent": 58.51,
+  "withModuleLinksPercent": 58.51,
+  "toolchainDecidedPercent": 24.67
+ },
+ "decided": {
+  "definite:unresolved": 14921,
+  "definite:definite": 4530,
+  "withheld:cfg-variant": 443,
+  "withheld:cfg-link": 3698
+ },
+ "join": {
+  "answer": 23592,
+  "none:kind-not-joined": 5897,
+  "filter:collision": 528,
+  "unapplied:library": 17445,
+  "none:local": 4553,
+  "unapplied:generated": 941,
+  "filter:import-names-module": 44,
+  "none:no-name-site": 53,
+  "none:no-occurrence-at-site": 2285,
+  "none:trait-declaration": 1234,
+  "filter:kind-incompatible": 11,
+  "none:file-not-indexed": 3868,
+  "filter:extern-crate": 2
+ },
+ "agreement": {
+  "confirmed": 4530,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 60489,
+  "linksAfter": 60489,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": {
+  "wallS": 43.6,
+  "cpuS": 78,
+  "peakMiB": 1671
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 53.6,
+   "cpuS": 66.8
+  },
+  "route": {
+   "wallS": 114.7,
+   "cpuS": 74.7
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 39979,
+  "buckets": {
+   "credited": 14921,
+   "no identity: library item": 12185,
+   "no identity: local binding": 2165,
+   "gate: known error classes": 454,
+   "gate: cfg-variant guard": 404,
+   "gate: cfg condition other than test": 3254,
+   "gate: kind/namespace": 21,
+   "no identity: generated item": 363,
+   "gate: trait-method declaration": 1234,
+   "no answer: no-occurrence-at-site": 2030,
+   "no answer: no-name-site": 50,
+   "no answer: file-not-indexed": 2898
+  },
+  "libraryPassingCfg": 10654,
+  "notIndexed": {
+   "other source": 1113,
+   "tests": 1785
+  },
+  "notIndexedFiles": 56,
+  "notIndexedTop": [
+   {
+    "path": "clap_complete/tests/testsuite/engine.rs",
+    "links": 750,
+    "class": "tests"
+   },
+   {
+    "path": "clap_complete/src/engine/complete.rs",
+    "links": 605,
+    "class": "other source"
+   },
+   {
+    "path": "tests/builder/env.rs",
+    "links": 346,
+    "class": "tests"
+   },
+   {
+    "path": "clap_complete/src/env/shells.rs",
+    "links": 185,
+    "class": "other source"
+   },
+   {
+    "path": "clap_complete/src/engine/custom.rs",
+    "links": 135,
+    "class": "other source"
+   },
+   {
+    "path": "tests/builder/help_env.rs",
+    "links": 125,
+    "class": "tests"
+   },
+   {
+    "path": "tests/builder/utf16.rs",
+    "links": 122,
+    "class": "tests"
+   },
+   {
+    "path": "tests/builder/cargo.rs",
+    "links": 81,
+    "class": "tests"
+   },
+   {
+    "path": "clap_complete/src/env/mod.rs",
+    "links": 78,
+    "class": "other source"
+   },
+   {
+    "path": "tests/derive/occurrences.rs",
+    "links": 54,
+    "class": "tests"
+   },
+   {
+    "path": "src/_tutorial.rs",
+    "links": 40,
+    "class": "other source"
+   },
+   {
+    "path": "src/_derive/_tutorial.rs",
+    "links": 39,
+    "class": "other source"
+   }
+  ]
+ },
+ "c19": {
+  "links": 52417,
+  "level2": 19785,
+  "gainCheckout": 16761,
+  "gainLibrary": 10837,
+  "gatedPercent": 83.1,
+  "gatedLinks": 43561,
+  "percentCheckoutOnly": 69.72,
+  "trait": 1207,
+  "underCfg": 2686,
+  "generated": 316
+ }
+}

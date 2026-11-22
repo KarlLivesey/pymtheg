@@ -1,0 +1,176 @@
+{
+ "pin": "fjall-rs_fjall",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 93
+ },
+ "sourceOnly": {
+  "links": 13361,
+  "level2": 6072,
+  "assumed": 97,
+  "proven": 5975,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 45.45,
+  "withModuleLinksPercent": 45.45
+ },
+ "route": {
+  "links": 13361,
+  "level2": 7950,
+  "assumed": 97,
+  "proven": 5975,
+  "toolchainDecided": 1878,
+  "libraryModuleLinks": 0,
+  "level2Percent": 59.5,
+  "withModuleLinksPercent": 59.5,
+  "toolchainDecidedPercent": 14.06
+ },
+ "decided": {
+  "definite:definite": 1438,
+  "definite:unresolved": 1878,
+  "withheld:cfg-variant": 7,
+  "withheld:cfg-link": 38
+ },
+ "join": {
+  "none:file-not-indexed": 2506,
+  "none:kind-not-joined": 1123,
+  "answer": 3361,
+  "unapplied:library": 4441,
+  "none:local": 1238,
+  "unapplied:generated": 207,
+  "none:trait-declaration": 250,
+  "none:no-occurrence-at-site": 216,
+  "none:no-name-site": 13,
+  "filter:import-names-module": 1,
+  "filter:collision": 5
+ },
+ "agreement": {
+  "confirmed": 1438,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 13361,
+  "linksAfter": 13361,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": {
+  "wallS": 15.8,
+  "cpuS": 28.8,
+  "peakMiB": 1101
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 13.1,
+   "cpuS": 19.7
+  },
+  "route": {
+   "wallS": 34.5,
+   "cpuS": 21.1
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 7289,
+  "buckets": {
+   "no answer: file-not-indexed": 1589,
+   "no identity: library item": 2823,
+   "gate: trait-method declaration": 250,
+   "no identity: generated item": 86,
+   "credited": 1878,
+   "no answer: no-occurrence-at-site": 193,
+   "no identity: local binding": 425,
+   "gate: cfg-variant guard": 7,
+   "gate: cfg condition other than test": 25,
+   "no answer: no-name-site": 13
+  },
+  "libraryPassingCfg": 2721,
+  "notIndexed": {
+   "examples": 1273,
+   "other source": 316
+  },
+  "notIndexedFiles": 26,
+  "notIndexedTop": [
+   {
+    "path": "examples/axum-kv/src/main.rs",
+    "links": 268,
+    "class": "examples"
+   },
+   {
+    "path": "examples/actix-kv/src/main.rs",
+    "links": 258,
+    "class": "examples"
+   },
+   {
+    "path": "examples_disabled/tx-blob-cas/src/main.rs",
+    "links": 253,
+    "class": "other source"
+   },
+   {
+    "path": "examples/ttl-json/src/main.rs",
+    "links": 110,
+    "class": "examples"
+   },
+   {
+    "path": "examples/migration-lazy/src/main.rs",
+    "links": 88,
+    "class": "examples"
+   },
+   {
+    "path": "examples/structured/src/main.rs",
+    "links": 57,
+    "class": "examples"
+   },
+   {
+    "path": "examples_disabled/migration/src/main.rs",
+    "links": 56,
+    "class": "other source"
+   },
+   {
+    "path": "examples/tx-ssi-mpmc-queue/src/main.rs",
+    "links": 49,
+    "class": "examples"
+   },
+   {
+    "path": "examples/tx-mpmc-queue/src/main.rs",
+    "links": 47,
+    "class": "examples"
+   },
+   {
+    "path": "examples/triplestore/src/main.rs",
+    "links": 43,
+    "class": "examples"
+   },
+   {
+    "path": "examples/tx-keyspace-move/src/main.rs",
+    "links": 41,
+    "class": "examples"
+   },
+   {
+    "path": "examples/tx-ssi-keyspace-move/src/main.rs",
+    "links": 41,
+    "class": "examples"
+   }
+  ]
+ },
+ "c19": {
+  "links": 13361,
+  "level2": 5916,
+  "gainCheckout": 2336,
+  "gainLibrary": 3114,
+  "gatedPercent": 82.2,
+  "gatedLinks": 10983,
+  "percentCheckoutOnly": 61.76,
+  "trait": 250,
+  "underCfg": 134,
+  "generated": 86
+ }
+}

@@ -1,0 +1,157 @@
+{
+ "pin": "alacritty_alacritty",
+ "state": "partial",
+ "reason": "build script of crossfont did not finish",
+ "partialCauses": 2,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 80
+ },
+ "sourceOnly": {
+  "links": 31393,
+  "level2": 15477,
+  "assumed": 252,
+  "proven": 15225,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 49.3,
+  "withModuleLinksPercent": 49.3
+ },
+ "route": {
+  "links": 31393,
+  "level2": 15477,
+  "assumed": 252,
+  "proven": 15225,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 49.3,
+  "withModuleLinksPercent": 49.3,
+  "toolchainDecidedPercent": 0
+ },
+ "decided": {},
+ "join": {
+  "filter:import-names-module": 104,
+  "unapplied:library": 9986,
+  "none:kind-not-joined": 2997,
+  "answer": 9537,
+  "none:local": 4974,
+  "none:no-occurrence-at-site": 281,
+  "unapplied:generated": 1110,
+  "none:trait-declaration": 747,
+  "none:no-name-site": 70,
+  "none:no-graph-symbol": 428,
+  "filter:kind-incompatible": 2,
+  "none:file-not-indexed": 1102,
+  "filter:extern-crate": 5,
+  "filter:collision": 5
+ },
+ "agreement": {
+  "confirmed": 0,
+  "differs": 0,
+  "percent": null
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 31393,
+  "linksAfter": 31393,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": {
+  "wallS": 35.8,
+  "cpuS": 90.8,
+  "peakMiB": 1692
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 32.9,
+   "cpuS": 40.7
+  },
+  "route": {
+   "wallS": 72.4,
+   "cpuS": 40.9
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 15871,
+  "buckets": {
+   "gate: kind/namespace": 32,
+   "no identity: library item": 7012,
+   "no answer: no-occurrence-at-site": 239,
+   "other": 3677,
+   "gate: trait-method declaration": 739,
+   "no identity: local binding": 2326,
+   "no identity: generated item": 835,
+   "no answer: no-name-site": 41,
+   "no identity: declaration without a graph symbol": 428,
+   "gate: cfg-variant guard": 13,
+   "gate: cfg condition other than test": 54,
+   "no answer: file-not-indexed": 467,
+   "gate: known error classes": 8
+  },
+  "libraryPassingCfg": 6705,
+  "notIndexed": {
+   "other source": 467
+  },
+  "notIndexedFiles": 8,
+  "notIndexedTop": [
+   {
+    "path": "alacritty_terminal/src/tty/windows/blocking.rs",
+    "links": 186,
+    "class": "other source"
+   },
+   {
+    "path": "alacritty_terminal/src/tty/windows/child.rs",
+    "links": 75,
+    "class": "other source"
+   },
+   {
+    "path": "alacritty_terminal/src/tty/windows/conpty.rs",
+    "links": 68,
+    "class": "other source"
+   },
+   {
+    "path": "alacritty_terminal/src/tty/windows/mod.rs",
+    "links": 60,
+    "class": "other source"
+   },
+   {
+    "path": "alacritty/src/macos/locale.rs",
+    "links": 30,
+    "class": "other source"
+   },
+   {
+    "path": "alacritty/src/macos/proc.rs",
+    "links": 28,
+    "class": "other source"
+   },
+   {
+    "path": "alacritty/src/panic.rs",
+    "links": 12,
+    "class": "other source"
+   },
+   {
+    "path": "alacritty/src/macos/mod.rs",
+    "links": 8,
+    "class": "other source"
+   }
+  ]
+ },
+ "c19": {
+  "links": 30965,
+  "level2": 14852,
+  "gainCheckout": 6713,
+  "gainLibrary": 7269,
+  "gatedPercent": 89.52,
+  "gatedLinks": 27721,
+  "percentCheckoutOnly": 69.64,
+  "trait": 738,
+  "underCfg": 382,
+  "generated": 830
+ }
+}

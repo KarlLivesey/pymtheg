@@ -1,0 +1,185 @@
+{
+ "pin": "tokio-rs_axum",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 98
+ },
+ "sourceOnly": {
+  "links": 41067,
+  "level2": 16583,
+  "assumed": 1144,
+  "proven": 15439,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 40.38,
+  "withModuleLinksPercent": 40.38
+ },
+ "route": {
+  "links": 41067,
+  "level2": 20284,
+  "assumed": 1144,
+  "proven": 15439,
+  "toolchainDecided": 3701,
+  "libraryModuleLinks": 0,
+  "level2Percent": 49.39,
+  "withModuleLinksPercent": 49.39,
+  "toolchainDecidedPercent": 9.01
+ },
+ "decided": {
+  "definite:definite": 2756,
+  "definite:unresolved": 3701,
+  "withheld:cfg-variant": 410,
+  "withheld:cfg-link": 334
+ },
+ "join": {
+  "none:kind-not-joined": 4367,
+  "answer": 7201,
+  "unapplied:library": 9758,
+  "none:local": 3981,
+  "none:trait-declaration": 459,
+  "unapplied:generated": 580,
+  "none:no-graph-symbol": 611,
+  "filter:import-names-module": 62,
+  "none:no-name-site": 84,
+  "none:no-occurrence-at-site": 196,
+  "filter:extern-crate": 3,
+  "none:file-not-indexed": 13442,
+  "filter:collision": 42,
+  "filter:proc-macro-crate-item": 2,
+  "filter:kind-incompatible": 3
+ },
+ "agreement": {
+  "confirmed": 2756,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 41067,
+  "linksAfter": 41067,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": {
+  "wallS": 32.4,
+  "cpuS": 79.9,
+  "peakMiB": 1960
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 46.7,
+   "cpuS": 57.9
+  },
+  "route": {
+   "wallS": 78.7,
+   "cpuS": 57.9
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 24208,
+  "buckets": {
+   "no identity: library item": 6748,
+   "no identity: local binding": 1325,
+   "gate: trait-method declaration": 459,
+   "credited": 3701,
+   "no identity: declaration without a graph symbol": 611,
+   "no identity: generated item": 197,
+   "no answer: no-name-site": 81,
+   "no answer: no-occurrence-at-site": 178,
+   "gate: cfg-variant guard": 331,
+   "gate: known error classes": 44,
+   "no answer: file-not-indexed": 10376,
+   "gate: cfg condition other than test": 111,
+   "gate: kind/namespace": 34,
+   "other": 12
+  },
+  "libraryPassingCfg": 6514,
+  "notIndexed": {
+   "other source": 3712,
+   "tests": 1773,
+   "examples": 4891
+  },
+  "notIndexedFiles": 207,
+  "notIndexedTop": [
+   {
+    "path": "axum/src/extract/ws.rs",
+    "links": 648,
+    "class": "other source"
+   },
+   {
+    "path": "axum-extra/src/response/file_stream.rs",
+    "links": 605,
+    "class": "other source"
+   },
+   {
+    "path": "axum-extra/src/extract/json_deserializer.rs",
+    "links": 313,
+    "class": "other source"
+   },
+   {
+    "path": "axum/src/extract/multipart.rs",
+    "links": 306,
+    "class": "other source"
+   },
+   {
+    "path": "examples/oauth/src/main.rs",
+    "links": 300,
+    "class": "examples"
+   },
+   {
+    "path": "axum-extra/src/extract/multipart.rs",
+    "links": 293,
+    "class": "other source"
+   },
+   {
+    "path": "examples/compression/src/tests.rs",
+    "links": 241,
+    "class": "examples"
+   },
+   {
+    "path": "axum-extra/src/extract/query.rs",
+    "links": 234,
+    "class": "other source"
+   },
+   {
+    "path": "axum-extra/src/response/multipart.rs",
+    "links": 212,
+    "class": "other source"
+   },
+   {
+    "path": "axum-extra/src/response/multiple.rs",
+    "links": 183,
+    "class": "other source"
+   },
+   {
+    "path": "examples/testing/src/main.rs",
+    "links": 182,
+    "class": "examples"
+   },
+   {
+    "path": "axum-extra/src/protobuf.rs",
+    "links": 160,
+    "class": "other source"
+   }
+  ]
+ },
+ "c19": {
+  "links": 41067,
+  "level2": 16213,
+  "gainCheckout": 5515,
+  "gainLibrary": 7354,
+  "gatedPercent": 68.68,
+  "gatedLinks": 28203,
+  "percentCheckoutOnly": 52.91,
+  "trait": 459,
+  "underCfg": 429,
+  "generated": 197
+ }
+}

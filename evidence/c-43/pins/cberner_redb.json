@@ -1,0 +1,163 @@
+{
+ "pin": "cberner_redb",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 90
+ },
+ "sourceOnly": {
+  "links": 73731,
+  "level2": 35223,
+  "assumed": 110,
+  "proven": 35113,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 47.77,
+  "withModuleLinksPercent": 47.77
+ },
+ "route": {
+  "links": 73731,
+  "level2": 44116,
+  "assumed": 110,
+  "proven": 35113,
+  "toolchainDecided": 8893,
+  "libraryModuleLinks": 0,
+  "level2Percent": 59.83,
+  "withModuleLinksPercent": 59.83,
+  "toolchainDecidedPercent": 12.06
+ },
+ "decided": {
+  "definite:definite": 9882,
+  "definite:unresolved": 8893,
+  "withheld:cfg-variant": 662,
+  "withheld:cfg-link": 3423
+ },
+ "join": {
+  "none:kind-not-joined": 5481,
+  "unapplied:library": 27584,
+  "none:no-name-site": 46,
+  "filter:import-names-module": 86,
+  "answer": 22860,
+  "unapplied:generated": 822,
+  "none:local": 10347,
+  "none:no-occurrence-at-site": 1273,
+  "none:trait-declaration": 1223,
+  "filter:collision": 1088,
+  "none:file-not-indexed": 2779,
+  "none:no-graph-symbol": 10,
+  "filter:kind-incompatible": 17,
+  "filter:extern-crate": 1
+ },
+ "agreement": {
+  "confirmed": 9882,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 73731,
+  "linksAfter": 73731,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": {
+  "wallS": 115.9,
+  "cpuS": 1900.1,
+  "peakMiB": 2064
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 66.1,
+   "cpuS": 83.9
+  },
+  "route": {
+   "wallS": 189,
+   "cpuS": 87.3
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 38394,
+  "buckets": {
+   "no identity: library item": 19167,
+   "no answer: no-name-site": 45,
+   "gate: kind/namespace": 54,
+   "no identity: local binding": 3416,
+   "credited": 8893,
+   "no answer: no-occurrence-at-site": 805,
+   "gate: trait-method declaration": 1223,
+   "gate: cfg-variant guard": 660,
+   "gate: known error classes": 106,
+   "gate: cfg condition other than test": 1627,
+   "no identity: generated item": 364,
+   "no answer: file-not-indexed": 2022,
+   "no identity: declaration without a graph symbol": 10,
+   "other": 2
+  },
+  "libraryPassingCfg": 15384,
+  "notIndexed": {
+   "other source": 517,
+   "fuzz": 1505
+  },
+  "notIndexedFiles": 8,
+  "notIndexedTop": [
+   {
+    "path": "fuzz/fuzz_targets/fuzz_redb.rs",
+    "links": 1153,
+    "class": "fuzz"
+   },
+   {
+    "path": "src/types/chrono_v0_4.rs",
+    "links": 352,
+    "class": "other source"
+   },
+   {
+    "path": "fuzz/fuzz_targets/fuzz_corruption.rs",
+    "links": 266,
+    "class": "fuzz"
+   },
+   {
+    "path": "fuzz/fuzz_targets/common.rs",
+    "links": 86,
+    "class": "fuzz"
+   },
+   {
+    "path": "crates/redb-no-std-test/src/main.rs",
+    "links": 72,
+    "class": "other source"
+   },
+   {
+    "path": "src/tree_store/page_store/file_backend/fallback.rs",
+    "links": 55,
+    "class": "other source"
+   },
+   {
+    "path": "src/legacy_types.rs",
+    "links": 27,
+    "class": "other source"
+   },
+   {
+    "path": "crates/redb-no-std-test/src/lib.rs",
+    "links": 11,
+    "class": "other source"
+   }
+  ]
+ },
+ "c19": {
+  "links": 73731,
+  "level2": 31261,
+  "gainCheckout": 15259,
+  "gainLibrary": 23621,
+  "gatedPercent": 84.59,
+  "gatedLinks": 62367,
+  "percentCheckoutOnly": 63.09,
+  "trait": 1223,
+  "underCfg": 6653,
+  "generated": 364
+ }
+}

@@ -1,0 +1,182 @@
+{
+ "pin": "actix_actix-web",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 293
+ },
+ "sourceOnly": {
+  "links": 86640,
+  "level2": 36227,
+  "assumed": 3111,
+  "proven": 33116,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 41.81,
+  "withModuleLinksPercent": 41.81
+ },
+ "route": {
+  "links": 86640,
+  "level2": 49643,
+  "assumed": 3111,
+  "proven": 33116,
+  "toolchainDecided": 13416,
+  "libraryModuleLinks": 0,
+  "level2Percent": 57.3,
+  "withModuleLinksPercent": 57.3,
+  "toolchainDecidedPercent": 15.48
+ },
+ "decided": {
+  "definite:unresolved": 13416,
+  "definite:definite": 10069,
+  "withheld:cfg-link": 1961,
+  "withheld:cfg-variant": 37
+ },
+ "join": {
+  "answer": 25483,
+  "none:no-graph-symbol": 1189,
+  "filter:import-names-module": 488,
+  "none:kind-not-joined": 7599,
+  "unapplied:library": 33355,
+  "unapplied:generated": 1810,
+  "none:local": 9241,
+  "none:trait-declaration": 1358,
+  "none:no-name-site": 298,
+  "none:no-occurrence-at-site": 2172,
+  "filter:collision": 144,
+  "none:file-not-indexed": 3001,
+  "filter:extern-crate": 12,
+  "filter:kind-incompatible": 21
+ },
+ "agreement": {
+  "confirmed": 10069,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 86640,
+  "linksAfter": 86640,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": {
+  "wallS": 92.3,
+  "cpuS": 274,
+  "peakMiB": 3029
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 112.1,
+   "cpuS": 117.3
+  },
+  "route": {
+   "wallS": 195.7,
+   "cpuS": 119.2
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 49944,
+  "buckets": {
+   "credited": 13416,
+   "no identity: declaration without a graph symbol": 1189,
+   "gate: kind/namespace": 272,
+   "no identity: library item": 22834,
+   "no identity: generated item": 1040,
+   "no identity: local binding": 3942,
+   "gate: trait-method declaration": 1358,
+   "no answer: no-name-site": 254,
+   "gate: cfg condition other than test": 1295,
+   "no answer: no-occurrence-at-site": 1856,
+   "gate: cfg-variant guard": 30,
+   "gate: known error classes": 61,
+   "no answer: file-not-indexed": 2397
+  },
+  "libraryPassingCfg": 20387,
+  "notIndexed": {
+   "tests": 614,
+   "other source": 1783
+  },
+  "notIndexedFiles": 34,
+  "notIndexedTop": [
+   {
+    "path": "actix-web-actors/src/ws.rs",
+    "links": 804,
+    "class": "other source"
+   },
+   {
+    "path": "actix-web/src/introspection.rs",
+    "links": 756,
+    "class": "other source"
+   },
+   {
+    "path": "actix-web-actors/tests/test_ws.rs",
+    "links": 219,
+    "class": "tests"
+   },
+   {
+    "path": "actix-web-actors/src/context.rs",
+    "links": 172,
+    "class": "other source"
+   },
+   {
+    "path": "actix-web-codegen/tests/trybuild/route-custom-method.rs",
+    "links": 51,
+    "class": "tests"
+   },
+   {
+    "path": "actix-web/src/http/header/any_or_some.rs",
+    "links": 51,
+    "class": "other source"
+   },
+   {
+    "path": "actix-web-codegen/tests/trybuild/routes-ok.rs",
+    "links": 24,
+    "class": "tests"
+   },
+   {
+    "path": "actix-multipart/tests/trybuild/max-parts.rs",
+    "links": 23,
+    "class": "tests"
+   },
+   {
+    "path": "actix-web-codegen/tests/trybuild/route-ok.rs",
+    "links": 23,
+    "class": "tests"
+   },
+   {
+    "path": "actix-web-codegen/tests/trybuild/route-custom-lowercase.rs",
+    "links": 21,
+    "class": "tests"
+   },
+   {
+    "path": "actix-multipart/tests/trybuild/all-required.rs",
+    "links": 20,
+    "class": "tests"
+   },
+   {
+    "path": "actix-multipart/tests/trybuild/optional-and-list.rs",
+    "links": 20,
+    "class": "tests"
+   }
+  ]
+ },
+ "c19": {
+  "links": 86640,
+  "level2": 34923,
+  "gainCheckout": 19439,
+  "gainLibrary": 24639,
+  "gatedPercent": 84.82,
+  "gatedLinks": 73491,
+  "percentCheckoutOnly": 62.74,
+  "trait": 1358,
+  "underCfg": 4290,
+  "generated": 1040
+ }
+}
