@@ -16,9 +16,10 @@ Sharing uses explicit history archives. It is not live team synchronization.
 
 ## Contract for the first slice
 
-- `pymtheg init [DIRECTORY] [--name NAME] [--format text|json]` creates a local
-  workspace identity and a default `.pymtheg/settings.json` only when that config is
-  absent. Everything Pymtheg stores for the project is under `.pymtheg/` (see
+- `pymtheg init [DIRECTORY] [--name NAME] [--trust | --source-only] [--format text|json]`
+  creates a local workspace identity and a default `.pymtheg/settings.json`
+  only when that config is absent. It asks once whether you trust the
+  repository (see [Trusting the repository](#trusting-the-repository)). Everything Pymtheg stores for the project is under `.pymtheg/` (see
   [Local state and sharing](#local-state-and-sharing)).
   No sample program, requirement or decision is invented.
 - `.pymtheg/project.json` stores a versioned UUID/name, not an absolute path.
@@ -41,6 +42,72 @@ Sharing uses explicit history archives. It is not live team synchronization.
 - No global project registry or automatic agent-server installation is needed.
   MCP's project_info returns the initialized project's portable identity. An
   omitted MCP directory resolves from the current working directory.
+
+## Trusting the repository
+
+Decision D22: init asks once, as coding agents do, whether you trust the
+repository.
+
+- **Trusted** lets each language's official tooling run on the project. That
+  runs its build scripts and macros, as building it would. Today this turns on
+  the Go toolchain route, with its existing policy: offline by default and cgo
+  off.
+- **Source only** means Pymtheg starts no program on this repository's behalf, neither a build tool nor Git; it only reads files.
+
+**The answer belongs to you, never to the repository.** It is kept outside
+every checkout, in the user's own configuration (`$PYMTHEG_CONFIG_HOME`, else `$XDG_CONFIG_HOME/pymtheg/`, `~/.config/pymtheg/`, `~/Library/Application Support/pymtheg/` on macOS or `%APPDATA%\pymtheg\` on Windows; file `trust.json`, user-only), keyed by the checkout's real path with the
+project's identity as a cross-check. A copied or moved checkout, or a clone,
+is asked again; each Git worktree is its own path and is asked once; a
+symlinked path is the checkout it points to. Nothing under a checkout is ever
+read as an answer, so a repository cannot ship one. An unreadable or corrupt
+file means unanswered, never trusted. Nothing committed can grant trust: a committed
+`"graph": {"trust": "trusted"}` is at most the answer init preselects, while a
+committed `"graph": {"trust": "source-only"}` binds on every machine (the
+repository's author may forbid build tools) and init then refuses `--trust`.
+A checkout with no answer here is **unanswered**: it is treated as source only, and
+graph answers report `trust: "unanswered"` with `trustAnswer`, one line on how
+to answer. Graph commands never prompt; only init asks.
+
+How each path asks:
+
+- **Terminal init.** The question comes once, on the terminal, with trusted
+  preselected: Enter accepts it, and input that ends without an answer
+  records source only.
+- **Flags.** `--trust` and `--source-only` answer without a prompt, for
+  scripts.
+- **No terminal.** A command-line init with no terminal and no flag (piped
+  input, CI) records source only and says so.
+- **MCP.** The first planning write on a project that was never initialised
+  (`requirement_links` requirement or add, `observe_implementation`,
+  `link_implementation`) does not guess. It returns the trust question to the
+  calling model, which answers from its user or its standing instructions and
+  calls again with `trust: "trusted"` or `trust: "source-only"`.
+- **Studio.** Project setup shows the same question, with trusted
+  preselected, and shows the recorded answer afterwards.
+- **A clone of an initialised project.** `pymtheg init` on it asks the
+  question (or takes a flag) and changes nothing else. Over MCP, `code_graph`
+  takes `trust` to record the answer, and the first planning write's `trust`
+  records it too. Studio setup asks when the checkout has no answer.
+- **Nested folders.** A folder inside a project uses that project's answer.
+
+Trust is for the folder. A different repository later cloned at a trusted
+path with the same committed project id keeps the answer, and so does
+checking out another branch, even an untrusted one, in a trusted checkout:
+answer again with `pymtheg trust --revoke` and init when what the folder
+holds changes hands.
+
+Re-running init never changes a recorded answer. `pymtheg trust` lists your
+answers; `pymtheg trust --revoke [DIRECTORY]` removes one, after which the next
+init asks again. A deleted checkout leaves a harmless entry that `--revoke`
+with its old path removes.
+
+Committed per-language settings may only turn a route off:
+`"graph": {"toolchain": {"go": false}}` keeps Go off even on a trusted
+checkout. A committed `true` adds nothing, and a committed tool path is never
+run, since it could point into the repository (graph answers warn
+`committed-tool-path-ignored`). A tool path, or `false`, can be given in your
+own answer file: `"toolchain": {"go": "/usr/local/go/bin/go"}` in the
+checkout's entry.
 
 ## Evidence to collect
 
@@ -118,15 +185,16 @@ Initialization creates
 ignore file excludes `.pymtheg/shared/` and `.pymtheg/rebuildable/`. No database
 is created by initialization or a document preview.
 
-| Path                                  | Holds                                                                                                                  | Kind                                                      |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| `.pymtheg/project.json`               | Stable workspace identity                                                                                              | Commit                                                    |
-| `.pymtheg/settings.json`              | Project configuration and scenarios                                                                                    | Commit                                                    |
-| `.pymtheg/shared/architecture.sqlite` | Requirements, links, decisions, retained observations, checkpoint history, recorded-change ledger, architecture drafts | Shared data, local database; share it by exported history |
-| `.pymtheg/shared/drafts.sqlite`       | Unsaved Studio buffers and form/context drafts                                                                         | Authored, local                                           |
-| `.pymtheg/local/writer.json`          | This installation's writer identity and author label                                                                   | Local only; ignores itself; never copy to another machine |
-| `.pymtheg/rebuildable/graph.sqlite`   | Code graph cache                                                                                                       | Rebuildable; ignores itself                               |
-| `.pymtheg/rebuildable/runs.sqlite`    | The three most recent Studio runs                                                                                      | Rebuildable; ignores itself                               |
+| Path                                          | Holds                                                                                                                  | Kind                                                      |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `.pymtheg/project.json`                       | Stable workspace identity                                                                                              | Commit                                                    |
+| `.pymtheg/settings.json`                      | Project configuration and scenarios                                                                                    | Commit                                                    |
+| `.pymtheg/shared/architecture.sqlite`         | Requirements, links, decisions, retained observations, checkpoint history, recorded-change ledger, architecture drafts | Shared data, local database; share it by exported history |
+| `.pymtheg/shared/drafts.sqlite`               | Unsaved Studio buffers and form/context drafts                                                                         | Authored, local                                           |
+| `.pymtheg/local/writer.json`                  | This installation's writer identity and author label                                                                   | Local only; ignores itself; never copy to another machine |
+| `.pymtheg/rebuildable/graph.sqlite`           | Code graph cache                                                                                                       | Rebuildable; ignores itself                               |
+| `.pymtheg/rebuildable/graph.sqlite-turnstile` | Empty lock file: writers of the graph take turns through it (C-37)                                                     | Rebuildable; never written, only locked; present only where the store uses the write-ahead log |
+| `.pymtheg/rebuildable/runs.sqlite`            | The three most recent Studio runs                                                                                      | Rebuildable; ignores itself                               |
 
 Deleting `.pymtheg/rebuildable/` loses nothing that cannot be regenerated.
 Commit `.pymtheg/project.json`, `.pymtheg/settings.json`, `.pym` files and ordinary

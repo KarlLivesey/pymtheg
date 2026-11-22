@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { initializeWorkspace } from "./workspace.js";
+import { initializeWorkspace, type InitOptions } from "./workspace.js";
 import {
   previewProjectDocumentation,
   type DocumentationPreviewOptions,
@@ -10,10 +10,17 @@ export async function setupProject(
   name: string | undefined,
   importDocuments: boolean,
   signal: AbortSignal,
-  options: DocumentationPreviewOptions = {},
+  {
+    trust,
+    defaulted,
+    ...options
+  }: DocumentationPreviewOptions & InitOptions = {},
 ) {
   signal.throwIfAborted();
-  const initialized = await initializeWorkspace(root, name);
+  const initialized = await initializeWorkspace(root, name, {
+    ...(trust ? { trust } : {}),
+    ...(defaulted ? { defaulted } : {}),
+  });
   try {
     const documentation = await previewProjectDocumentation(
       initialized.root,

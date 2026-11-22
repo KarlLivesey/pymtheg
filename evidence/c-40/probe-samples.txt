@@ -1,0 +1,120 @@
+== ts-default
+{"point":"start","seconds":1,"heapUsedMiB":16,"externalMiB":29,"rssMiB":124}
+{"point":"file writes","seconds":94,"heapUsedMiB":337,"externalMiB":92,"rssMiB":992,"writes":20000}
+{"point":"go analyze input","seconds":105,"heapUsedMiB":296,"externalMiB":66,"rssMiB":1031,"files":5254}
+{"point":"go analyze returned","seconds":117,"heapUsedMiB":309,"externalMiB":66,"rssMiB":1312,"results":1335,"resultJsonMiB":109,"links":402370,"symbols":37285}
+{"point":"rust analyze input","seconds":185,"heapUsedMiB":32,"externalMiB":66,"rssMiB":1292,"files":0}
+{"point":"rust analyze returned","seconds":185,"heapUsedMiB":32,"externalMiB":66,"rssMiB":1292,"results":0,"resultJsonMiB":0,"links":0,"symbols":0}
+{"point":"typescript analyze input","seconds":186,"heapUsedMiB":123,"externalMiB":66,"rssMiB":1322,"files":27194}
+{"point":"typescript analyze returned","seconds":1769,"heapUsedMiB":2873,"externalMiB":66,"rssMiB":4202,"results":27190,"resultJsonMiB":298,"links":507433,"symbols":224589}
+{"point":"file writes","seconds":1855,"heapUsedMiB":2871,"externalMiB":66,"rssMiB":4200,"writes":40000}
+{"point":"file writes","seconds":1959,"heapUsedMiB":2871,"externalMiB":66,"rssMiB":4201,"writes":60000}
+== ts-12000
+{"point":"start","seconds":1,"heapUsedMiB":16,"externalMiB":29,"rssMiB":123}
+{"point":"file writes","seconds":90,"heapUsedMiB":339,"externalMiB":92,"rssMiB":1076,"writes":20000}
+{"point":"go analyze input","seconds":100,"heapUsedMiB":299,"externalMiB":66,"rssMiB":1069,"files":5254}
+{"point":"go analyze returned","seconds":111,"heapUsedMiB":312,"externalMiB":66,"rssMiB":1316,"results":1335,"resultJsonMiB":109,"links":402370,"symbols":37285}
+{"point":"rust analyze input","seconds":178,"heapUsedMiB":34,"externalMiB":66,"rssMiB":1294,"files":0}
+{"point":"rust analyze returned","seconds":178,"heapUsedMiB":34,"externalMiB":66,"rssMiB":1294,"results":0,"resultJsonMiB":0,"links":0,"symbols":0}
+{"point":"typescript analyze input","seconds":178,"heapUsedMiB":125,"externalMiB":66,"rssMiB":1325,"files":27194}
+{"point":"typescript analyze returned","seconds":1702,"heapUsedMiB":2874,"externalMiB":66,"rssMiB":4492,"results":27190,"resultJsonMiB":298,"links":507433,"symbols":224589}
+{"point":"file writes","seconds":1764,"heapUsedMiB":2871,"externalMiB":66,"rssMiB":4490,"writes":40000}
+{"point":"file writes","seconds":1884,"heapUsedMiB":2871,"externalMiB":66,"rssMiB":4490,"writes":60000}
+{"point":"go resolve input","seconds":1931,"heapUsedMiB":4277,"externalMiB":66,"rssMiB":5527,"files":32448,"symbols":274386,"links":479410}
+{"point":"go resolve returned","seconds":1944,"heapUsedMiB":4211,"externalMiB":66,"rssMiB":5530,"resolutions":462673,"added":6170}
+{"point":"go resolution write begins","seconds":1963,"heapUsedMiB":3662,"externalMiB":66,"rssMiB":6321}
+{"point":"go resolution write ended","seconds":2063,"heapUsedMiB":3663,"externalMiB":66,"rssMiB":6321}
+{"point":"rust resolution write begins","seconds":2065,"heapUsedMiB":2870,"externalMiB":66,"rssMiB":6296}
+{"point":"rust resolution write ended","seconds":2066,"heapUsedMiB":2870,"externalMiB":66,"rssMiB":6296}
+{"point":"typescript resolve input","seconds":2079,"heapUsedMiB":3645,"externalMiB":66,"rssMiB":6306,"files":0,"symbols":274386,"links":507433}
+{"point":"typescript resolution write begins","seconds":2081,"heapUsedMiB":2870,"externalMiB":66,"rssMiB":6296}
+{"point":"typescript resolution write ended","seconds":2100,"heapUsedMiB":2870,"externalMiB":66,"rssMiB":6297}
+{"point":"indexed","seconds":2104,"heapUsedMiB":2869,"externalMiB":66,"rssMiB":6295,"symbols":274386,"links":993013,"failed":12477}
+== slice
+{"point":"start","seconds":1,"heapUsedMiB":16,"externalMiB":29,"rssMiB":126}
+{"point":"go analyze input","seconds":87,"heapUsedMiB":289,"externalMiB":66,"rssMiB":886,"files":5254}
+{"point":"go analyze returned","seconds":99,"heapUsedMiB":302,"externalMiB":66,"rssMiB":1215,"results":1335,"resultJsonMiB":109,"links":402370,"symbols":37285}
+{"point":"rust analyze input","seconds":170,"heapUsedMiB":24,"externalMiB":66,"rssMiB":1198,"files":0}
+{"point":"rust analyze returned","seconds":170,"heapUsedMiB":24,"externalMiB":66,"rssMiB":1198,"results":0,"resultJsonMiB":0,"links":0,"symbols":0}
+{"point":"typescript analyze input","seconds":170,"heapUsedMiB":41,"externalMiB":66,"rssMiB":1209,"files":2295}
+{"point":"typescript analyze returned","seconds":210,"heapUsedMiB":396,"externalMiB":66,"rssMiB":1469,"results":2293,"resultJsonMiB":42,"links":137576,"symbols":49851}
+{"point":"go resolve input","seconds":259,"heapUsedMiB":1274,"externalMiB":66,"rssMiB":2207,"files":7549,"symbols":99648,"links":479410}
+{"point":"go resolve returned","seconds":270,"heapUsedMiB":1208,"externalMiB":66,"rssMiB":2237,"resolutions":462673,"added":6170}
+{"point":"go resolution write begins","seconds":284,"heapUsedMiB":1112,"externalMiB":66,"rssMiB":3004}
+{"point":"go resolution write ended","seconds":403,"heapUsedMiB":1112,"externalMiB":66,"rssMiB":3004}
+{"point":"rust resolution write begins","seconds":424,"heapUsedMiB":395,"externalMiB":66,"rssMiB":2170}
+{"point":"rust resolution write ended","seconds":424,"heapUsedMiB":395,"externalMiB":66,"rssMiB":2170}
+{"point":"typescript resolve input","seconds":431,"heapUsedMiB":600,"externalMiB":66,"rssMiB":2659,"files":0,"symbols":99648,"links":137576}
+{"point":"typescript resolution write begins","seconds":432,"heapUsedMiB":395,"externalMiB":66,"rssMiB":2656}
+{"point":"typescript resolution write ended","seconds":440,"heapUsedMiB":395,"externalMiB":66,"rssMiB":2723}
+{"point":"indexed","seconds":441,"heapUsedMiB":394,"externalMiB":66,"rssMiB":2723,"symbols":99648,"links":623156,"failed":445}
+== slice2
+{"point":"start","seconds":1,"heapUsedMiB":16,"externalMiB":29,"rssMiB":126}
+{"point":"go analyze input","seconds":72,"heapUsedMiB":289,"externalMiB":66,"rssMiB":916,"files":5254}
+{"point":"go analyze returned","seconds":82,"heapUsedMiB":302,"externalMiB":66,"rssMiB":1216,"results":1335,"resultJsonMiB":109,"links":402370,"symbols":37285}
+{"point":"rust analyze input","seconds":122,"heapUsedMiB":24,"externalMiB":66,"rssMiB":1200,"files":0}
+{"point":"rust analyze returned","seconds":122,"heapUsedMiB":24,"externalMiB":66,"rssMiB":1200,"results":0,"resultJsonMiB":0,"links":0,"symbols":0}
+{"point":"typescript analyze input","seconds":122,"heapUsedMiB":41,"externalMiB":66,"rssMiB":1211,"files":2295}
+{"point":"typescript analyze returned","seconds":156,"heapUsedMiB":133,"externalMiB":66,"rssMiB":1681,"results":2293,"resultJsonMiB":42,"links":137576,"symbols":49851}
+{"point":"go resolve input","seconds":189,"heapUsedMiB":918,"externalMiB":66,"rssMiB":1860,"files":7549,"symbols":99648,"links":479410}
+{"point":"go resolve returned","seconds":197,"heapUsedMiB":853,"externalMiB":66,"rssMiB":1884,"resolutions":462673,"added":6170}
+{"point":"go resolution write begins","seconds":210,"heapUsedMiB":756,"externalMiB":66,"rssMiB":2160}
+{"point":"go resolution write ended","seconds":302,"heapUsedMiB":756,"externalMiB":66,"rssMiB":2160}
+{"point":"rust resolution write begins","seconds":305,"heapUsedMiB":39,"externalMiB":66,"rssMiB":2138}
+{"point":"rust resolution write ended","seconds":305,"heapUsedMiB":39,"externalMiB":66,"rssMiB":2138}
+{"point":"typescript resolve input","seconds":307,"heapUsedMiB":245,"externalMiB":66,"rssMiB":2140,"files":0,"symbols":99648,"links":137576}
+{"point":"typescript resolution write begins","seconds":307,"heapUsedMiB":39,"externalMiB":66,"rssMiB":2138}
+{"point":"typescript resolution write ended","seconds":311,"heapUsedMiB":39,"externalMiB":66,"rssMiB":2138}
+{"point":"indexed","seconds":313,"heapUsedMiB":38,"externalMiB":66,"rssMiB":2138,"symbols":99648,"links":623156,"failed":445}
+== trpc
+{"point":"start","seconds":2,"heapUsedMiB":16,"externalMiB":29,"rssMiB":125}
+{"point":"go analyze input","seconds":4,"heapUsedMiB":17,"externalMiB":20,"rssMiB":243,"files":0}
+{"point":"go analyze returned","seconds":4,"heapUsedMiB":17,"externalMiB":20,"rssMiB":243,"results":0,"resultJsonMiB":0,"links":0,"symbols":0}
+{"point":"rust analyze input","seconds":4,"heapUsedMiB":17,"externalMiB":20,"rssMiB":243,"files":0}
+{"point":"rust analyze returned","seconds":4,"heapUsedMiB":17,"externalMiB":20,"rssMiB":243,"results":0,"resultJsonMiB":0,"links":0,"symbols":0}
+{"point":"typescript analyze input","seconds":4,"heapUsedMiB":24,"externalMiB":20,"rssMiB":244,"files":1353}
+{"point":"typescript analyze returned","seconds":36,"heapUsedMiB":123,"externalMiB":20,"rssMiB":1009,"results":1353,"resultJsonMiB":25,"links":107470,"symbols":17804}
+{"point":"go resolution write begins","seconds":46,"heapUsedMiB":75,"externalMiB":20,"rssMiB":986}
+{"point":"go resolution write ended","seconds":46,"heapUsedMiB":75,"externalMiB":20,"rssMiB":986}
+{"point":"rust resolution write begins","seconds":46,"heapUsedMiB":75,"externalMiB":20,"rssMiB":986}
+{"point":"rust resolution write ended","seconds":46,"heapUsedMiB":75,"externalMiB":20,"rssMiB":986}
+{"point":"typescript resolve input","seconds":48,"heapUsedMiB":185,"externalMiB":20,"rssMiB":993,"files":0,"symbols":17804,"links":107470}
+{"point":"typescript resolution write begins","seconds":48,"heapUsedMiB":75,"externalMiB":20,"rssMiB":991}
+{"point":"typescript resolution write ended","seconds":51,"heapUsedMiB":75,"externalMiB":20,"rssMiB":990}
+{"point":"indexed","seconds":51,"heapUsedMiB":74,"externalMiB":20,"rssMiB":990,"symbols":17804,"links":107470,"failed":6}
+== trpc2
+{"point":"start","seconds":6,"heapUsedMiB":16,"externalMiB":29,"rssMiB":125}
+{"point":"go analyze input","seconds":9,"heapUsedMiB":17,"externalMiB":20,"rssMiB":241,"files":0}
+{"point":"go analyze returned","seconds":9,"heapUsedMiB":17,"externalMiB":20,"rssMiB":241,"results":0,"resultJsonMiB":0,"links":0,"symbols":0}
+{"point":"rust analyze input","seconds":9,"heapUsedMiB":17,"externalMiB":20,"rssMiB":241,"files":0}
+{"point":"rust analyze returned","seconds":9,"heapUsedMiB":17,"externalMiB":20,"rssMiB":241,"results":0,"resultJsonMiB":0,"links":0,"symbols":0}
+{"point":"typescript analyze input","seconds":9,"heapUsedMiB":24,"externalMiB":20,"rssMiB":248,"files":1353}
+{"point":"typescript analyze returned","seconds":42,"heapUsedMiB":123,"externalMiB":20,"rssMiB":1083,"results":1353,"resultJsonMiB":25,"links":107470,"symbols":17804}
+{"point":"go resolution write begins","seconds":52,"heapUsedMiB":75,"externalMiB":20,"rssMiB":1056}
+{"point":"go resolution write ended","seconds":52,"heapUsedMiB":75,"externalMiB":20,"rssMiB":1056}
+{"point":"rust resolution write begins","seconds":52,"heapUsedMiB":75,"externalMiB":20,"rssMiB":1055}
+{"point":"rust resolution write ended","seconds":52,"heapUsedMiB":75,"externalMiB":20,"rssMiB":1055}
+{"point":"typescript resolve input","seconds":54,"heapUsedMiB":185,"externalMiB":20,"rssMiB":1060,"files":0,"symbols":17804,"links":107470}
+{"point":"typescript resolution write begins","seconds":55,"heapUsedMiB":75,"externalMiB":20,"rssMiB":1058}
+{"point":"typescript resolution write ended","seconds":58,"heapUsedMiB":75,"externalMiB":20,"rssMiB":1058}
+{"point":"indexed","seconds":58,"heapUsedMiB":74,"externalMiB":20,"rssMiB":1058,"symbols":17804,"links":107470,"failed":6}
+== turbo
+{"point":"start","seconds":1,"heapUsedMiB":16,"externalMiB":29,"rssMiB":125}
+{"point":"go analyze input","seconds":406,"heapUsedMiB":20,"externalMiB":52,"rssMiB":1073,"files":100}
+{"point":"go analyze returned","seconds":406,"heapUsedMiB":24,"externalMiB":53,"rssMiB":1073,"results":75,"resultJsonMiB":0,"links":390,"symbols":240}
+{"point":"rust analyze input","seconds":411,"heapUsedMiB":442,"externalMiB":52,"rssMiB":1087,"files":1393}
+{"point":"rust analyze returned","seconds":558,"heapUsedMiB":1023,"externalMiB":52,"rssMiB":3339,"results":1393,"resultJsonMiB":353,"links":689189,"symbols":44759}
+{"point":"typescript analyze input","seconds":711,"heapUsedMiB":30,"externalMiB":52,"rssMiB":3323,"files":3094}
+{"point":"typescript analyze returned","seconds":741,"heapUsedMiB":78,"externalMiB":52,"rssMiB":3370,"results":3094,"resultJsonMiB":14,"links":53495,"symbols":14387}
+{"point":"go resolve input","seconds":767,"heapUsedMiB":628,"externalMiB":52,"rssMiB":3359,"files":4587,"symbols":59438,"links":512}
+{"point":"go resolve returned","seconds":768,"heapUsedMiB":628,"externalMiB":52,"rssMiB":3359,"resolutions":496,"added":106}
+{"point":"go resolution write begins","seconds":768,"heapUsedMiB":84,"externalMiB":52,"rssMiB":3346}
+{"point":"go resolution write ended","seconds":768,"heapUsedMiB":83,"externalMiB":52,"rssMiB":3345}
+{"point":"rust resolve input","seconds":787,"heapUsedMiB":1417,"externalMiB":52,"rssMiB":3378,"files":4587,"symbols":59438,"links":689189}
+{"point":"rust resolve returned","seconds":917,"heapUsedMiB":1356,"externalMiB":52,"rssMiB":4581,"resolutions":301467,"added":402}
+{"point":"rust resolution write begins","seconds":946,"heapUsedMiB":948,"externalMiB":52,"rssMiB":4607}
+{"point":"rust resolution write ended","seconds":1187,"heapUsedMiB":949,"externalMiB":52,"rssMiB":4608}
+{"point":"typescript resolve input","seconds":1189,"heapUsedMiB":134,"externalMiB":52,"rssMiB":4593,"files":0,"symbols":59438,"links":53495}
+{"point":"typescript resolution write begins","seconds":1189,"heapUsedMiB":45,"externalMiB":52,"rssMiB":4592}
+{"point":"typescript resolution write ended","seconds":1191,"heapUsedMiB":45,"externalMiB":52,"rssMiB":4592}
+{"point":"indexed","seconds":1193,"heapUsedMiB":42,"externalMiB":52,"rssMiB":4592,"symbols":59438,"links":743704,"failed":26}
