@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { queryObjects } from "node:v8";
@@ -668,6 +675,64 @@ test(
     );
     const fine = linkOn(result, "other.ts", "// fine-call", "fine");
     assert.equal(fine.target, "other.ts#fine");
+  },
+);
+
+// C-47: reduced from oclif/core (MIT; test/fixtures/graph-typescript-judge-bound/LICENSE)
+// after a seeded edit broke src/parser/index.ts. Judging `defaults.options`
+// recurses through Arg, ArgParser, ArgParserContext and Command without end.
+// On main the judge swallowed each stack overflow and went on, so the run
+// could take an unbounded time.
+async function fixtureFiles(name) {
+  const root = new URL(`fixtures/${name}/`, import.meta.url);
+  const files = {};
+  const walk = async (dir) => {
+    for (const entry of await readdir(new URL(dir, root), {
+      withFileTypes: true,
+    })) {
+      const path = `${dir}${entry.name}`;
+      if (entry.isDirectory()) await walk(`${path}/`);
+      else if (entry.name !== "LICENSE")
+        files[path] = await readFile(new URL(path, root), "utf8");
+    }
+  };
+  await walk("");
+  return files;
+}
+
+test(
+  "a structural judgement that does not end fails its link with the judge's bound as the reason",
+  { timeout: 120_000 },
+  async () => {
+    const files = await fixtureFiles("graph-typescript-judge-bound");
+    const bound = (result) =>
+      result.links
+        .filter((l) => l.cause?.via?.includes("judge-budget-exhausted"))
+        .map((l) => [l.file, l.text, l.reason, l.cause.file]);
+    const first = await indexFiles(files);
+    assert.deepEqual(Object.keys(failedReasons(first)), [
+      "src/parser/index.ts",
+    ]);
+    assert.deepEqual(bound(first), [
+      [
+        "src/args.ts",
+        "defaults.options",
+        "invalid-code",
+        "src/parser/index.ts",
+      ],
+    ]);
+    // A second, independent index gives the same links.
+    const second = await indexFiles(files);
+    assert.deepEqual(
+      second.links.map((l) => [
+        l.file,
+        l.text,
+        l.resolution,
+        l.reason,
+        l.cause,
+      ]),
+      first.links.map((l) => [l.file, l.text, l.resolution, l.reason, l.cause]),
+    );
   },
 );
 

@@ -907,7 +907,12 @@ accept the arguments.
   of 8,000,000 steps. When it is reached, every link of that program that
   could have a target is unresolved with `taint-budget-exhausted`, except
   links that bind a failed file directly, which stay `invalid-code`; no pin
-  outside microsoft/TypeScript comes near it. The program budget counts
+  outside microsoft/TypeScript comes near it. The structural judgement of a receiver
+  that depends on a failed file is also bounded (C-47): at most 100 nested
+  judgements and 200,000 judgement steps, and a stack overflow inside it
+  counts as the bound. A link whose judgement reaches a bound is
+  `invalid-code` with the failed file as its cause and the reason
+  `judge-budget-exhausted`. It is never treated as clean. The program budget counts
   every checkout file a program loads, imported files included; a file past
   it is left out of that program only (installed declarations have their
   own budget). Invalid extracted UTF-16 ranges use the same per-file

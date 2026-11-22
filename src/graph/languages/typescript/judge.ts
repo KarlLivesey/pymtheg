@@ -76,6 +76,43 @@ const FAILED_PARAMETER_OVERLOADS = true;
 /** R-1: overloads that all return one class keep its member set. */
 const SAME_CLASS_OVERLOADS = true;
 
+/**
+ * C-47: the most steps one judgement may take, and the deepest nesting of
+ * type and expression judgements. A step is one type, expression or
+ * checker-type judgement actually computed (a memoised answer costs none).
+ * Without a bound, a recursive generic type whose judgement meets a cycle
+ * (and so is not memoised) is judged again at every level: work that grows
+ * exponentially. The count depends only on the source and on the judgements
+ * made before it in the same program, which the module makes in a fixed
+ * order. The depth bound keeps the judgement below the stack limit, whose
+ * overflow is not deterministic.
+ */
+export const JUDGE_BUDGET = 200_000;
+export const JUDGE_DEPTH = 100;
+/** Budgets other than JUDGE_BUDGET, per checker (a test passes one in). */
+const judgeBudgetFor = new WeakMap<ts.TypeChecker, number>();
+export function setJudgeBudget(checker: ts.TypeChecker, steps: number): void {
+  judgeBudgetFor.set(checker, steps);
+}
+/** Observation counters: judgements, the most steps one took, judgements stopped. */
+export const judgeStatistics = {
+  judgements: 0,
+  maxSteps: 0,
+  maxDepth: 0,
+  exhausted: 0,
+};
+export const JUDGE_BOUND_REASON =
+  "the structural judgement reached its bound (judge-budget-exhausted)";
+/** Thrown when one judgement reaches its step or depth bound (C-47). */
+export class JudgeLimit extends Error {
+  constructor(readonly bound: "steps" | "depth") {
+    // One reason for every bound (steps, depth, or a stack overflow, which
+    // counts as depth), so the stored reason does not depend on which one
+    // the engine reached first.
+    super(JUDGE_BOUND_REASON);
+  }
+}
+
 const CLEAN: Judged = { k: "clean" };
 const EMPTY: Env = new Map();
 const NONE: ReadonlySet<ts.Node> = new Set();
@@ -152,12 +189,66 @@ export const HANDLED: Record<string, readonly string[]> = {};
 
 export function createJudge(input: JudgeInput): Judge {
   const { checker, program, taint, failedNames } = input;
+  // C-47: steps spent by the current judgement, its nesting, and whether a
+  // public entry point is running (nested entries share one count).
+  const budget = judgeBudgetFor.get(checker) ?? JUDGE_BUDGET;
+  let spent = 0;
+  let depth = 0;
+  let entries = 0;
+  /** Whether a structural judgement (`expression`, `tainted`) is running. */
+  let judging = false;
+  const charge = (steps: number) => {
+    spent += steps;
+    if (spent > budget) throw new JudgeLimit("steps");
+  };
+  function nested<T>(run: () => T): T {
+    charge(1);
+    if (++depth > judgeStatistics.maxDepth) judgeStatistics.maxDepth = depth;
+    if (depth > JUDGE_DEPTH) {
+      depth--;
+      throw new JudgeLimit("depth");
+    }
+    try {
+      return run();
+    } finally {
+      depth--;
+    }
+  }
+  function entry<A extends unknown[], T>(run: (...args: A) => T) {
+    return (...args: A): T => {
+      if (entries++ === 0) {
+        spent = 0;
+        depth = 0;
+        judging = true;
+        judgeStatistics.judgements++;
+      }
+      try {
+        return run(...args);
+      } catch (error) {
+        if (error instanceof JudgeLimit && entries === 1)
+          judgeStatistics.exhausted++;
+        throw error;
+      } finally {
+        if (--entries === 0) {
+          judging = false;
+          judgeStatistics.maxSteps = Math.max(judgeStatistics.maxSteps, spent);
+        }
+      }
+    };
+  }
   const library = (node: ts.Node) =>
     program.isSourceFileDefaultLibrary(node.getSourceFile());
+  // A stack overflow is not an answer (its point depends on the engine):
+  // it ends the judgement as a bound does.
+  const overflow = (error: unknown) => {
+    if (error instanceof JudgeLimit) throw error;
+    if (judging && error instanceof RangeError) throw new JudgeLimit("depth");
+  };
   const symbolAt = (node: ts.Node): ts.Symbol | undefined => {
     try {
       return checker.getSymbolAtLocation(node);
-    } catch {
+    } catch (error) {
+      overflow(error);
       return undefined;
     }
   };
@@ -167,7 +258,8 @@ export function createJudge(input: JudgeInput): Judge {
     if (!(symbol.flags & ts.SymbolFlags.Alias)) return symbol;
     try {
       return checker.getAliasedSymbol(symbol);
-    } catch {
+    } catch (error) {
+      overflow(error);
       return symbol;
     }
   };
@@ -203,7 +295,13 @@ export function createJudge(input: JudgeInput): Judge {
       }
       state = 1;
       const before = cycles;
-      const computed = compute();
+      let computed: Judged;
+      try {
+        computed = compute();
+      } catch (error) {
+        state = 0;
+        throw error;
+      }
       if (cycles === before) {
         value = computed;
         state = 2;
@@ -294,6 +392,7 @@ export function createJudge(input: JudgeInput): Judge {
 
   // ---------------- taint of a judgement ----------------
   function tainted(judged: Judged, seen = new Set<Judged>()): boolean {
+    charge(1);
     if (seen.has(judged)) return false;
     seen.add(judged);
     switch (judged.k) {
@@ -599,7 +698,7 @@ export function createJudge(input: JudgeInput): Judge {
   function type(node: ts.TypeNode, context: TypeContext): Judged {
     const handler = TYPES.get(node.kind);
     return handler
-      ? handler(node, context)
+      ? nested(() => handler(node, context))
       : unhandled(DENY_TYPE, "type", kindName(node.kind));
   }
   const keyword = () => CLEAN;
@@ -783,7 +882,8 @@ export function createJudge(input: JudgeInput): Judge {
     if (!mentionsTypeParameter(node, context)) {
       try {
         return fromType(checker.getTypeFromTypeNode(node));
-      } catch {
+      } catch (error) {
+        overflow(error);
         return unhandled(DENY_TYPE, "type", "computation without a type");
       }
     }
@@ -909,6 +1009,7 @@ export function createJudge(input: JudgeInput): Judge {
   }
   /** A type the checker derived from untainted inputs. */
   function fromType(target: ts.Type): Judged {
+    charge(1);
     const primitive =
       ts.TypeFlags.Any |
       ts.TypeFlags.Unknown |
@@ -994,7 +1095,7 @@ export function createJudge(input: JudgeInput): Judge {
     try {
       const handler = EXPRESSIONS.get(node.kind);
       const judged = handler
-        ? handler(node, undefined)
+        ? nested(() => handler(node, undefined))
         : unhandled(DENY_EXPRESSION, "expression", kindName(node.kind));
       if (cycles === before) expressions.set(node, judged);
       return judged;
@@ -1177,7 +1278,8 @@ export function createJudge(input: JudgeInput): Judge {
     let tuple = false;
     try {
       tuple = checker.isTupleType(typeAt(node));
-    } catch {
+    } catch (error) {
+      overflow(error);
       tuple = false;
     }
     return tuple
@@ -1302,7 +1404,8 @@ export function createJudge(input: JudgeInput): Judge {
           break;
         }
       }
-    } catch {
+    } catch (error) {
+      overflow(error);
       declarations = [];
     }
     return memberOf(object, declarations, key.text, node);
@@ -1635,7 +1738,8 @@ export function createJudge(input: JudgeInput): Judge {
         declarations =
           checker.getPropertyOfType(typeAt(pattern), key.text)?.declarations ??
           [];
-      } catch {
+      } catch (error) {
+        overflow(error);
         declarations = [];
       }
       value = memberOf(source, declarations, key.text, node);
@@ -1838,7 +1942,8 @@ export function createJudge(input: JudgeInput): Judge {
           return signature
             ? fromType(checker.getReturnTypeOfSignature(signature))
             : unhandled(DENY_CALL, "call", "checked type without a signature");
-        } catch {
+        } catch (error) {
+          overflow(error);
           return unhandled(DENY_CALL, "call", "checked type");
         }
       }
@@ -1926,7 +2031,8 @@ export function createJudge(input: JudgeInput): Judge {
         chosen = checker.getResolvedSignature(
           call as ts.CallLikeExpression,
         )?.declaration;
-      } catch {
+      } catch (error) {
+        overflow(error);
         chosen = undefined;
       }
       const decl = signatures.find((signature) => signature === chosen);
@@ -2179,7 +2285,8 @@ export function createJudge(input: JudgeInput): Judge {
       let picked: ts.Declaration | undefined;
       try {
         picked = checker.getResolvedSignature(call)?.declaration;
-      } catch {
+      } catch (error) {
+        overflow(error);
         picked = undefined;
       }
       const found = overloads.find((signature) => signature === picked);
@@ -2321,5 +2428,10 @@ export function createJudge(input: JudgeInput): Judge {
     "union",
   ];
 
-  return { expression, tainted, signatureDependsOnFailed, reaches };
+  return {
+    expression: entry(expression),
+    tainted: entry((judged: Judged) => tainted(judged)),
+    signatureDependsOnFailed,
+    reaches,
+  };
 }

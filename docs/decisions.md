@@ -3127,6 +3127,23 @@ uses the importer's own conditions and workspace route. Invalid extracted
 source ranges fail the affected file through the compiler session's
 containment path. [C-32](changes/C-32.md)
 
+### C-47 The structural judgement is bounded by counts
+
+The structural judgement (C-13) recursed without end on oclif/core's
+recursive generic types beside a failed file. Its error handlers swallowed
+each stack overflow and went on, so the run's length depended on where
+V8's stack ran out: it could take more than 85 minutes, or never end. One
+judgement is now bounded by counts: 100 nested judgements and 200,000 steps
+actually computed. A stack overflow inside it counts as the depth bound,
+and every handler in the judge lets a bound through. A link whose
+judgement reaches a bound is `invalid-code`, caused by the failed file,
+with one reason, `judge-budget-exhausted`, whichever bound fired. **Rules
+out:** a wall-clock watchdog; treating a stack overflow as an answer
+(clean, or "no symbol"). An index run that ignores SIGTERM during a
+synchronous analysis is recorded as further work: module analysis would
+have to run in a worker that the coordinator terminates, as `check` does.
+[C-47](changes/C-47.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000

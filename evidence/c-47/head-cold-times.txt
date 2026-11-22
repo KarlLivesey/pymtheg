@@ -1,0 +1,4 @@
+t1 30.22 s exit 0
+t2 30.55 s exit 0
+t3 30.64 s exit 0
+t4 30.91 s exit 0

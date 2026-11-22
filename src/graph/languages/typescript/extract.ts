@@ -46,7 +46,7 @@ import {
   taintOf,
   type Taint,
 } from "./taint.js";
-import { createJudge, type Judge, type Judged } from "./judge.js";
+import { createJudge, JudgeLimit, type Judge, type Judged } from "./judge.js";
 import {
   objectProducers,
   propertyWrite,
@@ -1329,7 +1329,13 @@ export function extractFile(
       try {
         judged = judgeOf(taint).expression(receiver);
       } catch (error) {
-        if (!isLimit(error)) throw error;
+        // C-47: a judgement stopped at its bound, or by a stack overflow, is
+        // not an answer: the receiver is failed with the bound as the reason.
+        if (error instanceof JudgeLimit)
+          judged = { k: "failed", why: error.message };
+        else if (isLimit(error))
+          judged = { k: "failed", why: new JudgeLimit("depth").message };
+        else throw error;
       }
       if (judged?.k === "failed")
         return { causes: through.causes, via: `${through.via}; ${judged.why}` };
