@@ -602,23 +602,23 @@ test("a stack limit on one declaration makes only what depends on it unknown, no
   assert.equal(broken.reason, "invalid-code");
 });
 
-test("a cause the walk propagates names at most 64 failed files; taint is unchanged", async () => {
+test("a cause the walk propagates names at most 8 failed files; taint is unchanged", async () => {
   // microsoft/TypeScript's failed test scripts declare the same global names
-  // hundreds of times; a cause set keeps the first 64 the walk reaches.
+  // hundreds of times; a cause set keeps the first 8 the walk reaches.
   // Through the walk: holder depends on the unread name, the call on holder.
   const files = {
     "lib.ts": "export interface Box extends Shared {}\n",
     "use.ts": 'import type { Box } from "./lib";\ndeclare const box: Box;\nbox.run(); // shared-call\n',
   };
-  for (let i = 0; i < 70; i++)
+  for (let i = 0; i < 12; i++)
     files[`broken${String(i).padStart(2, "0")}.ts`] =
       "interface Shared { run(): void }\nconst = ;\n";
   const result = await indexFiles(files);
   const call = linkOn(result, "use.ts", "// shared-call", "run");
   assert.equal(call.reason, "invalid-code");
   const causes = call.cause.files ?? [call.cause.file];
-  assert.equal(causes.length, 64);
-  assert.equal(new Set(causes).size, 64);
+  assert.equal(causes.length, 8);
+  assert.equal(new Set(causes).size, 8);
   for (const cause of causes) assert.match(cause, /^broken\d\d\.ts$/);
 });
 

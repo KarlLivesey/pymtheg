@@ -533,11 +533,13 @@ export const EDGE_STEPS = 4;
  * never grows again, so a merge costs at most this many steps, and the
  * fixpoint stays linear in the program's dependence graph however many
  * failed files a name can come from (microsoft/TypeScript's test scripts
- * declare the same names hundreds of times). A link then names at most this
+ * declare the same names hundreds of times), and a walk that finishes holds
+ * one set per tainted symbol (231,000 there: 64 per set exhausted the default
+ * heap). A link then names at most this
  * many of its causes. Taint itself (whether a symbol has any cause) is
  * unchanged.
  */
-export const CAUSE_CAP = 64;
+export const CAUSE_CAP = 8;
 
 function computeTaint(
   input: TaintInput,
