@@ -19,10 +19,11 @@ import typescript, {
 /**
  * Indexes `files` (twice when `twice` is set) and returns the report, the
  * stored files and every link with its text, line, outcome and target.
+ * `between` runs on the store between the two indexes.
  */
 async function indexFiles(
   files,
-  { twice = false, module: language = typescript } = {},
+  { twice = false, between, module: language = typescript } = {},
 ) {
   const scratch = await mkdtemp(join(tmpdir(), "pymtheg-ts-large-"));
   const root = join(scratch, "project");
@@ -53,6 +54,7 @@ async function indexFiles(
           line: text.slice(lineStart, lineEnd < 0 ? undefined : lineEnd),
           resolution: l.resolution,
           reason: l.data?.reason,
+          cause: l.data?.cause ?? null,
           assumes: l.data?.assumes ?? [],
           target: l.resolution === "resolved" ? symbols.get(l.targetId) : null,
         };
@@ -60,7 +62,9 @@ async function indexFiles(
       return { report, stored, links };
     };
     const first = await read();
-    return twice ? { first, second: await read() } : first;
+    if (!twice) return first;
+    await between?.(store);
+    return { first, second: await read() };
   } finally {
     store.close();
     await rm(scratch, { recursive: true, force: true });
@@ -447,6 +451,48 @@ for (const steps of [1, 5])
     assert.equal(brokenLinks(result).length, 3);
   });
 
+// A receiver that reaches a failed file only through other files' names.
+const FAILED_AT_DEPTH = {
+  "broken.ts": "export const conf = { run() {} };\nconst = ;\n",
+  "dep.ts":
+    'import { conf } from "./broken";\nexport function make() { return conf; }\n',
+  "use.ts": 'import { make } from "./dep";\nmake().run(); // depth-call\n',
+  "bad.ts": "export const thing = { m() {} };\nconst = ;\n",
+  "mid.ts":
+    'import { thing } from "./bad";\nexport const holder = { inner: thing };\n',
+  "nested.ts":
+    'import { holder } from "./mid";\nholder.inner.m(); // nested-call\n',
+};
+const depthLinks = (result) =>
+  [
+    ["use.ts", "// depth-call", "run"],
+    ["nested.ts", "// nested-call", "m"],
+  ].map(([file, marker, text]) => {
+    const link = linkOn(result, file, marker, text);
+    return [file, link.resolution, link.reason, link.cause];
+  });
+
+test("a receiver that reaches a failed file at depth keeps that cause within the walk's budget", async () => {
+  const result = await indexFiles(FAILED_AT_DEPTH);
+  assert.deepEqual(depthLinks(result), [
+    ["use.ts", "unresolved", "invalid-code", ["broken.ts"]],
+    ["nested.ts", "unresolved", "invalid-code", ["bad.ts"]],
+  ]);
+});
+
+// Under a stopped walk the judge does not explore (C-26): the same links
+// are unresolved without the cause. Links into the failed file itself keep
+// theirs (the budget tests above).
+test("a receiver that reaches a failed file at depth is taint-budget-exhausted when the walk stops", async () => {
+  const result = await indexFiles(FAILED_AT_DEPTH, {
+    module: typescriptModule({ taintSteps: 1 }),
+  });
+  assert.deepEqual(depthLinks(result), [
+    ["use.ts", "unresolved", "taint-budget-exhausted", null],
+    ["nested.ts", "unresolved", "taint-budget-exhausted", null],
+  ]);
+});
+
 test("a program with no failed file needs no walk, whatever the budget", async () => {
   const clean = await indexFiles(
     {
@@ -750,13 +796,24 @@ test("a clean file's stored result does not grow with the number of failed files
 });
 
 test("an unchanged re-index reuses stored results when files have failed", async () => {
+  let reusedBefore;
   const { first, second } = await indexFiles(
     {
       "broken.js": "const = ;\n",
       "clean.ts": "export function ok() {}\nok(); // ok-call\n",
     },
-    { twice: true },
+    {
+      twice: true,
+      // Rewriting the failed file without its content marker makes the
+      // core retry it; nothing else changed, so the module must reuse its
+      // stored results instead of building a program.
+      between: (store) => {
+        store.replaceFile(store.files().find((f) => f.path === "broken.js"));
+        reusedBefore = statistics.reused;
+      },
+    },
   );
+  assert.equal(statistics.reused, reusedBefore + 1);
   for (const result of [first, second]) {
     assert.deepEqual(Object.keys(failedReasons(result)), ["broken.js"]);
     assert.equal(
