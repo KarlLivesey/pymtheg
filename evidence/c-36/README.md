@@ -2,21 +2,38 @@
 
 [Change note](../../docs/changes/C-36.md)
 
-Main is `db29fc7`. All runs used the dev server with Node 24, source-only, on
-the pinned checkouts of `sweep/repos.json`. Timings are observations on a
-shared server; the work counts are the comparison.
+All runs used the dev server with Node 24, source-only, on the pinned
+checkouts of `sweep/repos.json`. Timings are observations on a shared
+server; the work counts and row comparisons are the comparison. After the
+review, main is `5d97762` (with C-24, C-35 and C-26) and the candidate is
+this branch. Before the review, main was `db29fc7`.
 
 - [Edit measurements](edits.json) hold one row per `graph index` from
-  `scripts/reindex/measure.mjs`: CPU seconds, the number of Rust files whose
-  links were decided, whether the scoped path ran, the full-pass reason and
-  the CPU of the Rust analysis and resolution stages. Every revert row
+  `scripts/reindex/measure.mjs` after the review fixes. Each row gives CPU
+  seconds, the Rust files whose links were decided, whether the scoped path
+  ran, the full-pass reason and the CPU of the Rust stages. Every revert row
   equalled that build's cold store.
-- [Probe](probe.json) records the lookup cuts in a cold index of each pin and
-  the cost and cuts of one full pass against passes that decide one sampled
-  file. The samples rank paths by SHA-256 of `c36-probe:<path>`.
-- [Seeded edits](seeded.json) list every seeded step: file, kind, whether the
+  [Before the review](edits-before-review.json) holds the same rows for
+  `d96a8ba`.
+- [Ten-pin comparison](ten-pins.json) compares every Rust link of ten cold
+  pins between main and the candidate with `evidence/c-31/compare.mjs`:
+  definite targets lost or retargeted (`changes`), new definite links,
+  Level 2 counts and symbol identities.
+- [Cold comparison](cold.json) records cold runs main, after, main on four
+  pins with every row compared with the first run. File records carry the
+  module version, so the comparison maps Rust version 47 back to 46
+  (`cold-cost.mjs --rust-version 47=46`). [Before the review](cold-before-review.json).
+- [Seeded edits, first batch](seeded-review.json) and
+  [second batch](seeded-review-2.json) list every seeded step after the
+  review fixes. Each step records its file and kind, whether the
   incremental store equalled a fresh cold index, the files decided, the
-  path taken and the verified no-edit run after it.
-- [Cold comparison](cold.json) records the cold runs main, after, main on
-  four pins with every row compared with the first run.
+  path taken and the verified no-edit run after it. Both batches used
+  `--scoped-mix`; the second used the reweighted mix.
+  [The batch at d96a8ba](seeded.json) used the default mix.
+- [Tests at the reviewed head](reviewed-head-tests.txt) show the new tests
+  run against a build of `d96a8ba`.
+- [Probe](probe.json) records the lookup cuts in a cold index of each pin
+  before the review, and the cost and cuts of one full pass against passes
+  that decide one sampled file. The samples rank paths by SHA-256 of
+  `c36-probe:<path>`.
 - [Checks](checks.json) records the build, type, format and test results.

@@ -1297,8 +1297,7 @@ test("Rust: removing a glob-chain call leaves other files' decisions as cold", a
           "src/widget.rs",
           preludeCrate(0)["src/widget.rs"].replace("r.area()", "0"),
         ),
-      check: (store, work) =>
-        assert.equal(work["analyze.rust.scopedFiles"], 1),
+      check: (store, work) => assert.equal(work["analyze.rust.scopedFiles"], 1),
     },
   ]);
 });

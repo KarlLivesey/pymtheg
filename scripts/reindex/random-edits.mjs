@@ -346,9 +346,11 @@ const rustKinds = [
   "derive",
 ];
 const rustScopedKinds = [
-  ...["body", "body", "body", "body", "call", "call", "call", "call"],
-  ...["comment", "comment", "comment"],
-  ...rustKinds.filter((kind) => !["body", "comment"].includes(kind)),
+  ...Array(6).fill("body"),
+  ...Array(6).fill("call"),
+  ...Array(4).fill("comment"),
+  // Each other kind once.
+  ...new Set(rustKinds.filter((kind) => !["body", "comment"].includes(kind))),
 ];
 const rustCreated = [];
 function rustEdit(step, file, source) {

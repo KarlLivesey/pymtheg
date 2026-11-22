@@ -3,9 +3,9 @@
   "pin": "BurntSushi_ripgrep",
   "round": 0,
   "build": "main-1",
-  "wallS": 39.05,
-  "cpuS": 48,
-  "peakMiB": 905,
+  "wallS": 47.44,
+  "cpuS": 44.7,
+  "peakMiB": 925,
   "equality": {
    "rows": {
     "graph_files": 102,
@@ -24,9 +24,9 @@
   "pin": "BurntSushi_ripgrep",
   "round": 0,
   "build": "after",
-  "wallS": 53.35,
-  "cpuS": 50.5,
-  "peakMiB": 901,
+  "wallS": 34.58,
+  "cpuS": 42.6,
+  "peakMiB": 907,
   "equality": {
    "rows": {
     "graph_files": 102,
@@ -45,9 +45,9 @@
   "pin": "BurntSushi_ripgrep",
   "round": 0,
   "build": "main-2",
-  "wallS": 39.2,
-  "cpuS": 48.3,
-  "peakMiB": 923,
+  "wallS": 38.43,
+  "cpuS": 44.3,
+  "peakMiB": 906,
   "equality": {
    "rows": {
     "graph_files": 102,
@@ -66,9 +66,9 @@
   "pin": "fjall-rs_fjall",
   "round": 0,
   "build": "main-1",
-  "wallS": 14.81,
-  "cpuS": 21.1,
-  "peakMiB": 607,
+  "wallS": 13.4,
+  "cpuS": 20.2,
+  "peakMiB": 606,
   "equality": {
    "rows": {
     "graph_files": 120,
@@ -77,7 +77,7 @@
     "graph_symbols": 1179,
     "graph_links": 13401,
     "graph_candidates": 14,
-    "graph_library_targets": 2043,
+    "graph_library_targets": 2131,
     "project": 1
    },
    "differences": []
@@ -87,9 +87,9 @@
   "pin": "fjall-rs_fjall",
   "round": 0,
   "build": "after",
-  "wallS": 14.9,
-  "cpuS": 21.3,
-  "peakMiB": 601,
+  "wallS": 12.54,
+  "cpuS": 18.5,
+  "peakMiB": 612,
   "equality": {
    "rows": {
     "graph_files": 120,
@@ -98,7 +98,7 @@
     "graph_symbols": 1179,
     "graph_links": 13401,
     "graph_candidates": 14,
-    "graph_library_targets": 2043,
+    "graph_library_targets": 2131,
     "project": 1
    },
    "differences": []
@@ -108,9 +108,9 @@
   "pin": "fjall-rs_fjall",
   "round": 0,
   "build": "main-2",
-  "wallS": 14.93,
-  "cpuS": 20.9,
-  "peakMiB": 604,
+  "wallS": 13.2,
+  "cpuS": 18.7,
+  "peakMiB": 608,
   "equality": {
    "rows": {
     "graph_files": 120,
@@ -119,7 +119,7 @@
     "graph_symbols": 1179,
     "graph_links": 13401,
     "graph_candidates": 14,
-    "graph_library_targets": 2043,
+    "graph_library_targets": 2131,
     "project": 1
    },
    "differences": []
@@ -129,9 +129,9 @@
   "pin": "cberner_redb",
   "round": 0,
   "build": "main-1",
-  "wallS": 71.16,
-  "cpuS": 87.5,
-  "peakMiB": 1234,
+  "wallS": 67.06,
+  "cpuS": 76.6,
+  "peakMiB": 1247,
   "equality": {
    "rows": {
     "graph_files": 98,
@@ -150,9 +150,9 @@
   "pin": "cberner_redb",
   "round": 0,
   "build": "after",
-  "wallS": 74.33,
-  "cpuS": 90.5,
-  "peakMiB": 1209,
+  "wallS": 76.06,
+  "cpuS": 81.7,
+  "peakMiB": 1241,
   "equality": {
    "rows": {
     "graph_files": 98,
@@ -171,9 +171,9 @@
   "pin": "cberner_redb",
   "round": 0,
   "build": "main-2",
-  "wallS": 93.66,
-  "cpuS": 92.8,
-  "peakMiB": 1227,
+  "wallS": 62.82,
+  "cpuS": 76.8,
+  "peakMiB": 1252,
   "equality": {
    "rows": {
     "graph_files": 98,
@@ -192,9 +192,9 @@
   "pin": "helix-editor_helix",
   "round": 0,
   "build": "main-1",
-  "wallS": 165.57,
-  "cpuS": 149.1,
-  "peakMiB": 1368,
+  "wallS": 95.08,
+  "cpuS": 109.2,
+  "peakMiB": 1405,
   "equality": {
    "rows": {
     "graph_files": 269,
@@ -213,9 +213,9 @@
   "pin": "helix-editor_helix",
   "round": 0,
   "build": "after",
-  "wallS": 157.53,
-  "cpuS": 132.9,
-  "peakMiB": 1400,
+  "wallS": 92.61,
+  "cpuS": 114.8,
+  "peakMiB": 1316,
   "equality": {
    "rows": {
     "graph_files": 269,
@@ -234,9 +234,9 @@
   "pin": "helix-editor_helix",
   "round": 0,
   "build": "main-2",
-  "wallS": 164.25,
-  "cpuS": 130.8,
-  "peakMiB": 1353,
+  "wallS": 82.64,
+  "cpuS": 105.9,
+  "peakMiB": 1396,
   "equality": {
    "rows": {
     "graph_files": 269,

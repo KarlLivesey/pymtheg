@@ -1,9 +1,10 @@
 {
- "note": "C-36 checks on the dev server, Node 24, on the branch after merging origin/main 2dc05be.",
+ "note": "C-36 checks after the review fixes, on the dev server with Node 24, on the branch after merging origin/main 5d97762.",
  "build": "npm run build: pass",
  "typeCheck": "tsc --noEmit -p tsconfig.json and -p web/tsconfig.json: pass",
- "format": "npm run format:check: pass",
+ "format": "npm run format:check: pass after formatting one test file (whitespace only)",
  "sweepTests": "node --test scripts/sweep/*.test.mjs: 30 of 30 pass",
- "fullSuite": "npm test: 3274 of 3274 pass, after the signal-test change described in the note; the run before it passed 3272 and failed the two analyze-phase signal cases",
- "focused": "Rust kill tests 2 of 2 and finishing tests 7 of 7 pass on their own; the Rust equality tests pass within the full suite"
+ "fullSuite": "npm test: 3295 of 3295 pass",
+ "focused": "Rust equality, kill and finishing tests: 33 of 33 pass; the reviewer's 15 cases equal cold at every step",
+ "beforeReview": "npm test at d96a8ba: 3274 of 3274 pass after the signal-test change; the run before it failed the two analyze-phase signal cases"
 }
