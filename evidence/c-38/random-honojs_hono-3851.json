@@ -1,0 +1,548 @@
+{
+ "id": "honojs/hono",
+ "seed": 3851,
+ "expectedSteps": 27,
+ "steps": [
+  {
+   "step": 0,
+   "file": "src/utils/jwt/types.ts",
+   "kind": "body",
+   "line": 22,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12294,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 25387,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 824
+   }
+  },
+  {
+   "step": 1,
+   "file": "src/adapter/cloudflare-pages/conninfo.ts",
+   "kind": "body",
+   "line": 15,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30882,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 52143,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 892
+   }
+  },
+  {
+   "step": 2,
+   "file": "benchmarks/jsx/src/react-jsx/preact.ts",
+   "kind": "comment",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3165,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5051,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 900
+   }
+  },
+  {
+   "step": 3,
+   "file": "benchmarks/fetch/bench.mts",
+   "kind": "body",
+   "line": 43,
+   "equal": true,
+   "differences": [],
+   "wallMs": 6547,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6040,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 858
+   }
+  },
+  {
+   "step": 4,
+   "file": "src/jsx/hooks/string.test.tsx",
+   "kind": "body",
+   "line": 7,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9230,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17516,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 902
+   }
+  },
+  {
+   "step": 5,
+   "file": "src/utils/buffer.test.ts",
+   "kind": "delete",
+   "line": 116,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8536,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17404,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 795
+   }
+  },
+  {
+   "step": 6,
+   "file": "src/utils/buffer.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8539,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17146,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 860
+   }
+  },
+  {
+   "step": 7,
+   "file": "src/middleware/method-not-allowed/index.ts",
+   "kind": "body",
+   "line": 62,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11202,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 22084,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 828
+   }
+  },
+  {
+   "step": 8,
+   "file": "src/router/reg-exp-router/matcher.ts",
+   "kind": "comment",
+   "line": 33,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14415,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 24351,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 819
+   }
+  },
+  {
+   "step": 9,
+   "file": "src/utils/jwt/jwa.ts",
+   "kind": "comment",
+   "line": 5,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31977,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 48944,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 784
+   }
+  },
+  {
+   "step": 10,
+   "file": "src/adapter/cloudflare-workers/conninfo.test.ts",
+   "kind": "comment",
+   "line": 19,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8760,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 16825,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 854
+   }
+  },
+  {
+   "step": 11,
+   "file": "adapters/aws-lambda/test/index.test.ts",
+   "kind": "delete",
+   "line": 489,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29872,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 50541,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 882
+   }
+  },
+  {
+   "step": 12,
+   "file": "adapters/aws-lambda/test/index.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29177,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 49641,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 833
+   }
+  },
+  {
+   "step": 13,
+   "file": "src/middleware/jwt/index.test.ts",
+   "kind": "comment",
+   "line": 152,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10022,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17373,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 848
+   }
+  },
+  {
+   "step": 14,
+   "file": "src/utils/jwt/jwt.ts",
+   "kind": "body",
+   "line": 52,
+   "equal": true,
+   "differences": [],
+   "wallMs": 17254,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 27093,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 914
+   }
+  },
+  {
+   "step": 15,
+   "file": "adapters/cloudflare-workers/src/websocket.ts",
+   "kind": "body",
+   "line": 11,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3174,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 4746,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 787
+   }
+  },
+  {
+   "step": 16,
+   "file": "src/middleware/context-storage/index.ts",
+   "kind": "comment",
+   "line": 36,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26297,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 44126,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 869
+   }
+  },
+  {
+   "step": 17,
+   "file": "src/middleware/basic-auth/index.ts",
+   "kind": "comment",
+   "line": 11,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14558,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 24066,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 761
+   }
+  },
+  {
+   "step": 18,
+   "file": "src/middleware/serve-static/path.ts",
+   "kind": "body",
+   "line": 6,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11696,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 22899,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 861
+   }
+  },
+  {
+   "step": 19,
+   "file": "src/context.test.ts",
+   "kind": "comment",
+   "line": 498,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30279,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 47921,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 830
+   }
+  },
+  {
+   "step": 20,
+   "file": "adapters/aws-lambda/src/conninfo.ts",
+   "kind": "body",
+   "line": 62,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3192,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5482,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 874
+   }
+  },
+  {
+   "step": 21,
+   "file": "benchmarks/routers/src/rou3.mts",
+   "kind": "comment",
+   "line": 17,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2972,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 4848,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 828
+   }
+  },
+  {
+   "step": 22,
+   "file": "src/helper/accepts/accepts.ts",
+   "kind": "body",
+   "line": 29,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10815,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 22789,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 875
+   }
+  },
+  {
+   "step": 23,
+   "file": "src/adapter/cloudflare-pages/handler.ts",
+   "kind": "delete",
+   "line": 58,
+   "equal": true,
+   "differences": [],
+   "wallMs": 80059,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 648,
+   "cpuMs": 81144,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 777
+   }
+  },
+  {
+   "step": 24,
+   "file": "src/adapter/cloudflare-pages/handler.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 50967,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 62595,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 788
+   }
+  },
+  {
+   "step": 25,
+   "file": "src/jsx/streaming.ts",
+   "kind": "body",
+   "line": 218,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10747,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 23249,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 914
+   }
+  },
+  {
+   "step": 26,
+   "file": "src/helper/proxy/index.ts",
+   "kind": "export",
+   "line": 206,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28554,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 49877,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 928
+   }
+  }
+ ],
+ "equal": true
+}
