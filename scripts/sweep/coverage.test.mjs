@@ -9,7 +9,7 @@ import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { readLabels } from "./coverage-refresh-data.mjs";
 import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, installedCoverage, median, stratumShare } from "./coverage.mjs";
-import { classify, columns, externalIdentity, goImports, libraryModuleLinks, libraryModuleRow, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
+import { classify, columns, externalIdentity, goImports, libraryModuleLinks, libraryModuleRow, libraryScore, mergedGlobalLevel2, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
 
 test("assumed Level 2 links remain in the total and are counted separately", () => {
   const score = libraryScore([
@@ -608,4 +608,18 @@ test("stored resolution classes, library included, agree with the CLI's counts o
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+});
+
+test("C-42: a merged environment global counts when it names the symbol and every declaring unit", () => {
+  const dom = { ecosystem: "dom", unit: "dom", symbol: "Console.prototype.log" };
+  const node = { ecosystem: "npm", unit: "@types/node", symbol: "Console.prototype.log" };
+  const merged = { mergedGlobal: true };
+  assert.equal(mergedGlobalLevel2(merged, [dom, node], 0), true);
+  // Not marked by the module: a candidate set of alternatives.
+  assert.equal(mergedGlobalLevel2({}, [dom, node], 0), false);
+  // A checkout candidate, one unit only, or a candidate without a symbol.
+  assert.equal(mergedGlobalLevel2(merged, [dom, node], 1), false);
+  assert.equal(mergedGlobalLevel2(merged, [dom, { ...dom, symbol: "Console.log" }], 0), false);
+  assert.equal(mergedGlobalLevel2(merged, [dom, { ...node, symbol: undefined }], 0), false);
+  assert.equal(mergedGlobalLevel2(merged, [dom], 0), false);
 });

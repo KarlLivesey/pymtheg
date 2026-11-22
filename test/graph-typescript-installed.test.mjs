@@ -1485,3 +1485,112 @@ test("a merged-member call keeps one identity for a same-package directory augme
     assert.equal(target(call("main.ts", "c.setOption")).unit, "cm-extra");
   });
 });
+
+// C-42: one global declared by the DOM library and by @types/node.
+async function environmentLayout(write, main, extra = {}) {
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        lib: ["es2022", "dom"],
+        types: ["node", "kit-a", "kit-b"],
+      },
+      include: ["src"],
+    }),
+  );
+  await write(
+    "node_modules/@types/node/package.json",
+    manifest("@types/node", "20.0.0"),
+  );
+  await write(
+    "node_modules/@types/node/index.d.ts",
+    [
+      "export {};",
+      "declare global {",
+      "  interface Console { log(...data: any[]): void }",
+      "  var console: Console;",
+      "  function setTimeout(callback: () => void, ms?: number): number;",
+      "  interface URL { readonly href: string }",
+      "  var URL: { new (url: string): URL };",
+      "}",
+      "",
+    ].join("\n"),
+  );
+  for (const name of ["kit-a", "kit-b"]) {
+    await write(`node_modules/${name}/package.json`, manifest(name, "1.0.0"));
+    await write(
+      `node_modules/${name}/index.d.ts`,
+      `interface Runner${name.at(-1).toUpperCase()} { run(): void }\n`,
+    );
+  }
+  await write("src/main.ts", main);
+  for (const [path, text] of Object.entries(extra)) await write(path, text);
+}
+const linkAt = (store, name) => {
+  const links = store
+    .links()
+    .filter((link) => link.file === "src/main.ts" && link.targetName === name);
+  assert.equal(links.length, 1, name);
+  return links[0];
+};
+const units = (link) =>
+  (link.libraries ?? [])
+    .map(({ ecosystem, unit }) => `${ecosystem}:${unit}`)
+    .sort();
+
+test("a global declared by the DOM library and by @types/node is one merged environment global", async () => {
+  const { request, read, write } = await project();
+  await environmentLayout(
+    write,
+    [
+      'console.log("x");',
+      "setTimeout(() => {}, 1);",
+      // As in vitejs/vite packages/vite/src/shared/moduleRunnerTransport.ts.
+      'export const url = new URL("ws://localhost");',
+      "",
+    ].join("\n"),
+  );
+  await request("index");
+  read((store) => {
+    for (const name of ["console.log", "setTimeout", "URL"]) {
+      const link = linkAt(store, name);
+      assert.equal(link.resolution, "ambiguous", name);
+      assert.equal(link.data.mergedGlobal, true, name);
+      assert.deepEqual(link.candidates, [], name);
+      assert.equal(units(link).length, 2, name);
+      assert.ok(units(link).includes("dom:dom"), name);
+      assert.ok(
+        link.libraries.every(({ symbol }) => !!symbol),
+        name,
+      );
+    }
+  });
+});
+
+test("different global symbols that share a member name are not a merged global", async () => {
+  const { request, read, write } = await project();
+  await environmentLayout(
+    write,
+    "declare const r: RunnerA | RunnerB;\nr.run();\nexport {};\n",
+  );
+  await request("index");
+  read((store) => {
+    const link = linkAt(store, "r.run");
+    assert.notEqual(link.resolution, "library");
+    assert.equal(link.data.mergedGlobal, undefined);
+  });
+});
+
+test("a merged global beside an unread file stays withheld", async () => {
+  const { request, read, write } = await project();
+  await environmentLayout(write, 'console.log("x");\nexport {};\n', {
+    "src/broken.ts": "export const z = 1;\nlet = ;\n",
+  });
+  await request("index");
+  read((store) => {
+    const link = linkAt(store, "console.log");
+    assert.equal(link.resolution, "unresolved");
+    assert.equal(link.data.mergedGlobal, undefined);
+  });
+});

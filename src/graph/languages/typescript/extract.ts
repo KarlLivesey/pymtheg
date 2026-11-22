@@ -174,6 +174,11 @@ interface Targets {
   noAnswer?: boolean;
   competingTypes?: readonly string[];
   /**
+   * C-42: the library candidates are the declarations, in several library
+   * units, of one global compiler symbol (a merged environment global).
+   */
+  mergedGlobal?: boolean;
+  /**
    * Why there is no complete target set: external, local, no-symbol,
    * missing-module, external-package, unresolved-alias, computed-specifier.
    */
@@ -863,6 +868,29 @@ export function extractFile(
     }
     return undefined;
   }
+  /** The compiler's (merged) symbol of a declaration, from its name. */
+  function declaredSymbol(declaration: ts.Declaration): ts.Symbol | undefined {
+    const name = ts.getNameOfDeclaration(declaration);
+    const symbol = name && checker.getSymbolAtLocation(name);
+    return symbol && !(symbol.flags & ts.SymbolFlags.Alias)
+      ? symbol
+      : undefined;
+  }
+  /**
+   * Whether a declaration is in the global scope (C-42): in a script file
+   * (such as `lib.dom.d.ts`) or inside `declare global` / `global {}`, and
+   * not inside an ambient module (`declare module "x"`) or a module file.
+   */
+  function environmentDeclaration(declaration: ts.Node): boolean {
+    for (let node = declaration.parent; node; node = node.parent) {
+      if (ts.isModuleDeclaration(node)) {
+        if (node.flags & ts.NodeFlags.GlobalAugmentation) return true;
+        if (ts.isStringLiteral(node.name)) return false;
+      }
+      if (ts.isSourceFile(node)) return !ts.isExternalModule(node);
+    }
+    return false;
+  }
   function resolveChecked(found: Lookup, meaning: Meaning): Targets {
     const receiver = found.receiver;
     if (found.reason || !found.symbol)
@@ -877,6 +905,10 @@ export function extractFile(
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
     let missingGlobalTypes = false;
+    // C-42: the compiler symbols whose declarations gave library facts, and
+    // whether any library fact is synthesised or outside the global scope.
+    const librarySymbols = new Set<ts.Symbol | undefined>();
+    let unmergedLibrary = false;
     let installedType = false;
     let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
     let verifyObjectProducers = false;
@@ -1145,18 +1177,20 @@ export function extractFile(
                 if (owners?.length) {
                   for (const { name } of owners) {
                     const node = nodeMemberTarget(name, member!, proved.symbol);
-                    if (node)
+                    if (node) {
                       (libraryFacts ??= new Map()).set(libraryKey(node), node);
-                    else missingGlobalTypes = true;
+                      unmergedLibrary = true;
+                    } else missingGlobalTypes = true;
                   }
                 } else if (
                   nodeCanDeclare(owner) &&
                   !(meaning === "type" && proved.symbol === "CryptoKey")
                 ) {
                   const node = nodeGlobalTarget(proved.symbol);
-                  if (node)
+                  if (node) {
                     (libraryFacts ??= new Map()).set(libraryKey(node), node);
-                  else missingGlobalTypes = true;
+                    unmergedLibrary = true;
+                  } else missingGlobalTypes = true;
                 }
               }
             }
@@ -1166,6 +1200,9 @@ export function extractFile(
               importer.targetKey(proved),
               proved,
             );
+            if (namespace || !environmentDeclaration(declaration))
+              unmergedLibrary = true;
+            else librarySymbols.add(declaredSymbol(declaration));
           } else if (inCheckout(declaration)) {
             if (!record(declaration, current)) local++;
           } else external++;
@@ -1264,12 +1301,23 @@ export function extractFile(
         specifier && ts.isStringLiteralLike(specifier) ? specifier : undefined;
       const unbuiltEntry =
         viaSpecifier && context.unbuilt?.forSpecifier(viaSpecifier);
+      // C-42: one global symbol declared in several library units.
+      const merged =
+        !!libraries &&
+        libraries.length > 1 &&
+        !targets.length &&
+        !unmergedLibrary &&
+        librarySymbols.size === 1 &&
+        !librarySymbols.has(undefined) &&
+        new Set(libraries.map(({ ecosystem, unit }) => `${ecosystem}\0${unit}`))
+          .size > 1;
       return {
         targets,
         viaAlias,
         receiver,
         declarations,
         ...(libraries && { libraryFacts: libraries }),
+        ...(merged && { mergedGlobal: true }),
         ...(unbuiltEntry && { unbuiltEntry }),
         ...(viaSpecifier && { viaSpecifier }),
       };
@@ -2207,10 +2255,12 @@ export function extractFile(
       facts.targets = found.targets.map((target) => ({ ...target }));
     if (found.libraryFacts?.length && !reason) {
       if (insideWith(at)) reason = "dynamic-scope";
-      else
+      else {
         facts.libraryFacts = found.libraryFacts.map((target) => ({
           ...target,
         }));
+        if (found.mergedGlobal) facts.mergedGlobal = true;
+      }
     }
     if (reason) facts.reason = reason;
     if (
