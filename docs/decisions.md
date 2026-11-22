@@ -2423,6 +2423,22 @@ is as trusted as building it (D17), and that is a single judgement about the
 repository, not one per language. **Rules out:** running build tools on a
 project whose owner was never asked.
 
+### D23: a global declared by several typings is one named target
+
+**Decided (manager, 22 November 2026):** where the compiler itself holds ONE
+global symbol whose declarations sit in several library units (`URL`,
+`fetch`, `setTimeout`, `console.log` declared by both the DOM library and the
+Node typings), and the graph names that symbol in every declaring unit, the
+link is complete: it counts at Level 2 as proven. The stored form stays a
+candidate set carrying the merged-global mark, so storage, queries and the
+conformance kit are unchanged. **Why:** the units are not alternatives; the
+declarations merge into one symbol, so naming all of them names the target
+exactly, which is what the owner's library rule asks (library and symbol).
+**Rules out:** counting a candidate set whose members are different symbols
+(union arms such as `toString` on several types); counting a set that includes
+a checkout or synthesised target; a mark given without the compiler's own
+single-symbol proof.
+
 ### D19: coverage is judged with dependencies installed
 
 **Decided (Karl, 21 November 2026):** "we will assume in 99% of cases
