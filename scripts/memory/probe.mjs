@@ -108,10 +108,15 @@ proto.replaceAnalysis = function (module, ...rest) {
 const store = new SqliteGraphStore(graph, "c40-probe");
 sample("start");
 try {
-  const report = await indexProject(root, new LanguageRegistry(modules), store, {
-    excludeDirectories: [".pymtheg"],
-    signal: new AbortController().signal,
-  });
+  const report = await indexProject(
+    root,
+    new LanguageRegistry(modules),
+    store,
+    {
+      excludeDirectories: [".pymtheg"],
+      signal: new AbortController().signal,
+    },
+  );
   sample("indexed", {
     symbols: report.symbols,
     links: report.links,
