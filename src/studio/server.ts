@@ -636,8 +636,12 @@ export async function startStudio(options: {
                   "previewToken",
                   "resolutions",
                   "allowBrokenLinks",
+                  "trust",
                 ].includes(key),
             ) ||
+            (data.trust !== undefined &&
+              data.trust !== "trusted" &&
+              data.trust !== "source-only") ||
             (data.name !== undefined && typeof data.name !== "string") ||
             (data.importDocuments !== undefined &&
               typeof data.importDocuments !== "boolean") ||
@@ -729,6 +733,10 @@ export async function startStudio(options: {
               abort.signal,
               {
                 service,
+                // D22: the setup dialog's answer; none records nothing.
+                ...(data.trust === "trusted" || data.trust === "source-only"
+                  ? { trust: data.trust }
+                  : {}),
                 resolutions:
                   data.resolutions === undefined
                     ? []
