@@ -1,0 +1,442 @@
+{
+ "BurntSushi_ripgrep": [
+  {
+   "pin": "BurntSushi_ripgrep",
+   "round": 0,
+   "build": "main",
+   "wallS": 39.93,
+   "cpuS": 49.3,
+   "peakMiB": 908,
+   "equality": {
+    "rows": {
+     "graph_files": 102,
+     "graph_contexts": 14,
+     "graph_parse_failures": 0,
+     "graph_symbols": 4392,
+     "graph_links": 39819,
+     "graph_candidates": 24,
+     "graph_library_targets": 8159,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "round": 0,
+   "build": "after",
+   "wallS": 41.36,
+   "cpuS": 47.3,
+   "peakMiB": 924,
+   "equality": {
+    "rows": {
+     "graph_files": 102,
+     "graph_contexts": 14,
+     "graph_parse_failures": 0,
+     "graph_symbols": 4392,
+     "graph_links": 39819,
+     "graph_candidates": 24,
+     "graph_library_targets": 8159,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "actix_actix-web": [
+  {
+   "pin": "actix_actix-web",
+   "round": 0,
+   "build": "main",
+   "wallS": 92.2,
+   "cpuS": 111.9,
+   "peakMiB": 1325,
+   "equality": {
+    "rows": {
+     "graph_files": 329,
+     "graph_contexts": 14,
+     "graph_parse_failures": 0,
+     "graph_symbols": 7703,
+     "graph_links": 86640,
+     "graph_candidates": 12,
+     "graph_library_targets": 10919,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "actix_actix-web",
+   "round": 0,
+   "build": "after",
+   "wallS": 90.14,
+   "cpuS": 108.8,
+   "peakMiB": 1348,
+   "equality": {
+    "rows": {
+     "graph_files": 329,
+     "graph_contexts": 14,
+     "graph_parse_failures": 0,
+     "graph_symbols": 7703,
+     "graph_links": 86640,
+     "graph_candidates": 12,
+     "graph_library_targets": 10919,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "cberner_redb": [
+  {
+   "pin": "cberner_redb",
+   "round": 0,
+   "build": "main",
+   "wallS": 84.27,
+   "cpuS": 90.4,
+   "peakMiB": 1215,
+   "equality": {
+    "rows": {
+     "graph_files": 98,
+     "graph_contexts": 9,
+     "graph_parse_failures": 0,
+     "graph_symbols": 5523,
+     "graph_links": 73731,
+     "graph_candidates": 520,
+     "graph_library_targets": 8806,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "cberner_redb",
+   "round": 0,
+   "build": "after",
+   "wallS": 70.82,
+   "cpuS": 86.1,
+   "peakMiB": 1240,
+   "equality": {
+    "rows": {
+     "graph_files": 98,
+     "graph_contexts": 9,
+     "graph_parse_failures": 0,
+     "graph_symbols": 5523,
+     "graph_links": 73731,
+     "graph_candidates": 520,
+     "graph_library_targets": 8806,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "crossbeam-rs_crossbeam": [
+  {
+   "pin": "crossbeam-rs_crossbeam",
+   "round": 0,
+   "build": "main",
+   "wallS": 36.38,
+   "cpuS": 45.2,
+   "peakMiB": 891,
+   "equality": {
+    "rows": {
+     "graph_files": 115,
+     "graph_contexts": 8,
+     "graph_parse_failures": 0,
+     "graph_symbols": 3380,
+     "graph_links": 34220,
+     "graph_candidates": 162,
+     "graph_library_targets": 5741,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "crossbeam-rs_crossbeam",
+   "round": 0,
+   "build": "after",
+   "wallS": 35.29,
+   "cpuS": 44.3,
+   "peakMiB": 910,
+   "equality": {
+    "rows": {
+     "graph_files": 115,
+     "graph_contexts": 8,
+     "graph_parse_failures": 0,
+     "graph_symbols": 3380,
+     "graph_links": 34220,
+     "graph_candidates": 162,
+     "graph_library_targets": 5741,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "fjall-rs_fjall": [
+  {
+   "pin": "fjall-rs_fjall",
+   "round": 0,
+   "build": "main",
+   "wallS": 15.61,
+   "cpuS": 21.6,
+   "peakMiB": 610,
+   "equality": {
+    "rows": {
+     "graph_files": 120,
+     "graph_contexts": 25,
+     "graph_parse_failures": 0,
+     "graph_symbols": 1179,
+     "graph_links": 13401,
+     "graph_candidates": 14,
+     "graph_library_targets": 2131,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "round": 0,
+   "build": "after",
+   "wallS": 13.89,
+   "cpuS": 20.2,
+   "peakMiB": 613,
+   "equality": {
+    "rows": {
+     "graph_files": 120,
+     "graph_contexts": 25,
+     "graph_parse_failures": 0,
+     "graph_symbols": 1179,
+     "graph_links": 13401,
+     "graph_candidates": 14,
+     "graph_library_targets": 2131,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "helix-editor_helix": [
+  {
+   "pin": "helix-editor_helix",
+   "round": 0,
+   "build": "main",
+   "wallS": 90.18,
+   "cpuS": 113.6,
+   "peakMiB": 1354,
+   "equality": {
+    "rows": {
+     "graph_files": 269,
+     "graph_contexts": 18,
+     "graph_parse_failures": 0,
+     "graph_symbols": 8461,
+     "graph_links": 90780,
+     "graph_candidates": 60,
+     "graph_library_targets": 10203,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "helix-editor_helix",
+   "round": 0,
+   "build": "after",
+   "wallS": 133.09,
+   "cpuS": 126.3,
+   "peakMiB": 1302,
+   "equality": {
+    "rows": {
+     "graph_files": 269,
+     "graph_contexts": 18,
+     "graph_parse_failures": 0,
+     "graph_symbols": 8461,
+     "graph_links": 90780,
+     "graph_candidates": 60,
+     "graph_library_targets": 10203,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "rust-embedded_cortex-m": [
+  {
+   "pin": "rust-embedded_cortex-m",
+   "round": 0,
+   "build": "main",
+   "wallS": 7.5,
+   "cpuS": 10.3,
+   "peakMiB": 410,
+   "equality": {
+    "rows": {
+     "graph_files": 132,
+     "graph_contexts": 14,
+     "graph_parse_failures": 0,
+     "graph_symbols": 1361,
+     "graph_links": 5531,
+     "graph_candidates": 6,
+     "graph_library_targets": 889,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "rust-embedded_cortex-m",
+   "round": 0,
+   "build": "after",
+   "wallS": 8.52,
+   "cpuS": 11.1,
+   "peakMiB": 398,
+   "equality": {
+    "rows": {
+     "graph_files": 132,
+     "graph_contexts": 14,
+     "graph_parse_failures": 0,
+     "graph_symbols": 1361,
+     "graph_links": 5531,
+     "graph_candidates": 6,
+     "graph_library_targets": 889,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "rustls_rustls": [
+  {
+   "pin": "rustls_rustls",
+   "round": 0,
+   "build": "main",
+   "wallS": 118.1,
+   "cpuS": 144.8,
+   "peakMiB": 1522,
+   "equality": {
+    "rows": {
+     "graph_files": 172,
+     "graph_contexts": 19,
+     "graph_parse_failures": 0,
+     "graph_symbols": 7269,
+     "graph_links": 70802,
+     "graph_candidates": 0,
+     "graph_library_targets": 4942,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "rustls_rustls",
+   "round": 0,
+   "build": "after",
+   "wallS": 137.23,
+   "cpuS": 166,
+   "peakMiB": 1491,
+   "equality": {
+    "rows": {
+     "graph_files": 172,
+     "graph_contexts": 19,
+     "graph_parse_failures": 0,
+     "graph_symbols": 7269,
+     "graph_links": 70802,
+     "graph_candidates": 0,
+     "graph_library_targets": 4942,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "serde-rs_serde": [
+  {
+   "pin": "serde-rs_serde",
+   "round": 0,
+   "build": "main",
+   "wallS": 33.74,
+   "cpuS": 46.4,
+   "peakMiB": 889,
+   "equality": {
+    "rows": {
+     "graph_files": 208,
+     "graph_contexts": 7,
+     "graph_parse_failures": 0,
+     "graph_symbols": 4246,
+     "graph_links": 30714,
+     "graph_candidates": 0,
+     "graph_library_targets": 743,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "serde-rs_serde",
+   "round": 0,
+   "build": "after",
+   "wallS": 42.29,
+   "cpuS": 54.8,
+   "peakMiB": 897,
+   "equality": {
+    "rows": {
+     "graph_files": 208,
+     "graph_contexts": 7,
+     "graph_parse_failures": 0,
+     "graph_symbols": 4246,
+     "graph_links": 30714,
+     "graph_candidates": 0,
+     "graph_library_targets": 743,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ],
+ "tokio-rs_axum": [
+  {
+   "pin": "tokio-rs_axum",
+   "round": 0,
+   "build": "main",
+   "wallS": 46.56,
+   "cpuS": 60.6,
+   "peakMiB": 992,
+   "equality": {
+    "rows": {
+     "graph_files": 310,
+     "graph_contexts": 64,
+     "graph_parse_failures": 0,
+     "graph_symbols": 4561,
+     "graph_links": 41099,
+     "graph_candidates": 26,
+     "graph_library_targets": 4306,
+     "project": 1
+    },
+    "differences": []
+   }
+  },
+  {
+   "pin": "tokio-rs_axum",
+   "round": 0,
+   "build": "after",
+   "wallS": 49.14,
+   "cpuS": 64.2,
+   "peakMiB": 1020,
+   "equality": {
+    "rows": {
+     "graph_files": 310,
+     "graph_contexts": 64,
+     "graph_parse_failures": 0,
+     "graph_symbols": 4561,
+     "graph_links": 41099,
+     "graph_candidates": 26,
+     "graph_library_targets": 4306,
+     "project": 1
+    },
+    "differences": []
+   }
+  }
+ ]
+}
