@@ -10,6 +10,7 @@
 // The commits are chosen once into <commits.json> (with their patches) so
 // every build replays the same edits.
 //   node scripts/keys/commit-replay.mjs <dist> <scratch> <repo id> <count> <commits.json> <out.json>
+import "../isolated-home.mjs";
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
