@@ -30,6 +30,16 @@ this branch. Before the review, main was `db29fc7`.
   path taken and the verified no-edit run after it. Both batches used
   `--scoped-mix`; the second used the reweighted mix.
   [The batch at d96a8ba](seeded.json) used the default mix.
+- Round 2, after the cost fix:
+  [dioxus cold, two rounds](cold-dioxus.json),
+  [helix, redb and embassy cold](cold-round2.json) with
+  [embassy's second main run](cold-embassy-main2.json), which was repeated
+  for timing alone after the harness ran out of memory comparing it.
+  [Eight pins' rows](rows-eight-pins.json) come from parallel runs that are
+  not cost evidence. [Dioxus edits](edits-dioxus.json) and the
+  [clap seeded batch](seeded-clap.json) complete the round. The
+  [ten-pin comparison](ten-pins.json) is from this round, while
+  [cold.json](cold.json) was measured before the cost fix.
 - [Tests at the reviewed head](reviewed-head-tests.txt) show the new tests
   run against a build of `d96a8ba`.
 - [Probe](probe.json) records the lookup cuts in a cold index of each pin

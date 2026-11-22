@@ -1,0 +1,1499 @@
+{
+ "note": "C-36 round 2: seeded Rust edits on clap (scripts/reindex/random-edits.mjs --command --scoped-mix) with the head after the cost fix. Each step: the incremental store after graph index equals a fresh cold index row for row, then an unchanged graph index verifies without an index run and leaves the store byte-identical.",
+ "runs": [
+  {
+   "id": "clap-rs/clap",
+   "seed": 36401,
+   "expectedSteps": 20,
+   "equal": true,
+   "steps": [
+    {
+     "step": 0,
+     "file": "tests/builder/require.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 793
+     }
+    },
+    {
+     "step": 1,
+     "file": "tests/builder/double_require.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 833
+     }
+    },
+    {
+     "step": 2,
+     "file": "tests/examples.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 754
+     }
+    },
+    {
+     "step": 3,
+     "file": "tests/builder/occurrences.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 775
+     }
+    },
+    {
+     "step": 4,
+     "file": "examples/tutorial_builder/04_02_parse.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 782
+     }
+    },
+    {
+     "step": 5,
+     "file": "clap_complete/src/aot/shells/zsh.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 789
+     }
+    },
+    {
+     "step": 6,
+     "file": "tests/derive/flags.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 785
+     }
+    },
+    {
+     "step": 7,
+     "file": "tests/derive/boxed.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 699
+     }
+    },
+    {
+     "step": 8,
+     "file": "examples/tutorial_derive/03_06_optional.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 792
+     }
+    },
+    {
+     "step": 9,
+     "file": "tests/derive_ui/multiple_external_subcommand.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 708
+     }
+    },
+    {
+     "step": 10,
+     "file": "examples/tutorial_builder/04_04_custom.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 712
+     }
+    },
+    {
+     "step": 11,
+     "file": "clap_mangen/src/render.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 756
+     }
+    },
+    {
+     "step": 12,
+     "file": "examples/escaped-positional-derive.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 758
+     }
+    },
+    {
+     "step": 13,
+     "file": "tests/derive_ui.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 860
+     }
+    },
+    {
+     "step": 14,
+     "file": "tests/examples.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 797
+     }
+    },
+    {
+     "step": 15,
+     "file": "clap_builder/src/parser/matches/value_source.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 907
+     }
+    },
+    {
+     "step": 16,
+     "file": "clap_derive/src/dummies.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 722
+     }
+    },
+    {
+     "step": 17,
+     "file": "tests/macros.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 753
+     }
+    },
+    {
+     "step": 18,
+     "file": "clap_lex/tests/testsuite/main.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 821
+     }
+    },
+    {
+     "step": 19,
+     "file": "examples/tutorial_builder/04_01_possible.rs",
+     "kind": "export",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 757
+     }
+    }
+   ]
+  },
+  {
+   "id": "clap-rs/clap",
+   "seed": 36402,
+   "expectedSteps": 20,
+   "equal": true,
+   "steps": [
+    {
+     "step": 0,
+     "file": "clap_builder/src/output/mod.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 981
+     }
+    },
+    {
+     "step": 1,
+     "file": "clap_builder/src/builder/tests.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 897
+     }
+    },
+    {
+     "step": 2,
+     "file": "clap_derive/src/dummies.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 751
+     }
+    },
+    {
+     "step": 3,
+     "file": "clap_builder/src/builder/command.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 756
+     }
+    },
+    {
+     "step": 4,
+     "file": "tests/builder/help.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 812
+     }
+    },
+    {
+     "step": 5,
+     "file": "clap_builder/src/error/format.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 776
+     }
+    },
+    {
+     "step": 6,
+     "file": "tests/derive/options.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 338,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 748
+     }
+    },
+    {
+     "step": 7,
+     "file": "clap_complete_nushell/tests/common.rs",
+     "kind": "derive",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 338,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 765
+     }
+    },
+    {
+     "step": 8,
+     "file": "clap_builder/src/builder/possible_value.rs",
+     "kind": "add-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 338,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 782
+     }
+    },
+    {
+     "step": 9,
+     "file": "clap_complete/tests/testsuite/zsh.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 777
+     }
+    },
+    {
+     "step": 10,
+     "file": "tests/builder/conflicts.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 791
+     }
+    },
+    {
+     "step": 11,
+     "file": "clap_lex/tests/testsuite/parsed.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 338,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 745
+     }
+    },
+    {
+     "step": 12,
+     "file": "examples/tutorial_derive/03_01_flag_count.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 339,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 809
+     }
+    },
+    {
+     "step": 13,
+     "file": "clap_mangen/src/render.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 339,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 734
+     }
+    },
+    {
+     "step": 14,
+     "file": "tests/builder/opts.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 784
+     }
+    },
+    {
+     "step": 15,
+     "file": "examples/tutorial_builder/03_02_option.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 339,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 867
+     }
+    },
+    {
+     "step": 16,
+     "file": "tests/builder/require.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 796
+     }
+    },
+    {
+     "step": 17,
+     "file": "examples/derive_ref/augment_subcommands.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 339,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 732
+     }
+    },
+    {
+     "step": 18,
+     "file": "clap_builder/src/builder/range.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 340,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 758
+     }
+    },
+    {
+     "step": 19,
+     "file": "tests/builder/version.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 340,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 839
+     }
+    }
+   ]
+  },
+  {
+   "id": "clap-rs/clap",
+   "seed": 36403,
+   "expectedSteps": 20,
+   "equal": true,
+   "steps": [
+    {
+     "step": 0,
+     "file": "examples/typed-derive/custom.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 755
+     }
+    },
+    {
+     "step": 1,
+     "file": "tests/builder/derive_order.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 696
+     }
+    },
+    {
+     "step": 2,
+     "file": "tests/derive_ui/external_subcommand_wrong_type.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 739
+     }
+    },
+    {
+     "step": 3,
+     "file": "examples/tutorial_builder/03_03_positional.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 781
+     }
+    },
+    {
+     "step": 4,
+     "file": "examples/tutorial_derive/04_01_enum.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 855
+     }
+    },
+    {
+     "step": 5,
+     "file": "tests/builder/borrowed.rs",
+     "kind": "cfg",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 969
+     }
+    },
+    {
+     "step": 6,
+     "file": "tests/builder/help.rs",
+     "kind": "export",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 804
+     }
+    },
+    {
+     "step": 7,
+     "file": "tests/builder/error.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 764
+     }
+    },
+    {
+     "step": 8,
+     "file": "clap_complete_nushell/tests/nushell.rs",
+     "kind": "cfg",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 788
+     }
+    },
+    {
+     "step": 9,
+     "file": "clap_builder/src/builder/arg.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 800
+     }
+    },
+    {
+     "step": 10,
+     "file": "clap_derive/src/dummies.rs",
+     "kind": "add-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 755
+     }
+    },
+    {
+     "step": 11,
+     "file": "clap_complete/src/macros.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 714
+     }
+    },
+    {
+     "step": 12,
+     "file": "tests/builder/global_args.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 748
+     }
+    },
+    {
+     "step": 13,
+     "file": "tests/derive_ui/skip_without_default.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 812
+     }
+    },
+    {
+     "step": 14,
+     "file": "examples/tutorial_derive/03_01_flag_bool.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 759
+     }
+    },
+    {
+     "step": 15,
+     "file": "tests/derive/author_version_about.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 761
+     }
+    },
+    {
+     "step": 16,
+     "file": "clap_builder/src/builder/app_settings.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 763
+     }
+    },
+    {
+     "step": 17,
+     "file": "tests/derive_ui/struct_subcommand.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 338,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 881
+     }
+    },
+    {
+     "step": 18,
+     "file": "tests/builder/action.rs",
+     "kind": "add-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 338,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 763
+     }
+    },
+    {
+     "step": 19,
+     "file": "tests/derive_ui/defer_variant.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 708
+     }
+    }
+   ]
+  },
+  {
+   "id": "clap-rs/clap",
+   "seed": 36404,
+   "expectedSteps": 20,
+   "equal": true,
+   "steps": [
+    {
+     "step": 0,
+     "file": "src/_cookbook/find.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 754
+     }
+    },
+    {
+     "step": 1,
+     "file": "examples/tutorial_derive/05_01_assert.rs",
+     "kind": "export",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 791
+     }
+    },
+    {
+     "step": 2,
+     "file": "examples/tutorial_builder/03_02_option_mult.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 765
+     }
+    },
+    {
+     "step": 3,
+     "file": "clap_complete/src/aot/shells/fish.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 710
+     }
+    },
+    {
+     "step": 4,
+     "file": "examples/tutorial_derive/04_04_custom.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 791
+     }
+    },
+    {
+     "step": 5,
+     "file": "examples/derive_ref/hand_subcommand.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 832
+     }
+    },
+    {
+     "step": 6,
+     "file": "src/_faq.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 786
+     }
+    },
+    {
+     "step": 7,
+     "file": "tests/derive_ui/flatten_and_methods.rs",
+     "kind": "export",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 686
+     }
+    },
+    {
+     "step": 8,
+     "file": "clap_complete/src/engine/mod.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 794
+     }
+    },
+    {
+     "step": 9,
+     "file": "examples/tutorial_builder/04_03_relations.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 754
+     }
+    },
+    {
+     "step": 10,
+     "file": "src/_tutorial.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 337,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 738
+     }
+    },
+    {
+     "step": 11,
+     "file": "examples/typed-derive/fn_parser.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 338,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 747
+     }
+    },
+    {
+     "step": 12,
+     "file": "clap_derive/src/dummies.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 338,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 801
+     }
+    },
+    {
+     "step": 13,
+     "file": "tests/builder/flag_subcommands.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 339,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 752
+     }
+    },
+    {
+     "step": 14,
+     "file": "tests/derive/non_literal_attributes.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 339,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 802
+     }
+    },
+    {
+     "step": 15,
+     "file": "examples/tutorial_builder/04_02_parse.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 339,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 712
+     }
+    },
+    {
+     "step": 16,
+     "file": "tests/derive/macros.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 853
+     }
+    },
+    {
+     "step": 17,
+     "file": "tests/derive/custom_string_parsers.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 764
+     }
+    },
+    {
+     "step": 18,
+     "file": "clap_complete/src/aot/shells/shell.rs",
+     "kind": "export",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 339,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 775
+     }
+    },
+    {
+     "step": 19,
+     "file": "examples/typed-derive/implicit.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 340,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 723
+     }
+    }
+   ]
+  }
+ ]
+}
