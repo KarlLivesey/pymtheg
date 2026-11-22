@@ -3200,9 +3200,13 @@ the same run.
 - **Syntactic:** its tokens outside function bodies (comments left out,
   JSDoc kept), plus, inside bodies, what the whole-program scans read
   without the checker (returns, writes, initialisers, module references).
-- **Checker:** the printed inferred type of each declaration outside
-  bodies, in a program with each text, in every program whose stored
-  `loadedBy` names it.
+  In a JavaScript file every token and JSDoc of every body as well: the
+  binder declares members from bodies there.
+- **Checker:** the inferred type of each declaration outside bodies, as
+  printed and with every declaration it reaches, in a program with each
+  text, in every program whose stored `loadedBy` names it. A named
+  declaration inside a body reached by one, or an elided type, means the
+  full analysis.
 
 When both match, the file is extracted alone in each project that owns it,
 after the same warm-up as a full analysis. Every other stored result is

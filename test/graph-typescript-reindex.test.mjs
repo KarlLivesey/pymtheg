@@ -465,6 +465,14 @@ test("TypeScript re-index equals cold: a failed file in a project that does not 
         },
         scoped: true,
       },
+      {
+        name: "an edit inside the failed file",
+        edit: {
+          "fixtures/broken.ts":
+            "export const = ;\nfunction later() {\n  void 0;\n}\n",
+        },
+        scoped: false,
+      },
     ],
     typescriptModule(),
   );
@@ -557,6 +565,18 @@ for (const [name, broken, g, scoped] of [
             "src/f.ts": f.replace("  return 0;", "  void 0;\n  return 0;"),
           },
           scoped,
+        },
+        {
+          // The failed file's own text: its previous result cannot be stood
+          // on (C-39 keeps library targets beside it that read this text).
+          name: "an edit inside the failed file",
+          edit: {
+            "src/broken.ts": broken.replace(
+              "const = ;",
+              "const = ;\nfunction later() {\n  void 0;\n}",
+            ),
+          },
+          scoped: false,
         },
       ],
       typescriptModule(),
@@ -751,8 +771,7 @@ const BODY_CASES = [
     files: {
       "src/a.js":
         "export function f() {\n  /** @typedef {{ run(): void }} Task */\n  return 0;\n}\n",
-      "src/b.ts":
-        'declare const t: import("./a.js").Task;\nt.run();\n',
+      "src/b.ts": 'declare const t: import("./a.js").Task;\nt.run();\n',
     },
     edit: {
       "src/a.js":
@@ -814,7 +833,8 @@ const BODY_CASES = [
     files: {
       "src/f.ts":
         "function wrap<T>(make: () => T): { value: T } {\n  return { value: make() };\n}\nexport const box = wrap(() => {\n  class L {\n    a() {}\n  }\n  return new L();\n});\n",
-      "src/g.ts": 'import { box } from "./f";\nbox.value.a();\nbox.value.b();\n',
+      "src/g.ts":
+        'import { box } from "./f";\nbox.value.a();\nbox.value.b();\n',
     },
     edit: {
       "src/f.ts":
@@ -857,7 +877,8 @@ test("TypeScript re-index equals cold: a returned object literal whose body move
       "tsconfig.json": tsconfig(),
       "src/f.ts":
         "export function make() {\n  console.log(0);\n  return { a: 1, run() { return 'x'; } };\n}\n",
-      "src/g.ts": 'import { make } from "./f";\nmake().a;\nmake().run().toUpperCase();\n',
+      "src/g.ts":
+        'import { make } from "./f";\nmake().a;\nmake().run().toUpperCase();\n',
     },
     [
       {

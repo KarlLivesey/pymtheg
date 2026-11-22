@@ -977,9 +977,11 @@ TypeScript can reuse every other file's stored result after a one-file edit
 that other files cannot see. The edited file is then extracted again in
 the projects that own it, and nothing else is. What other files can see is
 compared between the old and new text in every program that loads the
-file: its tokens outside function bodies, what whole-program scans read
-inside them (returns, writes, initialisers, module references), and the
-inferred types the checker prints. Other files' target facts follow the
+file: its tokens outside function bodies (in a JavaScript file, inside
+them too), what whole-program scans read inside them (returns, writes,
+initialisers, module references), and the inferred types, with every
+declaration they reach. A body-local named declaration reached by an
+inferred type uses the full analysis. Other files' target facts follow the
 file's moved declarations. Anything else uses the full analysis: a changed
 surface, an added, removed or renamed file, a config, manifest or
 dependency change, a declaration file, `declare global` or `declare
