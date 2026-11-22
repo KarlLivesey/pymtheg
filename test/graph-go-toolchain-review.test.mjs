@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-config.mjs";
 // W3-L round 1 review: each case fails without its fix. Fixtures under
 // test/fixtures/graph-go-toolchain/ are compiler-checked (Go 1.27.4):
 //   generics, anonstruct, outside, vendored, disagree, replace/app,
@@ -8,6 +9,7 @@
 //     declared through dot-import"), by design: it is valid for linux only.
 // These tests need the user's `go`; without one on PATH they are skipped.
 import assert from "node:assert/strict";
+import { toolchainWorkDirectory } from "../dist/project/local-trust.js";
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
@@ -169,14 +171,17 @@ test(
         const runs = [];
         for (let run = 0; run < 3; run++)
           runs.push(await index(root, store, on));
-        assert.ok(
-          existsSync(join(root, ".pymtheg", "rebuildable", "toolchain", "go")),
+        // C-44: the default toolchain folder is the user's cache, outside
+        // the project; nothing is built in the project.
+        const work = join(toolchainWorkDirectory(root), "go");
+        assert.ok(existsSync(work));
+        assert.equal(
+          existsSync(join(root, ".pymtheg", "rebuildable", "toolchain")),
+          false,
         );
         // No helper build directory or build cache is left in the folder.
         assert.deepEqual(
-          readdirSync(
-            join(root, ".pymtheg", "rebuildable", "toolchain", "go"),
-          ).filter(
+          readdirSync(work).filter(
             (name) => name.startsWith("build") || name.startsWith("run-"),
           ),
           [],

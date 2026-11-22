@@ -2416,9 +2416,21 @@ have a pre-existing instruction to approve it"): an initialisation without the
 answer does not guess; it returns the trust question to the calling model,
 which answers from its user or its standing instructions and calls again.
 Studio setup shows the same question. Only a command-line init with no
-terminal and no flag records source only, and says so; the answer is stored in the project
-configuration, shown in answers, and can be changed later; the per-language
-settings of D17 remain as overrides. **Why:** running a toolchain on a project
+terminal and no flag records source only, and says so. As implemented in C-44
+(manager's rulings, 22 November 2026): the answer belongs to the user, never
+to the repository. It is kept outside every checkout, in the user's own configuration (`$PYMTHEG_CONFIG_HOME`, else `$XDG_CONFIG_HOME/pymtheg/`, `~/.config/pymtheg/`, `~/Library/Application Support/pymtheg/` on macOS or `%APPDATA%\pymtheg\` on Windows; file `trust.json`, user-only), keyed by
+the checkout's real path with the project's identity as a cross-check, so a
+clone, a copy or a moved checkout is unanswered and is asked again. Nothing
+under a checkout is ever read as an answer or a tool path: anything in a
+working tree is under the repository's control (a file can be force-added,
+and checkout paths are often predictable). Nothing
+committed can grant trust: a committed `graph.trust: "trusted"` is at most
+init's preselected answer, while a committed `"source-only"` binds on every
+machine. The committed per-language settings of D17 may only turn a route off;
+a committed tool path is never run, and tool paths are local only. A checkout
+with no answer runs nothing and reports `unanswered` with how to answer. The
+answer is shown in graph answers; `pymtheg trust` lists answers and
+`pymtheg trust --revoke` removes one. **Why:** running a toolchain on a project
 is as trusted as building it (D17), and that is a single judgement about the
 repository, not one per language. **Rules out:** running build tools on a
 project whose owner was never asked.

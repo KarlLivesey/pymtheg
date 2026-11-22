@@ -3,6 +3,7 @@
 // and constructor name, the largest strings' starts, and, for the largest
 // constructor groups, the names of what holds them (one edge up).
 //   node --max-old-space-size=N scripts/memory/snapshot.mjs <file.heapsnapshot> [top]
+import "../isolated-home.mjs";
 import { readFileSync } from "node:fs";
 
 const [file, topArg] = process.argv.slice(2);

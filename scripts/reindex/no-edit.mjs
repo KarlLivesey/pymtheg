@@ -6,6 +6,7 @@
 // row for row with the cold copy. A second cold index into a new store with
 // the same project id shows whether cold itself reproduces.
 //   node scripts/reindex/no-edit.mjs <dist> <root> <work dir> <out.json> [warm runs]
+import "../isolated-home.mjs";
 import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";

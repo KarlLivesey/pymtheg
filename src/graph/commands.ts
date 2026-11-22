@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, realpath, stat } from "node:fs/promises";
 import {
   checkpointSchema,
   checkpointFrom,
@@ -33,7 +33,20 @@ import {
   type ToolchainState,
 } from "./command-toolchain.js";
 import { loadConfig } from "../project/config.js";
-import { graphToolchains } from "../shared/config.js";
+import {
+  committedToolPaths,
+  graphToolchains,
+  trustState,
+  type TrustState,
+} from "../shared/config.js";
+import {
+  cacheInsideCheckout,
+  readLocalTrust,
+  toolchainWorkDirectory,
+  toolInsideCheckout,
+} from "../project/local-trust.js";
+import { readWorkspace } from "../project/workspace.js";
+import { trustAnswerHow } from "../project/trust.js";
 import { dirname, join } from "node:path";
 
 export type GraphCommand = "index" | "status" | QueryCommand;
@@ -107,6 +120,13 @@ export interface GraphResponse {
    * absent when the project has not opted in (off).
    */
   toolchain?: ToolchainState;
+  /**
+   * D22: the trust that applies on this machine, for an initialised project:
+   * its local answer, "source-only" when the committed settings bind it, or
+   * "unanswered" (nothing runs) with trustAnswer saying how to answer.
+   */
+  trust?: TrustState;
+  trustAnswer?: string;
 }
 export interface GraphExecutionOptions {
   signal?: AbortSignal;
@@ -242,8 +262,38 @@ export async function executeGraph(
     // unreadable one is off too, with a warning.
     let toolchains: Record<string, boolean | string> = {};
     let settingsError: string | null = null;
+    // D22: the trust that applies on this machine, reported for an
+    // initialised project. Only the local answer can turn routes on.
+    let trust: TrustState | undefined;
+    let ignoredPaths: string[] = [];
+    const insidePaths: string[] = [];
+    const hardLinked: string[] = [];
+    let cacheInside = false;
     try {
-      toolchains = graphToolchains((await loadConfig(root)).config);
+      const { config } = await loadConfig(root);
+      const local = await readLocalTrust(root);
+      toolchains = graphToolchains(config, local);
+      ignoredPaths = committedToolPaths(config);
+      // Defence in depth (D22): a tool path that resolves inside the
+      // checkout is the repository's code; it is never run, even when the
+      // user's own configuration names it. The route stays off.
+      // The cache folder holds the routes' helpers and facts: one inside the
+      // checkout would let the repository supply them, so no route runs.
+      if (Object.keys(toolchains).length && (await cacheInsideCheckout(root))) {
+        toolchains = {};
+        cacheInside = true;
+      }
+      for (const [key, setting] of Object.entries(toolchains)) {
+        if (typeof setting !== "string") continue;
+        if (await toolInsideCheckout(setting, root)) {
+          delete toolchains[key];
+          insidePaths.push(key);
+        } else if (((await stat(setting).catch(() => null))?.nlink ?? 1) > 1)
+          // A second name for the same file could live in the checkout.
+          hardLinked.push(key);
+      }
+      if (await readWorkspace(root).catch(() => null))
+        trust = trustState(config, local);
     } catch (error) {
       settingsError = error instanceof Error ? error.message : String(error);
     }
@@ -279,10 +329,8 @@ export async function executeGraph(
         options.onModuleCall?.(false);
       }
     };
-    const toolchainDirectory = join(
-      dirname(storagePath(root, "graph")),
-      "toolchain",
-    );
+    // D22: outside the checkout (the user's cache folder), never in it.
+    const toolchainDirectory = toolchainOn ? toolchainWorkDirectory(root) : "";
     // The completion and the analysis completion are read again in one
     // snapshot, which supplies the answer. The analysis completion names
     // each incremental module that owns a stored file, as an index run
@@ -683,6 +731,10 @@ export async function executeGraph(
         },
         data: null,
       };
+      if (trust) {
+        response.trust = trust;
+        if (trust === "unanswered") response.trustAnswer = trustAnswerHow;
+      }
       if (toolchainOn)
         response.toolchain = report
           ? toolchainState(toolchains, report.toolchains)
@@ -699,6 +751,31 @@ export async function executeGraph(
           code: "toolchain-inputs-not-rechecked",
           message:
             "Toolchain-backed facts are as recorded at the last sync; the toolchain's inputs (Go version, go.mod/go.sum, local replace targets, Go files outside the index) were not re-checked. Sync (a query without --no-sync, or graph index) to re-check them.",
+          files: [],
+        });
+      if (cacheInside)
+        response.warnings.push({
+          code: "cache-home-inside-checkout",
+          message:
+            "The Pymtheg cache folder lies inside this checkout, so no toolchain route runs. Set PYMTHEG_CACHE_HOME to a folder outside it.",
+          files: [],
+        });
+      if (hardLinked.length)
+        response.warnings.push({
+          code: "tool-file-hard-linked",
+          message: `The tool file for ${hardLinked.join(", ")} in your trust answer has more than one hard link; another name for it could be inside a repository. Check it is the tool you mean.`,
+          files: [],
+        });
+      if (insidePaths.length)
+        response.warnings.push({
+          code: "tool-path-inside-checkout",
+          message: `The tool path for ${insidePaths.join(", ")} in your trust answer resolves inside this checkout, so it is never run and that route stays off. Name a tool outside the repository.`,
+          files: [],
+        });
+      if (ignoredPaths.length)
+        response.warnings.push({
+          code: "committed-tool-path-ignored",
+          message: `.pymtheg/settings.json names a tool path for ${ignoredPaths.join(", ")}; a committed path is never run (it could point into the repository). Tool paths go in your own trust answer file (pymtheg trust).`,
           files: [],
         });
       if (settingsError)
