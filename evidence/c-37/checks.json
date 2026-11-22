@@ -1,0 +1,31 @@
+{
+ "main": "5d97762",
+ "buildExit": 0,
+ "typeCheckExit": 0,
+ "formatCheckExit": 0,
+ "npmTest": { "exit": 0, "passed": 3277, "failed": 0, "skipped": 0 },
+ "earlierFullTest": {
+  "passed": 3275,
+  "failed": 1,
+  "failures": [
+   "after every file write another connection can read status and open the store for writing: the C-6 lock contract, which batching changes; the test now sets a one-row budget for it, and a second test checks the batch contract"
+  ]
+ },
+ "coldEquality": {
+  "pins": ["restic/restic", "cli/cli", "trpc/trpc", "helix-editor/helix"],
+  "disk": "4 of 4 equal to main",
+  "memory": "4 of 4 equal to main",
+  "method": "SHA-256 and row count of every table dump.mjs compares, same project id"
+ },
+ "killHarness": {
+  "file": "test/graph-reindex-kill.test.mjs",
+  "batchBudgets": [5, 40, 50000],
+  "note": "a kill point after every write and at the end of every batch scope; with 40 rows the run made fewer commits than writes"
+ },
+ "oneFileEdits": {
+  "pins": ["restic/restic", "cli/cli"],
+  "rounds": 3,
+  "revertEqualsCold": "every round",
+  "sqlStatements": "cli/cli body edit 1,422 against 1,420 on main"
+ }
+}
