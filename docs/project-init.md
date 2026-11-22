@@ -54,10 +54,13 @@ repository.
   off.
 - **Source only** means Pymtheg never runs anything from the repository.
 
-**The answer belongs to this machine, never to Git.** It is kept in
-`.pymtheg/local/trust.json` (a folder that ignores itself), with the project's
-identity and the checkout's absolute path, so a copied or moved checkout, or a
-clone, is asked again. Nothing committed can grant trust: a committed
+**The answer belongs to you, never to the repository.** It is kept outside
+every checkout, in the user's own configuration (`$PYMTHEG_CONFIG_HOME`, else `$XDG_CONFIG_HOME/pymtheg/`, `~/.config/pymtheg/`, `~/Library/Application Support/pymtheg/` on macOS or `%APPDATA%\pymtheg\` on Windows; file `trust.json`, user-only), keyed by the checkout's real path with the
+project's identity as a cross-check. A copied or moved checkout, or a clone,
+is asked again; each Git worktree is its own path and is asked once; a
+symlinked path is the checkout it points to. Nothing under a checkout is ever
+read as an answer, so a repository cannot ship one. An unreadable or corrupt
+file means unanswered, never trusted. Nothing committed can grant trust: a committed
 `"graph": {"trust": "trusted"}` is at most the answer init preselects, while a
 committed `"graph": {"trust": "source-only"}` binds on every machine (the
 repository's author may forbid build tools) and init then refuses `--trust`.
@@ -87,15 +90,18 @@ How each path asks:
   records it too. Studio setup asks when the checkout has no answer.
 - **Nested folders.** A folder inside a project uses that project's answer.
 
-Re-running init never changes a recorded answer. To change it, edit or remove
-`.pymtheg/local/trust.json` and answer again.
+Re-running init never changes a recorded answer. `pymtheg trust` lists your
+answers; `pymtheg trust --revoke [DIRECTORY]` removes one, after which the next
+init asks again. A deleted checkout leaves a harmless entry that `--revoke`
+with its old path removes.
 
 Committed per-language settings may only turn a route off:
 `"graph": {"toolchain": {"go": false}}` keeps Go off even on a trusted
 checkout. A committed `true` adds nothing, and a committed tool path is never
 run, since it could point into the repository (graph answers warn
-`committed-tool-path-ignored`). A tool path, or `false`, can be given in the
-local file: `{"toolchain": {"go": "/usr/local/go/bin/go"}}` beside the answer.
+`committed-tool-path-ignored`). A tool path, or `false`, can be given in your
+own answer file: `"toolchain": {"go": "/usr/local/go/bin/go"}` in the
+checkout's entry.
 
 ## Evidence to collect
 
@@ -180,7 +186,6 @@ is created by initialization or a document preview.
 | `.pymtheg/shared/architecture.sqlite` | Requirements, links, decisions, retained observations, checkpoint history, recorded-change ledger, architecture drafts | Shared data, local database; share it by exported history |
 | `.pymtheg/shared/drafts.sqlite`       | Unsaved Studio buffers and form/context drafts                                                                         | Authored, local                                           |
 | `.pymtheg/local/writer.json`          | This installation's writer identity and author label                                                                   | Local only; ignores itself; never copy to another machine |
-| `.pymtheg/local/trust.json`           | This checkout's trust answer on this machine (D22) and local tool paths                                                | Local only; ignores itself; never committed               |
 | `.pymtheg/rebuildable/graph.sqlite`   | Code graph cache                                                                                                       | Rebuildable; ignores itself                               |
 | `.pymtheg/rebuildable/runs.sqlite`    | The three most recent Studio runs                                                                                      | Rebuildable; ignores itself                               |
 

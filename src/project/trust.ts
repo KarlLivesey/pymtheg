@@ -10,7 +10,7 @@ export const trustQuestion = [
   "    for some languages that runs the repository's build scripts and",
   "    macros, as building it would.",
   "  Source only: Pymtheg never runs anything from this repository.",
-  "The answer is kept for this checkout on this machine only (.pymtheg/local/trust.json).",
+  "The answer is kept for this checkout in your own Pymtheg configuration, never in the repository.",
 ].join("\n");
 
 /** D22: how a checkout with no answer on this machine gets one. */

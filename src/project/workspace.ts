@@ -27,11 +27,7 @@ import {
   type ProjectTrust,
   type TrustState,
 } from "../shared/config.js";
-import {
-  localTrustFile,
-  readLocalTrust,
-  writeLocalTrust,
-} from "./local-trust.js";
+import { readLocalTrust, writeLocalTrust } from "./local-trust.js";
 
 /** D22: the init answer to "do you trust this repository?". */
 export interface InitOptions {
@@ -42,8 +38,9 @@ export interface InitOptions {
 /** The settings file a new project starts with. It never holds a trust answer. */
 const initialSettings = () => json({ version: 1, scenarios: {} });
 /**
- * The trust that applies to the checkout at `root`: this machine's answer
- * (.pymtheg/local/trust.json), unless the committed settings say source only.
+ * The trust that applies to the checkout at `root`: the user's answer (kept
+ * outside the checkout, local-trust.ts), unless the committed settings say
+ * source only.
  */
 export async function checkoutTrust(root: string): Promise<TrustState> {
   return trustState(
@@ -52,8 +49,8 @@ export async function checkoutTrust(root: string): Promise<TrustState> {
   );
 }
 /**
- * Records this machine's answer when the checkout has none, in
- * .pymtheg/local/ (never in Git). Never replaces an answer: re-running init
+ * Records the user's answer when the checkout has none, in the user's own
+ * configuration (never in the checkout). Never replaces an answer: re-running init
  * does not change it. A committed `graph.trust: "source-only"` binds, so
  * "trusted" is refused there.
  */
@@ -68,7 +65,7 @@ async function recordTrust(root: string, trust: ProjectTrust | undefined) {
   if (local?.trust === trust) return false;
   if (local)
     throw Error(
-      `This checkout's trust answer is already "${local.trust}". Init does not change it; edit or remove ${localTrustFile} to change it.`,
+      `This checkout's trust answer is already "${local.trust}". Init does not change it; run pymtheg trust --revoke to answer again.`,
     );
   await writeLocalTrust(root, trust);
   return true;
@@ -233,7 +230,7 @@ async function initialize(
     const before = await checkoutTrust(ancestor.root);
     if (options.trust && before !== "unanswered" && options.trust !== before)
       throw Error(
-        `This folder belongs to “${ancestor.workspace.name}” at ${ancestor.root}, whose trust answer on this machine is "${before}". Change it in that project's ${localTrustFile}.`,
+        `This folder belongs to “${ancestor.workspace.name}” at ${ancestor.root}, whose trust answer on this machine is "${before}". Revoke it with pymtheg trust --revoke ${ancestor.root} to answer again.`,
       );
     const trustRecorded =
       before === "unanswered" &&

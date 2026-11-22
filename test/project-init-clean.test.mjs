@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-config.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -281,10 +282,6 @@ for (const kind of [
           .sort(),
         [
           ".pymtheg/.gitignore",
-          // C-44: the no-terminal answer (source only), kept on this machine
-          // in a folder that ignores itself.
-          ".pymtheg/local/.gitignore",
-          ".pymtheg/local/trust.json",
           ".pymtheg/project.json",
           ".pymtheg/settings.json",
         ],

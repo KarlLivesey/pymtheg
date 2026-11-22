@@ -282,8 +282,11 @@ export function registerLinkTools(
             ),
             { code: "busy" },
           );
+        // D22: the question when a never-initialised project has no answer;
+        // otherwise the job initialises it only once its write proceeds.
         if (a.action === "requirement" || a.action === "add")
-          await workspace.initialiseForWrite(a.trust);
+          if (await workspace.trustForFirstWrite(a.trust))
+            input.trust = a.trust;
         const job = workspace.links.start(a.action, input);
         if (a.wait)
           await wait(job, ctx, () => workspace.links.cancel(job.id), true);

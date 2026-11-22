@@ -1,11 +1,20 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-config.mjs";
 // W3-L2: the Go toolchain opt-in through `pymtheg graph` (commands.ts).
 // Fixtures: test/fixtures/graph-go-toolchain/ (compiler-checked, see
 // test/graph-go-toolchain.test.mjs). These tests need the user's `go`; without
 // one on PATH the toolchain cases are skipped, and say so.
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { test } from "node:test";
@@ -16,6 +25,7 @@ import { LanguageRegistry } from "../dist/graph/registry.js";
 import { SqliteGraphStore } from "../dist/graph/store.js";
 import go from "../dist/graph/languages/go/index.js";
 import { initializeWorkspace } from "../dist/project/workspace.js";
+import { trustFile } from "../dist/project/local-trust.js";
 
 const FIXTURES = fileURLToPath(
   new URL("./fixtures/graph-go-toolchain/", import.meta.url),
@@ -34,8 +44,8 @@ async function project(fixture, setting) {
   return { dir, root };
 }
 /**
- * D22 (C-44): the route is on only with this machine's trusted answer
- * (.pymtheg/local/trust.json). `true` answers trusted; a path answers
+ * D22 (C-44): the route is on only with the user's trusted answer, kept
+ * outside the checkout (here an isolated configuration folder). `true` answers trusted; a path answers
  * trusted and names the local tool path; `false` answers trusted and turns
  * Go off in the committed settings; null writes settings with neither.
  */
@@ -52,11 +62,13 @@ async function settings(root, go) {
     }),
   );
   if (go === null) return;
-  const local = join(root, ".pymtheg", "local", "trust.json");
-  const answer = JSON.parse(await readFile(local, "utf8"));
-  if (typeof go === "string") answer.toolchain = { go };
-  else delete answer.toolchain;
-  await writeFile(local, JSON.stringify(answer));
+  // A tool path is the user's own setting, in the same file.
+  const file = trustFile();
+  const answers = JSON.parse(await readFile(file, "utf8"));
+  const entry = answers.checkouts[await realpath(root)];
+  if (typeof go === "string") entry.toolchain = { go };
+  else delete entry.toolchain;
+  await writeFile(file, JSON.stringify(answers));
 }
 const run = (root, command, args = [], extra = {}) =>
   executeGraph(

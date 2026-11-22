@@ -356,12 +356,12 @@ document `architecture/plan.json`; that is not a file on disk.
 By default nothing runs `go`: Go links come from the source alone. A checkout
 that is **trusted on this machine** (decision D22) has its Go links checked with
 the Go toolchain (`go list` and `go/types`), which runs the project's `go`
-build configuration and is as trusted as building it. The answer is this
-machine's, kept in `.pymtheg/local/trust.json` and never in Git, so a cloned
+build configuration and is as trusted as building it. The answer is yours,
+kept in your own Pymtheg configuration and never in a repository, so a cloned
 repository is asked again. Nothing committed can turn the route on: a committed
 `"graph": {"trust": "source-only"}` forbids it on every machine, and a committed
 `"graph": {"toolchain": {"go": false}}` turns Go off; a tool path is honoured
-only from the local file (`"toolchain": {"go": "/usr/local/go/bin/go"}`).
+only from your own answer file (`"toolchain": {"go": "/usr/local/go/bin/go"}`).
 
 Over MCP, `summary.trust` says which applies: `trusted`, `source-only` or
 `unanswered` (with `summary.trustAnswer` saying how to answer). On an
@@ -381,4 +381,4 @@ expect(routed.summary.toolchain === null);
 // => this checkout was answered "source-only" by the first planning write above, so nothing runs.
 ```
 
-To change an answer, edit or remove `.pymtheg/local/trust.json` and answer again.
+`pymtheg trust` lists your answers and `pymtheg trust --revoke` removes one.

@@ -40,7 +40,7 @@ import {
 import { readLocalTrust } from "../project/local-trust.js";
 import { readWorkspace } from "../project/workspace.js";
 import { trustAnswerHow } from "../project/trust.js";
-import { dirname, join } from "node:path";
+import { dirname, join, sep } from "node:path";
 
 export type GraphCommand = "index" | "status" | QueryCommand;
 export interface GraphProgress {
@@ -240,11 +240,29 @@ export async function executeGraph(
     // initialised project. Only the local answer can turn routes on.
     let trust: TrustState | undefined;
     let ignoredPaths: string[] = [];
+    const insidePaths: string[] = [];
     try {
       const { config } = await loadConfig(root);
       const local = await readLocalTrust(root);
       toolchains = graphToolchains(config, local);
       ignoredPaths = committedToolPaths(config);
+      // Defence in depth (D22): a tool path that resolves inside the
+      // checkout is the repository's code; it is never run, even when the
+      // user's own configuration names it. The route stays off.
+      const project = await realpath(root);
+      for (const [key, setting] of Object.entries(toolchains)) {
+        if (typeof setting !== "string") continue;
+        let tool = setting;
+        try {
+          tool = await realpath(setting);
+        } catch {
+          /* missing: the route reports it */
+        }
+        if (tool === project || tool.startsWith(project + sep)) {
+          delete toolchains[key];
+          insidePaths.push(key);
+        }
+      }
       if (await readWorkspace(root).catch(() => null))
         trust = trustState(config, local);
     } catch (error) {
@@ -663,10 +681,16 @@ export async function executeGraph(
             "Toolchain-backed facts are as recorded at the last sync; the toolchain's inputs (Go version, go.mod/go.sum, local replace targets, Go files outside the index) were not re-checked. Sync (a query without --no-sync, or graph index) to re-check them.",
           files: [],
         });
+      if (insidePaths.length)
+        response.warnings.push({
+          code: "tool-path-inside-checkout",
+          message: `The tool path for ${insidePaths.join(", ")} in your trust answer resolves inside this checkout, so it is never run and that route stays off. Name a tool outside the repository.`,
+          files: [],
+        });
       if (ignoredPaths.length)
         response.warnings.push({
           code: "committed-tool-path-ignored",
-          message: `.pymtheg/settings.json names a tool path for ${ignoredPaths.join(", ")}; a committed path is never run (it could point into the repository). Put tool paths in .pymtheg/local/trust.json.`,
+          message: `.pymtheg/settings.json names a tool path for ${ignoredPaths.join(", ")}; a committed path is never run (it could point into the repository). Tool paths go in your own trust answer file (pymtheg trust).`,
           files: [],
         });
       if (settingsError)

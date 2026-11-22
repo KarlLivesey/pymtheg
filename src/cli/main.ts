@@ -86,6 +86,44 @@ try {
     process.exitCode = await (
       await import("../implementation/cli.js")
     ).observeCommand(args.slice(1), cancel.signal);
+  } else if (args[0] === "trust") {
+    // D22: the user's trust answers, kept outside every checkout.
+    const { listTrust, revokeTrust, trustFile } = await import(
+      "../project/local-trust.js"
+    );
+    const rest = args
+      .slice(1)
+      .filter((arg) => arg !== "--format" && arg !== "json");
+    if (rest[0] === "--revoke") {
+      if (rest.length > 2)
+        throw Error("Usage: pymtheg trust --revoke [DIRECTORY]");
+      const target = resolve(rest[1] ?? ".");
+      const removed = await revokeTrust(target);
+      process.stdout.write(
+        removed
+          ? `Removed the trust answer for ${target}. The next init asks again; until then nothing from it runs.\n`
+          : `No trust answer is recorded for ${target}.\n`,
+      );
+    } else if (rest.length === 0 || rest[0] === "--list") {
+      const answers = await listTrust();
+      if (wantsJson) process.stdout.write(json({ file: trustFile(), answers }));
+      else
+        process.stdout.write(
+          [
+            `Trust answers (${trustFile()}):`,
+            ...(answers.length
+              ? answers.map(
+                  (a) =>
+                    `  ${a.trust === "trusted" ? "trusted    " : "source only"}  ${a.root}`,
+                )
+              : ["  none"]),
+            "",
+          ].join("\n"),
+        );
+    } else
+      throw Error(
+        "Usage: pymtheg trust [--list] | pymtheg trust --revoke [DIRECTORY]",
+      );
   } else if (args[0] === "init") {
     const { askTrust } = await import("../project/trust.js");
     const { findWorkspace, checkoutTrust } = await import(
@@ -206,7 +244,7 @@ try {
               : []),
             initialized.trust === "unanswered"
               ? (await import("../project/trust.js")).trustAnswerHow
-              : `${trust.asked === "no-terminal" && initialized.trustRecorded ? "No terminal to ask whether you trust this repository, so recorded source only. " : ""}${(await import("../project/trust.js")).trustSummary(initialized.trust)} Kept for this checkout on this machine in .pymtheg/local/trust.json, never in Git; edit or remove it there to change it.`,
+              : `${trust.asked === "no-terminal" && initialized.trustRecorded ? "No terminal to ask whether you trust this repository, so recorded source only. " : ""}${(await import("../project/trust.js")).trustSummary(initialized.trust)} Kept for this checkout in your own Pymtheg configuration, never in the repository; pymtheg trust lists answers and --revoke removes one.`,
             "Commit .pymtheg/project.json, .pymtheg/settings.json and .pymtheg/.gitignore with your designs.",
             "Planning/history in .pymtheg/shared/ and caches in .pymtheg/rebuildable/ stay local and ignored; share planning by exported history.",
             `Next: ${identity.cli} doctor`,

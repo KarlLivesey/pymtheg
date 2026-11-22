@@ -14,7 +14,7 @@ export interface Scenario {
  * D22: whether the project's owner trusts the repository. `trusted` lets each
  * language's official tooling run on the project, as building it would run
  * its build scripts and macros; `source-only` runs nothing of the project.
- * The answer is this machine's (.pymtheg/local/trust.json, LocalTrust);
+ * The answer is the user's, kept outside every checkout (LocalTrust);
  * nothing committed grants it. No answer is `unanswered` and runs nothing.
  */
 export type ProjectTrust = "trusted" | "source-only";

@@ -128,6 +128,24 @@ export class AgentWorkspace {
       this.access.firstWriteTrust = undefined;
     }
   }
+  /**
+   * D22 for writes that initialise the project themselves once they proceed
+   * (requirement_links): an initialised checkout records a given answer
+   * now; a never-initialised one without an answer gets the question; with
+   * one, true: pass it to the write.
+   */
+  async trustForFirstWrite(trust: ProjectTrust | undefined): Promise<boolean> {
+    if (await readWorkspace(this.root)) {
+      if (trust) await initializeWorkspace(this.root, undefined, { trust });
+      return false;
+    }
+    if (!trust) await this.initialiseForWrite(undefined); // throws the question
+    return true;
+  }
+  /** Whether the project has been initialised (has its project.json). */
+  async initialised(): Promise<boolean> {
+    return (await readWorkspace(this.root)) !== null;
+  }
   static async open(
     path: string,
     outputs: OutputRegistry = OutputRegistry.empty(),

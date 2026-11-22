@@ -125,8 +125,8 @@ export function ProjectSetup({
             {result.trust === "trusted"
               ? "Trusted: the languages' official tools may run on this project."
               : "Source only: nothing from this project is run."}{" "}
-            Kept for this checkout on this machine in .pymtheg/local/trust.json,
-            never in Git; edit or remove it there to change it.
+            Kept for this checkout in your own Pymtheg configuration, never in
+            the repository; run pymtheg trust --revoke to answer again.
           </p>
         )}
         {!result && (

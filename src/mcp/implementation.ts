@@ -209,11 +209,18 @@ export function registerImplementationTools(
       },
       inputSchema: unlinkCodeSchema,
     },
-    async (args, ctx) =>
-      output({
+    async (args, ctx) => {
+      // A project never initialised has no link to remove: say so and
+      // initialise nothing (D22: only a write that proceeds initialises).
+      if (!(await workspace.initialised()))
+        throw Error(
+          "This project is not initialised, so it has no implementation link to remove.",
+        );
+      return output({
         revision: revisionReceipt(
           await workspace.access.unlinkImplementation(args, ctx.mcpReq.signal),
         ),
-      }),
+      });
+    },
   );
 }

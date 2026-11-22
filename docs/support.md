@@ -975,8 +975,8 @@ graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
 **Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted
 on this machine (below; [code guide](code-guide.md#the-go-toolchain-route)),
-indexing also runs `go` from `PATH`, or the absolute path named in
-`.pymtheg/local/trust.json`, (`go list` and a `go/types` helper) in a
+indexing also runs `go` from `PATH`, or the absolute path named in your own
+trust answer file, (`go list` and a `go/types` helper) in a
 closed environment with network, cgo and telemetry off, and merges its facts:
 it can upgrade unresolved or candidate links to definite, confirm source-only
 links or verify candidate sets; such links carry `decidedBy: "toolchain"`.
@@ -988,7 +988,9 @@ An unreadable `.pymtheg/settings.json` keeps every route off with a
 
 **Trust at init (decision D22, C-44).** `init` asks once whether the
 repository is trusted and records the answer for this checkout on this
-machine in `.pymtheg/local/trust.json`, never in Git. A trusted checkout runs
+machine in the user's own configuration (`$PYMTHEG_CONFIG_HOME` or the
+platform's config folder, `trust.json`, user-only), never under a checkout;
+`pymtheg trust` lists and `--revoke` removes answers. A trusted checkout runs
 the Go route above with its default policy. A source-only checkout, or one
 with no answer on this machine (`unanswered`: a clone, a copy, a moved
 checkout), runs nothing. Nothing committed can grant trust: a committed
@@ -997,7 +999,11 @@ checkout), runs nothing. Nothing committed can grant trust: a committed
 `graph.toolchain.go: false` turns Go off, and a committed tool path is never
 run (warning `committed-tool-path-ignored`). Graph answers of an initialised
 project report `trust` (`trusted`, `source-only` or `unanswered`, then with
-`trustAnswer`). The question and how each path answers it are described in
+`trustAnswer`). **Behaviour change (C-44):** a committed
+`graph.toolchain.go: true` no longer turns the Go route on for whoever checks the
+repository out; each user answers the trust question once per checkout. A
+tool path that resolves inside the checkout is never run, even from the
+user's own file (warning `tool-path-inside-checkout`). The question and how each path answers it are described in
 [project initialization](project-init.md#trusting-the-repository). Sources:
 [W3-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L.md), [W3-L2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L2.md).
 

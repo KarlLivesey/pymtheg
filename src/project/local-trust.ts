@@ -1,29 +1,33 @@
 // SPDX-License-Identifier: MIT
 /**
- * D22: the trust answer belongs to the machine, never to Git. It is kept in
- * `.pymtheg/local/trust.json`, a folder that ignores itself, with the
- * project's identity (project.json's id) and the checkout's absolute, real
- * path. A copied or moved checkout, which carries the same id to another
- * path, or a different project's file, is unanswered and asks again: an
- * answer is about this checkout on this machine. Nothing committed can grant
- * trust: `graph.trust: "trusted"` in the committed settings is only the
- * answer init preselects, while `"source-only"` binds (see graphToolchains).
+ * D22: the trust answer belongs to the user, never to the repository. It is
+ * kept outside every checkout, in the user's own configuration, the way
+ * coding agents keep theirs: one file mapping each checkout's real path (with
+ * the project's id as a cross-check) to the answer and any local tool paths.
+ * Anything inside a working tree is under the repository's control (a file
+ * can be force-added; checkout paths are often predictable), so nothing under
+ * a checkout is ever read as a trust answer or a tool path.
  *
- * The local file may also name tool paths (`toolchain`), which a committed
- * file never can: a committed path to a "rust-analyzer" inside the
- * repository would run the repository's code.
+ * Location: $PYMTHEG_CONFIG_HOME, else $XDG_CONFIG_HOME/pymtheg, else
+ * ~/Library/Application Support/pymtheg on macOS, %APPDATA%\pymtheg on
+ * Windows and ~/.config/pymtheg elsewhere; the file is `trust.json`, created
+ * with user-only permissions. An unreadable, corrupt or wrong-typed file, or
+ * an entry for another project at that path, is unanswered: never trusted.
+ * A moved or copied checkout is unanswered (another real path); each Git
+ * worktree is its own path and is asked once.
  */
 import { randomUUID } from "node:crypto";
 import {
-  lstat,
+  chmod,
   mkdir,
   readFile,
   realpath,
   rename,
+  unlink,
   writeFile,
 } from "node:fs/promises";
-import { join } from "node:path";
-import { storageDirectory } from "../storage/local.js";
+import { homedir } from "node:os";
+import { isAbsolute, join } from "node:path";
 import { identity, json } from "../shared/identity.js";
 import {
   projectTrustValues,
@@ -31,11 +35,79 @@ import {
   type ProjectTrust,
 } from "../shared/config.js";
 
-export const localTrustFile = ".pymtheg/local/trust.json";
 const schema = "pymtheg.trust/v1";
+
+/** The directory of the user's Pymtheg configuration. */
+export function userConfigDirectory(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  if (env.PYMTHEG_CONFIG_HOME && isAbsolute(env.PYMTHEG_CONFIG_HOME))
+    return env.PYMTHEG_CONFIG_HOME;
+  if (env.XDG_CONFIG_HOME && isAbsolute(env.XDG_CONFIG_HOME))
+    return join(env.XDG_CONFIG_HOME, "pymtheg");
+  if (process.platform === "darwin")
+    return join(homedir(), "Library", "Application Support", "pymtheg");
+  if (process.platform === "win32" && env.APPDATA)
+    return join(env.APPDATA, "pymtheg");
+  return join(homedir(), ".config", "pymtheg");
+}
+/** The user's trust answers. */
+export const trustFile = () => join(userConfigDirectory(), "trust.json");
+
+interface Entry {
+  project: string;
+  trust: ProjectTrust;
+  toolchain?: Record<string, boolean | string>;
+  recorded: string;
+}
 
 const object = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** Every well-formed entry; an unreadable or corrupt file has none. */
+async function readAll(): Promise<Record<string, Entry>> {
+  let value: unknown;
+  try {
+    value = JSON.parse(await readFile(trustFile(), "utf8"));
+  } catch {
+    return {};
+  }
+  if (!object(value) || value.schema !== schema || !object(value.checkouts))
+    return {};
+  const entries: Record<string, Entry> = {};
+  for (const [path, entry] of Object.entries(value.checkouts)) {
+    if (
+      !isAbsolute(path) ||
+      !object(entry) ||
+      typeof entry.project !== "string" ||
+      !projectTrustValues.includes(entry.trust as ProjectTrust)
+    )
+      continue;
+    let toolchain: Record<string, boolean | string> | undefined;
+    if (entry.toolchain !== undefined) {
+      // A wrong-typed tool setting makes the whole entry unanswered.
+      if (!object(entry.toolchain)) continue;
+      toolchain = {};
+      let valid = true;
+      for (const [key, setting] of Object.entries(entry.toolchain)) {
+        if (
+          typeof setting !== "boolean" &&
+          !(typeof setting === "string" && isAbsolute(setting))
+        )
+          valid = false;
+        else toolchain[key] = setting;
+      }
+      if (!valid) continue;
+    }
+    entries[path] = {
+      project: entry.project,
+      trust: entry.trust as ProjectTrust,
+      ...(toolchain && Object.keys(toolchain).length ? { toolchain } : {}),
+      recorded: typeof entry.recorded === "string" ? entry.recorded : "",
+    };
+  }
+  return entries;
+}
 
 async function projectId(root: string): Promise<string | undefined> {
   try {
@@ -48,86 +120,109 @@ async function projectId(root: string): Promise<string | undefined> {
   }
 }
 
-/**
- * This machine's answer for the project at `root`, or undefined when there
- * is none for this project at this path. A malformed file is an error: it
- * names the file to repair or remove.
- */
+/** The user's answer for the checkout at `root`, or undefined. */
 export async function readLocalTrust(
   root: string,
 ): Promise<LocalTrust | undefined> {
-  const path = join(root, localTrustFile);
-  let text: string;
+  let real: string;
   try {
-    text = await readFile(path, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw error;
-  }
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
+    real = await realpath(root);
   } catch {
-    throw Error(
-      `${localTrustFile} is not JSON; repair it or remove it to answer again.`,
-    );
+    return undefined;
   }
-  if (
-    !object(value) ||
-    value.schema !== schema ||
-    !projectTrustValues.includes(value.trust as ProjectTrust)
-  )
-    throw Error(
-      `${localTrustFile} is not a trust answer; repair it or remove it to answer again.`,
-    );
-  // Another project's answer, or this checkout copied or moved: unanswered.
-  const [id, real] = [await projectId(root), await realpath(root)];
-  if (value.project !== id || value.root !== real) return undefined;
-  const toolchain: Record<string, boolean | string> = {};
-  if (value.toolchain !== undefined) {
-    if (!object(value.toolchain))
-      throw Error(`${localTrustFile}: toolchain must be an object`);
-    for (const [key, setting] of Object.entries(value.toolchain)) {
-      if (
-        typeof setting !== "boolean" &&
-        !(typeof setting === "string" && setting.startsWith("/"))
-      )
-        throw Error(
-          `${localTrustFile}: toolchain.${key} must be true, false or an absolute path`,
-        );
-      toolchain[key] = setting;
-    }
-  }
+  const entry = (await readAll())[real];
+  if (!entry || entry.project !== (await projectId(real))) return undefined;
   return {
-    trust: value.trust as ProjectTrust,
-    ...(Object.keys(toolchain).length ? { toolchain } : {}),
+    trust: entry.trust,
+    ...(entry.toolchain ? { toolchain: entry.toolchain } : {}),
   };
 }
 
-/** Records this machine's answer for the project at `root` (atomically). */
+/**
+ * Updates the file under a lock (create-exclusive), re-reading and merging so
+ * concurrent writers keep each other's entries, then writes a user-only
+ * temporary file and renames it into place. A lock whose owner is gone is
+ * taken over.
+ */
+async function update(
+  change: (entries: Record<string, Entry>) => void,
+): Promise<void> {
+  const directory = userConfigDirectory();
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const lock = join(directory, "trust.json.lock");
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await writeFile(lock, String(process.pid), { flag: "wx", mode: 0o600 });
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      const owner = Number(await readFile(lock, "utf8").catch(() => "0"));
+      let alive = false;
+      try {
+        if (owner > 0) {
+          process.kill(owner, 0);
+          alive = true;
+        }
+      } catch {
+        /* gone */
+      }
+      if (!alive) await unlink(lock).catch(() => {});
+      else if (attempt > 2000)
+        throw Error(`${lock} is held by process ${owner}; try again`);
+      else await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+  }
+  try {
+    const entries = await readAll();
+    change(entries);
+    const staged = join(directory, `.trust.${randomUUID()}.tmp`);
+    await writeFile(staged, json({ schema, checkouts: entries }), {
+      flag: "wx",
+      mode: 0o600,
+    });
+    await chmod(staged, 0o600);
+    await rename(staged, trustFile());
+  } finally {
+    await unlink(lock).catch(() => {});
+  }
+}
+
+/** Records the user's answer for the checkout at `root`. */
 export async function writeLocalTrust(
   root: string,
   trust: ProjectTrust,
 ): Promise<void> {
-  const id = await projectId(root);
-  if (!id) throw Error("The trust answer needs an initialised project");
-  const directory = join(storageDirectory(root, "marker", true), "local");
-  await mkdir(directory, { recursive: true, mode: 0o700 });
-  const info = await lstat(directory);
-  if (!info.isDirectory() || info.isSymbolicLink())
-    throw Error("Local identity directory must be real");
-  // The folder ignores itself, as the writer identity's does.
-  await writeFile(join(directory, ".gitignore"), "*\n", {
-    flag: "wx",
-    mode: 0o600,
-  }).catch((error) => {
-    if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+  const real = await realpath(root);
+  const project = await projectId(real);
+  if (!project) throw Error("The trust answer needs an initialised project");
+  await update((entries) => {
+    entries[real] = { project, trust, recorded: new Date().toISOString() };
   });
-  const staged = join(directory, `.trust.${randomUUID()}.tmp`);
-  await writeFile(
-    staged,
-    json({ schema, project: id, root: await realpath(root), trust }),
-    { flag: "wx", mode: 0o600 },
-  );
-  await rename(staged, join(directory, "trust.json"));
+}
+
+/** Every recorded answer (for `pymtheg trust --list`). */
+export async function listTrust(): Promise<
+  { root: string; project: string; trust: ProjectTrust; recorded: string }[]
+> {
+  return Object.entries(await readAll())
+    .map(([root, entry]) => ({ root, ...entry }))
+    .sort((a, b) => (a.root < b.root ? -1 : a.root > b.root ? 1 : 0));
+}
+
+/** Removes the answer for a checkout path (real or as recorded). */
+export async function revokeTrust(root: string): Promise<boolean> {
+  let key = root;
+  try {
+    key = await realpath(root);
+  } catch {
+    /* a deleted checkout: the recorded path itself */
+  }
+  let removed = false;
+  await update((entries) => {
+    if (entries[key]) {
+      delete entries[key];
+      removed = true;
+    }
+  });
+  return removed;
 }

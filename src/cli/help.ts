@@ -19,6 +19,10 @@ const commands = [
     "Start here: create .pymtheg/ without overwriting existing work; old layouts are unused. Asks once whether you trust the repository (--trust or --source-only answers it).",
   ],
   [
+    "trust [--list] | trust --revoke [DIRECTORY] [--format text|json]",
+    "List your trust answers (kept in your own configuration, never in a repository), or remove one so the next init asks again.",
+  ],
+  [
     "studio PATH [--port PORT] [--plugin TARGET=PATH]",
     "Open the local design and architecture workspace.",
   ],

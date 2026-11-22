@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-config.mjs";
 // R1-J: honest MCP surfaces. Each test drives the built product over real
 // stdio MCP (and the CLI where the CLI shares the behaviour).
 import test from "node:test";
@@ -129,6 +130,15 @@ test("E: the first MCP planning write initialises the project exactly as pymtheg
           }),
           /Do you trust this repository\?[\s\S]*trust: "trusted" or "source-only"/,
         );
+        assert.equal((await s.call("project_info", {})).initialised, false);
+        // A first add that fails (no such record), with the answer, also
+        // initialises nothing: only a write that proceeds does.
+        const failed = await links(s, "add", {
+          record: "R9",
+          selector: "Save",
+          trust: "source-only",
+        });
+        assert.equal(failed.summary.status, "record-not-found");
         assert.equal((await s.call("project_info", {})).initialised, false);
         const created = await links(s, "requirement", {
           id: "R1",

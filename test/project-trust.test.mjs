@@ -1,11 +1,20 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-config.mjs";
 // C-44 (decision D22): init asks once whether the repository is trusted, and
 // the answer belongs to this machine, never to Git. Prompt tests drive the
 // question through controlled streams; no test depends on a real terminal or
 // on time.
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, existsSync, mkdirSync } from "node:fs";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  realpathSync,
+  statSync,
+  symlinkSync,
+} from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
@@ -25,6 +34,7 @@ import {
 } from "../dist/project/workspace.js";
 import {
   readLocalTrust,
+  trustFile,
   writeLocalTrust,
 } from "../dist/project/local-trust.js";
 import { askTrust, TrustCancelled } from "../dist/project/trust.js";
@@ -166,37 +176,37 @@ test("the prompt: Enter trusts, n is source only, other answers ask again, ended
   assert.equal((await ask()).answer, "source-only");
 });
 
-test("init records the answer for this checkout in .pymtheg/local, untracked and ignored by Git, never in the settings", async () => {
+test("init records the answer in the user's own configuration, user-only, never under the checkout", async () => {
   await scratch(async (root) => {
     git(root, "init", "--quiet");
     const first = await initializeWorkspace(root, undefined, trusted);
     assert.equal(first.trust, "trusted");
     assert.equal(first.trustRecorded, true);
     assert.deepEqual(await settings(root), { version: 1, scenarios: {} });
-    const local = JSON.parse(
-      await readFile(join(root, ".pymtheg/local/trust.json"), "utf8"),
-    );
-    assert.equal(local.trust, "trusted");
-    assert.equal(
-      local.project,
-      JSON.parse(await readFile(join(root, ".pymtheg/project.json"), "utf8"))
-        .id,
-    );
-    // Git: the answer is ignored and untracked; what init commits holds none.
+    // Nothing new under the checkout but what init always writes.
     git(root, "add", "-A");
-    const tracked = git(root, "ls-files").split("\n").filter(Boolean);
-    assert.ok(tracked.includes(".pymtheg/settings.json"));
+    assert.deepEqual(git(root, "ls-files").split("\n").filter(Boolean).sort(), [
+      ".pymtheg/.gitignore",
+      ".pymtheg/project.json",
+      ".pymtheg/settings.json",
+    ]);
     assert.equal(
-      tracked.some((path) => path.startsWith(".pymtheg/local/")),
+      git(root, "status", "--porcelain", "--ignored").includes("local"),
       false,
     );
-    assert.match(
-      git(root, "status", "--porcelain", "--ignored", ".pymtheg/local"),
-      /^!! \.pymtheg\/local\/$/m,
-    );
+    // The user's file: outside the checkout, user-only, keyed by the real path.
+    const file = trustFile();
+    assert.equal(file.startsWith(process.env.PYMTHEG_CONFIG_HOME), true);
+    assert.equal(file.startsWith(root), false);
+    assert.equal(statSync(file).mode & 0o777, 0o600);
+    assert.equal(statSync(dirname(file)).mode & 0o077, 0);
+    const answers = JSON.parse(await readFile(file, "utf8"));
+    const entry = answers.checkouts[realpathSync(root)];
+    assert.equal(entry.trust, "trusted");
     assert.equal(
-      git(root, "check-ignore", ".pymtheg/local/trust.json").trim(),
-      ".pymtheg/local/trust.json",
+      entry.project,
+      JSON.parse(await readFile(join(root, ".pymtheg/project.json"), "utf8"))
+        .id,
     );
     // Re-running init keeps it; the same answer is a no-op; a different one is refused.
     const again = await initializeWorkspace(root);
@@ -208,7 +218,7 @@ test("init records the answer for this checkout in .pymtheg/local, untracked and
     );
     await assert.rejects(
       initializeWorkspace(root, undefined, { trust: "source-only" }),
-      /already "trusted"\. Init does not change it/,
+      /already "trusted"\. Init does not change it; run pymtheg trust --revoke/,
     );
     // A nested folder uses the checkout's answer.
     const nested = join(root, "sub", "dir");
@@ -223,28 +233,144 @@ test("init records the answer for this checkout in .pymtheg/local, untracked and
   });
 });
 
-test("a copied or moved checkout, or another project's file, is unanswered", async () => {
+test("a copied or moved checkout, a symlinked path, another project at the path: keyed by real path and project id", async () => {
   await scratch(async (root) => {
     const a = join(root, "a");
     await initializeWorkspace(a, undefined, trusted);
-    // A full copy (including .pymtheg/local): same project id, another path.
+    // A copy: same project id, another real path.
     cpSync(a, join(root, "copy"), { recursive: true });
     assert.equal(await readLocalTrust(join(root, "copy")), undefined);
     assert.equal(await checkoutTrust(join(root, "copy")), "unanswered");
-    // Another project's answer file.
+    // A symlink to the checkout is the same real path: the same answer.
+    symlinkSync(a, join(root, "link"));
+    assert.equal(await checkoutTrust(join(root, "link")), "trusted");
+    // Another project now at the recorded path (same path, new id): unanswered.
     const b = join(root, "b");
+    await initializeWorkspace(b, undefined, trusted);
+    await rm(b, { recursive: true });
     await initializeWorkspace(b);
-    cpSync(
-      join(a, ".pymtheg/local/trust.json"),
-      join(b, ".pymtheg/local/trust.json"),
-    );
     assert.equal(await checkoutTrust(b), "unanswered");
-    // Answering the copy records its own answer.
+    // Answering the copy records its own answer and leaves the original alone.
     await initializeWorkspace(join(root, "copy"), undefined, {
       trust: "source-only",
     });
     assert.equal(await checkoutTrust(join(root, "copy")), "source-only");
     assert.equal(await checkoutTrust(a), "trusted");
+  });
+});
+
+test("an unreadable, corrupt or wrong-typed answer file is unanswered, never trusted", async () => {
+  await scratch(async (root) => {
+    await initializeWorkspace(root, undefined, trusted);
+    const file = trustFile();
+    const good = await readFile(file, "utf8");
+    const real = realpathSync(root);
+    const id = JSON.parse(good).checkouts[real].project;
+    for (const bad of [
+      "{ not json",
+      JSON.stringify({ schema: "other", checkouts: {} }),
+      JSON.stringify({
+        schema: "pymtheg.trust/v1",
+        checkouts: { [real]: { project: id, trust: "yes" } },
+      }),
+      JSON.stringify({
+        schema: "pymtheg.trust/v1",
+        checkouts: {
+          [real]: {
+            project: id,
+            trust: "trusted",
+            toolchain: { go: "relative/go" },
+          },
+        },
+      }),
+      JSON.stringify({
+        schema: "pymtheg.trust/v1",
+        checkouts: { [real]: { project: 7, trust: "trusted" } },
+      }),
+    ]) {
+      await writeFile(file, bad);
+      assert.equal(await checkoutTrust(root), "unanswered", bad);
+    }
+    await writeFile(file, good);
+    chmodSync(file, 0o000);
+    try {
+      // Root can read anything; the check holds for ordinary users.
+      if (process.getuid?.() !== 0)
+        assert.equal(await checkoutTrust(root), "unanswered");
+    } finally {
+      chmodSync(file, 0o600);
+    }
+    assert.equal(await checkoutTrust(root), "trusted");
+  });
+});
+
+test("concurrent writers keep each other's answers", async () => {
+  await scratch(async (root) => {
+    const projects = Array.from({ length: 8 }, (_, i) => join(root, `p${i}`));
+    for (const project of projects) await initializeWorkspace(project);
+    await Promise.all(
+      projects.map((project, i) =>
+        writeLocalTrust(project, i % 2 ? "trusted" : "source-only"),
+      ),
+    );
+    // And two processes at once.
+    const [x, y] = [join(root, "x"), join(root, "y")];
+    for (const project of [x, y]) await initializeWorkspace(project);
+    const spawnInit = (dir) =>
+      new Promise((done, fail) => {
+        const child = spawn(process.execPath, [cli, "init", dir, "--trust"], {
+          stdio: "ignore",
+        });
+        child.on("exit", (code) =>
+          code === 0 ? done() : fail(Error(`init exited ${code}`)),
+        );
+      });
+    await Promise.all([spawnInit(x), spawnInit(y)]);
+    for (const [i, project] of projects.entries())
+      assert.equal(
+        await checkoutTrust(project),
+        i % 2 ? "trusted" : "source-only",
+      );
+    assert.equal(await checkoutTrust(x), "trusted");
+    assert.equal(await checkoutTrust(y), "trusted");
+  });
+});
+
+test("pymtheg trust lists answers and --revoke removes one, also for a deleted checkout", async () => {
+  await scratch(async (root) => {
+    const run = (...args) =>
+      spawnSync(process.execPath, [cli, "trust", ...args], {
+        encoding: "utf8",
+      });
+    const a = join(root, "a");
+    await initializeWorkspace(a, undefined, trusted);
+    const listed = run("--list", "--format", "json");
+    assert.equal(listed.status, 0, listed.stderr);
+    assert.ok(
+      JSON.parse(listed.stdout).answers.some(
+        (entry) => entry.root === realpathSync(a) && entry.trust === "trusted",
+      ),
+    );
+    assert.match(run().stdout, /trusted\s+.*\/a$/m);
+    const revoked = run("--revoke", a);
+    assert.match(revoked.stdout, /Removed the trust answer/);
+    assert.equal(await checkoutTrust(a), "unanswered");
+    // A deleted checkout leaves a stale entry that --revoke removes by its path.
+    await initializeWorkspace(a, undefined, trusted);
+    const real = realpathSync(a);
+    await rm(a, { recursive: true });
+    assert.ok(
+      JSON.parse(run("--list", "--format", "json").stdout).answers.some(
+        (entry) => entry.root === real,
+      ),
+    );
+    assert.match(run("--revoke", real).stdout, /Removed/);
+    assert.equal(
+      JSON.parse(run("--list", "--format", "json").stdout).answers.some(
+        (entry) => entry.root === real,
+      ),
+      false,
+    );
   });
 });
 
@@ -274,7 +400,10 @@ test("command-line init: flags answer, no terminal records source only and says 
       piped.stdout,
       /No terminal to ask whether you trust this repository, so recorded source only\./,
     );
-    assert.match(piped.stdout, /\.pymtheg\/local\/trust\.json, never in Git/);
+    assert.match(
+      piped.stdout,
+      /your own Pymtheg configuration, never in the repository/,
+    );
     assert.equal(await checkoutTrust(join(root, "a")), "source-only");
     const flagged = init([join(root, "b"), "--trust"]);
     assert.equal(flagged.status, 0, flagged.stderr);
@@ -394,13 +523,38 @@ test(
       const own = await executeGraph({ command: "index", root: origin });
       assert.equal(own.toolchain.go.state, "used");
       assert.ok(decided(origin) > 0);
-      // A clone: the tracked files only.
+      // The author also force-adds forged answers for the predictable
+      // clone path: in the place C-44's first version read, and in the
+      // user-file format. Nothing under a checkout is read as an answer.
+      const clone = join(realpathSync(root), "clone");
+      const id = JSON.parse(
+        await readFile(join(origin, ".pymtheg/project.json"), "utf8"),
+      ).id;
+      const forged = {
+        schema: "pymtheg.trust/v1",
+        project: id,
+        root: clone,
+        trust: "trusted",
+        checkouts: { [clone]: { project: id, trust: "trusted" } },
+      };
+      mkdirSync(join(origin, ".pymtheg/local"), { recursive: true });
+      await writeFile(
+        join(origin, ".pymtheg/local/trust.json"),
+        JSON.stringify(forged),
+      );
+      await writeFile(
+        join(origin, ".pymtheg/trust.json"),
+        JSON.stringify(forged),
+      );
+      // A clone: the tracked files only, forged answers included.
       git(origin, "init", "--quiet");
       git(origin, "add", "-A");
-      const clone = join(root, "clone");
-      for (const file of git(origin, "ls-files").split("\n").filter(Boolean))
+      git(origin, "add", "-f", ".pymtheg/local/trust.json");
+      const tracked = git(origin, "ls-files").split("\n").filter(Boolean);
+      assert.ok(tracked.includes(".pymtheg/local/trust.json"));
+      for (const file of tracked)
         cpSync(join(origin, file), join(clone, file), { recursive: true });
-      assert.equal(existsSync(join(clone, ".pymtheg/local")), false);
+      assert.ok(existsSync(join(clone, ".pymtheg/local/trust.json")));
       const response = await executeGraph({ command: "index", root: clone });
       assert.equal(response.trust, "unanswered");
       assert.equal(response.toolchain, undefined);
@@ -622,7 +776,7 @@ test("Studio setup without trust records no answer and reports unanswered", asyn
       const body = await response.json();
       assert.equal(body.trust, "unanswered");
       assert.equal(body.trustRecorded, false);
-      assert.equal(existsSync(join(root, ".pymtheg/local/trust.json")), false);
+      assert.equal(await readLocalTrust(root), undefined);
       // The project view says so, and the dialog asks when it next opens.
       const view = await (
         await fetch(new URL("/api/project", studio.url), {
@@ -633,5 +787,130 @@ test("Studio setup without trust records no answer and reports unanswered", asyn
     } finally {
       await studio.close();
     }
+  });
+});
+
+test("the reviewer's attack: a force-committed in-tree answer with an in-repository tool path at the clone's path runs nothing", async () => {
+  await scratch(async (root) => {
+    const origin = join(root, "origin");
+    cpSync(GO_FIXTURE, origin, { recursive: true });
+    await initializeWorkspace(origin);
+    const id = JSON.parse(
+      await readFile(join(origin, ".pymtheg/project.json"), "utf8"),
+    ).id;
+    const clone = join(realpathSync(root), "clone");
+    // An in-repository "go" that would leave a marker, and a spy go first on PATH.
+    const marker = join(root, "repo-script-ran.txt");
+    const spyMarker = join(root, "spy-go-started.txt");
+    mkdirSync(join(origin, "tools"));
+    await writeFile(
+      join(origin, "tools", "go"),
+      `#!/bin/sh\necho ran >> '${marker}'\nexit 1\n`,
+    );
+    chmodSync(join(origin, "tools", "go"), 0o755);
+    const bin = join(root, "bin");
+    mkdirSync(bin);
+    await writeFile(
+      join(bin, "go"),
+      `#!/bin/sh\necho started >> '${spyMarker}'\nexit 1\n`,
+    );
+    chmodSync(join(bin, "go"), 0o755);
+    mkdirSync(join(origin, ".pymtheg/local"), { recursive: true });
+    await writeFile(
+      join(origin, ".pymtheg/local/trust.json"),
+      JSON.stringify({
+        schema: "pymtheg.trust/v1",
+        project: id,
+        root: clone,
+        trust: "trusted",
+        toolchain: { go: join(clone, "tools", "go") },
+      }),
+    );
+    git(origin, "init", "--quiet");
+    git(origin, "add", "-A");
+    git(origin, "add", "-f", ".pymtheg/local/trust.json");
+    for (const file of git(origin, "ls-files").split("\n").filter(Boolean))
+      cpSync(join(origin, file), join(clone, file), { recursive: true });
+    chmodSync(join(clone, "tools", "go"), 0o755);
+    const path = process.env.PATH;
+    process.env.PATH = `${bin}${delimiter}${path}`;
+    try {
+      const response = await executeGraph({ command: "index", root: clone });
+      assert.equal(response.trust, "unanswered");
+      assert.equal(response.toolchain, undefined);
+    } finally {
+      process.env.PATH = path;
+    }
+    assert.equal(existsSync(spyMarker), false, "the spy go was started");
+    assert.equal(existsSync(marker), false, "the repository's script ran");
+  });
+});
+
+test("a tool path inside the checkout is refused even from the user's own answer", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    cpSync(GO_FIXTURE, project, { recursive: true });
+    await initializeWorkspace(project, undefined, trusted);
+    const marker = join(root, "ran.txt");
+    mkdirSync(join(project, "bin"));
+    await writeFile(
+      join(project, "bin", "go"),
+      `#!/bin/sh\necho ran > '${marker}'\nexit 1\n`,
+    );
+    chmodSync(join(project, "bin", "go"), 0o755);
+    // Through a symlink outside the checkout too: the real path decides.
+    symlinkSync(join(project, "bin", "go"), join(root, "go-link"));
+    for (const tool of [join(project, "bin", "go"), join(root, "go-link")]) {
+      const answers = JSON.parse(await readFile(trustFile(), "utf8"));
+      answers.checkouts[realpathSync(project)].toolchain = { go: tool };
+      await writeFile(trustFile(), JSON.stringify(answers));
+      const response = await executeGraph({ command: "index", root: project });
+      assert.ok(
+        response.warnings.some((w) => w.code === "tool-path-inside-checkout"),
+        tool,
+      );
+      assert.equal(response.toolchain?.go, undefined);
+      assert.equal(existsSync(marker), false, tool);
+    }
+  });
+});
+
+test("a hostile committed .pymtheg/local/.gitignore is rewritten before anything is written there", async () => {
+  const { localHistoryWriter } = await import("../dist/storage/writer.js");
+  await scratch(async (root) => {
+    git(root, "init", "--quiet");
+    await initializeWorkspace(root);
+    mkdirSync(join(root, ".pymtheg/local"), { recursive: true });
+    await writeFile(
+      join(root, ".pymtheg/local/.gitignore"),
+      "# ignores nothing\n!*\n",
+    );
+    git(root, "add", "-f", ".pymtheg/local/.gitignore");
+    localHistoryWriter(root);
+    assert.equal(
+      await readFile(join(root, ".pymtheg/local/.gitignore"), "utf8"),
+      "*\n",
+    );
+    assert.equal(
+      git(root, "check-ignore", ".pymtheg/local/writer.json").trim(),
+      ".pymtheg/local/writer.json",
+    );
+  });
+});
+
+test("a failed first link write (an unknown record) on a never-initialised project creates nothing", async () => {
+  const { createCodeLink, removeCodeLink } = await import(
+    "../dist/architecture/code-links.js"
+  );
+  await scratch(async (root) => {
+    await writeFile(join(root, "a.go"), "package p\nfunc Save() {}\n");
+    const added = await createCodeLink({
+      root,
+      record: "R9",
+      selector: "Save",
+    });
+    assert.equal(added.status, "record-not-found");
+    await assert.rejects(removeCodeLink({ root, link: "deadbeef-x" }));
+    assert.equal(existsSync(join(root, ".pymtheg")), false);
   });
 });
