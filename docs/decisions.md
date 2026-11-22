@@ -3176,14 +3176,22 @@ cut or a re-entry guard. The cut check runs with the new facts and, unless
 all facts are the same up to offset ranks, with the old ones, in both Rust
 passes.
 
-The guarantee rests on the resolver's caches. They store only answers
-computed without a cut, never evict an answer, and ignore a memo hit that
-would carry a lookup past the depth limit. Trait risk and receiver typing
-use limits that depend only on the facts. A scoped pass's cached answers
-are then a subset of a cold pass's, and each cached answer is the same in
-any history. A cut-free scoped decision therefore equals the cold one. No
-other file's decision can depend on whether the edited file's cut-free
-answers are cached.
+The guarantee rests on the resolver's caches: no cached answer depends on
+its caller.
+
+- A lookup memo entry holds no cut met at an ancestor (C-24), and a hit is
+  ignored if it would carry a lookup past the depth limit.
+- A lazily cached computation starts its lookups with an empty stack and is
+  keyed by the global lookup mode. Its answer is kept even when it met cuts
+  inside, unless a helper re-entry occurred, because a re-entry answers for
+  the caller's stack.
+- Trait risk and receiver typing use limits that depend only on the facts.
+- No answer is evicted.
+
+A key whose computation meets no cut then has the same answer in every
+history, so a cut-free scoped decision equals the cold one. The same holds
+when the edited file's answers are added or removed: another file's
+decision does not change.
 
 Every other edit uses the full Rust pass. So do a changed Cargo context,
 an added, removed or failed file, and missing completion evidence. The

@@ -393,6 +393,29 @@ export function resolveRust(
   let cycleCuts = 0;
   // Cuts met by isolated scope probes, whose counter is restored afterwards.
   let isolatedCuts = 0;
+  // C-36: helper re-entries met so far. A re-entry answers for the caller's
+  // stack, so an answer computed under one is never cached. Other cuts met
+  // inside a lazily cached computation are its own: it starts its lookups
+  // with an empty stack, so they do not depend on who asked.
+  let reentries = 0;
+  /**
+   * C-36: the global lookup mode that `find` keys its memo by. A lazily
+   * cached answer computed under one mode is not reused under another.
+   */
+  const lookupMode = (): string =>
+    JSON.stringify([
+      scopeMode,
+      macroIdentityKey(),
+      libraryLookup
+        ? [
+            libraryAttributeStart,
+            libraryImportScope,
+            libraryProbe,
+            protectModuleImports,
+            activeMacroImports.at(-1)?.id,
+          ]
+        : null,
+    ]);
   const namespaceParents = new WeakMap<Place, number>();
   let nextNamespaceParent = 0;
   function parentIdentity(loc: Place): number {
@@ -745,18 +768,19 @@ export function resolveRust(
     // Stable Rust does not apply procedural attribute macros to fields/variants.
     if (origin.nested) return false;
     if (!helperReady) return true;
-    const key = JSON.stringify(origin),
+    const key = JSON.stringify([origin, lookupMode()]),
       cached = helperCache.get(key);
     if (cached !== undefined) return cached;
-    if (helperBusy.has(key)) {
+    if (helperBusy.has(JSON.stringify(origin))) {
       // C-36: the answer of a helper already being decided depends on the
       // caller's stack, like a lookup cycle cut.
       cycleCuts++;
+      reentries++;
       if (activeLookup) activeLookup.trace.valid = false;
       return true;
     }
-    helperBusy.add(key);
-    const helperCuts = cycleCuts;
+    helperBusy.add(JSON.stringify(origin));
+    const helperCuts = reentries;
     let shadow = false;
     try {
       for (const own of ownerPlace(origin.file, origin.scope)) {
@@ -809,20 +833,20 @@ export function resolveRust(
           loc = loc.parent;
         }
       }
-      if (cycleCuts === helperCuts) helperCache.set(key, shadow);
+      if (reentries === helperCuts) helperCache.set(key, shadow);
       clearIncompleteLookups();
       return shadow;
     } finally {
-      helperBusy.delete(key);
+      helperBusy.delete(JSON.stringify(origin));
     }
   }
   const attributeShadowCache = new Map<string, boolean>();
   function shadowFromParents(origin: AttributeOrigin): boolean {
     if (origin.helper) return helperShadowed(origin);
-    const key = JSON.stringify(origin),
+    const key = JSON.stringify([origin, lookupMode()]),
       cached = attributeShadowCache.get(key);
     if (cached !== undefined) return cached;
-    const shadowCuts = cycleCuts;
+    const shadowCuts = reentries;
     const head = origin.name.split("::")[0]!,
       rule = attributeRules.get(head);
     let result = false;
@@ -861,7 +885,7 @@ export function resolveRust(
           parent = parent.parent;
         }
       }
-    if (cycleCuts === shadowCuts) attributeShadowCache.set(key, result);
+    if (reentries === shadowCuts) attributeShadowCache.set(key, result);
     return result;
   }
   let attributeContextReady = false;
@@ -871,9 +895,10 @@ export function resolveRust(
   const deferredHelpers: AttributeOrigin[] = [];
   const itemPresenceCache = new Map<string, string[]>();
   function itemPresence(item: GraphSymbol | GraphLink): string[] {
-    const cached = itemPresenceCache.get(item.id);
+    const presenceKey = `${item.id}|${lookupMode()}`;
+    const cached = itemPresenceCache.get(presenceKey);
     if (cached) return cached;
-    const presenceCuts = cycleCuts;
+    const presenceCuts = reentries;
     const attributes = [
       ...new Set([
         ...((data(item).opaqueItemAttributes ?? []) as string[]),
@@ -895,7 +920,8 @@ export function resolveRust(
         ),
       ]),
     ].sort();
-    if (cycleCuts === presenceCuts) itemPresenceCache.set(item.id, attributes);
+    if (reentries === presenceCuts)
+      itemPresenceCache.set(presenceKey, attributes);
     return attributes;
   }
   const possible = (conditions: readonly string[]): boolean => {
@@ -5404,7 +5430,8 @@ export function resolveRust(
    * known), and anything else as an unknown trait source.
    */
   function traitRisk(scope: string, place: Place): TraitRisk {
-    const key = `${place.file}|${place.crate.root}|${place.local}|${scope}`;
+    const mode = lookupMode();
+    const key = `${place.file}|${place.crate.root}|${place.local}|${scope}|${mode}`;
     const cached = riskCache.get(key);
     if (cached) return cached;
     // C-36: the risk is the union over every scope the glob imports reach.
@@ -5418,10 +5445,10 @@ export function resolveRust(
       standardGlob: false,
       glob: false,
     };
-    const riskCuts = cycleCuts;
+    const riskCuts = reentries;
     const visited = new Set<string>();
     const visit = (scope: string, place: Place) => {
-      const at = `${place.file}|${place.crate.root}|${place.local}|${scope}`;
+      const at = `${place.file}|${place.crate.root}|${place.local}|${scope}|${mode}`;
       if (visited.has(at)) return;
       visited.add(at);
       const known = riskCache.get(at);
@@ -5499,7 +5526,7 @@ export function resolveRust(
       }
     };
     visit(scope, place);
-    if (cycleCuts === riskCuts) riskCache.set(key, risk);
+    if (reentries === riskCuts) riskCache.set(key, risk);
     return risk;
   }
   let checkoutTraitMethodNames: Set<string> | undefined;
@@ -5515,11 +5542,12 @@ export function resolveRust(
     names: Set<string>;
     unknown: boolean;
   } {
-    const cached = outsideCache.get(t.id);
+    const outsideKey = `${t.id}|${lookupMode()}`;
+    const cached = outsideCache.get(outsideKey);
     if (cached) return cached;
-    const outsideCuts = cycleCuts;
+    const outsideCuts = reentries;
     const answer = implementedOutsideUncached(t);
-    if (cycleCuts === outsideCuts) outsideCache.set(t.id, answer);
+    if (reentries === outsideCuts) outsideCache.set(outsideKey, answer);
     return answer;
   }
   function implementedOutsideUncached(t: GraphSymbol): {
@@ -6017,17 +6045,18 @@ export function resolveRust(
       str(d.genericBindings),
       str(d.pathArgumentSyntax),
       str(d.implArgumentSyntax),
+      lookupMode(),
     ]);
     const cached = pathCallCache.get(key);
     if (cached) {
       recordReads(scopeTraceOf(cached));
       return cached;
     }
-    const pathCuts = cycleCuts;
+    const pathCuts = reentries;
     const answer = lookupWithReads(() =>
       pathCallTargetsUncached(name, selfPath, scope, d, targetName, file, loc),
     );
-    if (cycleCuts === pathCuts) pathCallCache.set(key, answer);
+    if (reentries === pathCuts) pathCallCache.set(key, answer);
     return answer;
   }
   function pathCallTargetsUncached(
@@ -6103,10 +6132,10 @@ export function resolveRust(
     // The call site's scope matters only to an inner method call's autoref
     // check; other recipes carry their own scopes.
     const text = JSON.stringify(r);
-    const key = `${site.file}|${text.includes(`"k":"m"`) ? site.scope : ""}|${placeId(loc)}|${text}`;
+    const key = `${site.file}|${text.includes(`"k":"m"`) ? site.scope : ""}|${placeId(loc)}|${text}|${lookupMode()}`;
     const cached = typingCache.get(key);
     if (cached) return cached;
-    const typingCuts = cycleCuts;
+    const typingCuts = reentries;
     let result: Typing;
     // C-36: the limit is the length of this recipe's own chain, not the depth
     // at which it is met, so a cached answer does not depend on its caller.
@@ -6253,7 +6282,7 @@ export function resolveRust(
     }
     if (!isGap(result) && r.im === true && result.borrow === "owned")
       result = { ...result, mutable: false };
-    if (cycleCuts === typingCuts) typingCache.set(key, result);
+    if (reentries === typingCuts) typingCache.set(key, result);
     return result;
   }
   /** The number of receiver recipes nested inside . */

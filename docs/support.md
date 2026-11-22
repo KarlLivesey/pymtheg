@@ -982,10 +982,10 @@ depth limit or a re-entry guard, as in modules that glob each other.
 Any other change uses the full Rust pass. This covers changes to symbols,
 imports, macros, modules, attributes or cfg conditions; a Cargo manifest,
 lockfile or configuration change; an added, removed or unreadable file; and
-an unfinished previous run. The resolver caches only answers that do not
-depend on which lookup ran first. The same file tree therefore produces the
-same graph after a fresh or incremental index, and one file's answer no
-longer depends on other files' calls. [C-36](changes/C-36.md)
+an unfinished previous run. No answer the resolver caches depends on its
+caller, and the scoped path is used only when the edited file's decisions
+meet no cut. The same file tree therefore produces the same graph after a
+fresh or incremental index. [C-36](changes/C-36.md)
 
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing
