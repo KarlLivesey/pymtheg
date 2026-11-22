@@ -1,5 +1,5 @@
 {
- "note": "Hand-entered verdicts for SW-6's remaining TypeScript groups, from the 10 fixed-seed sites per group in remaining-sites.json and the mechanical splits in candidate-split.json and failed-program-split.json. Splits marked 'estimate' come from the 10-site reading only.",
+ "note": "Hand-entered verdicts for SW-6's remaining TypeScript groups, from the 10 fixed-seed sites per group in remaining-sites.json and the mechanical splits in candidate-split.json, unseen-split.json, config-split.json and const-count.json. Splits marked 'estimate' come from the 10-site reading only.",
  "groups": [
   {
    "reason": "local",
@@ -20,20 +20,8 @@
   },
   {
    "reason": "(unit only)",
-   "shape": "Imports: the module link of an import (`import { Fragment } from \"react\"`) names a module, which has no symbol by definition. Calls: a library member call that names only the package (`screen.getByRole`, `fireEvent.click`, `it.each`, `assert.equal` from `assert/strict`).",
-   "provable": "Imports: no, a definitional ceiling under Level 2. Calls: yes, from the installed declarations the checker selects.",
-   "split": [
-    {
-     "part": "imports (module links)",
-     "kind": "imports",
-     "provable": false
-    },
-    {
-     "part": "calls and other member links",
-     "kindNot": "imports",
-     "provable": true
-    }
-   ]
+   "shape": "A library member link that names only the package (`screen.getByRole`, `fireEvent.click`, `it.each`, `assert.equal` from `assert/strict`). The module links of imports (`import { Fragment } from \"react\"`) are also unit-only; they are Level 2 under D20 and are not in this row.",
+   "provable": "Yes, from the installed declarations the checker selects."
   },
   {
    "reason": "no-symbol",
@@ -54,17 +42,22 @@
   },
   {
    "reason": "external",
-   "shape": "A declaration outside the checkout with no named library target. In programs that contain a failed file, C-13 withholds every library target: `lines.push`, `process.argv.slice`, `Object.defineProperty`, `.map`, `String(…)` and Vitest matchers in the sample. The rest includes 2,719 `as const` assertions stored as `references` links to `const`.",
-   "provable": "In failed-file programs: yes, where the target does not depend on the failed file (the taint judge can decide this). `as const` links are a defect: they should not be links at all.",
+   "shape": "A declaration outside the checkout with no named library target. Where the link carries C-13's `no-unseen-declarations` marker, its program contains an unread file and C-13 withholds the library target: `lines.push`, `process.argv.slice`, `Object.defineProperty`, `.map`, `String(…)` and Vitest matchers in the sample. `as const` assertions, stored as `references` links to `const` with or without the marker, are their own part. (The file result's `failedFiles` is module-wide, so it cannot tell these apart.)",
+   "provable": "Marked links: yes, where the target does not depend on the unread file (C-39 item 4 decides this per link). `as const` links are a defect: they should not be links at all.",
    "split": [
     {
-     "part": "in a program with a failed file (C-13 withholding)",
-     "failed": true,
+     "part": "carries the C-13 marker (computed beside an unread file), without `as const`",
+     "marked": true,
      "provable": true
     },
     {
-     "part": "other",
-     "failed": false,
+     "part": "`as const` assertions",
+     "constants": true,
+     "provable": "defect"
+    },
+    {
+     "part": "no marker, without `as const`",
+     "marked": false,
      "provable": "partly"
     }
    ]
@@ -96,24 +89,42 @@
   },
   {
    "reason": "incomplete-config",
-   "shape": "The owning config `extends` a config by package name, and the module records the extended settings as missing. In Turborepo, each example is its own pnpm workspace with its own lockfile, so the root install does not link it; the extended `@repo/typescript-config/*.json` is in the checkout, named by the example's `pnpm-workspace.yaml`. In Astro, the examples are installed and linked (`examples/ssr/node_modules/astro` points to `packages/astro`), and `astro/tsconfigs/strict` is in the checkout, but the module still records it as missing (a defect: the file is reached through the installed workspace link and its name does not match the `*tsconfig*.json` context pattern). Redux Toolkit's Expo examples extend `expo/tsconfig.base`, which is not installed.",
-   "provable": "Turborepo and Astro: yes, the extended config is in the checkout. Redux Toolkit's Expo examples: no, missing material.",
+   "shape": "The owning config `extends` a config by package name, and the module records the extended settings as missing. The cause is that `project.ts` treats every package-name `extends` as external without resolving it. A second barrier is that the context capture only matches `*tsconfig*.json` names, so a base such as `astro/tsconfigs/strict.json` is not read even when reached. In Astro, configs under `packages/` and `examples/` extend `astro/tsconfigs/{strict,strictest,base}`, and `astro` is installed as a workspace link into the checkout (`examples/ssr/node_modules/astro` points to `packages/astro`). In Turborepo, the `packages/` configs extend `@turbo/tsconfig/{library,base}.json`, installed as a workspace link. Turborepo's `examples/` are separate pnpm workspaces that the root install does not link. Redux Toolkit's Expo examples extend `expo/tsconfig.base`, which is not installed.",
+   "provable": "Astro and Turborepo `packages/`: yes, the extended config is installed as a workspace link into the checkout. Turborepo `examples/` and Redux Toolkit's Expo examples: no, not installed.",
    "split": [
     {
-     "part": "Turborepo example workspaces (config package in the checkout, workspace not installed)",
-     "pin": "vercel/turborepo",
+     "part": "Astro, `astro/tsconfigs/*` through an installed workspace link",
+     "config": [
+      "withastro/astro | "
+     ],
      "provable": true
     },
     {
-     "part": "Astro (config reached through an installed workspace link)",
-     "pin": "withastro/astro",
+     "part": "Turborepo `packages/`, `@turbo/tsconfig/*` through an installed workspace link",
+     "config": [
+      "vercel/turborepo | packages/ | "
+     ],
      "provable": true
     },
     {
-     "part": "other pins (uninstalled external packages)",
-     "pinsNot": [
-      "vercel/turborepo",
-      "withastro/astro"
+     "part": "Turborepo `examples/` (separate workspaces, not installed)",
+     "config": [
+      "vercel/turborepo | examples/ | "
+     ],
+     "provable": false
+    },
+    {
+     "part": "Turborepo `crates/`",
+     "config": [
+      "vercel/turborepo | crates/ | "
+     ],
+     "provable": false
+    },
+    {
+     "part": "other pins (packages that are not installed)",
+     "configNot": [
+      "withastro/astro | ",
+      "vercel/turborepo | "
      ],
      "provable": false
     }

@@ -31,13 +31,26 @@ SW-5's, which are SW-4's measurements, unchanged.
   Excerpts go through the exporter's privacy filter (`draw-installed.mjs`).
 - `candidate-split.json`: candidate-set links split by what their candidates
   are (`candsplit.mjs`).
-- `failed-program-split.json`: links in the large groups split by whether
-  their compiler program contained a failed file (`extsplit.mjs`).
+- `unseen-split.json`: links in the large groups split by C-13's per-link
+  `no-unseen-declarations` marker, which the module stamps on a link
+  computed by a program that contains an unread file (`unseen-split.mjs`).
+  The first version of this split used the file result's `failedFiles`,
+  which is module-wide, and so put links from clean programs in the
+  withheld group; it is replaced.
+- `config-split.json`: `incomplete-config` links by pin, top-level area and
+  the base the owning config extends, and by the reason each link would have
+  without the config gap (`config-split.mjs`).
+- `const-count.json`: the `as const` assertions stored as `references` links
+  named `const`, by pin and by first reason and marker (`const-count.mjs`).
+- `module-links.json`: what the library module links name, the module
+  specifier or a whole-module binding (`module-links.mjs`), checking that
+  D20 counts no member link.
 - `verdicts.json`: the hand-entered shape and provability verdict for each
   group, from reading those sites.
-- `plan-sw6.mjs`: the plan post-step. It renders the remaining-work list,
-  marks Go and Rust as unchanged since SW-5, and points the evidence links
-  at SW-6.
+- `plan-sw6.mjs`: the plan post-step. It renders the remaining-work list
+  and marks Go and Rust as unchanged since SW-5. (The plan generator now
+  takes the archive name from the `--results` path, so the evidence links
+  point at SW-6 without a rewrite.)
 - `pintable.mjs`: the per-pin table below, comparing the SW-5 and SW-6
   archives. `pinscore.mjs` recomputes one pin's figures directly from its
   graph.
@@ -101,7 +114,10 @@ node scripts/sweep/refresh-evidence.mjs overlay-installed --base evidence/sw-5/c
   --commit 2dc05bebd4d38fc44075c98637a58c15bd614ba3 --output "$PYM_SCRATCH/coverage-plan-input.json.gz"
 node evidence/sw-6/draw-installed.mjs "$PYM_SCRATCH/installed-run.json" remaining-sites.json 10
 node evidence/sw-6/candsplit.mjs "$PYM_SCRATCH/installed-run.json" > candidate-split.json
-node evidence/sw-6/extsplit.mjs "$PYM_SCRATCH/installed-run.json" external no-symbol any-receiver local "(unit only)" "(candidate set)" > failed-program-split.json
+node evidence/sw-6/unseen-split.mjs "$PYM_SCRATCH/installed-run.json" external no-symbol any-receiver local "(unit only)" "(candidate set)" > unseen-split.json
+node evidence/sw-6/config-split.mjs "$PYM_SCRATCH/installed-run.json" > config-split.json
+node evidence/sw-6/const-count.mjs "$PYM_SCRATCH/installed-run.json" > const-count.json
+node evidence/sw-6/module-links.mjs "$PYM_SCRATCH/installed-run.json" > module-links.json
 ```
 
 Then, from the repository root, regenerate the plan:

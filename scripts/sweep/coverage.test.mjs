@@ -9,7 +9,7 @@ import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { readLabels } from "./coverage-refresh-data.mjs";
 import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, installedCoverage, median, stratumShare } from "./coverage.mjs";
-import { classify, columns, externalIdentity, goImports, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
+import { classify, columns, externalIdentity, goImports, libraryModuleLinks, libraryModuleRow, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
 
 test("assumed Level 2 links remain in the total and are counted separately", () => {
   const score = libraryScore([
@@ -65,6 +65,70 @@ test("SW-5 replays every SW-4 installed fallback and preserves the other observa
   assert.deepEqual(after.modes.installed.repos.filter(({ measuredCommit }) => !measuredCommit), before.modes.installed.repos.filter(usable));
   assert.deepEqual(after.modes.installed.repos.filter(({ measuredCommit }) => measuredCommit).map(({ id }) => id),
     before.modes.installed.repos.filter((repo) => !usable(repo)).map(({ id }) => id));
+});
+
+test("D20: an import whose referent is a library module counts as a library module link; a member naming only its package does not", () => {
+  // Module links in each language: TypeScript `import … from "pkg"`, Go
+  // `import "pkg"`, Rust `use x;` / `extern crate x;`.
+  for (const module of ["typescript", "go", "rust"])
+    assert.equal(
+      libraryModuleRow([module, "imports", "library", [], 1]),
+      true,
+      module,
+    );
+  // A member link that names only the package (`vi.fn`, `screen.getByRole`).
+  assert.equal(
+    libraryModuleRow(["typescript", "calls", "library", [], 1]),
+    false,
+  );
+  assert.equal(
+    libraryModuleRow(["typescript", "references", "library", [], 1]),
+    false,
+  );
+  // Imports that did not reach a library unit, or carry a blocker.
+  assert.equal(
+    libraryModuleRow([
+      "typescript",
+      "imports",
+      "unresolved",
+      ["external-package"],
+      1,
+    ]),
+    false,
+  );
+  assert.equal(
+    libraryModuleRow([
+      "typescript",
+      "imports",
+      "library",
+      ["incomplete-config"],
+      1,
+    ]),
+    false,
+  );
+  assert.equal(libraryModuleRow(["go", "imports", "ambiguous", [], 1]), false);
+  const repos = [
+    {
+      language: "typescript",
+      counts: {},
+      inventory: [
+        ["typescript", "imports", "library", [], 5],
+        ["typescript", "calls", "library", [], 7],
+        ["go", "imports", "library", [], 2],
+      ],
+    },
+    {
+      language: "go",
+      counts: {},
+      inventory: [["go", "imports", "library", [], 3]],
+    },
+    { language: "rust", inventory: [["rust", "imports", "library", [], 9]] },
+  ];
+  assert.equal(libraryModuleLinks(repos, "typescript"), 5);
+  assert.equal(libraryModuleLinks(repos, "go"), 5);
+  assert.equal(libraryModuleLinks(repos, "go", true), 3);
+  // A repo without counts (an unfinished attempt) contributes nothing.
+  assert.equal(libraryModuleLinks(repos, "rust"), 0);
 });
 
 test("SW-6 refreshes every installed TypeScript pin and preserves the other observations", () => {
