@@ -434,8 +434,13 @@ export function containerOf(anchor: ts.Node): ts.Node | undefined {
   else if (ts.isBinaryExpression(anchor)) statement = anchor.parent;
   const parent = statement.parent;
   if (ts.isSourceFile(parent)) return parent;
-  if (ts.isModuleBlock(parent)) return parent.parent;
-  if (ts.isModuleDeclaration(parent)) return parent;
+  // A namespace is a container only if it is a symbol itself: one inside a
+  // plain block (`{ namespace N { interface I {} } }`, invalid code the
+  // binder still accepts) is not, so its members belong further out.
+  if (ts.isModuleBlock(parent) && anchorOf(parent.parent) === parent.parent)
+    return parent.parent;
+  if (ts.isModuleDeclaration(parent) && anchorOf(parent) === parent)
+    return parent;
   for (
     let current: ts.Node | undefined = parent;
     current;
