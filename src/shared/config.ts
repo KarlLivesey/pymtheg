@@ -34,12 +34,13 @@ export const projectTrustValues: readonly ProjectTrust[] = [
  * Code-graph settings. `trust`: the project-wide answer of D22, given at
  * `init`. `toolchain`: per-language overrides (D17), which win over `trust`
  * either way (`go`: true finds `go` on the user's PATH; an absolute path
- * names the trusted `go`; false keeps it off). Running a language's toolchain
+ * names the trusted `go`; false keeps it off; `rust` likewise names
+ * rust-analyzer, C-43). Running a language's toolchain
  * on a project is as trusted as building it. Off when both are absent.
  */
 export interface GraphConfig {
   trust?: ProjectTrust;
-  toolchain?: { go?: boolean | string };
+  toolchain?: { go?: boolean | string; rust?: boolean | string };
 }
 export interface ProjectConfig {
   version: 1;
@@ -64,17 +65,25 @@ export function graphConfig(value: unknown): GraphConfig {
   const toolchain = value.toolchain;
   if (!object(toolchain)) throw Error("graph.toolchain must be an object");
   for (const key of Object.keys(toolchain))
-    if (key !== "go") throw Error(`Unknown graph.toolchain setting: ${key}`);
-  const go = toolchain.go;
-  if (
-    go !== undefined &&
-    typeof go !== "boolean" &&
-    !(typeof go === "string" && go.startsWith("/"))
-  )
-    throw Error(
-      "graph.toolchain.go must be true, false or an absolute path to go",
-    );
-  return { ...answered, toolchain: go === undefined ? {} : { go } };
+    if (key !== "go" && key !== "rust")
+      throw Error(`Unknown graph.toolchain setting: ${key}`);
+  const routes: { go?: boolean | string; rust?: boolean | string } = {};
+  for (const [key, tool] of [
+    ["go", "go"],
+    ["rust", "rust-analyzer"],
+  ] as const) {
+    const setting = toolchain[key];
+    if (setting === undefined) continue;
+    if (
+      typeof setting !== "boolean" &&
+      !(typeof setting === "string" && setting.startsWith("/"))
+    )
+      throw Error(
+        `graph.toolchain.${key} must be true, false or an absolute path to ${tool}`,
+      );
+    routes[key] = setting;
+  }
+  return { ...answered, toolchain: routes };
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
@@ -180,7 +189,7 @@ export function machineScope(
   return scope.assumptions as string[];
 }
 /** Languages with a toolchain route. */
-export const toolchainRoutes = ["go"] as const;
+export const toolchainRoutes = ["go", "rust"] as const;
 
 /**
  * The trust that applies to a checkout (D22): a committed

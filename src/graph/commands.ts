@@ -27,6 +27,7 @@ import {
 import { queryGraph, type QueryCommand } from "./command-queries.js";
 import {
   goToolchainKey,
+  rustToolchainKey,
   toolchainState,
   type ToolchainState,
 } from "./command-toolchain.js";
@@ -349,22 +350,42 @@ export async function executeGraph(
     // files the index does not capture) are outside the inventory: a query
     // that would otherwise be answered unchanged recomputes the Go route's
     // key (its fingerprint pass) and syncs unless it equals the recorded one.
-    const recordedKey = (previousState as { toolchain?: ToolchainState } | null)
-      ?.toolchain?.go.key;
+    const recorded = (previousState as { toolchain?: ToolchainState } | null)
+      ?.toolchain;
+    // Each enabled route's key, computed as its analysis would (C-43: Rust
+    // without running rust-analyzer), against the recorded one.
+    const routeCurrent = async (id: "go" | "rust"): Promise<boolean> => {
+      const setting = toolchains[id];
+      if (setting === undefined) return true;
+      const key = recorded?.[id]?.key;
+      if (key === undefined) return false;
+      return (
+        (id === "go"
+          ? await goToolchainKey(
+              root,
+              setting,
+              inventory,
+              toolchainDirectory,
+              signal,
+            )
+          : await rustToolchainKey(
+              root,
+              setting,
+              inventory,
+              registry.modules.find((m) => m.id === "rust")?.contextFiles ??
+                [],
+              toolchainDirectory,
+              signal,
+            )) === key
+      );
+    };
     const toolchainCurrent =
       wouldIndex ||
       !toolchainOn ||
       request.command === "status" ||
       request.noSync
         ? true
-        : recordedKey !== undefined &&
-          (await goToolchainKey(
-            root,
-            toolchains.go!,
-            inventory,
-            toolchainDirectory,
-            signal,
-          )) === recordedKey;
+        : (await routeCurrent("go")) && (await routeCurrent("rust"));
     const shouldIndex = wouldIndex || !toolchainCurrent;
     let report: IndexReport | null = null;
     let durationMs: number | null = null;

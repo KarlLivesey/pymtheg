@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
-import type { ContextFile, GraphFile, LanguageModule } from "../../types.js";
+import type {
+  AnalyzedFile,
+  ContextFile,
+  GraphFile,
+  LanguageModule,
+  LinkResolution,
+} from "../../types.js";
 import { crates } from "./cargo.js";
 import type { AddedLink, GraphLink, GraphSymbol, Json } from "../../types.js";
+import { rustRoute } from "./toolchain-route.js";
 import { parseRust } from "./parse.js";
 import { compare, fileFacts } from "../../identity.js";
 import { resolveRust } from "./resolve.js";
@@ -14,7 +21,30 @@ type RustAnalysisInput = {
   projectId: string;
   files: readonly Pick<GraphFile, "path" | "module" | "result">[];
   contextFiles: Parameters<typeof crates>[0];
+  /**
+   * C-43: the toolchain route is on and answered. Links carrying `tc` (a
+   * checkout symbol id from the strict join) are decided here.
+   */
+  toolchain?: { rustAnalyzer: string; configuration: string };
 };
+
+/** Toolchain answers by outcome, and the first disagreements. */
+export interface ToolchainDecisions {
+  counts: Record<string, number>;
+  disagreements: Json[];
+}
+const DISAGREEMENT_LIMIT = 50;
+const beyondTest = (gates: readonly Json[] | undefined) =>
+  (gates ?? []).some((gate) => gate !== "test");
+/** Link data that explains an open link; dropped when the toolchain decides it. */
+const OPEN_DATA = [
+  "uncertainty",
+  "targets",
+  "targetCount",
+  "opaqueAttributes",
+  "cause",
+  "assumes",
+];
 
 const cargoInputs = (files: readonly ContextFile[]) =>
   files.map(({ path, status, text }) => ({ path, status, text }));
@@ -54,12 +84,116 @@ const symbolOrder = (symbols: readonly GraphSymbol[]) =>
 const linkOrder = (links: readonly GraphLink[]) =>
   bySite(links, (l) => [l.origin, l.targetName, l.sourceKey ?? ""]);
 
+/**
+ * C-43: decide each link the strict join answered, against the source-only
+ * answer and the cfg conditions this analysis found:
+ * - a link under a cfg condition other than `test` takes no answer (the
+ *   toolchain sees one configuration);
+ * - an answer whose target is under such a condition, or shares its
+ *   identity with another symbol (a cfg variant), takes no answer, and a
+ *   candidate set holding such a symbol stays a candidate set;
+ * - a source-only definite target that differs is kept, and counted;
+ * - a source-only library answer is kept;
+ * - a candidate set holding the answer, or an unresolved link, becomes
+ *   definite. The answer is recorded on the link (`toolchain`), and the
+ *   resolve phase applies it where the source-only answer is still open.
+ */
+function decideToolchain(
+  updated: readonly { path: string }[],
+  facts: readonly { symbols: GraphSymbol[]; links: GraphLink[] }[],
+  byPath: Map<string, { result: AnalyzedFile["result"] }>,
+  resolutions: Map<string, LinkResolution>,
+  toolchain: NonNullable<RustAnalysisInput["toolchain"]>,
+): ToolchainDecisions {
+  const counts: Record<string, number> = {};
+  const disagreements: Json[] = [];
+  const bump = (key: string) => (counts[key] = (counts[key] ?? 0) + 1);
+  // Final symbol conditions, and how many symbols share each identity.
+  const gated = new Set<string>();
+  const identityOf = new Map<string, string>();
+  const identities = new Map<string, number>();
+  updated.forEach((f, i) => {
+    const symbols = byPath.get(f.path)?.result.symbols;
+    if (!symbols) return;
+    symbols.forEach((symbol, j) => {
+      const id = facts[i]!.symbols[j]!.id;
+      const data = (symbol.data ?? {}) as Record<string, Json>;
+      if (beyondTest(data.conditions as Json[] | undefined)) gated.add(id);
+      const identity = `${symbol.kind}\u0000${symbol.identity}`;
+      identityOf.set(id, identity);
+      identities.set(identity, (identities.get(identity) ?? 0) + 1);
+    });
+  });
+  const variant = (id: string) =>
+    gated.has(id) || (identities.get(identityOf.get(id) ?? "") ?? 0) > 1;
+  updated.forEach((f, i) => {
+    const a = byPath.get(f.path);
+    if (!a) return;
+    a.result.links = a.result.links.map((l, j) => {
+      const data = (l.data ?? {}) as Record<string, Json>;
+      if (!("tc" in data)) return l;
+      const { tc, ...rest } = data;
+      const target = String(tc);
+      const id = facts[i]!.links[j]!.id;
+      const kept = (why: string) => {
+        bump(why);
+        return { ...l, data: rest };
+      };
+      if (beyondTest(rest.conditions as Json[] | undefined))
+        return kept("withheld:cfg-link");
+      if (!identityOf.has(target)) return kept("withheld:no-symbol");
+      if (variant(target)) return kept("withheld:cfg-variant");
+      const r = resolutions.get(id);
+      let from: "definite" | "candidates" | "unresolved";
+      if (r?.targetId) {
+        if (r.targetId !== target) {
+          if (disagreements.length < DISAGREEMENT_LIMIT)
+            disagreements.push({
+              file: f.path,
+              range: [l.range.start, l.range.end],
+              kind: l.kind,
+              name: l.targetName,
+              sourceOnly: r.targetId,
+              toolchain: target,
+            });
+          return kept("kept:source-only-differs");
+        }
+        from = "definite";
+      } else if (r?.library) return kept("kept:source-only-library");
+      else if (r?.candidateIds) {
+        if (!r.candidateIds.includes(target))
+          return kept("kept:outside-candidate-set");
+        if (r.libraries?.length || r.candidateIds.some(variant))
+          return kept("withheld:cfg-variant");
+        from = "candidates";
+      } else from = "unresolved";
+      bump(`definite:${from}`);
+      const decided: Record<string, Json> = { ...rest };
+      if (from !== "definite") for (const key of OPEN_DATA) delete decided[key];
+      decided.toolchain = {
+        origin: "toolchain",
+        rustAnalyzer: toolchain.rustAnalyzer,
+        configuration: toolchain.configuration,
+        upgrade: "definite",
+        from,
+        ...(from === "definite" ? {} : { target }),
+      };
+      return { ...l, data: decided };
+    });
+  });
+  return { counts, disagreements };
+}
+
 export const rustPhases = {
   analyze({
     projectId,
     files: listed,
     contextFiles: contexts,
-  }: RustAnalysisInput) {
+    toolchain,
+  }: RustAnalysisInput): {
+    files: AnalyzedFile[];
+    toolchain?: ToolchainDecisions;
+  } {
     const files = pathOrder(listed),
       contextFiles = pathOrder(contexts);
     const roots = new Map(
@@ -96,8 +230,11 @@ export const rustPhases = {
                 cause,
                 opaqueAttributes,
                 receiverTyping,
+                // A previous run's toolchain record is decided again.
+                toolchain: _toolchain,
                 ...rest
               } = (l.data ?? {}) as Record<string, Json>;
+              void _toolchain;
               return {
                 ...l,
                 data: {
@@ -150,7 +287,7 @@ export const rustPhases = {
     const conditions = new Map<string, string[]>();
     const assumedScope = new Set<string>();
     const notes = new Map<string, Record<string, Json>>();
-    resolveRust(
+    const resolutions = resolveRust(
       {
         projectId,
         files: updated,
@@ -258,7 +395,17 @@ export const rustPhases = {
             : l;
         });
     }
-    return analyzed;
+    if (!toolchain) return { files: analyzed };
+    return {
+      files: analyzed,
+      toolchain: decideToolchain(
+        updated,
+        facts,
+        byPath,
+        new Map(resolutions.map((r) => [r.linkId, r])),
+        toolchain,
+      ),
+    };
   },
   resolve(input: Parameters<typeof resolveRust>[0]) {
     const ctx = {
@@ -269,20 +416,49 @@ export const rustPhases = {
       links: linkOrder(input.links),
     };
     const links: AddedLink[] = [];
-    const resolutions = resolveRust(ctx, undefined, undefined, undefined, (l) =>
-      links.push(l),
+    let resolutions = resolveRust(
+      ctx,
+      undefined,
+      undefined,
+      undefined,
+      (l) => links.push(l),
     );
+    // C-43: the toolchain's answer, where the source-only one is still open.
+    const upgraded = new Map<string, string>();
+    for (const link of ctx.links) {
+      const record = (link.data as { toolchain?: Record<string, Json> })
+        ?.toolchain;
+      if (
+        record?.origin === "toolchain" &&
+        typeof record.target === "string" &&
+        record.from !== "definite"
+      )
+        upgraded.set(link.id, record.target);
+    }
+    if (upgraded.size) {
+      const seen = new Set<string>();
+      resolutions = resolutions.map((r) => {
+        const target = upgraded.get(r.linkId);
+        if (target === undefined) return r;
+        seen.add(r.linkId);
+        return r.candidateIds || (!r.targetId && !r.library)
+          ? { linkId: r.linkId, targetId: target }
+          : r;
+      });
+      for (const [linkId, targetId] of upgraded)
+        if (!seen.has(linkId)) resolutions.push({ linkId, targetId });
+    }
     return {
       resolutions,
       links,
       missingLinkReason: "analysis-resolution-disagreement",
     };
   },
-} satisfies Pick<LanguageModule, "analyze" | "resolve">;
+};
 
 const rust: LanguageModule = {
   id: "rust",
-  version: "46",
+  version: "48",
   extensions: [".rs"],
   contextFiles: [
     "Cargo.toml",
@@ -291,20 +467,57 @@ const rust: LanguageModule = {
     "**/.cargo/config",
   ],
   parse: parseRust,
-  analyze({ projectId, files, contextFiles, signal }) {
+  async analyze({ projectId, files, contextFiles, signal, toolchain }) {
     if (!files.length) return [];
-    const context = {
+    // C-43: the opt-in toolchain route's answers, joined to the parsed links.
+    const route = toolchain
+      ? await rustRoute(toolchain, projectId, files, contextFiles)
+      : undefined;
+    const context: RustAnalysisInput = {
       projectId,
-      files: files.map(({ path, module, result }) => ({
-        path,
-        module,
-        result,
-      })),
+      files: files.map(({ path, module, result }) => {
+        const answers = route?.answers.get(path);
+        return {
+          path,
+          module,
+          result: answers
+            ? {
+                ...result,
+                links: result.links.map((link, index) =>
+                  answers.has(index)
+                    ? {
+                        ...link,
+                        data: {
+                          ...((link.data ?? {}) as Record<string, Json>),
+                          tc: answers.get(index)!,
+                        },
+                      }
+                    : link,
+                ),
+              }
+            : result,
+        };
+      }),
       contextFiles: cargoInputs(contextFiles),
+      ...(route
+        ? {
+            toolchain: {
+              rustAnalyzer: route.rustAnalyzer,
+              configuration: route.configuration,
+            },
+          }
+        : {}),
     };
-    return signal
-      ? runRustPhase({ phase: "analyze", context }, signal)
+    const output = signal
+      ? await runRustPhase({ phase: "analyze", context }, signal)
       : rustPhases.analyze(context);
+    if (toolchain && output.toolchain)
+      toolchain.note({
+        status: "merged",
+        decided: output.toolchain.counts,
+        disagreements: output.toolchain.disagreements,
+      });
+    return output.files;
   },
   resolve({ projectId, files, contextFiles, symbols, links, signal }) {
     if (!links.length) return [];

@@ -286,11 +286,24 @@ export class GraphView {
     const toolchainView = toolchainClipped
       ? {
           setting: toolchain.setting,
-          go: {
-            state: toolchain.go.state,
-            reason: clip(toolchain.go.reason, 400),
-            errorCount: toolchain.go.errors?.length ?? 0,
-          },
+          ...(toolchain.go
+            ? {
+                go: {
+                  state: toolchain.go.state,
+                  reason: clip(toolchain.go.reason, 400),
+                  errorCount: toolchain.go.errors?.length ?? 0,
+                },
+              }
+            : {}),
+          ...(toolchain.rust
+            ? {
+                rust: {
+                  state: toolchain.rust.state,
+                  reason: clip(toolchain.rust.reason, 400),
+                  partialCount: toolchain.rust.partial?.length ?? 0,
+                },
+              }
+            : {}),
           detailRef: this.detail("toolchain", toolchain),
         }
       : (toolchain ?? null);

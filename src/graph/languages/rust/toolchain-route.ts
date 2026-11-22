@@ -1,0 +1,127 @@
+// SPDX-License-Identifier: MIT
+/**
+ * C-43: the Rust toolchain route for one analysis. Runs rust-analyzer (or
+ * reads its cached index), joins the index to the snapshot's parsed links
+ * and returns each link's checkout answer, with a report note saying what
+ * happened. Source-only links stand wherever there is no answer.
+ */
+import { realpath } from "node:fs/promises";
+import { resolve } from "node:path";
+import type {
+  ContextFile,
+  GraphFile,
+  Json,
+  ToolchainRequest,
+} from "../../types.js";
+import { fileFacts } from "../../identity.js";
+import { readScip } from "./scip.js";
+import { joinScip } from "./toolchain-join.js";
+import { installation, runAnalyzer, type RunControls } from "./toolchain.js";
+
+export interface RouteAnswers {
+  /** Per file, per parsed link index: the checkout symbol id. */
+  answers: Map<string, Map<number, string>>;
+  rustAnalyzer: string;
+  configuration: string;
+}
+
+/** Test hooks for the run (controlled clock and limit). */
+let controls: RunControls = {};
+export const setRunControls = (next: RunControls) => {
+  controls = next;
+};
+
+export async function rustRoute(
+  request: ToolchainRequest,
+  projectId: string,
+  files: readonly GraphFile[],
+  contextFiles: readonly ContextFile[],
+): Promise<RouteAnswers | undefined> {
+  const unavailable = (reason: string) => {
+    request.note({ status: "unavailable", reason });
+    return undefined;
+  };
+  if (!contextFiles.some((file) => file.path === "Cargo.toml"))
+    return unavailable("no Cargo.toml at the project root");
+  const workDir = resolve(request.workDir, "rust");
+  const install = await installation(
+    request.setting,
+    request.environment,
+    workDir,
+    request.signal,
+  );
+  if ("unavailable" in install) return unavailable(install.unavailable);
+  let root: string;
+  try {
+    root = await realpath(resolve(request.root));
+  } catch {
+    return unavailable(`the project root ${request.root} cannot be read`);
+  }
+  const rust = files.filter(
+    (file) => file.module === "rust" && file.path.endsWith(".rs"),
+  );
+  const run = await runAnalyzer(
+    root,
+    install,
+    rust.map((file) => ({ path: file.path, text: file.text, hash: file.hash })),
+    contextFiles.map((file) => ({
+      path: file.path,
+      text: file.status === "clean" ? file.text : undefined,
+    })),
+    workDir,
+    request.signal,
+    controls,
+  );
+  if ("unavailable" in run) return unavailable(run.unavailable);
+  let documents;
+  try {
+    documents = readScip(run.scip);
+  } catch (error) {
+    return unavailable(
+      `rust-analyzer's index cannot be read: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  // A library root rust-analyzer did not index: its files have no answers.
+  const indexed = new Set(documents.map((doc) => doc.path));
+  const partial = [
+    ...run.partial,
+    ...run.facts.libraryRoots
+      .filter((path) => !indexed.has(path))
+      .map((path) => `crate root ${path} is not in the index`),
+  ];
+  const joined = joinScip(
+    documents,
+    rust
+      .filter((file) => file.result.status !== "failed")
+      .map((file) => ({
+        path: file.path,
+        text: file.text,
+        result: file.result,
+        symbolIds: fileFacts(projectId, file).symbols.map((s) => s.id),
+      })),
+    run.facts,
+  );
+  request.note({
+    status: "available",
+    rustAnalyzer: install.analyzer,
+    version: install.analyzerVersion,
+    rustc: install.rustcVersion,
+    ...(install.rustupToolchain ? { toolchain: install.rustupToolchain } : {}),
+    configuration: install.configuration,
+    cached: run.cached,
+    key: run.key,
+    // An observation only; nothing depends on it.
+    analyzerMs: Math.round(run.elapsedMs),
+    documents: joined.documents,
+    partial,
+    join: joined.counts as unknown as Json,
+  });
+  // A partial index answers no link: a missing build script output or
+  // dependency can make rust-analyzer name another item of the same name.
+  if (partial.length) return undefined;
+  return {
+    answers: joined.answers,
+    rustAnalyzer: install.analyzerVersion,
+    configuration: install.configuration,
+  };
+}
