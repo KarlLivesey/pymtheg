@@ -3225,3 +3225,19 @@ savepoints per write (several times slower inserts), batches bounded by
 time, batching under a rollback journal (a batch larger than the page cache
 would lock readers out), and 50,000 pages or fewer per checkpoint (most of
 the gain lost). See [C-37](changes/C-37.md).
+
+### C-40 An analysis leaves no TypeScript program behind
+
+**Decided (C-40):** when the TypeScript module's `analyze` returns or
+throws, its cache of parsed compiler library files is cleared, and so is the
+last syntax node it passed to a checker. **Why:** programs share the cached
+library files and each checker records its facts on their symbols, so the
+cache kept the last program and its checker alive for the rest of the run:
+on microsoft/TypeScript the 27,000-file program, 2.75 GB of a 4.2 GB heap,
+through every later write and resolution. It ran out of the default heap at
+the Go resolution input. With the cache released it finishes at the default
+heap. **Trade:** each analysis parses the library files again (once per CLI
+command, as before; once per sync in a long-lived process). **Rules out
+for now:** streaming a module's results to the store. The results were
+small (298 MiB as JSON on microsoft/TypeScript); the retained program was
+the cost. See [C-40](changes/C-40.md).

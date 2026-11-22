@@ -925,9 +925,10 @@ accept the arguments.
   The 100-file cap counts compiler failures a program imports from another
   project. A member of a namespace that is no symbol (a namespace inside a
   plain block) is contained by the next container out that is one.
-  microsoft/TypeScript indexes with a 12,000 MB heap but not with the
-  default one: the indexer holds a module's whole analysis output while it
-  writes it.
+  microsoft/TypeScript indexes at Node's default heap (C-40: 33 min 53 s
+  on the dev server, exit 2 with its 12,477 failed files). Before C-40 it
+  needed a larger heap, because the module's cache of parsed library files
+  kept the last program alive after the analysis.
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.
