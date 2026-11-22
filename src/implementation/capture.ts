@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { realpath, stat } from "node:fs/promises";
+import { safeGit } from "../shared/safe-git.js";
 import { resolve, relative, isAbsolute } from "node:path";
 import { sourceFileByteLimit } from "../shared/source-limits.js";
 import { SourceReadError, readSourceBytes } from "../shared/source-read.js";
@@ -117,7 +118,8 @@ export async function captureImplementation(
     files.push({ path, text, hash: hash(text) });
   }
   const workspace = await findWorkspace(root);
-  const git = await runProcess("git", ["rev-parse", "HEAD"], {
+  // D22: Git is asked with the folder's configuration unable to start a program.
+  const git = await safeGit(["rev-parse", "HEAD"], {
     cwd: root,
     signal,
     timeoutMs: 5000,
@@ -130,8 +132,7 @@ export async function captureImplementation(
       ? git.stdout.trim()
       : null;
   const status = commit
-    ? await runProcess(
-        "git",
+    ? await safeGit(
         ["status", "--porcelain", "--", ...files.map((file) => file.path)],
         { cwd: root, signal, timeoutMs: 5000, maxBytes: 65536 },
       )

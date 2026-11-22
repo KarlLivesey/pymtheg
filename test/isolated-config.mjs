@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { DEFAULT_INHERITED_ENV_VARS } from "@modelcontextprotocol/client/stdio";
 
 process.env.PYMTHEG_TEST = "1";
+if (!process.env.PYMTHEG_CACHE_HOME)
+  process.env.PYMTHEG_CACHE_HOME = mkdtempSync(join(tmpdir(), "pym-cache-"));
 if (!process.env.PYMTHEG_CONFIG_HOME)
   process.env.PYMTHEG_CONFIG_HOME = mkdtempSync(join(tmpdir(), "pym-config-"));
 
@@ -16,6 +18,10 @@ if (!process.env.PYMTHEG_CONFIG_HOME)
 // the variables a child inherits; the isolated folder must be one of them.
 // PYMTHEG_TEST goes with it, so a child that loses only the folder refuses to
 // write (local-trust.ts) rather than touching the real file.
-for (const name of ["PYMTHEG_CONFIG_HOME", "PYMTHEG_TEST"])
+for (const name of [
+  "PYMTHEG_CONFIG_HOME",
+  "PYMTHEG_CACHE_HOME",
+  "PYMTHEG_TEST",
+])
   if (!DEFAULT_INHERITED_ENV_VARS.includes(name))
     DEFAULT_INHERITED_ENV_VARS.push(name);

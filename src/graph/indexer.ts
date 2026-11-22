@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { readdir, readFile } from "node:fs/promises";
+import { toolchainWorkDirectory } from "../project/local-trust.js";
 import { join, resolve } from "node:path";
 import { compare, contentHash, validateResult } from "./identity.js";
 import { resolutionFacts } from "./analysis.js";
@@ -399,8 +400,7 @@ export async function indexProject(
               root,
               setting,
               workDir:
-                options.toolchainDirectory ??
-                resolve(root, ".pymtheg", "rebuildable", "toolchain"),
+                options.toolchainDirectory ?? toolchainWorkDirectory(root),
               environment: options.environment ?? process.env,
               ...(options.signal ? { signal: options.signal } : {}),
               note: (note) =>

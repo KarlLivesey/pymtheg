@@ -37,7 +37,11 @@ import {
   trustState,
   type TrustState,
 } from "../shared/config.js";
-import { readLocalTrust } from "../project/local-trust.js";
+import {
+  readLocalTrust,
+  toolchainWorkDirectory,
+  toolInsideCheckout,
+} from "../project/local-trust.js";
 import { readWorkspace } from "../project/workspace.js";
 import { trustAnswerHow } from "../project/trust.js";
 import { dirname, join } from "node:path";
@@ -241,6 +245,7 @@ export async function executeGraph(
     let trust: TrustState | undefined;
     let ignoredPaths: string[] = [];
     const insidePaths: string[] = [];
+    const hardLinked: string[] = [];
     try {
       const { config } = await loadConfig(root);
       const local = await readLocalTrust(root);
@@ -251,10 +256,12 @@ export async function executeGraph(
       // user's own configuration names it. The route stays off.
       for (const [key, setting] of Object.entries(toolchains)) {
         if (typeof setting !== "string") continue;
-        if (await insideCheckout(setting, root)) {
+        if (await toolInsideCheckout(setting, root)) {
           delete toolchains[key];
           insidePaths.push(key);
-        }
+        } else if (((await stat(setting).catch(() => null))?.nlink ?? 1) > 1)
+          // A second name for the same file could live in the checkout.
+          hardLinked.push(key);
       }
       if (await readWorkspace(root).catch(() => null))
         trust = trustState(config, local);
@@ -283,10 +290,8 @@ export async function executeGraph(
         metadata,
       );
     const complete = previousState?.fingerprint === currentFingerprint();
-    const toolchainDirectory = join(
-      dirname(storagePath(root, "graph")),
-      "toolchain",
-    );
+    // D22: outside the checkout (the user's cache folder), never in it.
+    const toolchainDirectory = toolchainWorkDirectory(root);
     // The completion and the analysis completion are read again in one
     // snapshot, which supplies the answer. The analysis completion names
     // each incremental module that owns a stored file, as an index run
@@ -674,6 +679,12 @@ export async function executeGraph(
             "Toolchain-backed facts are as recorded at the last sync; the toolchain's inputs (Go version, go.mod/go.sum, local replace targets, Go files outside the index) were not re-checked. Sync (a query without --no-sync, or graph index) to re-check them.",
           files: [],
         });
+      if (hardLinked.length)
+        response.warnings.push({
+          code: "tool-file-hard-linked",
+          message: `The tool file for ${hardLinked.join(", ")} in your trust answer has more than one hard link; another name for it could be inside a repository. Check it is the tool you mean.`,
+          files: [],
+        });
       if (insidePaths.length)
         response.warnings.push({
           code: "tool-path-inside-checkout",
@@ -812,37 +823,5 @@ export async function executeGraph(
     return response;
   } finally {
     stageSync("command.sqliteClose", () => store?.close());
-  }
-}
-
-/**
- * Whether a tool path lies inside the checkout, by file identity: each
- * directory from the tool's resolved location up to the file-system root is
- * compared with the checkout root by device and inode, so neither spelling,
- * symlinks nor a case-insensitive or normalising file system can hide it.
- */
-async function insideCheckout(tool: string, root: string): Promise<boolean> {
-  let rootInfo;
-  try {
-    rootInfo = await stat(root);
-  } catch {
-    return false;
-  }
-  let dir: string;
-  try {
-    dir = dirname(await realpath(tool));
-  } catch {
-    dir = dirname(tool);
-  }
-  for (;;) {
-    try {
-      const info = await stat(dir);
-      if (info.dev === rootInfo.dev && info.ino === rootInfo.ino) return true;
-    } catch {
-      /* an unreadable level: keep walking up */
-    }
-    const parent = dirname(dir);
-    if (parent === dir) return false;
-    dir = parent;
   }
 }

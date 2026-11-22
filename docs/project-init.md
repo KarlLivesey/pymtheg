@@ -52,7 +52,7 @@ repository.
   runs its build scripts and macros, as building it would. Today this turns on
   the Go toolchain route, with its existing policy: offline by default and cgo
   off.
-- **Source only** means Pymtheg never runs anything from the repository.
+- **Source only** means no build tool and no code from the repository is run; Pymtheg still reads its files and asks Git about them, with the repository's Git configuration unable to start a program.
 
 **The answer belongs to you, never to the repository.** It is kept outside
 every checkout, in the user's own configuration (`$PYMTHEG_CONFIG_HOME`, else `$XDG_CONFIG_HOME/pymtheg/`, `~/.config/pymtheg/`, `~/Library/Application Support/pymtheg/` on macOS or `%APPDATA%\pymtheg\` on Windows; file `trust.json`, user-only), keyed by the checkout's real path with the
@@ -64,7 +64,7 @@ file means unanswered, never trusted. Nothing committed can grant trust: a commi
 `"graph": {"trust": "trusted"}` is at most the answer init preselects, while a
 committed `"graph": {"trust": "source-only"}` binds on every machine (the
 repository's author may forbid build tools) and init then refuses `--trust`.
-A checkout with no answer here is **unanswered**: nothing from it runs, and
+A checkout with no answer here is **unanswered**: it is treated as source only, and
 graph answers report `trust: "unanswered"` with `trustAnswer`, one line on how
 to answer. Graph commands never prompt; only init asks.
 
@@ -89,6 +89,12 @@ How each path asks:
   takes `trust` to record the answer, and the first planning write's `trust`
   records it too. Studio setup asks when the checkout has no answer.
 - **Nested folders.** A folder inside a project uses that project's answer.
+
+Trust is for the folder. A different repository later cloned at a trusted
+path with the same committed project id keeps the answer, and so does
+checking out another branch, even an untrusted one, in a trusted checkout:
+answer again with `pymtheg trust --revoke` and init when what the folder
+holds changes hands.
 
 Re-running init never changes a recorded answer. `pymtheg trust` lists your
 answers; `pymtheg trust --revoke [DIRECTORY]` removes one, after which the next

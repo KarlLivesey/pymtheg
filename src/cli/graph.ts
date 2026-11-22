@@ -39,7 +39,7 @@ export function formatGraph(response: GraphResponse): string {
       response.trust === "trusted"
         ? "Trust: trusted on this machine (build tools may run on this project)"
         : response.trust === "source-only"
-          ? "Trust: source only (nothing from this project is run)"
+          ? "Trust: source only (no build tool and no code from this project is run)"
           : `Trust: unanswered. ${response.trustAnswer ?? ""}`,
     );
   // The opt-in toolchain route (absent when off).

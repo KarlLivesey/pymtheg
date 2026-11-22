@@ -35,7 +35,9 @@ import {
 } from "../dist/project/workspace.js";
 import {
   readLocalTrust,
+  revokeTrust,
   trustFile,
+  trustLockHooks,
   writeLocalTrust,
 } from "../dist/project/local-trust.js";
 import { askTrust, TrustCancelled } from "../dist/project/trust.js";
@@ -498,7 +500,7 @@ test("graph answers report the trust on this machine: unanswered says how to ans
         assert.equal(response.trust, "unanswered");
         assert.match(
           response.trustAnswer,
-          /^No trust answer on this machine, so nothing from this repository is run\./,
+          /^No trust answer on this machine, so no build tool and no code from this repository is run\./,
         );
       } else {
         assert.equal(response.trust, "source-only");
@@ -955,7 +957,8 @@ test("a corrupt answers file is moved aside, user-only, not silently replaced; t
     const kept = join(dirname(file), aside.at(-1));
     assert.equal(await readFile(kept, "utf8"), "{ not json");
     assert.equal(statSync(kept).mode & 0o777, 0o600);
-    assert.equal(statSync(dirname(file)).mode & 0o777, 0o700);
+    // A folder the user named (PYMTHEG_CONFIG_HOME) is left as it is.
+    assert.equal(statSync(dirname(file)).mode & 0o777, 0o755);
     assert.equal(await checkoutTrust(root), "trusted");
     // A wrong-typed entry is set aside the same way; the valid entries stay.
     const answers = JSON.parse(await readFile(file, "utf8"));
@@ -1022,5 +1025,266 @@ test("a tool path reaching the checkout through a symlink chain, or a checkout o
       );
       assert.equal(existsSync(marker), false);
     }
+  });
+});
+
+// ---------------------------------------------------------------- the answers-file lock (round 4)
+
+/** A promise and its resolver. */
+const gate = () => {
+  let open;
+  const promise = new Promise((resolve) => (open = resolve));
+  return { promise, open };
+};
+
+test("the lock: a writer holding it makes another wait until it is done; both answers are kept", async () => {
+  await scratch(async (root) => {
+    const [a, b] = [join(root, "a"), join(root, "b")];
+    for (const project of [a, b]) await initializeWorkspace(project);
+    const entered = gate(),
+      proceed = gate(),
+      bWaiting = gate();
+    let first = true;
+    trustLockHooks.afterLock = async () => {
+      if (!first) return;
+      first = false;
+      entered.open();
+      await proceed.promise;
+    };
+    trustLockHooks.onWait = (why) => why === "held" && bWaiting.open();
+    try {
+      const writingA = writeLocalTrust(a, "trusted");
+      await entered.promise;
+      let bDone = false;
+      const writingB = writeLocalTrust(b, "source-only").then(
+        () => (bDone = true),
+      );
+      await bWaiting.promise;
+      assert.equal(bDone, false, "B wrote while A held the lock");
+      proceed.open();
+      await Promise.all([writingA, writingB]);
+    } finally {
+      trustLockHooks.afterLock = undefined;
+      trustLockHooks.onWait = undefined;
+    }
+    assert.equal(await checkoutTrust(a), "trusted");
+    assert.equal(await checkoutTrust(b), "source-only");
+  });
+});
+
+test("the lock: an unreadable lock is held, never taken; a dead owner's lock is taken over; a foreign lock is never released", async () => {
+  await scratch(async (root) => {
+    await initializeWorkspace(root);
+    const lock = join(dirname(trustFile()), "trust.json.lock");
+    mkdirSync(dirname(lock), { recursive: true });
+    // Unreadable (empty, as a lock being created would look to a reader once).
+    await writeFile(lock, "");
+    const waiting = gate();
+    trustLockHooks.onWait = (why) => why === "unreadable" && waiting.open();
+    try {
+      let done = false;
+      const writing = writeLocalTrust(root, "trusted").then(
+        () => (done = true),
+      );
+      await waiting.promise;
+      assert.equal(done, false, "an unreadable lock was taken");
+      await rm(lock);
+      await writing;
+    } finally {
+      trustLockHooks.onWait = undefined;
+    }
+    assert.equal(await checkoutTrust(root), "trusted");
+    // A dead owner (a process that has exited): taken over.
+    const dead = spawnSync(
+      process.execPath,
+      ["-e", "process.stdout.write(String(process.pid))"],
+      { encoding: "utf8" },
+    );
+    await writeFile(lock, `${dead.stdout} 1 dead-token`);
+    await revokeTrust(root);
+    assert.equal(await checkoutTrust(root), "unanswered");
+    assert.equal(existsSync(lock), false);
+    // A lock that another writer holds by the time we release is not ours to remove.
+    trustLockHooks.afterLock = async () => {
+      await writeFile(lock, `${process.pid} 0 someone-else`);
+    };
+    try {
+      await writeLocalTrust(root, "trusted");
+    } finally {
+      trustLockHooks.afterLock = undefined;
+    }
+    assert.equal(await readFile(lock, "utf8"), `${process.pid} 0 someone-else`);
+    await rm(lock);
+  });
+});
+
+test("the lock under contention: twelve inits at once, three rounds, and a revoke racing them, lose nothing", async () => {
+  await scratch(async (root) => {
+    const spawnCli = (args) =>
+      new Promise((done, fail) => {
+        const child = spawn(process.execPath, [cli, ...args], {
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        let out = "";
+        child.stdout.on("data", (d) => (out += d));
+        child.on("exit", (code) =>
+          code === 0
+            ? done(out)
+            : fail(Error(`${args.join(" ")} exited ${code}`)),
+        );
+      });
+    const victim = join(root, "victim");
+    await initializeWorkspace(victim, undefined, trusted);
+    for (let round = 0; round < 3; round++) {
+      const dirs = Array.from({ length: 12 }, (_, i) =>
+        join(root, `r${round}-${i}`),
+      );
+      for (const dir of dirs) await initializeWorkspace(dir);
+      const [revoked] = await Promise.all([
+        spawnCli(["trust", "--revoke", victim]),
+        ...dirs.map((dir) => spawnCli(["init", dir, "--trust"])),
+      ]);
+      for (const dir of dirs)
+        assert.equal(await checkoutTrust(dir), "trusted", dir);
+      assert.match(revoked, /Removed the trust answer/);
+      assert.equal(await checkoutTrust(victim), "unanswered");
+      await writeLocalTrust(victim, "trusted");
+    }
+  });
+});
+
+test("pymtheg trust: --revoke json revokes the folder named json, and --format text works", async () => {
+  await scratch(async (root) => {
+    const folder = join(root, "json");
+    await initializeWorkspace(folder, undefined, trusted);
+    const run = (...args) =>
+      spawnSync(process.execPath, [cli, "trust", ...args], {
+        encoding: "utf8",
+        cwd: root,
+      });
+    assert.match(run("--format", "text").stdout, /^Trust answers/);
+    const revoked = run("--revoke", "json");
+    assert.match(revoked.stdout, /Removed the trust answer for .*json/);
+    assert.equal(await checkoutTrust(folder), "unanswered");
+    assert.notEqual(run("--format", "yaml").status, 0);
+  });
+});
+
+test("a configuration home inside the checkout is refused", async () => {
+  await scratch(async (root) => {
+    await initializeWorkspace(root);
+    const inside = join(root, "cfg");
+    const result = spawnSync(process.execPath, [cli, "init", root, "--trust"], {
+      encoding: "utf8",
+      env: { ...process.env, PYMTHEG_CONFIG_HOME: inside },
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr + result.stdout, /lies inside this checkout/);
+    assert.equal(await checkoutTrust(root), "unanswered");
+  });
+});
+
+test("source only: a folder's Git configuration cannot start a program when Pymtheg asks Git", async () => {
+  await scratch(async (root) => {
+    for (const answer of ["source-only", undefined]) {
+      const project = join(root, answer ?? "unanswered");
+      mkdirSync(project);
+      const marker = join(root, `git-ran-${answer ?? "unanswered"}.txt`);
+      const script = join(root, `evil-${answer ?? "unanswered"}.sh`);
+      await writeFile(script, `#!/bin/sh\necho ran >> '${marker}'\ncat\n`);
+      chmodSync(script, 0o755);
+      git(project, "init", "--quiet");
+      await writeFile(join(project, "a.ts"), "export const a = 1;\n");
+      git(project, "add", "a.ts");
+      git(
+        project,
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@example.invalid",
+        "commit",
+        "--quiet",
+        "-m",
+        "a",
+      );
+      // The folder arrives with configuration naming a program, and an
+      // attribute applying a filter driver to the file.
+      await writeFile(join(project, ".gitattributes"), "*.ts filter=evil\n");
+      const config = join(project, ".git", "config");
+      await writeFile(
+        config,
+        (await readFile(config, "utf8")) +
+          `[core]\n\tfsmonitor = ${script}\n[filter "evil"]\n\tclean = ${script}\n\tsmudge = ${script}\n[diff]\n\texternal = ${script}\n`,
+      );
+      // Touch the file so status re-reads it through the filter.
+      await writeFile(join(project, "a.ts"), "export const a = 2;\n");
+      const init = spawnSync(
+        process.execPath,
+        [cli, "init", project, ...(answer ? ["--source-only"] : [])],
+        { encoding: "utf8", input: "" },
+      );
+      assert.equal(init.status, 0, init.stderr);
+      if (!answer) await revokeTrust(project);
+      const observed = spawnSync(
+        process.execPath,
+        [cli, "observe", "a.ts", "--root", project, "--format", "json"],
+        { encoding: "utf8" },
+      );
+      assert.equal(observed.status, 0, observed.stderr);
+      assert.equal(
+        existsSync(marker),
+        false,
+        `the repository's Git configuration started a program (${answer ?? "unanswered"})`,
+      );
+    }
+  });
+});
+
+test("a Go helper planted in the checkout is never run: toolchain work lives in the user's cache", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    cpSync(GO_FIXTURE, project, { recursive: true });
+    await initializeWorkspace(project, undefined, trusted);
+    const marker = join(root, "planted-ran.txt");
+    const planted = join(project, ".pymtheg/rebuildable/toolchain/go");
+    mkdirSync(planted, { recursive: true });
+    for (let i = 0; i < 4; i++) {
+      const name = join(
+        planted,
+        `golinks-${"0123456789abcdef".slice(i)}${"0".repeat(i)}`,
+      );
+      await writeFile(name, `#!/bin/sh\necho ran > '${marker}'\n`);
+      chmodSync(name, 0o755);
+    }
+    const { toolchainWorkDirectory } = await import(
+      "../dist/project/local-trust.js"
+    );
+    const work = toolchainWorkDirectory(project);
+    assert.equal(work.startsWith(process.env.PYMTHEG_CACHE_HOME), true);
+    assert.equal(work.startsWith(realpathSync(project)), false);
+    await executeGraph({ command: "index", root: project });
+    assert.equal(existsSync(marker), false);
+  });
+});
+
+test("the tool's own configuration folder (…/pymtheg) is tightened to user-only on a write", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    await initializeWorkspace(project);
+    const xdg = join(root, "xdg");
+    mkdirSync(join(xdg, "pymtheg"), { recursive: true, mode: 0o755 });
+    chmodSync(join(xdg, "pymtheg"), 0o755);
+    const { PYMTHEG_CONFIG_HOME: _home, ...env } = process.env;
+    const result = spawnSync(
+      process.execPath,
+      [cli, "init", project, "--trust"],
+      {
+        encoding: "utf8",
+        env: { ...env, XDG_CONFIG_HOME: xdg },
+      },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(statSync(join(xdg, "pymtheg")).mode & 0o777, 0o700);
+    assert.equal(statSync(xdg).mode & 0o777, statSync(xdg).mode & 0o777);
   });
 });

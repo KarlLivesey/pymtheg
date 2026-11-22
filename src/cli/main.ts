@@ -91,9 +91,14 @@ try {
     const { listTrust, revokeTrust, trustFile } = await import(
       "../project/local-trust.js"
     );
-    const rest = args
-      .slice(1)
-      .filter((arg) => arg !== "--format" && arg !== "json");
+    // --format takes a value (text or json); every other argument is positional.
+    const rest: string[] = [];
+    for (let i = 1; i < args.length; i++)
+      if (args[i] === "--format") {
+        if (!["text", "json"].includes(args[i + 1] ?? ""))
+          throw Error("Trust format must be text or json");
+        i++;
+      } else rest.push(args[i]!);
     if (rest[0] === "--revoke") {
       if (rest.length > 2)
         throw Error("Usage: pymtheg trust --revoke [DIRECTORY]");
@@ -101,7 +106,7 @@ try {
       const removed = await revokeTrust(target);
       process.stdout.write(
         removed
-          ? `Removed the trust answer for ${target}. The next init asks again; until then nothing from it runs.\n`
+          ? `Removed the trust answer for ${target}. The next init asks again; until then no build tool runs on it.\n`
           : `No trust answer is recorded for ${target}.\n`,
       );
     } else if (rest.length === 0 || rest[0] === "--list") {

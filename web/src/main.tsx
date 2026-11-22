@@ -1854,7 +1854,7 @@ function App() {
             // runs nothing until the question is answered.
             <button
               className="quiet-action trust-unanswered"
-              title="Nothing from this repository is run until you answer."
+              title="No build tool runs on this repository until you answer."
               onClick={() => setSetupOpen(true)}
             >
               Do you trust this repository? Answer

@@ -16,7 +16,8 @@
  * A moved or copied checkout is unanswered (another real path); each Git
  * worktree is its own path and is asked once.
  */
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { realpathSync } from "node:fs";
 import {
   chmod,
   link,
@@ -24,11 +25,12 @@ import {
   readFile,
   realpath,
   rename,
+  stat,
   unlink,
   writeFile,
 } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { identity, json } from "../shared/identity.js";
 import {
   projectTrustValues,
@@ -51,6 +53,87 @@ export function userConfigDirectory(
   if (process.platform === "win32" && env.APPDATA)
     return join(env.APPDATA, "pymtheg");
   return join(homedir(), ".config", "pymtheg");
+}
+/**
+ * The user's cache folder: $PYMTHEG_CACHE_HOME, else $XDG_CACHE_HOME/pymtheg,
+ * ~/Library/Caches/pymtheg on macOS, %LOCALAPPDATA%\pymtheg on Windows and
+ * ~/.cache/pymtheg elsewhere.
+ */
+export function userCacheDirectory(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  if (env.PYMTHEG_CACHE_HOME && isAbsolute(env.PYMTHEG_CACHE_HOME))
+    return env.PYMTHEG_CACHE_HOME;
+  if (env.XDG_CACHE_HOME && isAbsolute(env.XDG_CACHE_HOME))
+    return join(env.XDG_CACHE_HOME, "pymtheg");
+  if (process.platform === "darwin")
+    return join(homedir(), "Library", "Caches", "pymtheg");
+  if (process.platform === "win32" && env.LOCALAPPDATA)
+    return join(env.LOCALAPPDATA, "pymtheg");
+  return join(homedir(), ".cache", "pymtheg");
+}
+/**
+ * D22: where the toolchain routes build their helpers and keep their cached
+ * facts for one checkout: the user's cache folder, keyed by the checkout's
+ * real path, never inside the checkout, so nothing found in the working tree
+ * is ever run or read as toolchain output.
+ */
+export function toolchainWorkDirectory(root: string): string {
+  let real = root;
+  try {
+    real = realpathSync(root);
+  } catch {
+    /* a missing root keys by its path */
+  }
+  const key = createHash("sha256").update(real).digest("hex").slice(0, 24);
+  return join(userCacheDirectory(), "toolchain", key);
+}
+/**
+ * Whether a folder is the checkout or lies inside it, by file identity: it
+ * and each parent up to the file-system root are compared with the checkout
+ * root by device and inode, so neither spelling, symlinks nor a
+ * case-insensitive or normalising file system can hide it.
+ */
+export async function insideCheckout(
+  folder: string,
+  root: string,
+): Promise<boolean> {
+  let rootInfo;
+  try {
+    rootInfo = await stat(root);
+  } catch {
+    return false;
+  }
+  let dir = folder;
+  try {
+    dir = await realpath(folder);
+  } catch {
+    /* compare what exists of it */
+  }
+  for (;;) {
+    try {
+      const info = await stat(dir);
+      if (info.dev === rootInfo.dev && info.ino === rootInfo.ino) return true;
+    } catch {
+      /* an unreadable or missing level: keep walking up */
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return false;
+    dir = parent;
+  }
+}
+/** Whether a tool file lies inside the checkout (its folder, by identity). */
+export async function toolInsideCheckout(
+  tool: string,
+  root: string,
+): Promise<boolean> {
+  let path = tool;
+  try {
+    path = await realpath(tool);
+  } catch {
+    /* the route reports a missing tool */
+  }
+  return insideCheckout(dirname(path), root);
 }
 /** The user's trust answers. */
 export const trustFile = () => join(userConfigDirectory(), "trust.json");
@@ -159,6 +242,8 @@ export async function readLocalTrust(
   } catch {
     return undefined;
   }
+  // A configuration folder inside the checkout is the repository's: refused.
+  if (await insideCheckout(userConfigDirectory(), real)) return undefined;
   const entry = (await readAll())[real];
   if (!entry || entry.project !== (await projectId(real))) return undefined;
   return {
@@ -173,48 +258,132 @@ export async function readLocalTrust(
  * temporary file and renames it into place. A lock whose owner is gone is
  * taken over.
  */
+/** Test seams: pause points inside a write, and a report of each wait. */
+export const trustLockHooks: {
+  afterLock?: () => Promise<void>;
+  onWait?: (why: "held" | "unreadable") => void;
+} = {};
+
+interface LockOwner {
+  pid: number;
+  started: string;
+  token: string;
+}
+const parseLock = (text: string): LockOwner | undefined => {
+  const [pid, started, token, ...rest] = text.split(" ");
+  if (
+    !pid ||
+    !/^\d+$/.test(pid) ||
+    started === undefined ||
+    !token ||
+    rest.length
+  )
+    return undefined;
+  return { pid: Number(pid), started, token };
+};
+async function ownerAlive(owner: LockOwner): Promise<boolean> {
+  try {
+    process.kill(owner.pid, 0);
+  } catch (error) {
+    // EPERM: the process exists but is another user's.
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+  // A reused pid has another start time (where the system gives one).
+  return !owner.started || (await startTime(owner.pid)) === owner.started;
+}
+
+/**
+ * The answers-file lock. It is created whole: its content is written to a
+ * unique file, which is then hard-linked to the lock path, an atomic step
+ * that fails if a lock exists. A lock that cannot be read or parsed is held,
+ * never dead. A lock whose owner is gone is taken over atomically: it is
+ * renamed to a unique name, and only if what was renamed is the lock judged
+ * stale (same token) is it removed; otherwise it is linked back. A lock is
+ * released only if its token is ours.
+ */
+async function acquire(directory: string): Promise<string> {
+  const lock = join(directory, "trust.json.lock");
+  const token = randomUUID();
+  const content = `${process.pid} ${await startTime(process.pid)} ${token}`;
+  const staged = join(directory, `.lock.${token}.tmp`);
+  await writeFile(staged, content, { flag: "wx", mode: 0o600 });
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await link(staged, lock);
+        return token;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
+      let text: string;
+      try {
+        text = await readFile(lock, "utf8");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
+      }
+      const owner = parseLock(text);
+      if (!owner) trustLockHooks.onWait?.("unreadable");
+      else if (await ownerAlive(owner)) trustLockHooks.onWait?.("held");
+      else {
+        // Take over: move it aside, then check it is the stale one.
+        const aside = join(directory, `.lock.${token}.stale`);
+        try {
+          await rename(lock, aside);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+          throw error;
+        }
+        const moved = parseLock(await readFile(aside, "utf8").catch(() => ""));
+        if (moved?.token === owner.token) await unlink(aside);
+        else
+          // Someone else's lock: put it back if the path is still free.
+          await link(aside, lock)
+            .catch(() => {})
+            .finally(() => unlink(aside).catch(() => {}));
+        continue;
+      }
+      if (attempt > 4000)
+        throw Error(
+          `${lock} is held (${text.trim() || "unreadable"}); try again`,
+        );
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+  } finally {
+    await unlink(staged).catch(() => {});
+  }
+}
+async function release(directory: string, token: string): Promise<void> {
+  const lock = join(directory, "trust.json.lock");
+  const owner = parseLock(await readFile(lock, "utf8").catch(() => ""));
+  if (owner?.token === token) await unlink(lock).catch(() => {});
+}
+
+/** Whether the configuration folder is the tool's own (only that is chmodded). */
+const ownFolder = (directory: string) =>
+  !process.env.PYMTHEG_CONFIG_HOME || basename(directory) === "pymtheg";
+
 async function update(
   change: (entries: Record<string, Entry>) => void,
 ): Promise<void> {
   // A test run (npm test sets PYMTHEG_TEST) must never write the user's real
   // file: a process that lost its isolated folder fails loudly instead.
-  if (process.env.PYMTHEG_TEST && !process.env.PYMTHEG_CONFIG_HOME)
+  if (
+    process.env.PYMTHEG_TEST &&
+    !process.env.PYMTHEG_CONFIG_HOME &&
+    !process.env.XDG_CONFIG_HOME
+  )
     throw Error(
       "PYMTHEG_TEST is set but PYMTHEG_CONFIG_HOME is not: refusing to write the real trust answers from a test run",
     );
   const directory = userConfigDirectory();
   await mkdir(directory, { recursive: true, mode: 0o700 });
-  // The tool's own folder (never a parent) is kept user-only.
-  await chmod(directory, 0o700);
-  const lock = join(directory, "trust.json.lock");
-  const mine = `${process.pid} ${await startTime(process.pid)} ${randomUUID()}`;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      await writeFile(lock, mine, { flag: "wx", mode: 0o600 });
-      break;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-      const [pid = "0", started = ""] = (
-        await readFile(lock, "utf8").catch(() => "0")
-      ).split(" ");
-      const owner = Number(pid);
-      let alive = false;
-      try {
-        if (owner > 0) {
-          process.kill(owner, 0);
-          // A reused pid has another start time (where the system says).
-          alive = !started || (await startTime(owner)) === started;
-        }
-      } catch {
-        /* gone */
-      }
-      if (!alive) await unlink(lock).catch(() => {});
-      else if (attempt > 2000)
-        throw Error(`${lock} is held by process ${owner}; try again`);
-      else await new Promise((resolve) => setTimeout(resolve, 5));
-    }
-  }
+  // The tool's own folder (never a parent, never a folder the user named) is
+  // kept user-only; the file always is.
+  if (ownFolder(directory)) await chmod(directory, 0o700);
+  const token = await acquire(directory);
   try {
+    await trustLockHooks.afterLock?.();
     const { entries, whole } = await readFileEntries();
     if (!whole) {
       const aside = await setAside();
@@ -231,7 +400,7 @@ async function update(
     await chmod(staged, 0o600);
     await rename(staged, trustFile());
   } finally {
-    await unlink(lock).catch(() => {});
+    await release(directory, token);
   }
 }
 
@@ -269,6 +438,10 @@ export async function writeLocalTrust(
   const real = await realpath(root);
   const project = await projectId(real);
   if (!project) throw Error("The trust answer needs an initialised project");
+  if (await insideCheckout(userConfigDirectory(), real))
+    throw Error(
+      `The Pymtheg configuration folder ${userConfigDirectory()} lies inside this checkout, so no trust answer is kept there. Set PYMTHEG_CONFIG_HOME to a folder outside it.`,
+    );
   await update((entries) => {
     entries[real] = { project, trust, recorded: new Date().toISOString() };
   });
