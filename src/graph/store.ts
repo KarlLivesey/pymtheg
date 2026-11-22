@@ -170,7 +170,8 @@ export class SqliteGraphStore implements GraphStorage {
       if (isDatabaseFile(path)) this.turnstileFile = `${path}-turnstile`;
       // C-37: an open that finds its schema and identity in place writes
       // nothing, so a query opened writable takes no write lock. Otherwise
-      // the schema work passes the turnstile like any other write.
+      // the schema work is written before this connection has fixed its
+      // journal, so it takes no turnstile, as before C-37.
       const inPlace =
         this.schemaCurrent() &&
         !!this.db.prepare("SELECT 1 FROM graph_meta WHERE key='project'").get();
@@ -272,7 +273,18 @@ export class SqliteGraphStore implements GraphStorage {
     return this.turnstile;
   }
   private enterTurnstile(): boolean {
-    if (!this.openTurnstile()) return false;
+    // Only a connection that writes through the write-ahead log can batch,
+    // so only it takes turns: with a rollback journal every write commits
+    // alone, as before C-37, and taking the turnstile would only add a lock
+    // to each write. A connection fixes its journal at its first write
+    // (beforeWrite) and keeps that decision for its life, so it never holds
+    // the turnstile under one journal and asks for it under another. The
+    // constructor's schema work comes before that and takes no turn. One
+    // gap is accepted: a connection that kept the rollback journal because
+    // another connection blocked its switch takes no turn even if a later
+    // connection moves the file to the write-ahead log; its writes are then
+    // correct but wait without the one-batch bound.
+    if (!this.writeAheadLog || !this.openTurnstile()) return false;
     if (this.turnstileDepth === 0) this.turnstile!.exec("BEGIN IMMEDIATE");
     this.turnstileDepth++;
     return true;
@@ -373,19 +385,20 @@ export class SqliteGraphStore implements GraphStorage {
     state: "idle",
   };
   /**
-   * C-37: rows a batched write may add before it commits, as SQLite counts
-   * direct changes (total_changes()). A cold cli/cli index on disk took
-   * 224.5 s committing each file and 128.7 s in batches of 50,000 rows
-   * (with checkpoints every 100,000 pages); 20,000 rows was measured
-   * slower. One batch held the write lock for at most 4.6 s there; one
-   * module's resolution write, a single transaction before and after,
-   * held it longest (about 20 s). Tests lower it to put batch boundaries
-   * inside small fixtures.
+   * C-37: rows a batched write may add before it commits, counted as the
+   * direct changes each write statement reports (the rows it inserts,
+   * updates or deletes itself). Rows that triggers and cascades change are
+   * not counted, so a batch holds more rows than its budget: on restic a
+   * resolution batch cut at 50,000 direct changes held about 93,000 rows
+   * as SQLite's total_changes() counts them. A cold cli/cli index on disk
+   * took 224.5 s committing each file and 128.7 s in batches of 50,000
+   * (with checkpoints every 100,000 pages); 20,000 was measured slower.
+   * Tests lower it to put batch boundaries inside small fixtures.
    */
   static writeBatchRows = 50_000;
   /** Inside writeBatch: writes share one transaction until the budget is met. */
   private batching = false;
-  /** The total_changes() at which the open batch transaction began. */
+  /** The count of rows written (rowsWritten) when the open batch began. */
   private batchOpen: number | undefined;
   /**
    * C-37: runs `action` with its graph writes grouped into transactions of
@@ -426,7 +439,8 @@ export class SqliteGraphStore implements GraphStorage {
   }
   /**
    * Rows written by this connection's statements, as SQLite reports each
-   * statement's direct changes (the count `total_changes()` keeps), summed
+   * statement's direct changes (rows changed by triggers and cascades are
+   * not among them), summed
    * as the statements run, so counting a batch takes no SQL of its own.
    */
   private rowsWritten = 0;
