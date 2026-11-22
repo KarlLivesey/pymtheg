@@ -1,8 +1,8 @@
-{"id":"excalidraw/excalidraw","resolved":61380,"withoutAssumption":61330,"contextsDiffer":0,"contextsStampOnly":0}
-{"id":"honojs/hono","resolved":34654,"withoutAssumption":34654,"contextsDiffer":0,"contextsStampOnly":0}
-{"id":"reduxjs/redux-toolkit","resolved":23993,"withoutAssumption":23993,"contextsDiffer":0,"contextsStampOnly":0}
-{"id":"trpc/trpc","resolved":53059,"withoutAssumption":53059,"contextsDiffer":0,"contextsStampOnly":0}
-{"id":"vitejs/vite","resolved":23264,"withoutAssumption":16996,"contextsDiffer":10,"contextsStampOnly":10}
-{"id":"vitest-dev/vitest","resolved":72614,"withoutAssumption":36128,"contextsDiffer":8,"contextsStampOnly":8}
-{"id":"withastro/astro","resolved":66331,"withoutAssumption":60408,"contextsDiffer":4,"contextsStampOnly":4}
-{"resolved":335295,"withoutAssumption":286568}
+{"id":"excalidraw/excalidraw","resolved":61450,"withoutAssumption":61400,"contextsDiffer":0,"contextsStampOnly":0}
+{"id":"honojs/hono","resolved":36143,"withoutAssumption":36143,"contextsDiffer":0,"contextsStampOnly":0}
+{"id":"reduxjs/redux-toolkit","resolved":24005,"withoutAssumption":24005,"contextsDiffer":0,"contextsStampOnly":0}
+{"id":"trpc/trpc","resolved":53537,"withoutAssumption":53537,"contextsDiffer":0,"contextsStampOnly":0}
+{"id":"vitejs/vite","resolved":23604,"withoutAssumption":17168,"contextsDiffer":10,"contextsStampOnly":10}
+{"id":"vitest-dev/vitest","resolved":72619,"withoutAssumption":36133,"contextsDiffer":8,"contextsStampOnly":8}
+{"id":"withastro/astro","resolved":66332,"withoutAssumption":60408,"contextsDiffer":4,"contextsStampOnly":4}
+{"resolved":337690,"withoutAssumption":288794}
