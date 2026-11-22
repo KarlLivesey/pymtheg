@@ -3204,9 +3204,15 @@ the same run.
   binder declares members from bodies there.
 - **Checker:** the inferred type of each declaration outside bodies, as
   printed and with every declaration it reaches, in a program with each
-  text, in every program whose stored `loadedBy` names it. A named
+  text, in every program whose stored `loadedBy` names it. For a
+  signature, also its inferred type predicate (`x is A`) and `this`
+  type. A named
   declaration inside a body reached by one, or a printed type cut at a
   million characters, means the full analysis.
+
+The index report (`sync.report.analysisPaths`, and one line of the text
+output) names the path each module took, `reused`, `scoped` or `full`,
+and in order why a scoped analysis was not used.
 
 When both match, the file is extracted alone in each project that owns it,
 after the same warm-up as a full analysis. Every other stored result is

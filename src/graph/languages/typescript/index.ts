@@ -4,6 +4,7 @@ import ts from "typescript";
 import { contentHash } from "../../index.js";
 import { validSourceRange } from "../../identity.js";
 import type {
+  AnalysisPath,
   AnalyzedFile,
   Diagnostic,
   GraphFile,
@@ -151,9 +152,12 @@ export const statistics = {
   declined: {} as Record<string, number>,
 };
 
+/** This analysis's decline reasons, in order, for its index report. */
+let declines: string[] = [];
 /** Counts why a scoped analysis was not used; the full analysis follows. */
 const declined = (reason: string): undefined => {
   statistics.declined[reason] = (statistics.declined[reason] ?? 0) + 1;
+  declines.push(reason);
 };
 
 /** A program's name in `loadedBy`: its config, or "(inferred)". */
@@ -1007,6 +1011,12 @@ export function typescriptModule(
     dependencyInputs: true,
     incrementalAnalysis: true,
     analyze(context) {
+      declines = [];
+      const note = (path: AnalysisPath["path"]) =>
+        context.notePath?.({
+          path,
+          ...(declines.length && { declined: [...declines] }),
+        });
       const files = context.files.filter(readable);
       // Unchanged snapshot: stored facts came from a complete analysis of these
       // exact sources and contexts by this module version, so they are reused
@@ -1051,6 +1061,7 @@ export function typescriptModule(
           .map((file) => [file, syntaxFailure(file.path, file.text)] as const);
         if (again.every(([, failure]) => failure)) {
           statistics.reused++;
+          note("reused");
           return [
             ...kept.map((file) => ({ path: file.path, result: file.result })),
             ...again.map(([file, failure]) => ({
@@ -1141,10 +1152,14 @@ export function typescriptModule(
         } catch {
           declined("an exception");
         }
-        if (scoped) return scoped;
+        if (scoped) {
+          note(candidate.retriedOnly ? "reused" : "scoped");
+          return scoped;
+        }
       }
       // The full analysis reads the installed declarations afresh.
       if (context.dependencyInputs) context.dependencyInputs.refreshed = true;
+      note("full");
       return run(buildModel());
       /**
        * A stored result a scoped analysis can stand on: analysed by this

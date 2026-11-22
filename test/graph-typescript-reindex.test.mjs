@@ -716,6 +716,82 @@ test("TypeScript re-index equals cold: an object-producer lookup cut by its dept
 // C-38 review). Each edit changes only a body; each must leave the store
 // equal to cold. The audit in docs/changes/C-38.md lists every family.
 const BODY_CASES = [
+  // C-38 review round 2: inferred type predicates (TypeScript 5.5).
+  {
+    name: "an inferred type predicate narrowed by a guard added in the body",
+    files: {
+      "src/t.ts":
+        'export interface A { k: "a"; m(): void; onlyA(): void }\nexport interface B { k: "b"; m(): void }\nexport interface C { k: "c"; m(): void; onlyC(): void }\nexport function invariant(c: unknown): asserts c {}\n',
+      "src/f.ts":
+        'import type { A, B, C } from "./t";\nexport function isAC(x: A | B | C) {\n  return x.k !== "b";\n}\n',
+      "src/g.ts":
+        'import type { A, B, C } from "./t";\nimport { isAC } from "./f";\ndeclare const v: A | B | C;\nif (isAC(v)) {\n  v.m();\n  v.onlyA();\n}\n',
+    },
+    edit: {
+      "src/f.ts":
+        'import type { A, B, C } from "./t";\nexport function isAC(x: A | B | C) {\n  if (x.k === "c") throw new Error("c");\n  return x.k !== "b";\n}\n',
+    },
+  },
+  {
+    name: "an inferred type predicate widened by a guard removed from the body",
+    files: {
+      "src/t.ts":
+        'export interface A { k: "a"; m(): void; onlyA(): void }\nexport interface B { k: "b"; m(): void }\nexport interface C { k: "c"; m(): void; onlyC(): void }\nexport function invariant(c: unknown): asserts c {}\n',
+      "src/f.ts":
+        'import type { A, B, C } from "./t";\nexport function isAC(x: A | B | C) {\n  if (x.k === "c") throw new Error("c");\n  return x.k !== "b";\n}\n',
+      "src/g.ts":
+        'import type { A, B, C } from "./t";\nimport { isAC } from "./f";\ndeclare const v: A | B | C;\nif (isAC(v)) {\n  v.m();\n  v.onlyA();\n}\n',
+    },
+    edit: {
+      "src/f.ts":
+        'import type { A, B, C } from "./t";\nexport function isAC(x: A | B | C) {\n  return x.k !== "b";\n}\n',
+    },
+  },
+  {
+    name: "an inferred type predicate narrowed by an assertion call added in the body",
+    files: {
+      "src/t.ts":
+        'export interface A { k: "a"; m(): void; onlyA(): void }\nexport interface B { k: "b"; m(): void }\nexport interface C { k: "c"; m(): void; onlyC(): void }\nexport function invariant(c: unknown): asserts c {}\n',
+      "src/f.ts":
+        'import { invariant, type A, type B, type C } from "./t";\nexport function isAC(x: A | B | C) {\n  return x.k !== "b";\n}\n',
+      "src/g.ts":
+        'import type { A, B, C } from "./t";\nimport { isAC } from "./f";\ndeclare const v: A | B | C;\nif (isAC(v)) {\n  v.m();\n  v.onlyA();\n}\n',
+    },
+    edit: {
+      "src/f.ts":
+        'import { invariant, type A, type B, type C } from "./t";\nexport function isAC(x: A | B | C) {\n  invariant(x.k !== "c");\n  return x.k !== "b";\n}\n',
+    },
+  },
+  {
+    name: "an inferred type predicate of a class method",
+    files: {
+      "src/t.ts":
+        'export interface A { k: "a"; m(): void; onlyA(): void }\nexport interface B { k: "b"; m(): void }\nexport interface C { k: "c"; m(): void; onlyC(): void }\nexport function invariant(c: unknown): asserts c {}\n',
+      "src/f.ts":
+        'import type { A, B, C } from "./t";\nexport class Check {\n  isAC(x: A | B | C) {\n    return x.k !== "b";\n  }\n}\n',
+      "src/g.ts":
+        'import type { A, B, C } from "./t";\nimport { Check } from "./f";\ndeclare const v: A | B | C;\nif (new Check().isAC(v)) {\n  v.m();\n  v.onlyA();\n}\n',
+    },
+    edit: {
+      "src/f.ts":
+        'import type { A, B, C } from "./t";\nexport class Check {\n  isAC(x: A | B | C) {\n    if (x.k === "c") throw new Error("c");\n    return x.k !== "b";\n  }\n}\n',
+    },
+  },
+  {
+    name: "an inferred type predicate passed to filter",
+    files: {
+      "src/t.ts":
+        'export interface A { k: "a"; m(): void; onlyA(): void }\nexport interface B { k: "b"; m(): void }\nexport interface C { k: "c"; m(): void; onlyC(): void }\nexport function invariant(c: unknown): asserts c {}\n',
+      "src/f.ts":
+        'import type { A, B, C } from "./t";\nexport function keep(x: A | B | C) {\n  return x.k !== "b";\n}\n',
+      "src/g.ts":
+        'import type { A, B, C } from "./t";\nimport { keep } from "./f";\ndeclare const list: (A | B | C)[];\nlist.filter(keep).map((v) => v.m());\n',
+    },
+    edit: {
+      "src/f.ts":
+        'import type { A, B, C } from "./t";\nexport function keep(x: A | B | C) {\n  if (x.k === "c") throw new Error("c");\n  return x.k !== "b";\n}\n',
+    },
+  },
   {
     // An expando member of a body-local arrow is compared by its type.
     name: "an expando member of a returned arrow whose value changes",

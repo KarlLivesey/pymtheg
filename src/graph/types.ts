@@ -229,6 +229,18 @@ export interface ProjectAnalysisContext {
   previousFiles?: ReadonlyMap<string, GraphFile>;
   /** Includes deleted context paths. Analysis runs even when this list is empty. */
   changedContextFiles: readonly string[];
+  /** Reports which analysis path ran and why a cheaper one was not used. */
+  notePath?: (note: AnalysisPath) => void;
+}
+/**
+ * The analysis path a module took for one index (C-38), shown in the index
+ * report: `reused` built no program, `scoped` extracted only the edited
+ * files, `full` analysed every file; `declined` lists, in order, why a
+ * scoped analysis was not used.
+ */
+export interface AnalysisPath {
+  path: "reused" | "scoped" | "full";
+  declined?: readonly string[];
 }
 export interface AnalyzedFile {
   path: string;

@@ -10,6 +10,7 @@ import {
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import { count, stage } from "./work.js";
 import type {
+  AnalysisPath,
   AnalyzedFile,
   ContextFile,
   GraphFile,
@@ -49,6 +50,8 @@ export interface IndexReport {
   resolutionErrors: { module: string; message: string }[];
   /** Notes from opted-in toolchain routes; absent when no module made one. */
   toolchains?: { module: string; note: Json }[];
+  /** Per module that reported one: the analysis path and why (C-38). */
+  analysisPaths?: ({ module: string } & AnalysisPath)[];
 }
 export interface IndexOptions {
   excludeDirectories?: readonly string[];
@@ -435,6 +438,8 @@ export async function indexProject(
             ...changedContexts.filter((path) => needsContext(module, path)),
             ...checkedInputs.changed,
           ],
+          notePath: (note) =>
+            (report.analysisPaths ??= []).push({ module: module.id, ...note }),
         }),
       );
       if ("resolutionFiles" in output) {

@@ -33,6 +33,11 @@ export function formatGraph(response: GraphResponse): string {
     lines.push(
       `Indexed ${response.sync.report.indexed}; unchanged ${response.sync.report.unchanged}; removed ${response.sync.report.removed}`,
     );
+  // Which analysis path each module took, and why a cheaper one was not used.
+  for (const path of response.sync.report?.analysisPaths ?? [])
+    lines.push(
+      `Analysis ${path.module}: ${path.path}${path.declined?.length ? ` (scoped declined: ${path.declined.join("; ")})` : ""}`,
+    );
   // The opt-in toolchain route (absent when off).
   const toolchain = response.toolchain?.go;
   if (toolchain)

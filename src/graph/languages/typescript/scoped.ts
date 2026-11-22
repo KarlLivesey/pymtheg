@@ -258,7 +258,18 @@ export function checkerSurface(
         if (signature.declaration) into.push(where(signature.declaration));
         for (const parameter of signature.parameters)
           reach(checker.getTypeOfSymbol(parameter), into);
+        if (signature.thisParameter)
+          reach(checker.getTypeOfSymbol(signature.thisParameter), into);
         reach(checker.getReturnTypeOfSignature(signature), into);
+        // An inferred type predicate (`x is A`, TypeScript 5.5) narrows the
+        // caller's argument; its type is not part of the return type.
+        const predicate = checker.getTypePredicateOfSignature(signature);
+        if (predicate) {
+          into.push(
+            `predicate:${predicate.kind}:${predicate.parameterIndex ?? ""}`,
+          );
+          if (predicate.type) reach(predicate.type, into);
+        }
       }
     const declaredHere = symbols.some((symbol) =>
       symbol.declarations?.some((d) => d.getSourceFile() === source),
@@ -288,6 +299,25 @@ export function checkerSurface(
     reach(type, reached);
     return `${printed} {${reached.join(" ")}}`;
   };
+  /**
+   * What a signature tells callers beyond its parameters' written types: its
+   * return type, its type predicate (inferred for a function returning a
+   * boolean, TypeScript 5.5: `x is A`, with the narrowed type and what it
+   * reaches) and its `this` type.
+   */
+  const signatureFacts = (signature: ts.Signature): string => {
+    const parts = [describe(checker.getReturnTypeOfSignature(signature))];
+    const predicate = checker.getTypePredicateOfSignature(signature);
+    if (predicate)
+      parts.push(
+        `predicate ${predicate.kind} ${predicate.parameterIndex ?? ""} ${predicate.parameterName ?? ""} ${predicate.type ? describe(predicate.type) : ""}`,
+      );
+    if (signature.thisParameter)
+      parts.push(
+        `this ${describe(checker.getTypeOfSymbol(signature.thisParameter))}`,
+      );
+    return parts.join(" ");
+  };
   const visit = (node: ts.Node): void => {
     if (--left < 0) throw new SurfaceLimit();
     if (ts.isFunctionLike(node)) {
@@ -295,9 +325,7 @@ export function checkerSurface(
         node as ts.SignatureDeclaration,
       );
       if (signature && !annotated(node))
-        out.push(
-          `${ts.SyntaxKind[node.kind]} ${describe(checker.getReturnTypeOfSignature(signature))}`,
-        );
+        out.push(`${ts.SyntaxKind[node.kind]} ${signatureFacts(signature)}`);
       // Its parameters and type parameters, not its body.
       for (const parameter of (node as ts.SignatureDeclaration).parameters)
         visit(parameter);

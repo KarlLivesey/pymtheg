@@ -989,7 +989,9 @@ module`, a script, a file renamed for the compiler, a compiler limit, a
 failed file a binding reads, a file that reads object producers, an
 unfinished run or a missing completion record. A broken config elsewhere,
 retried on every index, does not block it. The same file tree produces the
-same graph after a fresh or incremental index. [C-38](changes/C-38.md)
+same graph after a fresh or incremental index. The index report names the
+path taken and why a scoped analysis was declined. Seeded edits scoped
+49–65%; real single-file commits on zustand 2 of 30. [C-38](changes/C-38.md)
 
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing
