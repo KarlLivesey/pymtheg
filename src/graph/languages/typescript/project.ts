@@ -55,6 +55,17 @@ function libFile(path: string): ts.SourceFile | undefined {
   }
   return libCache.get(name) ?? undefined;
 }
+/**
+ * C-40: forgets the parsed library files. Programs share them, and each
+ * checker records its own facts on their symbols, so the cache keeps the
+ * last program and its checker alive after an analysis: on
+ * microsoft/TypeScript the 27,000-file program, 2.7 GB of a 4.2 GB heap,
+ * held through every later write and resolution. Called when an analysis
+ * returns; the next one parses them again.
+ */
+export function releaseLibraryFiles(): void {
+  libCache.clear();
+}
 
 export const toVirtual = (path: string) => "/" + path;
 export const fromVirtual = (path: string): string | undefined =>

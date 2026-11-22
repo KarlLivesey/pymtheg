@@ -242,7 +242,9 @@ The graph store, indexer and three production language modules (`src/graph/`)
 answer the CLI command `pymtheg graph` (below), the MCP tools `code_graph` and
 `graph_result`, and requirement links (`pymtheg link`, MCP `requirement_links`).
 No Studio screen uses them; `observe` still uses the older TypeScript/JavaScript
-reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 4; a schema-3
+reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 4, with an
+empty `graph.sqlite-turnstile` beside it (created only where the store uses the write-ahead log) that its writers lock to take turns
+(C-37); a schema-3
 (0.1.0) graph is migrated in place when opened for writing (its rows are kept
 unchanged) and read as having no library targets when opened read-only. Any
 other graph database is refused with a rebuild message; 0.1.0 refuses a
@@ -928,9 +930,10 @@ and never yields a version pin.
   The 100-file cap counts compiler failures a program imports from another
   project. A member of a namespace that is no symbol (a namespace inside a
   plain block) is contained by the next container out that is one.
-  microsoft/TypeScript indexes with a 12,000 MB heap but not with the
-  default one: the indexer holds a module's whole analysis output while it
-  writes it.
+  microsoft/TypeScript indexes at Node's default heap (C-40: 33 min 53 s
+  on the dev server, exit 2 with its 12,477 failed files). Before C-40 it
+  needed a larger heap, because the module's cache of parsed library files
+  kept the last program alive after the analysis.
 - **A program that contains a failed file:** the failed file is absent;
   `invalid-code` with a cause is best-effort attribution. Links computed
   without the failed file carry `assumes: ["no-unseen-declarations"]`.
