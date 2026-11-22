@@ -24,7 +24,7 @@ const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
   process.argv.slice(2);
 if (!outArg)
   throw Error(
-    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command]",
+    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--readable]",
   );
 const dist = resolve(distArg);
 const expectedSteps = Number(countArg);
@@ -50,6 +50,16 @@ const temporary = storeDir && join(storeDir, `${name}.${seedArg}.sqlite`);
 // unchanged `graph index` that must verify without an index run and leave
 // the store's bytes as they were.
 const command = flags.includes("--command");
+// --readable: a TypeScript edit whose result does not parse cleanly is
+// drawn again (from the same seeded sequence), so the tree stays readable and
+// no file's failure withholds the library targets of its program.
+const readable = flags.includes("--readable");
+const parsesCleanly = await (async () => {
+  if (!readable) return () => true;
+  const ts = (await import(join(dist, "../node_modules/typescript/lib/typescript.js"))).default;
+  return (path, text) =>
+    !(ts.createSourceFile(path, text, ts.ScriptTarget.Latest).parseDiagnostics ?? []).length;
+})();
 if (command && !temporary) throw Error("--command requires --store-dir");
 const cacheAt = flags.indexOf("--cache-pages");
 const cachePages = cacheAt < 0 ? undefined : Number(flags[cacheAt + 1]);
@@ -64,7 +74,12 @@ if (
 if (existsSync(base) && !resume) throw Error(`exists: ${base}`);
 mkdirSync(base, { recursive: true });
 if (!existsSync(root))
-  cpSync(join(scratch, "pins", name), root, { recursive: true });
+  // Relative symlinks (pnpm's node_modules) stay relative, so the copy's
+  // installed packages resolve inside the copy, as in the pin (C-42 review).
+  cpSync(join(scratch, "pins", name), root, {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
 
 // Deterministic PRNG (mulberry32).
 let state = Number(seedArg) >>> 0;
@@ -334,11 +349,15 @@ const sourceOf = (file) =>
   readFileSync(join(scratch, "pins", name, file), "utf8");
 for (let step = 0; step < expectedSteps; step++) {
   let file = pick(files);
-  const original = sourceOf(file);
+  let original = sourceOf(file);
   let edit;
   let at = 0;
   if (repo.language === "go") edit = goEdit(step, file, original);
-  else {
+  else for (let draw = 0; ; draw++) {
+    if (draw) {
+      file = pick(files);
+      original = sourceOf(file);
+    }
     const lines = original.split("\n");
     let kind = pick(kinds);
     at = Math.floor(random() * lines.length);
@@ -354,6 +373,7 @@ for (let step = 0; step < expectedSteps; step++) {
     if (kind === "duplicate") lines.splice(at, 0, lines[at] ?? "");
     if (kind === "delete") lines.splice(at, 1);
     edit = { file, kind, text: lines.join("\n") };
+    if (parsesCleanly(file, edit.text) || draw >= 100) break;
   }
   file = edit.file;
   const { kind, text } = edit;
@@ -366,6 +386,19 @@ for (let step = 0; step < expectedSteps; step++) {
   incremental(join(base, `step-${step}.json`));
   const cold = temporary ?? join(base, `cold-${step}.sqlite`);
   clearStore(cold);
+  // What the compared stores hold, so an "equal" over empty sets shows.
+  const held = (() => {
+    const db = new DatabaseSync(graph, { readOnly: true });
+    try {
+      return {
+        links: db.prepare("SELECT count(*) AS n FROM graph_links").get().n,
+        library: db.prepare("SELECT count(*) AS n FROM graph_links WHERE resolution='library'").get().n,
+        merged: db.prepare("SELECT count(*) AS n FROM graph_links WHERE json_extract(body,'$.data.mergedGlobal')=1").get().n,
+      };
+    } finally {
+      db.close();
+    }
+  })();
   let differences;
   try {
     prepareStore(cold);
@@ -400,13 +433,14 @@ for (let step = 0; step < expectedSteps; step++) {
     line: at + 1,
     equal: differences.length === 0,
     differences,
+    held,
     wallMs: measured.wallMs,
     failed: measured.report?.failedCount,
     resolvedFiles: measured.counts?.["resolve.go.decisionFiles"] ?? 0,
     ...(noEdit ? { noEdit } : {}),
   });
   console.log(
-    `${id} step ${step} ${kind} ${file}:${at + 1}: ${differences.length ? "DIFFERENT " + JSON.stringify(differences).slice(0, 1500) : "equal"}`,
+    `${id} step ${step} ${kind} ${file}:${at + 1}: ${differences.length ? "DIFFERENT " + JSON.stringify(differences).slice(0, 1500) : "equal"} (links ${held.links}, library ${held.library}, merged ${held.merged})`,
   );
   report();
   if (differences.length)

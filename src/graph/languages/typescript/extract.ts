@@ -5,6 +5,7 @@ import {
   competingTestNames,
   globalTypeAvailability,
   isTestFramework,
+  isTestPackage,
   isTestGlobal,
   nodeCanDeclare,
   nodeGlobalCall,
@@ -868,6 +869,27 @@ export function extractFile(
     }
     return undefined;
   }
+  /**
+   * C-42 (narrowed D23): whether every variable declaration of a merged
+   * symbol declares the same type. The compiler's identity relation is not
+   * public, so two declared types agree when each is assignable to the
+   * other; a declaration without a type annotation does not agree.
+   */
+  function variableTypesAgree(symbol: ts.Symbol): boolean {
+    const variables = (symbol.declarations ?? []).filter(
+      ts.isVariableDeclaration,
+    );
+    if (variables.length < 2) return true;
+    if (variables.some((declaration) => !declaration.type)) return false;
+    const [first, ...rest] = variables.map((declaration) =>
+      checker.getTypeFromTypeNode(declaration.type!),
+    );
+    return rest.every(
+      (type) =>
+        checker.isTypeAssignableTo(type, first!) &&
+        checker.isTypeAssignableTo(first!, type),
+    );
+  }
   /** The compiler's (merged) symbol of a declaration, from its name. */
   function declaredSymbol(declaration: ts.Declaration): ts.Symbol | undefined {
     const name = ts.getNameOfDeclaration(declaration);
@@ -1301,16 +1323,25 @@ export function extractFile(
         specifier && ts.isStringLiteralLike(specifier) ? specifier : undefined;
       const unbuiltEntry =
         viaSpecifier && context.unbuilt?.forSpecifier(viaSpecifier);
-      // C-42: one global symbol declared in several library units.
+      // C-42: one global symbol declared in several library units. Narrowed
+      // D23: not when a unit is a test framework (competing packages: a file
+      // runs under one of them), nor when the symbol's variable declarations
+      // disagree on the type (the condition behind TS2403, which
+      // `skipLibCheck` hides).
+      const [mergedSymbol] = librarySymbols;
       const merged =
         !!libraries &&
         libraries.length > 1 &&
         !targets.length &&
         !unmergedLibrary &&
         librarySymbols.size === 1 &&
-        !librarySymbols.has(undefined) &&
+        !!mergedSymbol &&
         new Set(libraries.map(({ ecosystem, unit }) => `${ecosystem}\0${unit}`))
-          .size > 1;
+          .size > 1 &&
+        !libraries.some(
+          ({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit),
+        ) &&
+        variableTypesAgree(mergedSymbol);
       return {
         targets,
         viaAlias,

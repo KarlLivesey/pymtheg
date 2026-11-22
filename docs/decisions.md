@@ -3160,6 +3160,11 @@ candidates name each declaring unit with its own symbol path, and marks it
 to the same symbol, every declaration is in the global scope (a script file
 or `declare global`, never an ambient `declare module "x"`), there are at
 least two library units, no checkout candidate, and no synthesised target.
+After D23 was narrowed, two more conditions apply. No unit may be a test
+framework or a competing test package (`isTestPackage`: jest, mocha,
+vitest, their scoped parts, chai, jasmine, qunit and the like). And the
+symbol's variable declarations must agree on the type: each declared type
+must be assignable to the other, which is the condition behind TS2403.
 Across programs the mark is kept only when every program gives the same
 set. The candidate rows are deterministic, so the identity is the same in
 every file, program and run. **Rules out:** choosing one typing as the

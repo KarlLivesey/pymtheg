@@ -636,3 +636,46 @@ test("D23: merged environment globals are summed per language from the counts", 
   // Archives without the count (before C-42) contribute nothing.
   assert.equal(mergedGlobalCount(repos, "go"), 0);
 });
+
+test("D23: the refresh export counts a stored merged environment global at Level 2 and as merged", async () => {
+  const { mkdtempSync, mkdirSync: mkdir, writeFileSync: write, readFileSync: read, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const { executeGraph } = await import("../../dist/graph/commands.js");
+  const { exportRefresh } = await import("./coverage-refresh-export.mjs");
+  const scratch = mkdtempSync(joinPath(tmpdir(), "pymtheg-merged-export-"));
+  try {
+    const attempt = joinPath(scratch, "attempt");
+    const root = joinPath(attempt, "checkout");
+    const files = {
+      "tsconfig.json": JSON.stringify({ compilerOptions: { strict: true, lib: ["es2022", "dom"], types: ["node"] }, include: ["src"] }),
+      "node_modules/@types/node/package.json": JSON.stringify({ name: "@types/node", version: "20.0.0", types: "index.d.ts" }),
+      "node_modules/@types/node/index.d.ts":
+        "export {};\ndeclare global { interface Console { log(...data: any[]): void } var console: Console; }\n",
+      "src/main.ts": 'console.log("x");\nexport {};\n',
+    };
+    for (const [path, text] of Object.entries(files)) {
+      mkdir(joinPath(root, path, ".."), { recursive: true });
+      write(joinPath(root, path), text);
+    }
+    await executeGraph({ command: "index", root });
+    const status = await executeGraph({ command: "status", root });
+    write(joinPath(attempt, "warm.out"), JSON.stringify(status));
+    const output = joinPath(scratch, "export.json");
+    exportRefresh(
+      { mode: "installed", release: { sha256: "c42" }, repos: [{ id: "fixture/merged", language: "typescript", commit: "0", outcome: "finished" }] },
+      output,
+      () => attempt,
+    );
+    const [repo] = JSON.parse(read(output, "utf8")).repos;
+    const merged = status.counts.ambiguous;
+    assert.equal(merged, 1, "the fixture stores one marked candidate set");
+    assert.equal(repo.counts.typescript.merged, 1);
+    // The marked set is in Level 2; nothing else changes the count.
+    const links = repo.counts.typescript.links;
+    assert.ok(repo.counts.typescript.level2 >= 1 && repo.counts.typescript.level2 <= links);
+    assert.ok(!repo.inventory.some(([module, , outcome]) => module === "typescript" && outcome === "ambiguous"));
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
