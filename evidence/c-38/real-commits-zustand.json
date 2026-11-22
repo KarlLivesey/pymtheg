@@ -1,0 +1,478 @@
+[
+ {
+  "commit": "dac22e1ca73ee37c19228fdadfcf3f3398aaad3d",
+  "parent": "d7a5583cffd80af515f7dfb69583c95cbdc9e2ce",
+  "file": "src/react.ts",
+  "changedLines": 2,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 51,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 18077,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "c7516c1166c59435b07d66f6eda80a8619dd62b3",
+  "parent": "1b04af1d970e4c326bf1d8c87cd55196fb177d32",
+  "file": "tests/devtools.test.tsx",
+  "changedLines": 4,
+  "touchesReturn": false,
+  "scoped": 1,
+  "extracted": 1,
+  "declined": {},
+  "indexed": 1,
+  "cpuMs": 12536,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "95d3f338c463f499aaa7a8dd5448c8b13a7dec0b",
+  "parent": "32013285083648e8d58ba1f76d73b9bdc02fef50",
+  "file": "tests/immer.test.tsx",
+  "changedLines": 74,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 51,
+  "declined": {
+   "no previous facts": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16100,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "63300440c67b41e7db2b81538b5aa5d72693afc9",
+  "parent": "f0252e5db1e3b059d6dce606ef2206b261706e9d",
+  "file": "tests/subscribe.test.tsx",
+  "changedLines": 129,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16564,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "f0252e5db1e3b059d6dce606ef2206b261706e9d",
+  "parent": "206012dbd1ae046ea0aefb9cd7bf8bba913c6459",
+  "file": "src/middleware/devtools.ts",
+  "changedLines": 7,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16159,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "89ebcd73134ed32689ae767a5ce5ad8f24bd5ee1",
+  "parent": "6213fc11bdf096301a82ae5c236b5a666a4ee3ca",
+  "file": "src/middleware/devtools.ts",
+  "changedLines": 2,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15145,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "9b505ac392b8a9a68db07ec1b9063c3f3bc6cd1f",
+  "parent": "267a57c32c24822ecb66418ecdbcf05476313edd",
+  "file": "src/middleware/persist.ts",
+  "changedLines": 4,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "a stored result it cannot stand on": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16702,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "6e026d7530966146c963d5767433c0d838950b8f",
+  "parent": "e7d4593594adac1b6c71358d90b3434cd7cff59d",
+  "file": "src/middleware/devtools.ts",
+  "changedLines": 32,
+  "touchesReturn": true,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16494,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "c27934d83a03ed4e939f32528b0d52bee33d23d8",
+  "parent": "9e50621eb08e51f9eaeef8eba91a0eb62fcc800a",
+  "file": "eslint.config.mjs",
+  "changedLines": 6,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15724,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "3e329e5ac799288927755895fa9b7f05bea30aba",
+  "parent": "b0ea6ea01a88ad353ea179bca79698b5fafec18f",
+  "file": "tests/ssr.test.tsx",
+  "changedLines": 131,
+  "touchesReturn": true,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16588,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "3cb547d5edbaad37abb5c99ef78a6a9f15a422b5",
+  "parent": "003b0a734480b214e55862b6722d9834d496cf47",
+  "file": "tests/middlewareTypes.test.tsx",
+  "changedLines": 461,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 17151,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "59e8783db37d1cfc5c4503e37336b48d212c7833",
+  "parent": "db6fe66259dcb41fedd8d83160d6f1ece8913252",
+  "file": "tests/middlewareTypes.test.tsx",
+  "changedLines": 180,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 50,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16734,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "ab5a98b1877cd6ccc3373c470b3bd8b9c9f4c761",
+  "parent": "6422fa889889544f080f9d0426a404da139495a1",
+  "file": "tests/devtools.test.tsx",
+  "changedLines": 2,
+  "touchesReturn": false,
+  "scoped": 1,
+  "extracted": 1,
+  "declined": {},
+  "indexed": 1,
+  "cpuMs": 10499,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "c4085a4ff0890c3254af63be3891e01c9ebcebe0",
+  "parent": "f831bc8d71f3a23f4f0bc65462ca852792566cfc",
+  "file": "eslint.config.mjs",
+  "changedLines": 3,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15348,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "5aa923e8c3b84c2ba23297210deb13c218b8cfa1",
+  "parent": "41fed0fe6f190472bb6b331584cf087546f9df33",
+  "file": "src/react.ts",
+  "changedLines": 4,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15100,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "5bc717b66334e407dfdff0fa1b15330d81f290dd",
+  "parent": "ca08a5ebf944bf4add0a78d0573edbb6a52e41ae",
+  "file": "src/middleware.ts",
+  "changedLines": 21,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 14634,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "ca08a5ebf944bf4add0a78d0573edbb6a52e41ae",
+  "parent": "a6143e0f236f902b2e0b71b3d4108df4e8f68b4e",
+  "file": "src/middleware/devtools.ts",
+  "changedLines": 8,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15765,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "a03acc388763ecc8f6dcf7f096d2010a034c1fbe",
+  "parent": "01749b01c756a86a476024c1e89aa1fc20a50c79",
+  "file": "tests/vanilla/subscribe.test.tsx",
+  "changedLines": 11,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15958,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "ad32cdf7a0e1c29396972f8672e6a5440f7f31c5",
+  "parent": "670b60e19ab44789f41cdb60c476a5eeb647e3bb",
+  "file": "tests/vanilla/basic.test.ts",
+  "changedLines": 7,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15534,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "6953c29dc59e9aff425523aa4a2fe84891a188da",
+  "parent": "5df8085b0bc3019287d4f85084d20d538818f494",
+  "file": "tests/vanilla/shallow.test.tsx",
+  "changedLines": 18,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 14996,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "5df8085b0bc3019287d4f85084d20d538818f494",
+  "parent": "b4177b3172ac48ee63b65c2708757c4ad27cccb9",
+  "file": "src/middleware/persist.ts",
+  "changedLines": 9,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "a stored result it cannot stand on": 1
+  },
+  "indexed": 1,
+  "cpuMs": 14856,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "37878da019d2697b9023bd057a24b870c0bfdebb",
+  "parent": "9a58ca9c9563799b622ae6eeb07b29e5c7f7221a",
+  "file": "eslint.config.mjs",
+  "changedLines": 6,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15430,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "c72ac92764211e93b049eaac32f70d166507494a",
+  "parent": "48985a4cc2284b2587d01272a47a124067637b12",
+  "file": "src/traditional.ts",
+  "changedLines": 3,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 14637,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "4d3a0176ca20e9c58cc8f39157f80fb126d299fb",
+  "parent": "21fc1b15227f5004b051edcc1b1dd363dc4b281c",
+  "file": "examples/demo/src/components/Scene.jsx",
+  "changedLines": 98,
+  "touchesReturn": true,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 14557,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "8ced2719ac13bcb06574ef0609207b3ead55ca7e",
+  "parent": "bc60812e33f35de94c1405f6e2f8fd33d5b8b575",
+  "file": "src/middleware/combine.ts",
+  "changedLines": 13,
+  "touchesReturn": true,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15640,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "c9330941c8bad6add1c95bb69099c39606151abd",
+  "parent": "ae32ca6beec4e4dd110be75982ca54aa7355d679",
+  "file": "vitest.config.mts",
+  "changedLines": 3,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 14948,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "58d4b080510560ba210e739b72ade7efef1d67c9",
+  "parent": "fc104c2c1497280bcc39bb5589d9b8b8c89f6fd7",
+  "file": "rollup.config.mjs",
+  "changedLines": 4,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 14060,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "4378abe0a4fd1d78e44ddfee7a3298dfeed1cd15",
+  "parent": "d2ac8205ec618e0524b025401fb6590aed6c74d7",
+  "file": "rollup.config.js",
+  "changedLines": 2,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16395,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "2e6d8813095c6a79ca208bae4c2cf5edc12049a1",
+  "parent": "55a7d0a15bb8a29463da58db782dbf5acde98eed",
+  "file": "eslint.config.mjs",
+  "changedLines": 8,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 49,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 15151,
+  "equal": true,
+  "differences": []
+ },
+ {
+  "commit": "064be30bcb348d6385d7abb4d21d50cf00181ccd",
+  "parent": "259c19ff2d47bab2e8c68787895c52b2dd63aa44",
+  "file": "vitest.config.ts",
+  "changedLines": 1,
+  "touchesReturn": false,
+  "scoped": 0,
+  "extracted": 44,
+  "declined": {
+   "syntactic surface": 1
+  },
+  "indexed": 1,
+  "cpuMs": 16302,
+  "equal": true,
+  "differences": []
+ }
+]

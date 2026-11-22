@@ -1,0 +1,808 @@
+{
+ "id": "honojs/hono",
+ "seed": 3871,
+ "expectedSteps": 40,
+ "steps": [
+  {
+   "step": 0,
+   "file": "runtime-tests/fastly/vitest.config.ts",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 5365,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6873,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 918
+   }
+  },
+  {
+   "step": 1,
+   "file": "src/jsx/dom/server.test.tsx",
+   "kind": "export",
+   "line": 200,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31012,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 52083,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 895
+   }
+  },
+  {
+   "step": 2,
+   "file": "src/jsx/dom/server.test.tsx",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27223,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 48001,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 869
+   }
+  },
+  {
+   "step": 3,
+   "file": "src/adapter/cloudflare-pages/index.ts",
+   "kind": "comment",
+   "line": 2,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28241,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 49646,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 926
+   }
+  },
+  {
+   "step": 4,
+   "file": "src/adapter/vercel/index.ts",
+   "kind": "comment",
+   "line": 2,
+   "equal": true,
+   "differences": [],
+   "wallMs": 32764,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 54485,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 925
+   }
+  },
+  {
+   "step": 5,
+   "file": "src/router/reg-exp-router/index.ts",
+   "kind": "comment",
+   "line": 3,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30618,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 51656,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 915
+   }
+  },
+  {
+   "step": 6,
+   "file": "build/jsx-types.test.ts",
+   "kind": "body",
+   "line": 11,
+   "equal": true,
+   "differences": [],
+   "wallMs": 4169,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6944,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 839
+   }
+  },
+  {
+   "step": 7,
+   "file": "src/jsx/dom/css.ts",
+   "kind": "body",
+   "line": 28,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14099,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 26051,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 900
+   }
+  },
+  {
+   "step": 8,
+   "file": "src/jsx/context.ts",
+   "kind": "delete",
+   "line": 260,
+   "equal": true,
+   "differences": [],
+   "wallMs": 32766,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 54078,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 871
+   }
+  },
+  {
+   "step": 9,
+   "file": "src/jsx/context.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30589,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 51483,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 907
+   }
+  },
+  {
+   "step": 10,
+   "file": "src/jsx/intrinsic-element/components.test.tsx",
+   "kind": "delete",
+   "line": 225,
+   "equal": true,
+   "differences": [],
+   "wallMs": 46335,
+   "failed": 1,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 649,
+   "cpuMs": 71045,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 907
+   }
+  },
+  {
+   "step": 11,
+   "file": "src/jsx/intrinsic-element/components.test.tsx",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 39385,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 60453,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 931
+   }
+  },
+  {
+   "step": 12,
+   "file": "src/router/linear-router/router.test.ts",
+   "kind": "body",
+   "line": 67,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8897,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17940,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 854
+   }
+  },
+  {
+   "step": 13,
+   "file": "src/utils/ipaddr.test.ts",
+   "kind": "body",
+   "line": 124,
+   "equal": true,
+   "differences": [],
+   "wallMs": 34892,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 651,
+   "cpuMs": 60921,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 912
+   }
+  },
+  {
+   "step": 14,
+   "file": "src/jsx/intrinsic-element/components.test.tsx",
+   "kind": "comment",
+   "line": 102,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9839,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 18880,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 931
+   }
+  },
+  {
+   "step": 15,
+   "file": "benchmarks/jsx/src/react-jsx/page-preact.tsx",
+   "kind": "body",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3252,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5132,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 848
+   }
+  },
+  {
+   "step": 16,
+   "file": "src/utils/jwt/types.ts",
+   "kind": "body",
+   "line": 29,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15651,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 26813,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 867
+   }
+  },
+  {
+   "step": 17,
+   "file": "src/router/pattern-router/index.ts",
+   "kind": "comment",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26696,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 47270,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 875
+   }
+  },
+  {
+   "step": 18,
+   "file": "src/utils/crypto.test.ts",
+   "kind": "export",
+   "line": 44,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27656,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 48490,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 892
+   }
+  },
+  {
+   "step": 19,
+   "file": "src/utils/crypto.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28707,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 49151,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 902
+   }
+  },
+  {
+   "step": 20,
+   "file": "adapters/cloudflare-workers/src/serve-static.test.ts",
+   "kind": "body",
+   "line": 62,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3219,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5445,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 945
+   }
+  },
+  {
+   "step": 21,
+   "file": "benchmarks/fetch/summarize.mts",
+   "kind": "body",
+   "line": 28,
+   "equal": true,
+   "differences": [],
+   "wallMs": 5502,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6116,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 858
+   }
+  },
+  {
+   "step": 22,
+   "file": "benchmarks/routers/src/memoirist.mts",
+   "kind": "delete",
+   "line": 15,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3352,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5008,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 897
+   }
+  },
+  {
+   "step": 23,
+   "file": "benchmarks/routers/src/memoirist.mts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3319,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5451,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 848
+   }
+  },
+  {
+   "step": 24,
+   "file": "benchmarks/jsx/src/preact.ts",
+   "kind": "comment",
+   "line": 2,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2957,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 4847,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 800
+   }
+  },
+  {
+   "step": 25,
+   "file": "adapters/cloudflare-workers/src/index.ts",
+   "kind": "comment",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 24485,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 45614,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 868
+   }
+  },
+  {
+   "step": 26,
+   "file": "src/jsx/children.ts",
+   "kind": "body",
+   "line": 13,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10752,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 23396,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 862
+   }
+  },
+  {
+   "step": 27,
+   "file": "adapters/deno/src/conninfo.ts",
+   "kind": "comment",
+   "line": 15,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3575,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6336,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 874
+   }
+  },
+  {
+   "step": 28,
+   "file": "benchmarks/query-param/src/hono.mts",
+   "kind": "body",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3911,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6948,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 971
+   }
+  },
+  {
+   "step": 29,
+   "file": "src/utils/jwt/jws.ts",
+   "kind": "comment",
+   "line": 99,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13604,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 25825,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 912
+   }
+  },
+  {
+   "step": 30,
+   "file": "src/middleware/secure-headers/index.test.ts",
+   "kind": "delete",
+   "line": 183,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31986,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 51881,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 901
+   }
+  },
+  {
+   "step": 31,
+   "file": "src/middleware/secure-headers/index.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29940,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 49227,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 913
+   }
+  },
+  {
+   "step": 32,
+   "file": "src/adapter/netlify/index.ts",
+   "kind": "comment",
+   "line": 10,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12377,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 24440,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 841
+   }
+  },
+  {
+   "step": 33,
+   "file": "src/helper/css/index.test.tsx",
+   "kind": "body",
+   "line": 622,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10745,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 19854,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1066
+   }
+  },
+  {
+   "step": 34,
+   "file": "src/adapter/cloudflare-pages/handler.test.ts",
+   "kind": "delete",
+   "line": 280,
+   "equal": true,
+   "differences": [],
+   "wallMs": 32195,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 53159,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 934
+   }
+  },
+  {
+   "step": 35,
+   "file": "src/adapter/cloudflare-pages/handler.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31394,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 52007,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 972
+   }
+  },
+  {
+   "step": 36,
+   "file": "src/middleware/serve-static/index.ts",
+   "kind": "body",
+   "line": 118,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12134,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 24002,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 887
+   }
+  },
+  {
+   "step": 37,
+   "file": "src/middleware/timing/index.test.ts",
+   "kind": "delete",
+   "line": 84,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9583,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 19152,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 855
+   }
+  },
+  {
+   "step": 38,
+   "file": "src/middleware/timing/index.test.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9286,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 18653,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 885
+   }
+  },
+  {
+   "step": 39,
+   "file": "adapters/aws-lambda/src/handler.ts",
+   "kind": "body",
+   "line": 423,
+   "equal": true,
+   "differences": [],
+   "wallMs": 4047,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6699,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 967
+   }
+  }
+ ],
+ "equal": true
+}

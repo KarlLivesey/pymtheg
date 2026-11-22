@@ -3294,6 +3294,14 @@ The index report (`sync.report.analysisPaths`, and one line of the text
 output) names the path each module took, `reused`, `scoped` or `full`,
 and in order why a scoped analysis was not used.
 
+Every place where the module, producing one file's result, reads other
+files other than through the checker is marked in the code and registered
+(`PROGRAM_READERS` in `scoped.ts`) with the surface parts that hold what it
+reads of the edited file (values, not only targets), or the decline it
+causes. A test fails on an unregistered reader. Assigned values, the
+names the Node probe reads, comment pragmas and each function's implicit
+return are surface parts.
+
 When both match, the file is extracted alone in each project that owns it,
 after the same warm-up as a full analysis. Every other stored result is
 kept. Other files' target facts move with the file's re-keyed declarations

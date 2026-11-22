@@ -1,0 +1,128 @@
+[
+ {
+  "pin": "honojs_hono",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 69.65,
+  "cpuS": 96.1,
+  "peakMiB": 1467,
+  "equality": {
+   "rows": {
+    "graph_files": 460,
+    "graph_contexts": 5757,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5773,
+    "graph_links": 72340,
+    "graph_candidates": 63,
+    "graph_library_targets": 34386,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "round": 0,
+  "build": "after",
+  "wallS": 62.67,
+  "cpuS": 92.6,
+  "peakMiB": 1497,
+  "equality": {
+   "rows": {
+    "graph_files": 460,
+    "graph_contexts": 5757,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5773,
+    "graph_links": 72340,
+    "graph_candidates": 63,
+    "graph_library_targets": 34386,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 56.7,
+  "cpuS": 88.3,
+  "peakMiB": 1504,
+  "equality": {
+   "rows": {
+    "graph_files": 460,
+    "graph_contexts": 5757,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5773,
+    "graph_links": 72340,
+    "graph_candidates": 63,
+    "graph_library_targets": 34386,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "excalidraw_excalidraw",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 138.83,
+  "cpuS": 197.6,
+  "peakMiB": 3000,
+  "equality": {
+   "rows": {
+    "graph_files": 733,
+    "graph_contexts": 7226,
+    "graph_parse_failures": 0,
+    "graph_symbols": 13405,
+    "graph_links": 104519,
+    "graph_candidates": 392,
+    "graph_library_targets": 40475,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "excalidraw_excalidraw",
+  "round": 0,
+  "build": "after",
+  "wallS": 147.12,
+  "cpuS": 205.8,
+  "peakMiB": 3017,
+  "equality": {
+   "rows": {
+    "graph_files": 733,
+    "graph_contexts": 7226,
+    "graph_parse_failures": 0,
+    "graph_symbols": 13405,
+    "graph_links": 104519,
+    "graph_candidates": 392,
+    "graph_library_targets": 40475,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "excalidraw_excalidraw",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 150.19,
+  "cpuS": 205.9,
+  "peakMiB": 2921,
+  "equality": {
+   "rows": {
+    "graph_files": 733,
+    "graph_contexts": 7226,
+    "graph_parse_failures": 0,
+    "graph_symbols": 13405,
+    "graph_links": 104519,
+    "graph_candidates": 392,
+    "graph_library_targets": 40475,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]

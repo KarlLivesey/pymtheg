@@ -1,0 +1,408 @@
+{
+ "id": "excalidraw/excalidraw",
+ "seed": 3875,
+ "expectedSteps": 20,
+ "steps": [
+  {
+   "step": 0,
+   "file": "packages/excalidraw/index-node.ts",
+   "kind": "comment",
+   "line": 66,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13530,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 25697,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1495
+   }
+  },
+  {
+   "step": 1,
+   "file": "packages/excalidraw/tests/bucketFill.test.tsx",
+   "kind": "comment",
+   "line": 821,
+   "equal": true,
+   "differences": [],
+   "wallMs": 16775,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 29554,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1496
+   }
+  },
+  {
+   "step": 2,
+   "file": "packages/excalidraw/components/App.textTool.ts",
+   "kind": "body",
+   "line": 157,
+   "equal": true,
+   "differences": [],
+   "wallMs": 40778,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 66460,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1439
+   }
+  },
+  {
+   "step": 3,
+   "file": "setupTests.ts",
+   "kind": "body",
+   "line": 115,
+   "equal": true,
+   "differences": [],
+   "wallMs": 78742,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 839,
+   "cpuMs": 125329,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1373
+   }
+  },
+  {
+   "step": 4,
+   "file": "packages/common/src/utils.test.ts",
+   "kind": "comment",
+   "line": 48,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12912,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 25908,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1372
+   }
+  },
+  {
+   "step": 5,
+   "file": "packages/excalidraw/shortcut.ts",
+   "kind": "comment",
+   "line": 4,
+   "equal": true,
+   "differences": [],
+   "wallMs": 52737,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 76948,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1290
+   }
+  },
+  {
+   "step": 6,
+   "file": "packages/excalidraw/components/dropdownMenu/dropdownMenuUtils.ts",
+   "kind": "delete",
+   "line": 7,
+   "equal": true,
+   "differences": [],
+   "wallMs": 70912,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 835,
+   "cpuMs": 120624,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1316
+   }
+  },
+  {
+   "step": 7,
+   "file": "packages/excalidraw/components/dropdownMenu/dropdownMenuUtils.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 83458,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 835,
+   "cpuMs": 125573,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1413
+   }
+  },
+  {
+   "step": 8,
+   "file": "packages/excalidraw/components/dropdownMenu/DropdownMenuItemCheckbox.tsx",
+   "kind": "body",
+   "line": 10,
+   "equal": true,
+   "differences": [],
+   "wallMs": 39697,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 63023,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1454
+   }
+  },
+  {
+   "step": 9,
+   "file": "packages/excalidraw/fonts/Nunito/index.ts",
+   "kind": "comment",
+   "line": 11,
+   "equal": true,
+   "differences": [],
+   "wallMs": 43841,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 68691,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1933
+   }
+  },
+  {
+   "step": 10,
+   "file": "packages/excalidraw/components/TTDDialog/Chat/ChatHistoryMenu.tsx",
+   "kind": "body",
+   "line": 36,
+   "equal": true,
+   "differences": [],
+   "wallMs": 50541,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 74916,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1382
+   }
+  },
+  {
+   "step": 11,
+   "file": "packages/excalidraw/components/Ellipsify.tsx",
+   "kind": "comment",
+   "line": 19,
+   "equal": true,
+   "differences": [],
+   "wallMs": 44477,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 67721,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1779
+   }
+  },
+  {
+   "step": 12,
+   "file": "packages/excalidraw/components/TTDDialog/TTDDialog.tsx",
+   "kind": "body",
+   "line": 43,
+   "equal": true,
+   "differences": [],
+   "wallMs": 49897,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 75471,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1503
+   }
+  },
+  {
+   "step": 13,
+   "file": "packages/excalidraw/components/Minimap/MinimapAnnouncementDot.tsx",
+   "kind": "body",
+   "line": 58,
+   "equal": true,
+   "differences": [],
+   "wallMs": 42802,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 66542,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1411
+   }
+  },
+  {
+   "step": 14,
+   "file": "packages/excalidraw/context/ui-appState.ts",
+   "kind": "comment",
+   "line": 7,
+   "equal": true,
+   "differences": [],
+   "wallMs": 36762,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 62120,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1384
+   }
+  },
+  {
+   "step": 15,
+   "file": "packages/excalidraw/tests/selection.test.tsx",
+   "kind": "body",
+   "line": 1936,
+   "equal": true,
+   "differences": [],
+   "wallMs": 16123,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 29331,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1517
+   }
+  },
+  {
+   "step": 16,
+   "file": "packages/element/src/arrows/helpers.ts",
+   "kind": "body",
+   "line": 14,
+   "equal": true,
+   "differences": [],
+   "wallMs": 39276,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 61958,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1496
+   }
+  },
+  {
+   "step": 17,
+   "file": "packages/excalidraw/tests/fixtures/constants.ts",
+   "kind": "comment",
+   "line": 7,
+   "equal": true,
+   "differences": [],
+   "wallMs": 16139,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 27519,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1603
+   }
+  },
+  {
+   "step": 18,
+   "file": "packages/excalidraw/components/welcome-screen/WelcomeScreen.tsx",
+   "kind": "body",
+   "line": 7,
+   "equal": true,
+   "differences": [],
+   "wallMs": 35391,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 54697,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1325
+   }
+  },
+  {
+   "step": 19,
+   "file": "excalidraw-app/data/cacheMermaidChunks.ts",
+   "kind": "delete",
+   "line": 40,
+   "equal": true,
+   "differences": [],
+   "wallMs": 81315,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 835,
+   "cpuMs": 128402,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 1356
+   }
+  }
+ ],
+ "equal": true
+}
