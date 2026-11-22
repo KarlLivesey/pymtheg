@@ -3295,7 +3295,8 @@ before, and its session ends. A worker idle for 10 minutes (by an
 injectable clock) is ended. **Why:** an unchanged index costs 0.2 to 0.4 s
 instead of 0.7 to 1.3 s, and module state kept by a session can only be
 reused by a process that lives. **Trade:** a worker keeps its memory
-high-water mark between jobs (Hono: 2.6 GB resident on this branch) until it
-is ended when idle. **Rules out:** wall-clock waits before terminating a
+high-water mark between jobs unless it collects: after every job it runs a
+full collection and reports its live heap (77 to 132 MiB on four pins),
+and a worker above 512 MiB is ended when the job finishes. **Rules out:** wall-clock waits before terminating a
 job that does not acknowledge a cancel. See [C-48](changes/C-48.md).
 

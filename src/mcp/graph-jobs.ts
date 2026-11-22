@@ -20,6 +20,10 @@ export interface GraphJob {
   listeners: Set<(p: GraphProgress) => void>;
   /** The worker's session counters after the job (C-48). */
   session?: { loads: number; runs: number; dropped: number };
+  /** The worker's live heap after the job, after a full collection. */
+  memory?: { liveBytes: number; heapBytes: number };
+  /** The server ended the worker when the job finished: it kept more than its bound. */
+  workerEnded?: boolean;
   /** The job's work counters and stage times (observations). */
   work?: { counts: Record<string, number>; stages: Record<string, unknown> };
 }
@@ -30,6 +34,11 @@ export interface GraphJobsOptions {
   clock?: () => number;
   /** A worker with no job for this long is ended, with its session. */
   idleMs?: number;
+  /**
+   * A worker whose live heap after a job exceeds this many bytes is ended
+   * when the job finishes, with its session: the next job starts a new one.
+   */
+  restingBytes?: number;
 }
 type WorkerMessage = {
   kind: string;
@@ -40,6 +49,7 @@ type WorkerMessage = {
   error?: ReturnType<typeof operationError>;
   session?: GraphJob["session"];
   work?: GraphJob["work"];
+  memory?: GraphJob["memory"];
 };
 /**
  * The MCP server's graph jobs (C-48): one job at a time, run by one worker
@@ -57,12 +67,21 @@ type WorkerMessage = {
  * A worker with no job for `idleMs` (by `clock`) is ended when the next job
  * starts or when `releaseIfIdle()` runs; the server also arms a timer for it.
  */
+/**
+ * C-48: the live heap a worker may keep after a job (measured after a full
+ * collection). On restic, cli/cli, Hono and helix it kept 77 to 132 MiB
+ * after every job; a TypeScript program kept alive by a cache (C-40)
+ * would be gigabytes. Ending the worker affects no answer, only the next
+ * job's start-up.
+ */
+export const defaultRestingBytes = 512 * 1024 * 1024;
 export class GraphJobs {
   private readonly jobs = new Map<string, GraphJob>();
   private closed = false;
   private readonly launch: (control: SharedArrayBuffer) => Worker;
   private readonly clock: () => number;
   private readonly idleMs: number;
+  private readonly restingBytes: number;
   private worker: Worker | undefined;
   private control: Int32Array | undefined;
   private current: GraphJob | undefined;
@@ -84,6 +103,7 @@ export class GraphJobs {
         }));
     this.clock = options.clock ?? Date.now;
     this.idleMs = options.idleMs ?? 10 * 60_000;
+    this.restingBytes = options.restingBytes ?? defaultRestingBytes;
   }
   activeId() {
     return this.current && !this.current.exited ? this.current.id : null;
@@ -167,6 +187,13 @@ export class GraphJobs {
       }
       if (m.session) job.session = m.session;
       if (m.work) job.work = m.work;
+      if (m.memory) job.memory = m.memory;
+      // A worker that keeps more than its bound between jobs is ended now,
+      // not when it has been idle: only the next job's start-up is lost.
+      if (m.memory && m.memory.liveBytes > this.restingBytes) {
+        job.workerEnded = true;
+        void this.retire();
+      }
       this.finish(job);
     });
     worker.on("error", (e) => {

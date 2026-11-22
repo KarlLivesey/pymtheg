@@ -268,3 +268,31 @@ test("a worker terminated after any committed write leaves a store the next job 
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("after each job the worker reports what it keeps; over its bound it is ended when the job finishes", async () => {
+  const { base, root, write } = tree(goFiles);
+  const kept = jobsFor(root, "production");
+  const bounded = jobsFor(root, "production", { restingBytes: 1 });
+  try {
+    // Within the default bound the worker stays.
+    const first = await run(kept.jobs);
+    assert.ok(first.memory.liveBytes > 0);
+    assert.ok(first.memory.liveBytes < 512 * 1024 * 1024);
+    assert.equal(first.workerEnded ?? false, false);
+    await kept.jobs.close();
+    // Over its bound it is ended as the job finishes; the next job starts a
+    // new worker and its result equals cold.
+    write("a/a.go", "package a\n\nfunc Hello() int { return 4 }\n");
+    const over = await run(bounded.jobs);
+    assert.equal(over.state, "complete");
+    assert.equal(over.workerEnded, true);
+    const next = await run(bounded.jobs);
+    assert.equal(next.state, "complete");
+    assert.equal(bounded.jobs.generation, 2);
+    assert.deepEqual(await differencesFromCold(base, root, production), []);
+  } finally {
+    await kept.jobs.close();
+    await bounded.jobs.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});

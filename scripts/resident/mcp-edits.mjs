@@ -17,6 +17,9 @@ const args = process.argv.slice(2);
 const editsAt = args.indexOf("--edits");
 const edits =
   editsAt < 0 ? ["body", "export"] : args.splice(editsAt, 2)[1].split(",");
+const restingAt = args.indexOf("--resting-bytes");
+const restingBytes =
+  restingAt < 0 ? undefined : Number(args.splice(restingAt, 2)[1]);
 const [distArg, scratch, id, outArg] = args;
 const dist = resolve(distArg);
 const load = (path) => import(pathToFileURL(join(dist, path)).href);
@@ -48,7 +51,7 @@ const variants = {
   })(),
   export: original + pin.export,
 };
-const jobs = new GraphJobs(root);
+const jobs = new GraphJobs(root, restingBytes ? { restingBytes } : {});
 const step = async (label) => {
   const cpu = process.cpuUsage();
   const wall = performance.now();
@@ -64,6 +67,8 @@ const step = async (label) => {
     error: job.error,
     session: job.session,
     generation: jobs.generation,
+    memory: job.memory,
+    workerEnded: job.workerEnded ?? false,
     rssMiB: Math.round(process.memoryUsage().rss / 1048576),
     maxRssKiB: process.resourceUsage().maxRSS,
     counts: job.work?.counts ?? {},
@@ -74,7 +79,7 @@ const step = async (label) => {
     JSON.stringify(record, null, 1),
   );
   console.log(
-    `${id} ${label}: ${job.state}, wall ${record.wallMs} ms, cpu ${record.cpuMs} ms, rss ${record.rssMiB} MiB, worker ${record.generation}, session ${JSON.stringify(job.session)}`,
+    `${id} ${label}: ${job.state}, wall ${record.wallMs} ms, cpu ${record.cpuMs} ms, rss ${record.rssMiB} MiB, worker ${record.generation}, session ${JSON.stringify(job.session)}, live heap ${job.memory ? Math.round(job.memory.liveBytes / 1048576) : "?"} MiB${job.workerEnded ? ", worker ended" : ""}`,
   );
 };
 try {

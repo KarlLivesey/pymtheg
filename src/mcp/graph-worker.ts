@@ -23,6 +23,8 @@ import type { LanguageRegistry } from "../graph/registry.js";
 import { GraphView } from "./graph-view.js";
 import { agentLimits } from "./limits.js";
 import { graphWork, resetGraphWork } from "../graph/work.js";
+import { getHeapStatistics, setFlagsFromString } from "node:v8";
+import { runInNewContext } from "node:vm";
 import { CONTROL } from "./graph-control.js";
 
 export interface GraphWorkerOptions {
@@ -40,6 +42,29 @@ class Cancelled extends Error {
   constructor() {
     super("Graph request cancelled");
   }
+}
+
+/**
+ * A full collection, then this worker's live heap in bytes (V8's count of
+ * bytes in use) and the heap it holds from the system. A size, not a time.
+ */
+function resting(): { liveBytes: number; heapBytes: number } {
+  collect();
+  const heap = getHeapStatistics();
+  return {
+    liveBytes: heap.used_heap_size + heap.external_memory,
+    heapBytes: heap.total_heap_size,
+  };
+}
+let collector: (() => void) | undefined;
+function collect(): void {
+  if (!collector) {
+    // The worker runs without --expose-gc; this makes the collector
+    // available to a context created after the flag is set.
+    setFlagsFromString("--expose-gc");
+    collector = runInNewContext("gc") as () => void;
+  }
+  collector();
 }
 
 export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
@@ -70,6 +95,7 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
         controller.abort(new Cancelled());
       check();
     };
+    let answer: Record<string, unknown>;
     try {
       const response = await executeGraph(request, {
         signal,
@@ -84,25 +110,31 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
         throw Error(
           "Compact result exceeds session retention. Narrow the selector, limit or depth; no complete answer is retained.",
         );
-      parentPort!.postMessage({
+      answer = {
         kind: "result",
         id,
         view,
         session: { ...session.counts },
         work: { counts: graphWork.counts, stages: graphWork.stages },
-      });
+      };
     } catch (error) {
-      if (signal.aborted && Object.is(error, signal.reason))
-        parentPort!.postMessage({ kind: "cancelled", id });
-      else
-        parentPort!.postMessage({
-          kind: "error",
-          id,
-          error: operationError(error, "GRAPH_REQUEST_FAILED"),
-        });
+      answer =
+        signal.aborted && Object.is(error, signal.reason)
+          ? { kind: "cancelled", id }
+          : {
+              kind: "error",
+              id,
+              error: operationError(error, "GRAPH_REQUEST_FAILED"),
+            };
     } finally {
       Atomics.store(control, CONTROL.section, 0);
     }
+    // Between jobs the worker keeps only what its session keeps: the job's
+    // own objects are released here, before it answers, and what is still
+    // alive afterwards is measured. The server ends a worker that keeps more
+    // than its bound (GraphJobs).
+    answer.memory = resting();
+    parentPort!.postMessage(answer);
   }
   parentPort!.postMessage({ kind: "ready" });
 }
