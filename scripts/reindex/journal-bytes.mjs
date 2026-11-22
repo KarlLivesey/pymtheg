@@ -4,6 +4,7 @@
 // answer must be SQLite's file change counter (24-27) and its copy (92-95)
 // only.
 //   node scripts/reindex/journal-bytes.mjs <dist> <project root>
+import "../isolated-home.mjs";
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";

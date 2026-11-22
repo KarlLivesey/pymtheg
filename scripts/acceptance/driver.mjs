@@ -10,6 +10,7 @@
 // Each step appends one JSON line to /acc/out/results.jsonl. Nothing here
 // asserts on elapsed time; durations and sizes are observations only.
 // Uses only Node built-ins (the container has nothing else).
+import "../isolated-home.mjs";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";

@@ -1513,15 +1513,12 @@ test("the commit reader reads only bounded regular files: a FIFO or an endless d
     const a = await repo("head-fifo");
     await rm(join(a, ".git", "HEAD"));
     fifo(join(a, ".git", "HEAD"));
-    assert.equal(await gitCommitFromFiles(a), null);
     // 2. A loose ref is a link to an endless device (outside the git folder).
     const b = await repo("ref-device");
     symlinkSync("/dev/zero", join(b, ".git", "refs", "heads", "main"));
-    assert.equal(await gitCommitFromFiles(b), null);
     // 3. packed-refs is a FIFO (and the loose ref is missing).
     const c = await repo("packed-fifo");
     fifo(join(c, ".git", "packed-refs"));
-    assert.equal(await gitCommitFromFiles(c), null);
     // 4. A .git file names an outside git folder whose HEAD is a FIFO.
     const outside = join(root, "outside-gitdir");
     mkdirSync(outside);
@@ -1529,22 +1526,45 @@ test("the commit reader reads only bounded regular files: a FIFO or an endless d
     const d = join(root, "linked");
     mkdirSync(d);
     await writeFile(join(d, ".git"), `gitdir: ${outside}\n`);
-    assert.equal(await gitCommitFromFiles(d), null);
     // A packed-refs over the cap is not read either.
     const e = await repo("packed-big");
     await writeFile(
       join(e, ".git", "packed-refs"),
       "x".repeat(33 * 1024 * 1024),
     );
-    assert.equal(await gitCommitFromFiles(e), null);
-    // An aborted signal stops the read.
-    const controller = new AbortController();
-    controller.abort();
-    await assert.rejects(gitCommitFromFiles(e, controller.signal));
     // A regular repository still gives its commit.
     const ok = await repo("ok");
     const sha = "a".repeat(40);
     await writeFile(join(ok, ".git", "refs", "heads", "main"), sha + "\n");
-    assert.equal(await gitCommitFromFiles(ok), sha);
+    // The reads run in a child process ended by SIGKILL after 60 s: a read
+    // that blocks fails this test, and the suite goes on. (A test timeout
+    // would not do: a blocked FIFO open keeps the test process alive.)
+    const child = spawnSync(
+      process.execPath,
+      [
+        new URL("commit-reader-child.mjs", import.meta.url).pathname,
+        a,
+        b,
+        c,
+        d,
+        e,
+        ok,
+      ],
+      { encoding: "utf8", timeout: 60_000, killSignal: "SIGKILL" },
+    );
+    assert.equal(child.signal, null, "the commit reader blocked: killed");
+    assert.equal(child.status, 0, child.stderr);
+    assert.deepEqual(JSON.parse(child.stdout), [
+      null,
+      null,
+      null,
+      null,
+      null,
+      sha,
+    ]);
+    // An aborted signal stops the read.
+    const controller = new AbortController();
+    controller.abort();
+    await assert.rejects(gitCommitFromFiles(e, controller.signal));
   });
 });
