@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-config.mjs";
 // C-43: the opt-in Rust toolchain route (rust-analyzer SCIP). Most tests use
 // a controlled fake rust-analyzer, cargo and rustc that emit fixed answers;
 // the last ones run the real rust-analyzer when it is installed with
@@ -13,6 +14,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   statSync,
   writeFileSync,
 } from "node:fs";
@@ -34,6 +36,7 @@ import { toolchainState } from "../dist/graph/command-toolchain.js";
 import { executeGraph } from "../dist/graph/commands.js";
 import { graphConfig, graphToolchains } from "../dist/shared/config.js";
 import { initializeWorkspace } from "../dist/project/workspace.js";
+import { trustFile } from "../dist/project/local-trust.js";
 import { controlledClock } from "./controlled-clock.mjs";
 
 const FIXTURE = fileURLToPath(
@@ -975,9 +978,11 @@ test("graph answers report the Rust route's state beside Go's", async () => {
     writeProject(project, GATES);
     // Trusted on this machine, with a local rust-analyzer path that does not exist.
     await initializeWorkspace(project, undefined, { trust: "trusted" });
-    const local = join(project, ".pymtheg/local/trust.json");
-    const answer = JSON.parse(readFileSync(local, "utf8"));
-    writeFileSync(local, JSON.stringify({ ...answer, toolchain: { go: false, rust: join(root, "none", "rust-analyzer") } }));
+    // The user's own answer file (C-44), outside the checkout.
+    const file = trustFile();
+    const answers = JSON.parse(readFileSync(file, "utf8"));
+    answers.checkouts[realpathSync(project)].toolchain = { go: false, rust: join(root, "none", "rust-analyzer") };
+    writeFileSync(file, JSON.stringify(answers));
     const response = await executeGraph({ command: "index", root: project });
     assert.equal(response.trust, "trusted");
     assert.deepEqual(Object.keys(response.toolchain).sort(), ["rust", "setting"]);
