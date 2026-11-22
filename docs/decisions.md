@@ -3251,3 +3251,20 @@ link names a container only if that container is a symbol. One link
 without a source rejects a module's whole output, so a namespace that is
 no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).
+
+### C-45 Kept module state between index runs needs three proofs
+
+**Decided (C-45):** a process that indexes more than once may pass an
+`IndexSession`. The session loads the modules once and keeps per-module
+values between runs, returned only under the validity key the module kept
+them with. Everything is dropped unless the store's completion record is
+the one the session's last completed run wrote, and the project, store,
+module versions and index settings are unchanged. Values set by a run
+are kept only if it writes its completion record. The session holds no
+connection or lock between runs; each run is an ordinary index run.
+**Why:** a one-file edit rebuilds per-process and per-language state that
+did not change (C-45 measurements). The completion record already proves
+what the store holds, so it is the proof for kept state too. **Rules out:**
+a file watcher as the source of truth for what changed (only a hint), and
+a separate index daemon for now. See [C-45](changes/C-45.md).
+
