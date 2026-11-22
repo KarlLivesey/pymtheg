@@ -1764,6 +1764,12 @@ export function resolveRust(
   }
   let memo = new Map<string, Found>();
   const retryMemo = new Map<string, Found>();
+  // C-36: how much deeper than its entry each memoised lookup went. A hit
+  // that a fresh lookup could not have finished within the depth limit is not
+  // used, so whether a lookup reaches the limit never depends on what other
+  // lookups happened to memoise first.
+  const lookupHeights = new WeakMap<Found, number>();
+  let deepestLookup = 0;
   type ScopeRead = {
     key: string;
     name: string;
@@ -2980,7 +2986,9 @@ export function resolveRust(
       scopeMode === "baseline" || (baseline && canReuseBaseline(baseline))
         ? baseline
         : retryMemo.get(cacheKey);
-    if (cached) {
+    const cachedHeight = cached ? (lookupHeights.get(cached) ?? 0) : 0;
+    if (cached && seen.size + cachedHeight <= lookupDepth) {
+      deepestLookup = Math.max(deepestLookup, seen.size + cachedHeight);
       recordReads(scopeTraceOf(cached));
       return cached;
     }
@@ -2993,6 +3001,7 @@ export function resolveRust(
       return empty(!accessFrom ? false : true);
     }
     if (seen.size > lookupDepth) {
+      deepestLookup = Math.max(deepestLookup, seen.size);
       if (outer) outer.trace.valid = false;
       cycleCuts++;
       return { ...empty(false), reason: "import-lookup-depth-unverified" };
@@ -3032,6 +3041,7 @@ export function resolveRust(
           ? undefined
           : incompleteLookups.get(stateKey, seen, importExpansions);
     if (reused) {
+      deepestLookup = Math.max(deepestLookup, seen.size + reused.trace.depth);
       outer?.trace.absorb(reused.trace, outer.expansion);
       if (reused.cut) cycleCuts++;
       recordReads(scopeTraceOf(reused.result));
@@ -3051,6 +3061,8 @@ export function resolveRust(
     const outerReads = scopeReads;
     if (scopeAudit && lookupFactsFinal) scopeReads ??= rootScopeReads;
     const readStart = scopeReads?.length ?? 0;
+    const outerDeepest = deepestLookup;
+    deepestLookup = seen.size;
     try {
       result = lookupPath(name, loc, scope, ns, next, allowGlobs, accessFrom);
       const scopeTrace = capturedScopeTrace(readStart);
@@ -3061,6 +3073,8 @@ export function resolveRust(
       if (!outerReads) rootScopeReads.length = 0;
       activeLookup = outer;
     }
+    const height = deepestLookup - seen.size;
+    deepestLookup = Math.max(outerDeepest, deepestLookup);
     // C-24: a cycle cut answers "nothing more here" for a lookup already on
     // the stack. A result that met such a cut at an ancestor is the answer
     // for this entry point only: memoised as context-free, whichever lookup
@@ -3083,10 +3097,9 @@ export function resolveRust(
       // A complete entry preempts a previous incomplete result or cycle cut,
       // including when another saved lookup depended on that answer.
       if (observedIncompleteGuards.has(cacheKey)) clearIncompleteLookups();
+      lookupHeights.set(result, height);
       if (scopeMode === "baseline") memo.set(guard, result);
-      else {
-        retryMemo.set(cacheKey, result);
-      }
+      else retryMemo.set(cacheKey, result);
     } else if (trace && stateKey !== undefined) {
       observedIncompleteGuards.add(cacheKey);
       // This guard is supplied by the lookup itself, and must be absent on

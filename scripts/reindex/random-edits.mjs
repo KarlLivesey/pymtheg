@@ -23,7 +23,7 @@ const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
   process.argv.slice(2);
 if (!outArg)
   throw Error(
-    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command]",
+    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--scoped-mix]",
   );
 const dist = resolve(distArg);
 const expectedSteps = Number(countArg);
@@ -49,6 +49,8 @@ const temporary = storeDir && join(storeDir, `${name}.${seedArg}.sqlite`);
 // unchanged `graph index` that must verify without an index run and leave
 // the store's bytes as they were.
 const command = flags.includes("--command");
+// C-36: --scoped-mix weights Rust edits to those that can keep the surface.
+const scopedMix = flags.includes("--scoped-mix");
 if (command && !temporary) throw Error("--command requires --store-dir");
 const cacheAt = flags.indexOf("--cache-pages");
 const cachePages = cacheAt < 0 ? undefined : Number(flags[cacheAt + 1]);
@@ -343,9 +345,14 @@ const rustKinds = [
   "cfg",
   "derive",
 ];
+const rustScopedKinds = [
+  ...["body", "body", "body", "body", "call", "call", "call", "call"],
+  ...["comment", "comment", "comment"],
+  ...rustKinds.filter((kind) => !["body", "comment"].includes(kind)),
+];
 const rustCreated = [];
 function rustEdit(step, file, source) {
-  const kind = pick(rustKinds);
+  const kind = pick(scopedMix ? rustScopedKinds : rustKinds);
   const insert = (at, text) => source.slice(0, at) + text + source.slice(at);
   // After any inner attributes, doc comments and blank lines at the top.
   const head = /^(?:\s*(?:#!\[[^\n]*\]|\/\/[^\n]*)\n)*/.exec(source)[0].length;
@@ -361,6 +368,24 @@ function rustEdit(step, file, source) {
           file,
           kind,
           text: insert(match.index + match[0].length, "\n    let _ = 0;"),
+        };
+      }
+      break;
+    }
+    case "call": {
+      // A statement that adds call links in an existing function body.
+      const functions = [
+        ...source.matchAll(/^\s*(?:pub[^\n]*?)?fn [^\n;]*\{$/gm),
+      ];
+      if (functions.length) {
+        const match = pick(functions);
+        return {
+          file,
+          kind,
+          text: insert(
+            match.index + match[0].length,
+            "\n    let _ = std::mem::size_of::<u8>();",
+          ),
         };
       }
       break;

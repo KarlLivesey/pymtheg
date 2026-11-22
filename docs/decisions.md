@@ -3162,20 +3162,34 @@ in the store. [C-33](changes/C-33.md)
 ### Rust re-index can reuse decisions outside the edited files (C-36)
 
 **Decided (C-36).** The Rust module uses the C-27 scoped analysis contract
-unchanged. It returns the edited paths alone only when every edited file is
-clean before and after, keeps its surface, and meets no lookup cycle cut
-while its links are decided. The surface is everything another file's
-resolution reads from the file: its symbols, file data and `imports`,
-`contains`, `macros` and `modules` links with their place in the link list,
-with source offsets replaced by their rank. The cut check runs with the
-new facts and, unless all facts are the same up to offset ranks, with the
-old ones, in both Rust passes. An answer met without a cut does not depend
-on which lookups ran before it. Every other edit, a changed Cargo context,
-an added, removed or failed file, and missing completion evidence use the
-full Rust pass. The scoped resolve pass rebuilds every link from the stored
-records in the store's id order, so it decides with the exact input the
-analysis checked. The C-22 cold equality rule and run ownership apply.
-[C-36](changes/C-36.md)
+unchanged. It returns the edited paths alone when three conditions hold:
+
+- every edited file is clean before and after;
+- it keeps its surface;
+- no cut occurs while its links are decided.
+
+The surface is everything another file's resolution reads from the file:
+its symbols, file data and `imports`, `contains`, `macros` and `modules`
+links. They are listed in the resolver's path and position order, with
+source offsets replaced by their rank. A cut is a lookup cycle cut, a depth
+cut or a re-entry guard. The cut check runs with the new facts and, unless
+all facts are the same up to offset ranks, with the old ones, in both Rust
+passes.
+
+The guarantee rests on the resolver's caches. They store only answers
+computed without a cut, never evict an answer, and ignore a memo hit that
+would carry a lookup past the depth limit. Trait risk and receiver typing
+use limits that depend only on the facts. A scoped pass's cached answers
+are then a subset of a cold pass's, and each cached answer is the same in
+any history. A cut-free scoped decision therefore equals the cold one. No
+other file's decision can depend on whether the edited file's cut-free
+answers are cached.
+
+Every other edit uses the full Rust pass. So do a changed Cargo context,
+an added, removed or failed file, and missing completion evidence. The
+scoped resolve pass rebuilds every link from the stored records and
+orders them like the full pass. The C-22 cold equality rule and run
+ownership apply. [C-36](changes/C-36.md)
 
 ### C-26 Non-returning analysis: a deterministic check before any deadline
 

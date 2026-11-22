@@ -975,12 +975,17 @@ graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
 Rust can reuse the stored link decisions outside the edited files. A comment,
 whitespace or body edit that leaves every fact another file reads unchanged
-re-decides only the edited file, unless deciding its links meets a lookup
-cycle, as in modules that glob each other. Any other change to symbols,
-imports, macros, modules, attributes or cfg conditions, a Cargo manifest,
-lockfile or configuration change, an added, removed or unreadable file, or an
-unfinished previous run uses the full Rust pass. The same file tree produces
-the same graph after a fresh or incremental index. [C-36](changes/C-36.md)
+re-decides only the edited file. This includes a body edit that adds calls.
+It does not apply when deciding the file's links meets a lookup cycle, a
+depth limit or a re-entry guard, as in modules that glob each other.
+
+Any other change uses the full Rust pass. This covers changes to symbols,
+imports, macros, modules, attributes or cfg conditions; a Cargo manifest,
+lockfile or configuration change; an added, removed or unreadable file; and
+an unfinished previous run. The resolver caches only answers that do not
+depend on which lookup ran first. The same file tree therefore produces the
+same graph after a fresh or incremental index, and one file's answer no
+longer depends on other files' calls. [C-36](changes/C-36.md)
 
 **Go toolchain route (opt-in, decision D17).** With the key
 `"graph": {"toolchain": {"go": true}}` added to the existing
