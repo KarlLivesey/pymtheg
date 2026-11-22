@@ -2397,22 +2397,26 @@ near 43% because most open links need type inference. **Rules out:** running
 the route on a project that has not opted in; reporting the opted-in figure
 without also giving the source-only one.
 
-### D22: init asks once whether build tools may run
+### D22: init asks once whether the repository is trusted
 
 **Decided (Karl, 22 November 2026):** "When the user runs init it should ask
 them of source only or build tools allowed (in general) for this aka do you
-trust the repo". So the opt-in of D17 becomes one project-wide answer given at
-`init`, covering every language: **source only** (nothing of the project is
-ever run) or **build tools allowed** (each language's official tooling may run
-on the project, which runs its build scripts and macros as a build would). The
-question is put as a matter of trusting the repository. As implemented by the
-manager: an init that cannot ask (no terminal, MCP, Studio without an explicit
-choice) records source only; the answer is stored in the project
+trust the repo", and then: "you generally trust a repo because you're gonna
+want to build whatever's on there. So it's not usually a problem. But yeah, it
+should be like a. Hey, do you trust the repo, much like how chat agents" ask
+it. So the opt-in of D17 becomes one project-wide answer given at `init`,
+covering every language, put as a trust question in the manner of coding
+agents: **trusted** (each language's official tooling may run on the project,
+which runs its build scripts and macros as a build would) or **source only**
+(nothing of the project is ever run). As implemented by the manager: trusting
+is the preselected answer of the prompt, since that is the usual case; an init
+that cannot ask (no terminal, MCP, Studio without an explicit choice) records
+source only, because nobody answered; the answer is stored in the project
 configuration, shown in answers, and can be changed later; the per-language
 settings of D17 remain as overrides. **Why:** running a toolchain on a project
 is as trusted as building it (D17), and that is a single judgement about the
 repository, not one per language. **Rules out:** running build tools on a
-project whose owner was never asked; a default of "allowed".
+project whose owner was never asked.
 
 ### D19: coverage is judged with dependencies installed
 
