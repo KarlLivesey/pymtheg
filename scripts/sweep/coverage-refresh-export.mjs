@@ -78,7 +78,7 @@ function scan(attempt, repo, audit) {
       totals.links++;
       byOutcome.set(outcome, byOutcome.get(outcome) + 1);
       const library = outcome === "library" ? storedLibraryIdentity({ file, resolution: outcome, library: row }) : null;
-      // C-42 (proposed): a merged environment global counts at Level 2.
+      // D23: a merged environment global counts at Level 2 as proven.
       const merged = outcome === "ambiguous" && data.mergedGlobal === true &&
         mergedGlobalLevel2(data, mergedCandidates.all(id), checkoutCount.get(id).n);
       if (merged) totals.merged = (totals.merged ?? 0) + 1;

@@ -465,8 +465,8 @@ export function libraryModuleLinks(repos, module, own = false) {
 }
 
 /**
- * C-42 (proposed, awaiting the manager's ruling): a merged environment
- * global. The TypeScript module marks a candidate set `mergedGlobal` when its
+ * D23 (C-42): a merged environment global counts at Level 2 as proven.
+ * The TypeScript module marks a candidate set `mergedGlobal` when its
  * library candidates are the declarations, in several library units, of one
  * global compiler symbol (for example `console.log`, declared by the DOM
  * library and by `@types/node`). Such a link names the symbol and every

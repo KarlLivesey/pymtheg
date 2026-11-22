@@ -610,7 +610,7 @@ test("stored resolution classes, library included, agree with the CLI's counts o
   }
 });
 
-test("C-42: a merged environment global counts when it names the symbol and every declaring unit", () => {
+test("D23: a merged environment global counts when it names the symbol and every declaring unit", () => {
   const dom = { ecosystem: "dom", unit: "dom", symbol: "Console.prototype.log" };
   const node = { ecosystem: "npm", unit: "@types/node", symbol: "Console.prototype.log" };
   const merged = { mergedGlobal: true };
@@ -622,4 +622,17 @@ test("C-42: a merged environment global counts when it names the symbol and ever
   assert.equal(mergedGlobalLevel2(merged, [dom, { ...dom, symbol: "Console.log" }], 0), false);
   assert.equal(mergedGlobalLevel2(merged, [dom, { ...node, symbol: undefined }], 0), false);
   assert.equal(mergedGlobalLevel2(merged, [dom], 0), false);
+});
+
+test("D23: merged environment globals are summed per language from the counts", async () => {
+  const { mergedGlobalCount } = await import("./coverage-refresh-data.mjs");
+  const repos = [
+    { language: "typescript", counts: { typescript: { links: 9, level2: 6, assumed: 0, merged: 2 }, go: { links: 1, level2: 1, assumed: 0 } } },
+    { language: "go", counts: { typescript: { links: 4, level2: 4, assumed: 0, merged: 1 } } },
+    { language: "typescript" },
+  ];
+  assert.equal(mergedGlobalCount(repos, "typescript"), 3);
+  assert.equal(mergedGlobalCount(repos, "typescript", true), 2);
+  // Archives without the count (before C-42) contribute nothing.
+  assert.equal(mergedGlobalCount(repos, "go"), 0);
 });

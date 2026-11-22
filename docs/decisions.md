@@ -3141,9 +3141,10 @@ Across programs the mark is kept only when every program gives the same
 set. The candidate rows are deterministic, so the identity is the same in
 every file, program and run. **Rules out:** choosing one typing as the
 target; marking different symbols (union arms) or sets that only one
-program's settings would select. Whether a merged global counts at Level 2
-is the manager's ruling; the rule is written in `coverage-rules.mjs`
-(`mergedGlobalLevel2`) as a proposal. [C-42](changes/C-42.md)
+program's settings would select. A merged global counts at Level 2 as
+proven (D23; `coverage-rules.mjs` `mergedGlobalLevel2`). A member call whose
+signature selection is proven is narrowed first to one declaration, as for
+any merged member. [C-42](changes/C-42.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 
