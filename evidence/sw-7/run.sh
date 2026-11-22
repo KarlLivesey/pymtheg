@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # run.sh : the installed sweep of microsoft/TypeScript alone (SW-5 runner
-# and policy, scripts/sweep/run.mjs --installed) with a build of THIS tree.
-# Run it from a checkout of PR 51's head (branch
-# c-40-streamed-module-results), which lets the pin finish at Node's default
-# heap; main's build reaches the wall limit (SW-6). The budget is 90 minutes
+# and policy, scripts/sweep/run.mjs --installed) with a build of this tree.
+# Main since PR 51 (`9b4cff4`) lets the pin finish at Node's default heap;
+# before it, the pin reached the wall limit (SW-6). The budget is 90 minutes
 # instead of 60 so that one slow attempt still finishes. Output
 # $PYM_SCRATCH/sweep-sw7.json, attempts under $PYM_SCRATCH/sw.
 set -u

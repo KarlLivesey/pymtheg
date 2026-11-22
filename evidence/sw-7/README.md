@@ -4,14 +4,20 @@ Measurement only: no product code and no coverage-rule change. The question
 is how a 20th installed TypeScript pin, microsoft/TypeScript, would move
 the headline, so that a ruling can say how such a pin should count.
 
+**Ruling (after this measurement):** microsoft/TypeScript counts in full,
+link-weighted, as every other pin, with no carve-out for `tsc/testdata`:
+81.85% for 20 pins, 83.10% with library module links. While the pin's two
+defects found here are open (`taint-budget-exhausted` and the "Awaiting
+project analysis" placeholders), the 19-pin figure (85.79%) is reported
+beside it.
+
 ## How it was measured
 
 - **Build.** The pin reaches the 60-minute limit on main (SW-6). PR 51
   (branch `c-40-streamed-module-results`, head `a95a346`, not merged) lets it
   finish at Node's default heap. The index was run with a build of that
-  head. **The scripts here run on main**, but the index they read needs
-  PR 51's build. This branch is therefore based on `origin/main`, and
-  `run.sh` has to be run from a checkout of PR 51's head.
+  head. PR 51 has since merged (main `9b4cff4`), so `run.sh` now runs from
+  main.
 - **Policy.** One installed attempt of `microsoft/TypeScript` at pin
   `21ba970`, with the SW-5 runner and policy (`scripts/sweep/run.mjs
   --installed`): frozen lockfile, lifecycle scripts off, no network while
@@ -148,8 +154,7 @@ link-weighted headline to 85.07% (−0.72).
 ## Files
 
 - `pin.json`: the one-pin manifest (from `sweep/repos.json`).
-- `run.sh`: the installed attempt; run from a checkout of PR 51's head (see
-  above).
+- `run.sh`: the installed attempt (from main, now that PR 51 has merged).
 - `score.mjs`: per pin, links, Level 2, assumption-marked Level 2 and D20
   library module links, using the coverage rules on main.
   - `--detail PIN` adds, for that pin:
@@ -167,9 +172,7 @@ link-weighted headline to 85.07% (−0.72).
 On the dev server:
 
 ```sh
-# from a checkout of PR 51's head, with this folder copied in:
 bash evidence/sw-7/run.sh
-# from main:
 SWEEP_SCRATCH=<scratch>/sw node evidence/sw-7/score.mjs <scratch>/sweep-sw7.json typescript-pin.json \
   --detail microsoft/TypeScript --any-outcome
 SWEEP_SCRATCH=<baseline scratch>/sw node evidence/sw-7/score.mjs <baseline scratch>/sweep-diag.json pins-19.json
