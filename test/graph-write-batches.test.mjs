@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -270,3 +271,30 @@ test(
     }
   },
 );
+
+test("with a rollback journal no batch forms and no turnstile is taken", async () => {
+  const base = mkdtempSync(join(tmpdir(), "c37-rollback-"));
+  const path = join(base, "graph.sqlite");
+  try {
+    // A SQLite without the write-ahead-log reset fix keeps the rollback
+    // journal (C-6): each write commits alone, as before C-37.
+    const store = new SqliteGraphStore(path, "c37", {
+      sqliteVersion: "3.45.0",
+    });
+    try {
+      await withBudget(1000, () =>
+        store.writeBatch(async () => {
+          store.replaceFile(record("a.syn"));
+          assert.deepEqual(paths(path), ["a.syn"]);
+          store.replaceFile(record("b.syn"));
+          assert.deepEqual(paths(path), ["a.syn", "b.syn"]);
+        }),
+      );
+    } finally {
+      store.close();
+    }
+    assert.equal(existsSync(`${path}-turnstile`), false);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});

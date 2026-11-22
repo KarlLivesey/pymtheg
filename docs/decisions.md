@@ -3258,11 +3258,13 @@ time limits where a deterministic property exists. See [C-26](changes/C-26.md).
 
 **Decided (C-37):** under the write-ahead log, an index run's writes (parse
 results, analysed results and each module's resolution write) share one
-transaction until about 50,000 rows are written (SQLite's direct changes, a
-fixed count), then commit; the rest commits at the end of each write phase.
+transaction until about 50,000 rows are written (a fixed count of each
+write statement's direct changes; rows changed by triggers and cascades are
+not counted), then commit; the rest commits at the end of each write phase.
 Every batch is one commit with the run's checks at its start: the
 unfinished-run mark at the first, and at each one the proof that no other
-run has written since. Every store write, and every batch, first takes a
+run has written since. Every store write under the write-ahead log, and
+every batch, first takes a
 turnstile, a lock-only database beside the store (`graph.sqlite-turnstile`,
 SQLite's own file lock), and leaves it once it holds the write lock. A
 writable open that finds its schema and identity in place writes nothing.
@@ -3282,8 +3284,11 @@ blocked under the write-ahead log. A run overtaken between two batches
 stops at the next batch. **Trade:** a run cut short loses up to one batch
 more of progress, which its mark makes the next run redo; the log reaches
 the checkpoint threshold plus about one batch (474 MiB on cli/cli, 499 MiB
-on Vector). Waiters are not served first in, first out, and nothing gives
-the run fairness against a continuous stream of short writers. **Rules out:**
+on Vector; 553 MiB on cli/cli counting direct changes). Only a connection
+that writes through the write-ahead log takes the turnstile; with a
+rollback journal every write commits alone and takes no turn, as before.
+Waiters are not served first in, first out, and nothing gives the run
+fairness against a continuous stream of writers. **Rules out:**
 savepoints per write (several times slower inserts), batches bounded by
 time, batching under a rollback journal (a batch larger than the page cache
 would lock readers out), and 50,000 pages or fewer per checkpoint (most of
