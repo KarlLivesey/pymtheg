@@ -2437,7 +2437,16 @@ exactly, which is what the owner's library rule asks (library and symbol).
 **Rules out:** counting a candidate set whose members are different symbols
 (union arms such as `toString` on several types); counting a set that includes
 a checkout or synthesised target; a mark given without the compiler's own
-single-symbol proof.
+single-symbol proof. **Narrowed in review (22 November 2026):** the compiler
+also merges globals that two competing packages declare (`describe` and `it`
+from two test frameworks loaded together, `expect` from two assertion
+libraries). Those units ARE alternatives: a file runs under one of them. So
+no set is marked when any of its units is a test framework, or when its
+variable declarations disagree on the type (the compiler's own
+"subsequent variable declarations must have the same type" condition, which
+`skipLibCheck` hides). The mark is for environment globals: the language
+library, DOM, workers, Node and compatible runtimes, and packages that
+augment them.
 
 ### D19: coverage is judged with dependencies installed
 
