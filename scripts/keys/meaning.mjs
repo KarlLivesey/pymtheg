@@ -96,6 +96,8 @@ export function keyForms(path) {
     const symbols = new Map();
     const groups = new Map();
     let ordinalMismatches = 0;
+    let duplicateKeys = 0;
+    const keys = new Set();
     for (const row of db
       .prepare(
         "SELECT body FROM graph_symbols WHERE json_extract(body,'$.module')='typescript'",
@@ -110,6 +112,9 @@ export function keyForms(path) {
         groups,
         JSON.stringify([symbol.file, symbol.kind, symbol.identity]),
       );
+      const unique = `${symbol.file}\0${symbol.key}`;
+      if (keys.has(unique)) duplicateKeys++;
+      keys.add(unique);
       // A name key's `~n` must be the stored ordinal.
       if (form(symbol.key) === "name") {
         const expected = `${symbol.kind}:${symbol.identity}${symbol.ordinal ? `~${symbol.ordinal}` : ""}`;
@@ -139,6 +144,7 @@ export function keyForms(path) {
       symbols: sorted(symbols),
       symbolsInSharedGroups: shared,
       ordinalMismatches,
+      duplicateKeys,
       groups: sorted(sizes),
       linkSources: sorted(sources),
       linksWithTargetKeys: linksWithKeys,

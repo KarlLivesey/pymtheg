@@ -123,6 +123,7 @@ import {
   isScopedDeclaration,
   keyOf,
   MODULE_KEY,
+  setKeyNames,
   kindOf,
   nameOf,
   objectMember,
@@ -290,6 +291,7 @@ const requiredProperty = (element: ts.BindingElement) =>
     ? undefined
     : staticName(element.propertyName ?? element.name);
 
+const namedPrograms = new WeakSet<ts.Program>();
 export function extractFile(
   file: ts.SourceFile,
   checker: ts.TypeChecker,
@@ -301,6 +303,14 @@ export function extractFile(
   context: RenameContext,
   library: ReturnType<typeof libraryReader>,
 ): ParseResult {
+  // Keys spell the source's names (setKeyNames): every file of the program
+  // learns the program's fresh names before any key of it is made.
+  if (!namedPrograms.has(program)) {
+    namedPrograms.add(program);
+    const fresh = context.fresh;
+    for (const source of program.getSourceFiles())
+      setKeyNames(source, (text) => restoreNames(text, fresh));
+  }
   const uncertainAt = new Set(context.renamed?.uncertain ?? []);
   const uncertainReason = (offset: number) =>
     context.renamed?.reasons[offset] ?? "dynamic-scope";
@@ -3590,31 +3600,18 @@ export function extractFile(
         "The TypeScript checker exhausted its stack on some lookups; those links are unresolved (compiler-limit)",
     });
   // Facts of a renamed file report the original names (see rename.ts).
-  // Keys hold identities, so they are restored too: this file's own keys
-  // when it was renamed, and target keys always, since a target file in
-  // this program may have been renamed. The fresh names are chosen per
-  // program, so only restored keys agree across programs and runs.
-  const fresh = context.fresh;
+  // Keys already do: they are made from restored names (setKeyNames), so
+  // they agree across programs, whose fresh names differ.
   if (context.renamed) {
+    const fresh = context.fresh;
     for (const symbol of symbols) {
-      symbol.key = restoreNames(symbol.key, fresh);
       symbol.name = restoreNames(symbol.name, fresh);
       symbol.identity = restoreNames(symbol.identity, fresh);
     }
-    for (const item of links) {
-      if (item.sourceKey !== null)
-        item.sourceKey = restoreNames(item.sourceKey, fresh);
+    for (const item of links)
       item.targetName = restoreNames(item.targetName, fresh);
-    }
     for (const diagnostic of diagnostics)
       diagnostic.message = restoreNames(diagnostic.message, fresh);
-  }
-  for (const item of links) {
-    const targets = (item.data as { targets?: unknown } | undefined)?.targets;
-    if (Array.isArray(targets))
-      for (const target of targets as { key?: unknown }[])
-        if (typeof target.key === "string")
-          target.key = restoreNames(target.key, fresh);
   }
 
   return {

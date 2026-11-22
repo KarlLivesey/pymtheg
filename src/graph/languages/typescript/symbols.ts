@@ -581,17 +581,32 @@ export const MODULE_KEY = "module";
  * same keys; they are only unique within the file.
  */
 const fileKeys = new WeakMap<ts.SourceFile, Map<ts.Node, string>>();
+/**
+ * How a file's compiler text spells names back to the source's (rename.ts:
+ * locally bound `require`/`module`/`exports` reach the compiler under fresh
+ * names). Keys are numbered by the restored kind and identity, the ones the
+ * core numbers ordinals by, so two declarations whose names differ only in
+ * the compiler's spelling share a group and never one key.
+ */
+const keyNames = new WeakMap<ts.SourceFile, (text: string) => string>();
+export function setKeyNames(
+  file: ts.SourceFile,
+  restore: (text: string) => string,
+): void {
+  if (!fileKeys.has(file)) keyNames.set(file, restore);
+}
 function keysOf(file: ts.SourceFile): Map<ts.Node, string> {
   const known = fileKeys.get(file);
   if (known) return known;
   const groups = new Map<string, { node: ts.Node; range: SourceRange }[]>();
+  const restore = keyNames.get(file) ?? ((text: string) => text);
   const add = (
     node: ts.Node,
     kind: string,
     identity: string,
     range: SourceRange,
   ) => {
-    const group = `${kind}:${identity}`;
+    const group = `${kind}:${restore(identity)}`;
     let members = groups.get(group);
     if (!members) groups.set(group, (members = []));
     members.push({ node, range });

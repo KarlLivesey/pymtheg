@@ -71,6 +71,32 @@ const keysOf = (store, file) =>
       .sort(([a], [b]) => (a < b ? -1 : 1)),
   );
 
+/**
+ * The key property on every stored TypeScript symbol: unique within its
+ * file, and its `~n` suffix the core's stored ordinal.
+ */
+function assertKeysAreOrdinals(store) {
+  const seen = new Set();
+  let numbered = 0;
+  for (const symbol of store.findSymbols()) {
+    if (symbol.module !== "typescript") continue;
+    const unique = `${symbol.file}\0${symbol.key}`;
+    assert.ok(
+      !seen.has(unique),
+      `duplicate key ${symbol.key} in ${symbol.file}`,
+    );
+    seen.add(unique);
+    if (symbol.key === "module") continue;
+    if (symbol.ordinal) numbered++;
+    assert.equal(
+      symbol.key,
+      `${symbol.kind}:${symbol.identity}${symbol.ordinal ? `~${symbol.ordinal}` : ""}`,
+      symbol.file,
+    );
+  }
+  return numbered;
+}
+
 const lib = (body) =>
   [
     `export function first() { ${body} }`,
@@ -138,8 +164,14 @@ test("keys are unique name paths; later same-named and anonymous siblings take ~
     "interface Merged { b: 1 }",
     "namespace Space { export const v = 1; }",
     "namespace Space { export const w = 1; }",
-    "[1].map(() => 1);",
-    "[1].map(() => 1);",
+    "declare const flag: boolean;",
+    "declare function describe(name: string, body: () => void): void;",
+    "export function host() {",
+    '  describe("same", () => { const helper = () => 1; });',
+    '  describe("same", () => { const helper = () => 2; });',
+    "  if (flag) { const inner = () => 1; }",
+    "  if (flag) { const inner = () => 2; }",
+    "}",
     "export default function () { return { x: 1, x2: { y: 1 } }; }",
     "",
   ].join("\n");
@@ -158,6 +190,23 @@ test("keys are unique name paths; later same-named and anonymous siblings take ~
       ["interface:Merged", 0],
       ["interface:Merged~1", 1],
     ]);
+    // Anonymous-scoped siblings: the same local in two identical callbacks
+    // and in two identical blocks.
+    for (const name of ["helper", "inner"]) {
+      const same = symbols
+        .filter((symbol) => symbol.name === name)
+        .sort((a, b) => a.range.start - b.range.start);
+      assert.equal(same.length, 2, name);
+      assert.equal(same[0].identity, same[1].identity, name);
+      assert.deepEqual(
+        same.map((symbol) => [symbol.key.endsWith("~1"), symbol.ordinal]),
+        [
+          [false, 0],
+          [true, 1],
+        ],
+        name,
+      );
+    }
     // Each key's ordinal suffix is the core's ordinal of that symbol.
     for (const symbol of symbols)
       if (symbol.key !== "module")
@@ -171,8 +220,8 @@ test("keys are unique name paths; later same-named and anonymous siblings take ~
 test("inserting, removing and reordering same-named and anonymous siblings equals cold after every re-index", async () => {
   const parts = [
     "export interface Merged { a: 1 }",
-    "[1].map(() => 1);",
-    "export function f() { return [1].map(() => 1); }",
+    'export function g() { describe("same", () => { const helper = () => 1; }); }',
+    "export function f() { if (flag) { const inner = () => 1; } if (flag) { const inner = () => 2; } return 1; }",
     "export interface Merged { b: 1 }",
     "export default class { m() { return { k: 1 }; } }",
     "export const o = { k: 1, n() { return 1; } };",
@@ -184,7 +233,9 @@ test("inserting, removing and reordering same-named and anonymous siblings equal
     "f(); f2(); o.n(); new Anonymous().m();",
     "",
   ].join("\n");
-  const text = (list) => list.join("\n") + "\n";
+  const prefix =
+    "declare const flag: boolean;\ndeclare function describe(name: string, body: () => void): void;\n";
+  const text = (list) => prefix + list.join("\n") + "\n";
   await withTree({ "x.ts": text(parts), "y.ts": consumer }, async (tree) => {
     await tree.index();
     await tree.equalsCold("first index");
@@ -193,7 +244,14 @@ test("inserting, removing and reordering same-named and anonymous siblings equal
         "insert a same-named sibling first",
         ["export interface Merged { c: 1 }", ...parts],
       ],
-      ["insert an anonymous sibling first", ["[1].map(() => 1);", ...parts]],
+      [
+        "insert an anonymous sibling first",
+        [
+          parts[0],
+          'export function g() { describe("same", () => { const helper = () => 3; }); describe("same", () => { const helper = () => 1; }); }',
+          ...parts.slice(2),
+        ],
+      ],
       ["remove the first same-named sibling", parts.filter((_, i) => i !== 0)],
       ["remove the first anonymous sibling", parts.filter((_, i) => i !== 1)],
       [
@@ -211,6 +269,7 @@ test("inserting, removing and reordering same-named and anonymous siblings equal
       tree.write("x.ts", text(list));
       await tree.index();
       await tree.equalsCold(name);
+      assertKeysAreOrdinals(tree.store);
     }
   });
 });
@@ -253,4 +312,92 @@ test("a file in two programs has the same keys, and links from both resolve to i
       await tree.equalsCold("two programs");
     },
   );
+});
+
+test("a renamed JavaScript file numbers its keys by the restored names, and stays clean", async () => {
+  await withTree(
+    {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { allowJs: true },
+        include: ["src"],
+      }),
+      "src/r.js": [
+        "function require(name) { return name; }",
+        "exports.require = function () { return 1; };",
+        'exports.other = function () { return require("x"); };',
+        "",
+      ].join("\n"),
+      "src/ruse.js": 'const r = require("./r"); r.require(); r.other();\n',
+      "src/other.ts": "export const unrelated = 1;\n",
+    },
+    async (tree) => {
+      const report = await tree.index();
+      assert.deepEqual(report.analysisErrors, []);
+      for (const file of tree.store.files())
+        assert.equal(file.result.status, "clean", file.path);
+      const named = tree.store
+        .findSymbols({ file: "src/r.js" })
+        .filter((symbol) => symbol.identity === "require")
+        .sort((a, b) => a.ordinal - b.ordinal)
+        .map((symbol) => [symbol.kind, symbol.key, symbol.ordinal]);
+      assert.deepEqual(named, [
+        ["function", "function:require", 0],
+        ["function", "function:require~1", 1],
+      ]);
+      assertKeysAreOrdinals(tree.store);
+      await tree.equalsCold("renamed");
+    },
+  );
+});
+
+test("on a mixed corpus every key is unique in its file and its ~n is the stored ordinal", async () => {
+  const files = {
+    "tsconfig.json": JSON.stringify({
+      compilerOptions: { allowJs: true, checkJs: true },
+      include: ["src"],
+    }),
+    "src/cjs.js": [
+      "const module = { id: 1 };",
+      "function exports() { return module.id; }",
+      "function require(name) { return name; }",
+      "exports.require = function () { return require('a'); };",
+      "module.exports.module = function () { return 2; };",
+      "",
+    ].join("\n"),
+    "src/merged.ts": [
+      "interface M { a: 1 }",
+      "interface M { b: 1 }",
+      "interface M { c: 1 }",
+      "namespace N { export const x = 1; }",
+      "namespace N { export const y = 1; }",
+      "function over(a: string): void;",
+      "function over(a: number): void;",
+      "function over(a: unknown) {}",
+      "export const objects = { k: 1, ['k']: 2, n: { k: 3 } };",
+      "",
+    ].join("\n"),
+    "src/scopes.ts": [
+      "declare const flag: boolean;",
+      "declare function describe(name: string, body: () => void): void;",
+      "export function host() {",
+      ...Array.from(
+        { length: 3 },
+        (_, i) =>
+          `describe("same", () => { const helper = () => ${i}; function inner() { return ${i}; } });`,
+      ),
+      ...Array.from(
+        { length: 3 },
+        (_, i) => `if (flag) { const local = () => ${i}; }`,
+      ),
+      "}",
+      "export default class { m() { return { k: 1 }; } m2() { return { k: 2 }; } }",
+      "",
+    ].join("\n"),
+  };
+  await withTree(files, async (tree) => {
+    await tree.index();
+    for (const file of tree.store.files())
+      assert.notEqual(file.result.status, "failed", file.path);
+    assert.ok(assertKeysAreOrdinals(tree.store) >= 6, "siblings were numbered");
+  });
 });

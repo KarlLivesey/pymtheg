@@ -52,8 +52,9 @@ const temporary = storeDir && join(storeDir, `${name}.${seedArg}.sqlite`);
 // the store's bytes as they were.
 const command = flags.includes("--command");
 // C-49: TypeScript edits also copy, remove and swap whole declarations,
-// members and object properties (same-named siblings) and insert anonymous
-// callbacks. A separate flag, so earlier seeds replay as they did.
+// members and object properties (same-named siblings) and insert a callback
+// holding a local (an anonymous-scoped symbol; a repeated insert is its
+// same-named sibling). A separate flag, so earlier seeds replay as they did.
 const siblings = flags.includes("--siblings");
 if (command && !temporary) throw Error("--command requires --store-dir");
 const cacheAt = flags.indexOf("--cache-pages");
@@ -69,7 +70,10 @@ if (
 if (existsSync(base) && !resume) throw Error(`exists: ${base}`);
 mkdirSync(base, { recursive: true });
 if (!existsSync(root))
-  cpSync(join(scratch, "pins", name), root, { recursive: true });
+  cpSync(join(scratch, "pins", name), root, {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
 
 // Deterministic PRNG (mulberry32).
 let state = Number(seedArg) >>> 0;
@@ -188,16 +192,19 @@ function siblingEdit(kind, file, source) {
       lists.push({
         list,
         statements,
+        block: ts.isBlock(node),
         comma: ts.isObjectLiteralExpression(node),
       });
     ts.forEachChild(node, walk);
   };
   walk(syntax);
+  // An anonymous-scoped local is a symbol only inside a declaration's
+  // body, so the callback goes into a block.
   const usable = lists.filter((item) =>
     kind === "swap"
       ? item.list.length >= 2
       : kind === "anonymous"
-        ? item.statements
+        ? item.statements && item.block
         : true,
   );
   if (!usable.length) return undefined;
@@ -218,7 +225,11 @@ function siblingEdit(kind, file, source) {
     return source.slice(0, start) + source.slice(stop);
   }
   if (kind === "anonymous")
-    return source.slice(0, start) + "[0].map(() => 0);\n" + source.slice(start);
+    return (
+      source.slice(0, start) +
+      "[0].forEach(() => { const c49 = () => 0; });\n" +
+      source.slice(start)
+    );
   const first = Math.min(at, list.length - 2);
   const [aStart, aEnd] = span(list[first]);
   const [bStart, bEnd] = span(list[first + 1]);
