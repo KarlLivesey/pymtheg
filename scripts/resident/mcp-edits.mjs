@@ -9,6 +9,7 @@
 // set after the job and its peak so far. The final store is compared with
 // a cold index row for row.
 //   node scripts/resident/mcp-edits.mjs <dist> <scratch> <repo id> <out dir> [--edits body,export]
+import "../isolated-home.mjs";
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";

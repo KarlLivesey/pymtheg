@@ -4,6 +4,7 @@
 // again, and lists per file whether its stored file record, symbols and
 // links changed, and how: the fields of the changed link records.
 //   node scripts/resident/edit-diff.mjs <dist> <scratch> <repo id> <edit>
+import "../isolated-home.mjs";
 import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
