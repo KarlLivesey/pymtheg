@@ -45,6 +45,10 @@ test("MCP lists pinned candidate files before a workspace exists, then captures 
     );
     assert.ok(!missing.content[0].text.includes(root));
     assert.ok(!missing.content[0].text.includes("ENOENT"));
+    // C-44: a write that fails initialises nothing, as before the trust question.
+    await assert.rejects(readFile(join(root, ".pymtheg", "project.json")), {
+      code: "ENOENT",
+    });
     const first = await call(client, "read_implementation", {
       section: "files",
       limit: 1,
@@ -67,6 +71,7 @@ test("MCP lists pinned candidate files before a workspace exists, then captures 
       files: first.files,
       label: "Selected code",
       expectedRevision: null,
+      trust: "source-only",
     });
     const graph = await call(client, "read_implementation", {
       section: "graph",

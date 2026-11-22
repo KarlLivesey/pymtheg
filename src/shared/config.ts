@@ -14,9 +14,18 @@ export interface Scenario {
  * D22: whether the project's owner trusts the repository. `trusted` lets each
  * language's official tooling run on the project, as building it would run
  * its build scripts and macros; `source-only` runs nothing of the project.
- * Absent is source only, as before D22.
+ * The answer is this machine's (.pymtheg/local/trust.json, LocalTrust);
+ * nothing committed grants it. No answer is `unanswered` and runs nothing.
  */
 export type ProjectTrust = "trusted" | "source-only";
+/** The trust that applies: an answer, or none on this machine yet. */
+export type TrustState = ProjectTrust | "unanswered";
+/** This machine's answer for one checkout, and its local tool settings. */
+export interface LocalTrust {
+  trust: ProjectTrust;
+  /** Local-only per-language settings: true, false or an absolute tool path. */
+  toolchain?: Record<string, boolean | string>;
+}
 export const projectTrustValues: readonly ProjectTrust[] = [
   "trusted",
   "source-only",
@@ -170,16 +179,49 @@ export function machineScope(
     );
   return scope.assumptions as string[];
 }
+/** Languages with a toolchain route. */
+export const toolchainRoutes = ["go"] as const;
+
+/**
+ * The trust that applies to a checkout (D22): a committed
+ * `graph.trust: "source-only"` binds (the repository's author may forbid
+ * build tools); otherwise this machine's answer, or `unanswered`.
+ */
+export function trustState(
+  config: ProjectConfig,
+  local: LocalTrust | undefined,
+): TrustState {
+  if (config.graph?.trust === "source-only") return "source-only";
+  return local?.trust ?? "unanswered";
+}
+
 /**
  * The toolchain routes that may run, as IndexOptions.toolchains (empty when
- * off). An explicit per-language setting wins; otherwise a trusted project
- * runs each route with its default policy (D22).
+ * off). The single place that decides it. Only this machine's trusted
+ * answer turns routes on (D22); nothing committed can. A committed
+ * per-language setting may only turn a route off (`false`): a committed
+ * `true` adds nothing and a committed tool path is never used, since a path
+ * into the repository would run its code. A tool path comes from the local
+ * answer only; a local `false` turns a route off too.
  */
 export function graphToolchains(
   config: ProjectConfig,
+  local: LocalTrust | undefined,
 ): Record<string, boolean | string> {
-  const explicit = config.graph?.toolchain?.go;
-  const go =
-    explicit !== undefined ? explicit : config.graph?.trust === "trusted";
-  return go === false ? {} : { go };
+  if (trustState(config, local) !== "trusted") return {};
+  const routes: Record<string, boolean | string> = {};
+  for (const key of toolchainRoutes) {
+    if (config.graph?.toolchain?.[key] === false) continue;
+    const own = local?.toolchain?.[key];
+    if (own === false) continue;
+    routes[key] = typeof own === "string" ? own : true;
+  }
+  return routes;
+}
+
+/** Committed tool paths, which graphToolchains never uses (reported as a warning). */
+export function committedToolPaths(config: ProjectConfig): string[] {
+  return toolchainRoutes.filter(
+    (key) => typeof config.graph?.toolchain?.[key] === "string",
+  );
 }

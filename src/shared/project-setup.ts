@@ -7,8 +7,8 @@ export const projectSetupSchema = z.object({
   workspace: workspaceSchema,
   created: z.boolean(),
   filesCreated: z.array(z.string()),
-  /** D22: the project's recorded trust answer, and whether this call recorded it. */
-  trust: z.enum(["trusted", "source-only"]).nullable().optional(),
+  /** D22: the trust that applies on this machine, and whether this call recorded it. */
+  trust: z.enum(["trusted", "source-only", "unanswered"]).optional(),
   trustRecorded: z.boolean().optional(),
   documentation: z.object({
     status: z.enum([

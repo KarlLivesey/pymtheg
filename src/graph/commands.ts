@@ -31,7 +31,15 @@ import {
   type ToolchainState,
 } from "./command-toolchain.js";
 import { loadConfig } from "../project/config.js";
-import { graphToolchains, type ProjectTrust } from "../shared/config.js";
+import {
+  committedToolPaths,
+  graphToolchains,
+  trustState,
+  type TrustState,
+} from "../shared/config.js";
+import { readLocalTrust } from "../project/local-trust.js";
+import { readWorkspace } from "../project/workspace.js";
+import { trustAnswerHow } from "../project/trust.js";
 import { dirname, join } from "node:path";
 
 export type GraphCommand = "index" | "status" | QueryCommand;
@@ -105,8 +113,13 @@ export interface GraphResponse {
    * absent when the project has not opted in (off).
    */
   toolchain?: ToolchainState;
-  /** D22: the project's trust answer from init, when one is recorded. */
-  trust?: ProjectTrust;
+  /**
+   * D22: the trust that applies on this machine, for an initialised project:
+   * its local answer, "source-only" when the committed settings bind it, or
+   * "unanswered" (nothing runs) with trustAnswer saying how to answer.
+   */
+  trust?: TrustState;
+  trustAnswer?: string;
 }
 export interface GraphExecutionOptions {
   signal?: AbortSignal;
@@ -223,12 +236,17 @@ export async function executeGraph(
     // unreadable one is off too, with a warning.
     let toolchains: Record<string, boolean | string> = {};
     let settingsError: string | null = null;
-    // D22: the project's recorded trust answer, reported when there is one.
-    let trust: ProjectTrust | undefined;
+    // D22: the trust that applies on this machine, reported for an
+    // initialised project. Only the local answer can turn routes on.
+    let trust: TrustState | undefined;
+    let ignoredPaths: string[] = [];
     try {
       const { config } = await loadConfig(root);
-      toolchains = graphToolchains(config);
-      trust = config.graph?.trust;
+      const local = await readLocalTrust(root);
+      toolchains = graphToolchains(config, local);
+      ignoredPaths = committedToolPaths(config);
+      if (await readWorkspace(root).catch(() => null))
+        trust = trustState(config, local);
     } catch (error) {
       settingsError = error instanceof Error ? error.message : String(error);
     }
@@ -623,7 +641,10 @@ export async function executeGraph(
         },
         data: null,
       };
-      if (trust) response.trust = trust;
+      if (trust) {
+        response.trust = trust;
+        if (trust === "unanswered") response.trustAnswer = trustAnswerHow;
+      }
       if (toolchainOn)
         response.toolchain = report
           ? toolchainState(toolchains, report.toolchains)
@@ -640,6 +661,12 @@ export async function executeGraph(
           code: "toolchain-inputs-not-rechecked",
           message:
             "Toolchain-backed facts are as recorded at the last sync; the toolchain's inputs (Go version, go.mod/go.sum, local replace targets, Go files outside the index) were not re-checked. Sync (a query without --no-sync, or graph index) to re-check them.",
+          files: [],
+        });
+      if (ignoredPaths.length)
+        response.warnings.push({
+          code: "committed-tool-path-ignored",
+          message: `.pymtheg/settings.json names a tool path for ${ignoredPaths.join(", ")}; a committed path is never run (it could point into the repository). Put tool paths in .pymtheg/local/trust.json.`,
           files: [],
         });
       if (settingsError)

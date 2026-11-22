@@ -4042,6 +4042,7 @@ function App() {
         <ProjectSetup
           name={basename(project.root)}
           workspace={project.workspace ?? null}
+          trust={project.trust ?? null}
           onClose={() => setSetupOpen(false)}
           onUpdate={(value) => {
             setProject((old) =>

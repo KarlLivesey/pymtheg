@@ -76,7 +76,11 @@ export class AgentWorkspace {
    * `trust`. An initialised project needs no answer.
    */
   async initialiseForWrite(trust: ProjectTrust | undefined): Promise<void> {
-    if (await readWorkspace(this.root)) return;
+    if (await readWorkspace(this.root)) {
+      // An initialised checkout with no answer here (a clone) records it.
+      if (trust) await initializeWorkspace(this.root, undefined, { trust });
+      return;
+    }
     if (!trust)
       throw Object.assign(
         Error(
@@ -85,6 +89,44 @@ export class AgentWorkspace {
         { code: "trust_required" },
       );
     await initializeWorkspace(this.root, undefined, { trust });
+  }
+  /**
+   * D22: records this machine's trust answer for an initialised checkout
+   * that has none; the same answer again is a no-op, a different one is
+   * refused. A project that was never initialised is initialised by its
+   * first planning write, which takes the answer.
+   */
+  async answerTrust(trust: ProjectTrust): Promise<void> {
+    if (!(await readWorkspace(this.root)))
+      throw Object.assign(
+        Error(
+          "This project is not initialised. Pass trust to its first planning write (requirement_links requirement or add, observe_implementation, link_implementation), or run pymtheg init.",
+        ),
+        { code: "not_initialised" },
+      );
+    await initializeWorkspace(this.root, undefined, { trust });
+  }
+  /**
+   * D22 for writes the Studio service initialises itself (observe and link
+   * implementation): the trust question is checked first, but the project
+   * is initialised only when the write proceeds (after it has validated
+   * its input), with the given answer.
+   */
+  async writeWithTrust<T>(
+    trust: ProjectTrust | undefined,
+    write: () => Promise<T>,
+  ): Promise<T> {
+    if (await readWorkspace(this.root)) {
+      if (trust) await initializeWorkspace(this.root, undefined, { trust });
+      return await write();
+    }
+    if (!trust) await this.initialiseForWrite(undefined); // throws the question
+    this.access.firstWriteTrust = trust;
+    try {
+      return await write();
+    } finally {
+      this.access.firstWriteTrust = undefined;
+    }
   }
   static async open(
     path: string,

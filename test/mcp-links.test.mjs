@@ -357,10 +357,13 @@ test("MCP Go toolchain decisions/state/warnings agree with CLI JSON", async () =
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
     const run = promisify(execFile);
-    const cfg = join(root, ".pymtheg", "settings.json");
-    const settings = JSON.parse(await readFile(cfg, "utf8"));
-    settings.graph = { toolchain: { go: true } };
-    await writeFile(cfg, JSON.stringify(settings));
+    // D22 (C-44): the route runs on this machine's trusted answer, given
+    // over MCP with code_graph's trust parameter.
+    const answered = await call("code_graph", {
+      action: "status",
+      trust: "trusted",
+    });
+    assert.equal(answered.summary.trust, "trusted");
     const graph = async (action, query, extra = {}) => {
       const first = await call("code_graph", {
         action,

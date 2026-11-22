@@ -54,9 +54,16 @@ repository.
   off.
 - **Source only** means Pymtheg never runs anything from the repository.
 
-The answer is stored as `"graph": {"trust": "trusted"}` or
-`"graph": {"trust": "source-only"}` in `.pymtheg/settings.json`. Graph answers
-report it as `trust`.
+**The answer belongs to this machine, never to Git.** It is kept in
+`.pymtheg/local/trust.json` (a folder that ignores itself), with the project's
+identity and the checkout's absolute path, so a copied or moved checkout, or a
+clone, is asked again. Nothing committed can grant trust: a committed
+`"graph": {"trust": "trusted"}` is at most the answer init preselects, while a
+committed `"graph": {"trust": "source-only"}` binds on every machine (the
+repository's author may forbid build tools) and init then refuses `--trust`.
+A checkout with no answer here is **unanswered**: nothing from it runs, and
+graph answers report `trust: "unanswered"` with `trustAnswer`, one line on how
+to answer. Graph commands never prompt; only init asks.
 
 How each path asks:
 
@@ -74,15 +81,21 @@ How each path asks:
   calls again with `trust: "trusted"` or `trust: "source-only"`.
 - **Studio.** Project setup shows the same question, with trusted
   preselected, and shows the recorded answer afterwards.
+- **A clone of an initialised project.** `pymtheg init` on it asks the
+  question (or takes a flag) and changes nothing else. Over MCP, `code_graph`
+  takes `trust` to record the answer, and the first planning write's `trust`
+  records it too. Studio setup asks when the checkout has no answer.
 - **Nested folders.** A folder inside a project uses that project's answer.
 
-Re-running init never changes a recorded answer. An explicit flag on an
-initialised project with no answer records it. To change it later, edit
-`graph.trust` in `.pymtheg/settings.json`.
+Re-running init never changes a recorded answer. To change it, edit or remove
+`.pymtheg/local/trust.json` and answer again.
 
-A per-language setting such as `"graph": {"toolchain": {"go": false}}` or an
-absolute path to `go` overrides the project-wide answer for that language
-either way. A project with no answer behaves as before D22: nothing is run.
+Committed per-language settings may only turn a route off:
+`"graph": {"toolchain": {"go": false}}` keeps Go off even on a trusted
+checkout. A committed `true` adds nothing, and a committed tool path is never
+run, since it could point into the repository (graph answers warn
+`committed-tool-path-ignored`). A tool path, or `false`, can be given in the
+local file: `{"toolchain": {"go": "/usr/local/go/bin/go"}}` beside the answer.
 
 ## Evidence to collect
 
@@ -167,6 +180,7 @@ is created by initialization or a document preview.
 | `.pymtheg/shared/architecture.sqlite` | Requirements, links, decisions, retained observations, checkpoint history, recorded-change ledger, architecture drafts | Shared data, local database; share it by exported history |
 | `.pymtheg/shared/drafts.sqlite`       | Unsaved Studio buffers and form/context drafts                                                                         | Authored, local                                           |
 | `.pymtheg/local/writer.json`          | This installation's writer identity and author label                                                                   | Local only; ignores itself; never copy to another machine |
+| `.pymtheg/local/trust.json`           | This checkout's trust answer on this machine (D22) and local tool paths                                                | Local only; ignores itself; never committed               |
 | `.pymtheg/rebuildable/graph.sqlite`   | Code graph cache                                                                                                       | Rebuildable; ignores itself                               |
 | `.pymtheg/rebuildable/runs.sqlite`    | The three most recent Studio runs                                                                                      | Rebuildable; ignores itself                               |
 

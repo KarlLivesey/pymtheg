@@ -973,28 +973,31 @@ An unfinished run or a direct graph write requires recovery. The opt-in
 toolchain route uses a full pass. The same file tree produces the same
 graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
-**Go toolchain route (opt-in, decision D17).** With the key
-`"graph": {"toolchain": {"go": true}}` added to the existing
-`.pymtheg/settings.json` (which must keep its `version: 1` and `scenarios`; a
-file holding only the `graph` key is unreadable and the route stays off with a
-`settings-unreadable` warning; full example in the
-[code guide](code-guide.md#the-go-toolchain-route)), or an absolute path to the
-`go` to trust instead of `true`, indexing also runs that `go` (`go list` and a `go/types` helper) in a
+**Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted
+on this machine (below; [code guide](code-guide.md#the-go-toolchain-route)),
+indexing also runs `go` from `PATH`, or the absolute path named in
+`.pymtheg/local/trust.json`, (`go list` and a `go/types` helper) in a
 closed environment with network, cgo and telemetry off, and merges its facts:
 it can upgrade unresolved or candidate links to definite, confirm source-only
 links or verify candidate sets; such links carry `decidedBy: "toolchain"`.
 Every answer reports `toolchain.go.state` (`used` with counts, `unavailable` with
 the reason, such as no `go.mod` at the project root, `go.work`, no `go`, or Go
 older than 1.22; `not-indexed`). Turning it on or off makes the next query sync.
-No MCP tool changes this setting; edit the file.
+An unreadable `.pymtheg/settings.json` keeps every route off with a
+`settings-unreadable` warning.
 
-**Trust at init (decision D22).** `init` asks once whether the repository is
-trusted and records `"graph": {"trust": "trusted"}` or `"source-only"` in
-`.pymtheg/settings.json`. A trusted project runs the Go route above with its
-default policy, as if `toolchain.go` were `true`. A source-only project, or one
-with no answer, runs nothing. An explicit `graph.toolchain.go`, `true`, `false`
-or a path, wins over the answer either way. Graph answers report the recorded
-answer as `trust`. The question and how each path answers it are described in
+**Trust at init (decision D22, C-44).** `init` asks once whether the
+repository is trusted and records the answer for this checkout on this
+machine in `.pymtheg/local/trust.json`, never in Git. A trusted checkout runs
+the Go route above with its default policy. A source-only checkout, or one
+with no answer on this machine (`unanswered`: a clone, a copy, a moved
+checkout), runs nothing. Nothing committed can grant trust: a committed
+`graph.trust: "source-only"` binds on every machine, a committed
+`"trusted"` is only init's preselected answer, a committed
+`graph.toolchain.go: false` turns Go off, and a committed tool path is never
+run (warning `committed-tool-path-ignored`). Graph answers of an initialised
+project report `trust` (`trusted`, `source-only` or `unanswered`, then with
+`trustAnswer`). The question and how each path answers it are described in
 [project initialization](project-init.md#trusting-the-repository). Sources:
 [W3-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L.md), [W3-L2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L2.md).
 

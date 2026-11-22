@@ -138,8 +138,10 @@ test("the CLI initializes an empty directory without generating example source",
     const info = JSON.parse(result.stdout);
     assert.equal(info.workspace.name, "Empty design");
     assert.deepEqual((await readdir(root)).sort(), [".pymtheg"]);
+    // C-44: "local" holds the no-terminal trust answer for this machine.
     assert.deepEqual((await readdir(join(root, ".pymtheg"))).sort(), [
       ".gitignore",
+      "local",
       "project.json",
       "settings.json",
     ]);

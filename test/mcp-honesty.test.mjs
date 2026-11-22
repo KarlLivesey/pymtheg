@@ -157,6 +157,14 @@ test("E: the first MCP planning write initialises the project exactly as pymtheg
         ]);
         const add = await links(s, "add", { record: "R1", selector: "Save" });
         assert.equal(add.summary.status, "created");
+        // trust means something only on the first planning writes.
+        assert.match(
+          await errorText(s, "requirement_links", {
+            action: "list",
+            trust: "trusted",
+          }),
+          /trust is not accepted by list/,
+        );
       },
     );
   } finally {

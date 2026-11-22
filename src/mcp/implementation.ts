@@ -152,13 +152,9 @@ export function registerImplementationTools(
     async ({ trust, ...args }, ctx) =>
       output({
         revision: revisionReceipt(
-          await (async () => {
-            await workspace.initialiseForWrite(trust);
-            return workspace.access.observeImplementation(
-              args,
-              ctx.mcpReq.signal,
-            );
-          })(),
+          await workspace.writeWithTrust(trust, () =>
+            workspace.access.observeImplementation(args, ctx.mcpReq.signal),
+          ),
         ),
         meaning: "Observed source structure. No correctness proof.",
       }),
@@ -192,10 +188,9 @@ export function registerImplementationTools(
     async ({ reviewed, trust, ...args }, ctx) =>
       output({
         revision: revisionReceipt(
-          await (async () => {
-            await workspace.initialiseForWrite(trust);
-            return workspace.access.linkImplementation(args, ctx.mcpReq.signal);
-          })(),
+          await workspace.writeWithTrust(trust, () =>
+            workspace.access.linkImplementation(args, ctx.mcpReq.signal),
+          ),
         ),
         reviewed,
         meaning:

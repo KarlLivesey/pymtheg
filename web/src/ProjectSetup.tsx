@@ -12,11 +12,14 @@ import type { importResolutionSchema } from "../../src/architecture/schema";
 export function ProjectSetup({
   name,
   workspace,
+  trust: current,
   onUpdate,
   onClose,
 }: {
   name: string;
   workspace: WorkspaceIdentity | null;
+  /** D22: the trust that applies on this machine (null before init). */
+  trust: "trusted" | "source-only" | "unanswered" | null;
   onUpdate: (value: Setup) => void;
   onClose: () => void;
 }) {
@@ -25,8 +28,10 @@ export function ProjectSetup({
     [error, setError] = useState(""),
     [result, setResult] = useState<Setup | null>(null);
   const [allowBrokenLinks, setAllowBrokenLinks] = useState(false);
-  // D22: asked once, when setup creates the project; trusted is preselected.
+  // D22: asked when this checkout has no answer on this machine (a new
+  // project, or a clone of an initialised one); trusted is preselected.
   const [trust, setTrust] = useState<"trusted" | "source-only">("trusted");
+  const ask = !workspace || current === "unanswered";
   async function run(
     importDocuments: boolean,
     resolutions?: z.infer<typeof importResolutionSchema>[],
@@ -39,7 +44,7 @@ export function ProjectSetup({
           name: projectName,
           importDocuments,
           allowBrokenLinks,
-          ...(workspace ? {} : { trust }),
+          ...(ask ? { trust } : {}),
           ...(resolutions ? { resolutions } : {}),
           ...(importDocuments || resolutions
             ? { previewToken: result?.documentation.previewToken }
@@ -89,7 +94,7 @@ export function ProjectSetup({
             onChange={(event) => setProjectName(event.target.value)}
           />
         </label>
-        {!workspace && !result && (
+        {ask && !result && (
           <fieldset className="trust-question">
             <legend>Do you trust this repository?</legend>
             <label>
@@ -115,12 +120,13 @@ export function ProjectSetup({
             </label>
           </fieldset>
         )}
-        {result?.trust && (
+        {result?.trust && result.trust !== "unanswered" && (
           <p>
             {result.trust === "trusted"
               ? "Trusted: the languages' official tools may run on this project."
               : "Source only: nothing from this project is run."}{" "}
-            Change it in .pymtheg/settings.json (graph.trust).
+            Kept for this checkout on this machine in .pymtheg/local/trust.json,
+            never in Git; edit or remove it there to change it.
           </p>
         )}
         {!result && (

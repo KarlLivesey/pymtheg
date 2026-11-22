@@ -88,10 +88,14 @@ try {
     ).observeCommand(args.slice(1), cancel.signal);
   } else if (args[0] === "init") {
     const { askTrust } = await import("../project/trust.js");
-    const { findWorkspace } = await import("../project/workspace.js");
+    const { findWorkspace, checkoutTrust } = await import(
+      "../project/workspace.js"
+    );
     /**
-     * D22: the trust answer for a new project. A flag answers it; a
-     * terminal is asked; with neither, source only is recorded and said.
+     * D22: this machine's trust answer, asked when the checkout has none
+     * (a new project, or a clone of an initialised one). A flag answers it;
+     * a terminal is asked; with neither, source only is recorded and said.
+     * A committed "source-only" binds, so nothing is asked.
      */
     const initTrust = async (
       directory: string,
@@ -102,10 +106,11 @@ try {
     }> => {
       if (flag) return { answer: flag };
       const existing = await findWorkspace(directory).catch(() => null);
-      if (existing) return {};
+      if (existing && (await checkoutTrust(existing.root)) !== "unanswered")
+        return {};
       if (process.stdin.isTTY && process.stderr.isTTY)
         return {
-          answer: await askTrust(process.stdin, process.stderr),
+          answer: await askTrust(process.stdin, process.stderr, cancel.signal),
           asked: "terminal",
         };
       return { answer: "source-only", asked: "no-terminal" };
@@ -153,9 +158,18 @@ try {
       !["text", "json"].includes(values.get("--format")!)
     )
       throw Error("Init format must be text or json");
-    // Ask only when this init creates the project: a nested folder uses its
-    // project's answer and re-running init never changes a recorded one.
-    const trust = await initTrust(directory ?? ".", trustFlag);
+    // Ask only when this checkout has no answer on this machine: re-running
+    // init never changes a recorded one.
+    let trust: Awaited<ReturnType<typeof initTrust>>;
+    try {
+      trust = await initTrust(directory ?? ".", trustFlag);
+    } catch (error) {
+      const { TrustCancelled } = await import("../project/trust.js");
+      if (!(error instanceof TrustCancelled)) throw error;
+      // Ctrl-C at the question: say so, write nothing, exit 130.
+      process.stderr.write(`\n${error.message}\n`);
+      process.exit(130);
+    }
     const response = await setupProject(
       directory ?? ".",
       values.get("--name"),
@@ -190,11 +204,9 @@ try {
             ...(initialized.filesCreated.length
               ? [`Created: ${initialized.filesCreated.join(", ")}`]
               : []),
-            ...(initialized.trust
-              ? [
-                  `${trust.asked === "no-terminal" && initialized.trustRecorded ? "No terminal to ask whether you trust this repository, so recorded source only. " : ""}${(await import("../project/trust.js")).trustSummary(initialized.trust)} Change it in .pymtheg/settings.json (graph.trust).`,
-                ]
-              : []),
+            initialized.trust === "unanswered"
+              ? (await import("../project/trust.js")).trustAnswerHow
+              : `${trust.asked === "no-terminal" && initialized.trustRecorded ? "No terminal to ask whether you trust this repository, so recorded source only. " : ""}${(await import("../project/trust.js")).trustSummary(initialized.trust)} Kept for this checkout on this machine in .pymtheg/local/trust.json, never in Git; edit or remove it there to change it.`,
             "Commit .pymtheg/project.json, .pymtheg/settings.json and .pymtheg/.gitignore with your designs.",
             "Planning/history in .pymtheg/shared/ and caches in .pymtheg/rebuildable/ stay local and ignored; share planning by exported history.",
             `Next: ${identity.cli} doctor`,

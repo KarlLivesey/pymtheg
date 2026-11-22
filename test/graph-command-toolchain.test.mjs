@@ -5,7 +5,7 @@
 // one on PATH the toolchain cases are skipped, and say so.
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { test } from "node:test";
@@ -15,6 +15,7 @@ import { formatGraph } from "../dist/cli/graph.js";
 import { LanguageRegistry } from "../dist/graph/registry.js";
 import { SqliteGraphStore } from "../dist/graph/store.js";
 import go from "../dist/graph/languages/go/index.js";
+import { initializeWorkspace } from "../dist/project/workspace.js";
 
 const FIXTURES = fileURLToPath(
   new URL("./fixtures/graph-go-toolchain/", import.meta.url),
@@ -32,16 +33,30 @@ async function project(fixture, setting) {
   if (setting !== undefined) await settings(root, setting);
   return { dir, root };
 }
+/**
+ * D22 (C-44): the route is on only with this machine's trusted answer
+ * (.pymtheg/local/trust.json). `true` answers trusted; a path answers
+ * trusted and names the local tool path; `false` answers trusted and turns
+ * Go off in the committed settings; null writes settings with neither.
+ */
 async function settings(root, go) {
   await mkdir(join(root, ".pymtheg"), { recursive: true });
+  if (go !== null && !existsSync(join(root, ".pymtheg", "project.json")))
+    await initializeWorkspace(root, undefined, { trust: "trusted" });
   await writeFile(
     join(root, ".pymtheg", "settings.json"),
     JSON.stringify({
       version: 1,
       scenarios: {},
-      ...(go === null ? {} : { graph: { toolchain: { go } } }),
+      ...(go === false ? { graph: { toolchain: { go: false } } } : {}),
     }),
   );
+  if (go === null) return;
+  const local = join(root, ".pymtheg", "local", "trust.json");
+  const answer = JSON.parse(await readFile(local, "utf8"));
+  if (typeof go === "string") answer.toolchain = { go };
+  else delete answer.toolchain;
+  await writeFile(local, JSON.stringify(answer));
 }
 const run = (root, command, args = [], extra = {}) =>
   executeGraph(

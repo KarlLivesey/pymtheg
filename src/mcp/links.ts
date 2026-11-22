@@ -266,6 +266,14 @@ export function registerLinkTools(
           delete input.symbolLimit;
           input.limit = a.symbolLimit ?? 200;
         }
+        if (
+          a.trust !== undefined &&
+          a.action !== "requirement" &&
+          a.action !== "add"
+        )
+          throw Error(
+            `trust is not accepted by ${a.action}: only requirement and add, the first planning writes, take it. To answer the trust question on an initialised project, pass trust to code_graph.`,
+          );
         ctx.mcpReq.signal.throwIfAborted();
         if (workspace.graph?.activeId())
           throw Object.assign(

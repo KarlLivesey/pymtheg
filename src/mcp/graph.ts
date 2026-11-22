@@ -162,7 +162,7 @@ export function registerGraphTools(
     "code_graph",
     {
       description:
-        "Ask about Go/Rust/TypeScript code: search first, then symbol/callers/callees/impact/path/file. uses lists project links to a library outside the project: query=unit (module path, crate or package), optional symbol=symbol path in it. Selectors accept stable symbol refs, exact names, qualified names or path:line[:column]. Queries automatically sync changed content unless noSync. Returns the first result page inline when finished within 5 seconds (default wait:true); otherwise returns a job with progress for graph_result. Use wait:false to return a handle immediately. section chooses the first result page; later pages use graph_result. index explicitly updates all modules; status is read-only. Cold indexing can be long: poll the job for deterministic file/phase progress. Never treat possible/unresolved calls as definite.",
+        'Ask about Go/Rust/TypeScript code: search first, then symbol/callers/callees/impact/path/file. uses lists project links to a library outside the project: query=unit (module path, crate or package), optional symbol=symbol path in it. Selectors accept stable symbol refs, exact names, qualified names or path:line[:column]. Queries automatically sync changed content unless noSync. Returns the first result page inline when finished within 5 seconds (default wait:true); otherwise returns a job with progress for graph_result. Use wait:false to return a handle immediately. section chooses the first result page; later pages use graph_result. index explicitly updates all modules; status is read-only. Cold indexing can be long: poll the job for deterministic file/phase progress. Never treat possible/unresolved calls as definite. summary.trust says whether this repository is trusted on this machine (D22); when it is "unanswered" nothing from the repository runs and links are source-only: ask your user "Do you trust this repository?" (or follow your standing instructions) and pass trust on a call to record the answer for this checkout.',
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -183,6 +183,12 @@ export function registerGraphTools(
           noSync: z.boolean().default(false),
           caseSensitive: z.boolean().default(false),
           includePossible: z.boolean().default(false),
+          trust: z
+            .enum(["trusted", "source-only"])
+            .optional()
+            .describe(
+              'An initialised project with no trust answer on this machine (summary.trust "unanswered"): the answer to "Do you trust this repository?". Trusted lets the languages\' official build tools run on it, as building it would; source-only runs nothing from it. Recorded for this checkout only; an existing answer is never changed.',
+            ),
         })
         .strict(),
     },
@@ -199,6 +205,7 @@ export function registerGraphTools(
             "index/status take no query; other actions require query; only path requires to; only uses takes symbol.",
           );
         ctx.mcpReq.signal.throwIfAborted();
+        if (a.trust) await workspace.answerTrust(a.trust);
         if (workspace.links?.activeId())
           throw Error(
             "A requirement-link job is running; await link_result before starting graph work.",
