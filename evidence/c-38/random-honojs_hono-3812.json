@@ -1,0 +1,408 @@
+{
+ "id": "honojs/hono",
+ "seed": 3812,
+ "expectedSteps": 20,
+ "steps": [
+  {
+   "step": 0,
+   "file": "src/client/utils.test.ts",
+   "kind": "comment",
+   "line": 32,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10075,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17478,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 827
+   }
+  },
+  {
+   "step": 1,
+   "file": "src/utils/mount.ts",
+   "kind": "body",
+   "line": 15,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15100,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 26691,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 812
+   }
+  },
+  {
+   "step": 2,
+   "file": "src/helper/dev/index.ts",
+   "kind": "body",
+   "line": 58,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10924,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 22109,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 978
+   }
+  },
+  {
+   "step": 3,
+   "file": "src/utils/concurrent.ts",
+   "kind": "body",
+   "line": 48,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11891,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 2,
+   "cpuMs": 23457,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 912
+   }
+  },
+  {
+   "step": 4,
+   "file": "benchmarks/jsx/src/benchmark.ts",
+   "kind": "body",
+   "line": 35,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3634,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5404,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 885
+   }
+  },
+  {
+   "step": 5,
+   "file": "src/utils/headers.ts",
+   "kind": "export",
+   "line": 356,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29365,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 47288,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 810
+   }
+  },
+  {
+   "step": 6,
+   "file": "src/utils/headers.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26616,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 47393,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 821
+   }
+  },
+  {
+   "step": 7,
+   "file": "benchmarks/jsx/src/nano.ts",
+   "kind": "delete",
+   "line": 5,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2662,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 4579,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 866
+   }
+  },
+  {
+   "step": 8,
+   "file": "benchmarks/jsx/src/nano.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3018,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 4907,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 931
+   }
+  },
+  {
+   "step": 9,
+   "file": "adapters/aws-lambda/test/stream-mock.ts",
+   "kind": "body",
+   "line": 35,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7136,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6431,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 846
+   }
+  },
+  {
+   "step": 10,
+   "file": "src/request.test.ts",
+   "kind": "comment",
+   "line": 24,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8955,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 18591,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 675
+   }
+  },
+  {
+   "step": 11,
+   "file": "adapters/netlify/vite.config.ts",
+   "kind": "comment",
+   "line": 5,
+   "equal": true,
+   "differences": [],
+   "wallMs": 4503,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6255,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 880
+   }
+  },
+  {
+   "step": 12,
+   "file": "src/router/trie-router/router.test.ts",
+   "kind": "body",
+   "line": 5,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9203,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17360,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 814
+   }
+  },
+  {
+   "step": 13,
+   "file": "adapters/deno/src/conninfo.ts",
+   "kind": "body",
+   "line": 9,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3111,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 5896,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 877
+   }
+  },
+  {
+   "step": 14,
+   "file": "src/jsx/dom/components.test.tsx",
+   "kind": "body",
+   "line": 185,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8480,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17489,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 914
+   }
+  },
+  {
+   "step": 15,
+   "file": "src/helper/proxy/index.test.ts",
+   "kind": "comment",
+   "line": 364,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8366,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 17777,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 812
+   }
+  },
+  {
+   "step": 16,
+   "file": "build/dts-plugins.ts",
+   "kind": "body",
+   "line": 39,
+   "equal": true,
+   "differences": [],
+   "wallMs": 5497,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 7228,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 823
+   }
+  },
+  {
+   "step": 17,
+   "file": "adapters/bun/vite.config.ts",
+   "kind": "comment",
+   "line": 15,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7560,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 1,
+   "extracted": 1,
+   "cpuMs": 6829,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 897
+   }
+  },
+  {
+   "step": 18,
+   "file": "src/jsx/dom/hooks/index.ts",
+   "kind": "export",
+   "line": 97,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27877,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 49130,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 845
+   }
+  },
+  {
+   "step": 19,
+   "file": "src/jsx/dom/hooks/index.ts",
+   "kind": "revert",
+   "line": 0,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29649,
+   "failed": 0,
+   "resolvedFiles": 0,
+   "scoped": 0,
+   "extracted": 650,
+   "cpuMs": 51373,
+   "noEdit": {
+    "complete": true,
+    "verified": true,
+    "identical": true,
+    "cpuMs": 762
+   }
+  }
+ ],
+ "equal": true
+}

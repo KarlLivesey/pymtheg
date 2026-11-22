@@ -3216,7 +3216,9 @@ depend on what other files asked first, so it is not used when:
   occurs.
 
 Every check is counted, never timed, and every refusal runs the full
-analysis. **Trade:** the scoped path still builds and warms the owning
+analysis. A run whose parsed writes wait for analysis (C-27) writes its
+run mark before analysing, so a run that begins meanwhile takes over
+(C-22). **Trade:** the scoped path still builds and warms the owning
 projects' programs and builds two programs per loading project. Module
 version 45. **Rules out:** a stored per-file type fingerprint, whose
 printed form would depend on the order types were created in.

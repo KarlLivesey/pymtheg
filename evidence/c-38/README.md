@@ -17,9 +17,14 @@ observations on a shared, heavily loaded server. The change note is
   programs built and files extracted, whether the scoped path ran, surface
   programs built, results changed, failed files, and why a scoped path was
   declined. Every revert equalled the cold store.
-- [`edit-equals-cold.txt`](edit-equals-cold.txt), RANDOM-FILES: each case
-  edit's store compared with a cold index of the edited tree
-  (`scripts/reindex/edit-equals-cold.mjs`); all equal.
+- [`edit-equals-cold.txt`](edit-equals-cold.txt) (body edits, after2) and
+  [`edit-equals-cold-comment-export.txt`](edit-equals-cold-comment-export.txt)
+  (comment and export edits, after3): each case edit's store compared with
+  a cold index of the edited tree (`scripts/reindex/edit-equals-cold.mjs`);
+  all equal.
+- `random-<pin>-<seed>.json`: the seeded random edits (after3), each step
+  with its kind, file and line, whether it was scoped, CPU, its equality
+  with a cold index, and the following no-edit run.
 - [`cold.json`](cold.json): cold index of each pin with main, after2 and
   main again (`scripts/reindex/cold-cost.mjs --ts-loaded-by`), with each
   store's row differences from main's first run (none).
