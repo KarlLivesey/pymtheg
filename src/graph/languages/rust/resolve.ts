@@ -782,59 +782,59 @@ export function resolveRust(
     helperBusy.add(JSON.stringify(origin));
     try {
       return lazyCompute(helperCache, "helper", key, () => {
-    let shadow = false;
-      for (const own of ownerPlace(origin.file, origin.scope)) {
-        let loc: Place | null = own;
-        while (loc) {
-          let scope = loc === own ? origin.scope : loc.local;
-          while (true) {
-            const b = attributeBindings.get(loc.file + "|" + scope);
-            if (b) {
-              if (
-                readableMacroUseBinds(
-                  origin.name,
-                  loc.file,
-                  scope,
-                  b.macroUseImports ?? [],
-                  true,
-                ) ||
-                (b.macroUseImports ?? []).some((r) =>
-                  r.names?.includes(origin.name),
+        let shadow = false;
+        for (const own of ownerPlace(origin.file, origin.scope)) {
+          let loc: Place | null = own;
+          while (loc) {
+            let scope = loc === own ? origin.scope : loc.local;
+            while (true) {
+              const b = attributeBindings.get(loc.file + "|" + scope);
+              if (b) {
+                if (
+                  readableMacroUseBinds(
+                    origin.name,
+                    loc.file,
+                    scope,
+                    b.macroUseImports ?? [],
+                    true,
+                  ) ||
+                  (b.macroUseImports ?? []).some((r) =>
+                    r.names?.includes(origin.name),
+                  )
                 )
+                  shadow = true;
+                if (
+                  !assumeUnseenHelperBindings &&
+                  (b.unknown || b.macroUse || b.helperUnknown)
+                )
+                  shadow = true; // unseen helper binding
+              }
+              const mode = libraryLookup;
+              libraryLookup = false;
+              let found: Found;
+              try {
+                found = find(origin.name, loc, scope, "macro");
+              } finally {
+                libraryLookup = mode;
+              }
+              if (
+                found.symbols.some(
+                  (s) => s.kind === "macro" || data(s).semanticKind === "macro",
+                ) ||
+                found.possibleImportNames?.includes(origin.name)
               )
                 shadow = true;
-              if (
-                !assumeUnseenHelperBindings &&
-                (b.unknown || b.macroUse || b.helperUnknown)
-              )
-                shadow = true; // unseen helper binding
+              if (!assumeUnseenHelperBindings && !found.complete) shadow = true; // unseen helper lookup
+              if (!scope) break;
+              scope = scope.includes("::")
+                ? scope.slice(0, scope.lastIndexOf("::"))
+                : "";
             }
-            const mode = libraryLookup;
-            libraryLookup = false;
-            let found: Found;
-            try {
-              found = find(origin.name, loc, scope, "macro");
-            } finally {
-              libraryLookup = mode;
-            }
-            if (
-              found.symbols.some(
-                (s) => s.kind === "macro" || data(s).semanticKind === "macro",
-              ) ||
-              found.possibleImportNames?.includes(origin.name)
-            )
-              shadow = true;
-            if (!assumeUnseenHelperBindings && !found.complete) shadow = true; // unseen helper lookup
-            if (!scope) break;
-            scope = scope.includes("::")
-              ? scope.slice(0, scope.lastIndexOf("::"))
-              : "";
+            loc = loc.parent;
           }
-          loc = loc.parent;
         }
-      }
-      clearIncompleteLookups();
-      return shadow;
+        clearIncompleteLookups();
+        return shadow;
       });
     } finally {
       helperBusy.delete(JSON.stringify(origin));
@@ -936,45 +936,46 @@ export function resolveRust(
       cached = lazyHit(attributeShadowCache, "attribute", key);
     if (cached !== undefined) return cached;
     return lazyCompute(attributeShadowCache, "attribute", key, () => {
-    const head = origin.name.split("::")[0]!,
-      rule = attributeRules.get(head);
-    let result = false;
-    if (rule && rule.category !== "builtin")
-      for (const own of ownerPlace(origin.file, origin.scope)) {
-        if (rule.category === "tool" && own.crate.deps.has(head)) result = true;
-        let parent: Place | null = own;
-        while (parent) {
-          {
-            let scope = parent === own ? origin.scope : parent.local;
-            while (true) {
-              const b = attributeBindings.get(parent.file + "|" + scope);
-              if (
-                b &&
-                attributeBindingShadows(
-                  head,
-                  (parent.file !== origin.file && b.names.includes(head)) ||
-                    readableMacroUseBinds(
-                      head,
-                      parent.file,
-                      scope,
-                      b.macroUseImports ?? [],
-                    ),
-                  parent.file !== origin.file &&
-                    (b.unknown ||
-                      (rule.category === "prelude" && !!b.macroUse)),
+      const head = origin.name.split("::")[0]!,
+        rule = attributeRules.get(head);
+      let result = false;
+      if (rule && rule.category !== "builtin")
+        for (const own of ownerPlace(origin.file, origin.scope)) {
+          if (rule.category === "tool" && own.crate.deps.has(head))
+            result = true;
+          let parent: Place | null = own;
+          while (parent) {
+            {
+              let scope = parent === own ? origin.scope : parent.local;
+              while (true) {
+                const b = attributeBindings.get(parent.file + "|" + scope);
+                if (
+                  b &&
+                  attributeBindingShadows(
+                    head,
+                    (parent.file !== origin.file && b.names.includes(head)) ||
+                      readableMacroUseBinds(
+                        head,
+                        parent.file,
+                        scope,
+                        b.macroUseImports ?? [],
+                      ),
+                    parent.file !== origin.file &&
+                      (b.unknown ||
+                        (rule.category === "prelude" && !!b.macroUse)),
+                  )
                 )
-              )
-                result = true;
-              if (!scope) break;
-              scope = scope.includes("::")
-                ? scope.slice(0, scope.lastIndexOf("::"))
-                : "";
+                  result = true;
+                if (!scope) break;
+                scope = scope.includes("::")
+                  ? scope.slice(0, scope.lastIndexOf("::"))
+                  : "";
+              }
             }
+            parent = parent.parent;
           }
-          parent = parent.parent;
         }
-      }
-    return result;
+      return result;
     });
   }
   let attributeContextReady = false;
@@ -987,27 +988,29 @@ export function resolveRust(
     const presenceKey = `${item.id}|${lookupMode()}`;
     const cached = lazyHit(itemPresenceCache, "presence", presenceKey);
     if (cached) return cached;
-    return lazyCompute(itemPresenceCache, "presence", presenceKey, () => [
-      ...new Set([
-        ...((data(item).opaqueItemAttributes ?? []) as string[]),
-        ...("kind" in item && item.kind === "module" && !data(item).unit
-          ? (moduleTargets.get(item.id) ?? []).flatMap((unit) =>
-              itemPresence(unit),
-            )
-          : []),
-        ...[
-          ...origins(item),
+    return lazyCompute(itemPresenceCache, "presence", presenceKey, () =>
+      [
+        ...new Set([
+          ...((data(item).opaqueItemAttributes ?? []) as string[]),
+          ...("kind" in item && item.kind === "module" && !data(item).unit
+            ? (moduleTargets.get(item.id) ?? []).flatMap((unit) =>
+                itemPresence(unit),
+              )
+            : []),
+          ...[
+            ...origins(item),
+            ...ownerPlace(item.file, str(data(item).scope)).flatMap(
+              (p) => p.shadowableAttributes ?? [],
+            ),
+          ]
+            .filter(shadowFromParents)
+            .map((x) => x.name),
           ...ownerPlace(item.file, str(data(item).scope)).flatMap(
-            (p) => p.shadowableAttributes ?? [],
+            (p) => p.opaqueAttributes ?? [],
           ),
-        ]
-          .filter(shadowFromParents)
-          .map((x) => x.name),
-        ...ownerPlace(item.file, str(data(item).scope)).flatMap(
-          (p) => p.opaqueAttributes ?? [],
-        ),
-      ]),
-    ].sort());
+        ]),
+      ].sort(),
+    );
   }
   const possible = (conditions: readonly string[]): boolean => {
     const key = JSON.stringify(conditions);
@@ -5510,98 +5513,98 @@ export function resolveRust(
     const cached = lazyHit(riskCache, "risk", key);
     if (cached) return cached;
     return lazyCompute(riskCache, "risk", key, () => {
-    // C-36: the risk is the union over every scope the glob imports reach.
-    // A union does not depend on where the walk entered a glob chain or
-    // cycle, so the cached answer is the same whichever caller asks first.
-    // An earlier walk stopped at three nested globs and counted a provisional
-    // answer for a scope already being walked, which depended on the caller.
-    const risk: TraitRisk = {
-      other: false,
-      standard: new Set(),
-      standardGlob: false,
-      glob: false,
-    };
-    const visited = new Set<string>();
-    const visit = (scope: string, place: Place) => {
-      const at = `${place.file}|${place.crate.root}|${place.local}|${scope}|${mode}`;
-      if (visited.has(at)) return;
-      visited.add(at);
-      const known = lazyHit(riskCache, "risk", at);
-      if (known) {
-        risk.other ||= known.other;
-        risk.standardGlob ||= known.standardGlob;
-        risk.glob ||= known.glob;
-        for (const n of known.standard) risk.standard.add(n);
-        return;
-      }
-      let s = scope;
-      while (true) {
-        if (opaqueScopes.has(`${place.crate.root}|${qualified(place, s)}`))
-          risk.other = true;
-        for (const l of importsInScope.get(`${place.file}|${s}`) ?? []) {
-          const d = data(l);
-          if (d.externCrate) continue;
-          const raw = compact(l.targetName).replace(/::\*$/, "");
-          if (d.glob) risk.glob = true;
-          if (standardPath(raw, place, s)) {
-            if (d.glob) risk.standardGlob = true;
-            else risk.standard.add(lastSegment(raw));
-            continue;
-          }
-          if (d.glob) {
-            const target = find(raw, place, s, "type");
-            if (
-              !target.complete ||
-              !target.symbols.length ||
-              target.failedFiles?.length
-            ) {
-              risk.other = true;
+      // C-36: the risk is the union over every scope the glob imports reach.
+      // A union does not depend on where the walk entered a glob chain or
+      // cycle, so the cached answer is the same whichever caller asks first.
+      // An earlier walk stopped at three nested globs and counted a provisional
+      // answer for a scope already being walked, which depended on the caller.
+      const risk: TraitRisk = {
+        other: false,
+        standard: new Set(),
+        standardGlob: false,
+        glob: false,
+      };
+      const visited = new Set<string>();
+      const visit = (scope: string, place: Place) => {
+        const at = `${place.file}|${place.crate.root}|${place.local}|${scope}|${mode}`;
+        if (visited.has(at)) return;
+        visited.add(at);
+        const known = lazyHit(riskCache, "risk", at);
+        if (known) {
+          risk.other ||= known.other;
+          risk.standardGlob ||= known.standardGlob;
+          risk.glob ||= known.glob;
+          for (const n of known.standard) risk.standard.add(n);
+          return;
+        }
+        let s = scope;
+        while (true) {
+          if (opaqueScopes.has(`${place.crate.root}|${qualified(place, s)}`))
+            risk.other = true;
+          for (const l of importsInScope.get(`${place.file}|${s}`) ?? []) {
+            const d = data(l);
+            if (d.externCrate) continue;
+            const raw = compact(l.targetName).replace(/::\*$/, "");
+            if (d.glob) risk.glob = true;
+            if (standardPath(raw, place, s)) {
+              if (d.glob) risk.standardGlob = true;
+              else risk.standard.add(lastSegment(raw));
               continue;
             }
-            for (const m of target.symbols) {
-              if (m.kind === "enum") continue;
-              const bodies =
-                m.kind !== "module"
-                  ? []
-                  : data(m).unit
-                    ? [roots.get(m.file)!].filter(Boolean)
-                    : (modulePlaces.get(m.id) ?? []);
-              if (!bodies.length) risk.other = true;
-              for (const body of bodies) visit(body.local, body);
+            if (d.glob) {
+              const target = find(raw, place, s, "type");
+              if (
+                !target.complete ||
+                !target.symbols.length ||
+                target.failedFiles?.length
+              ) {
+                risk.other = true;
+                continue;
+              }
+              for (const m of target.symbols) {
+                if (m.kind === "enum") continue;
+                const bodies =
+                  m.kind !== "module"
+                    ? []
+                    : data(m).unit
+                      ? [roots.get(m.file)!].filter(Boolean)
+                      : (modulePlaces.get(m.id) ?? []);
+                if (!bodies.length) risk.other = true;
+                for (const body of bodies) visit(body.local, body);
+              }
+              continue;
             }
-            continue;
+            const name = compact(l.targetName);
+            activeMacroImports.push(l);
+            let r: Found;
+            try {
+              r = findUsePath(
+                name,
+                place,
+                s,
+                "import",
+                new Set(),
+                true,
+                false,
+                !name.includes("::") && d.alias === name,
+              );
+            } finally {
+              activeMacroImports.pop();
+            }
+            if (
+              !r.complete ||
+              !r.symbols.length ||
+              r.failedFiles?.length ||
+              r.possibleImportNames?.length
+            )
+              risk.other = true;
           }
-          const name = compact(l.targetName);
-          activeMacroImports.push(l);
-          let r: Found;
-          try {
-            r = findUsePath(
-              name,
-              place,
-              s,
-              "import",
-              new Set(),
-              true,
-              false,
-              !name.includes("::") && d.alias === name,
-            );
-          } finally {
-            activeMacroImports.pop();
-          }
-          if (
-            !r.complete ||
-            !r.symbols.length ||
-            r.failedFiles?.length ||
-            r.possibleImportNames?.length
-          )
-            risk.other = true;
+          if (!s || s === place.local || !s.startsWith(place.local)) break;
+          s = parentScope(s);
         }
-        if (!s || s === place.local || !s.startsWith(place.local)) break;
-        s = parentScope(s);
-      }
-    };
-    visit(scope, place);
-    return risk;
+      };
+      visit(scope, place);
+      return risk;
     });
   }
   let checkoutTraitMethodNames: Set<string> | undefined;
@@ -6210,153 +6213,153 @@ export function resolveRust(
     const cached = lazyHit(typingCache, "typing", key);
     if (cached) return cached;
     return lazyCompute(typingCache, "typing", key, () => {
-    let result: Typing;
-    // C-36: the limit is the length of this recipe's own chain, not the depth
-    // at which it is met, so a cached answer does not depend on its caller.
-    const inner = () =>
-      chainLength(r) > 33
-        ? { gap: "receiver-too-long" }
-        : typing((r.e ?? {}) as Data, loc, site);
-    switch (str(r.k)) {
-      case "type": {
-        const ref = splitReference(str(r.t));
-        result = !ref
-          ? { gap: "reference-to-reference" }
-          : r.lit === true && !structLiteralType(ref.text, loc, str(r.s))
-            ? { gap: "struct-literal-owner" }
-            : {
-                text: ref.text,
-                loc,
-                scope: str(r.s),
-                generics: str(r.g),
-                borrow:
-                  ref.borrow !== "owned" ? ref.borrow : str(r.b) || "owned",
-                mutable: r.mu !== false,
-                syntax: str(r.a),
-              };
-        break;
-      }
-      case "p": {
-        let name = compact(str(r.p));
-        const selfPath = name === "Self" || name.startsWith("Self::");
-        if (selfPath && r.it) name = base(str(r.it)) + name.slice(4);
-        const d: Data = {
-          pathSyntax: str(r.p),
-          pathArgumentSyntax: str(r.pa) || "[]",
-          implType: str(r.it),
-          implKey: str(r.ik),
-          implArgumentSyntax: str(r.ia) || "[]",
-          argumentCount: Number(r.c),
-          argumentMinimum: Number(r.cm),
-          genericBindings: str(r.g),
-        };
-        const s = single(
-          pathCallTargets(
-            name,
-            selfPath,
-            selfPath ? str(r.is) : str(r.s),
-            d,
-            str(r.p),
-            site.file,
-            loc,
-          ),
-        );
-        result = s ? resultOf(s) : { gap: "callee-unresolved" };
-        break;
-      }
-      case "u": {
-        // A unit struct used as a value; its own declaration types it.
-        const f = find(str(r.p), loc, str(r.s), "value");
-        const s = single(f);
-        const place = s && declarationPlace(s);
-        result =
-          s &&
-          place &&
-          s.kind === "struct" &&
-          data(s).constructorForm === "unit" &&
-          !itemPresence(s).length
-            ? {
-                text: s.name,
-                loc: place,
-                scope: str(data(s).scope),
-                generics: "",
-                borrow: "owned",
-                mutable: true,
-                syntax: "",
-              }
-            : { gap: "non-local-value" };
-        break;
-      }
-      case "m": {
-        const t = inner();
-        if (isGap(t)) result = t;
-        else if (t.future) result = { gap: "future-receiver" };
-        else {
+      let result: Typing;
+      // C-36: the limit is the length of this recipe's own chain, not the depth
+      // at which it is met, so a cached answer does not depend on its caller.
+      const inner = () =>
+        chainLength(r) > 33
+          ? { gap: "receiver-too-long" }
+          : typing((r.e ?? {}) as Data, loc, site);
+      switch (str(r.k)) {
+        case "type": {
+          const ref = splitReference(str(r.t));
+          result = !ref
+            ? { gap: "reference-to-reference" }
+            : r.lit === true && !structLiteralType(ref.text, loc, str(r.s))
+              ? { gap: "struct-literal-owner" }
+              : {
+                  text: ref.text,
+                  loc,
+                  scope: str(r.s),
+                  generics: str(r.g),
+                  borrow:
+                    ref.borrow !== "owned" ? ref.borrow : str(r.b) || "owned",
+                  mutable: r.mu !== false,
+                  syntax: str(r.a),
+                };
+          break;
+        }
+        case "p": {
+          let name = compact(str(r.p));
+          const selfPath = name === "Self" || name.startsWith("Self::");
+          if (selfPath && r.it) name = base(str(r.it)) + name.slice(4);
+          const d: Data = {
+            pathSyntax: str(r.p),
+            pathArgumentSyntax: str(r.pa) || "[]",
+            implType: str(r.it),
+            implKey: str(r.ik),
+            implArgumentSyntax: str(r.ia) || "[]",
+            argumentCount: Number(r.c),
+            argumentMinimum: Number(r.cm),
+            genericBindings: str(r.g),
+          };
           const s = single(
-            methods(
-              t.text,
-              str(r.n),
+            pathCallTargets(
+              name,
+              selfPath,
+              selfPath ? str(r.is) : str(r.s),
+              d,
+              str(r.p),
+              site.file,
               loc,
-              t.scope,
-              true,
-              t.borrow,
-              t.mutable,
-              Number(r.c),
-              "",
-              Number(r.cm),
-              t.generics,
-              t.syntax,
-              t.loc,
-              site,
             ),
           );
-          result = s ? resultOf(s) : { gap: "receiver-method-unresolved" };
+          result = s ? resultOf(s) : { gap: "callee-unresolved" };
+          break;
         }
-        break;
+        case "u": {
+          // A unit struct used as a value; its own declaration types it.
+          const f = find(str(r.p), loc, str(r.s), "value");
+          const s = single(f);
+          const place = s && declarationPlace(s);
+          result =
+            s &&
+            place &&
+            s.kind === "struct" &&
+            data(s).constructorForm === "unit" &&
+            !itemPresence(s).length
+              ? {
+                  text: s.name,
+                  loc: place,
+                  scope: str(data(s).scope),
+                  generics: "",
+                  borrow: "owned",
+                  mutable: true,
+                  syntax: "",
+                }
+              : { gap: "non-local-value" };
+          break;
+        }
+        case "m": {
+          const t = inner();
+          if (isGap(t)) result = t;
+          else if (t.future) result = { gap: "future-receiver" };
+          else {
+            const s = single(
+              methods(
+                t.text,
+                str(r.n),
+                loc,
+                t.scope,
+                true,
+                t.borrow,
+                t.mutable,
+                Number(r.c),
+                "",
+                Number(r.cm),
+                t.generics,
+                t.syntax,
+                t.loc,
+                site,
+              ),
+            );
+            result = s ? resultOf(s) : { gap: "receiver-method-unresolved" };
+          }
+          break;
+        }
+        case "f": {
+          const t = inner();
+          result = isGap(t) ? t : fieldOf(t, str(r.n), loc);
+          break;
+        }
+        case "ref": {
+          const t = inner();
+          result = isGap(t)
+            ? t
+            : t.borrow !== "owned" || t.future
+              ? { gap: "reference-to-reference" }
+              : { ...t, borrow: r.m === true ? "mutable" : "shared" };
+          break;
+        }
+        case "deref": {
+          const t = inner();
+          result = isGap(t)
+            ? t
+            : t.borrow === "owned" || t.future
+              ? { gap: "deref-owned" }
+              : { ...t, mutable: t.borrow === "mutable", borrow: "owned" };
+          break;
+        }
+        case "try": {
+          const t = inner();
+          result = isGap(t) ? t : unwrapTry(t);
+          break;
+        }
+        case "await": {
+          const t = inner();
+          result = isGap(t)
+            ? t
+            : t.future
+              ? { ...t, future: false }
+              : { gap: "await-non-async" };
+          break;
+        }
+        default:
+          result = { gap: str(r.w) || "syntax" };
       }
-      case "f": {
-        const t = inner();
-        result = isGap(t) ? t : fieldOf(t, str(r.n), loc);
-        break;
-      }
-      case "ref": {
-        const t = inner();
-        result = isGap(t)
-          ? t
-          : t.borrow !== "owned" || t.future
-            ? { gap: "reference-to-reference" }
-            : { ...t, borrow: r.m === true ? "mutable" : "shared" };
-        break;
-      }
-      case "deref": {
-        const t = inner();
-        result = isGap(t)
-          ? t
-          : t.borrow === "owned" || t.future
-            ? { gap: "deref-owned" }
-            : { ...t, mutable: t.borrow === "mutable", borrow: "owned" };
-        break;
-      }
-      case "try": {
-        const t = inner();
-        result = isGap(t) ? t : unwrapTry(t);
-        break;
-      }
-      case "await": {
-        const t = inner();
-        result = isGap(t)
-          ? t
-          : t.future
-            ? { ...t, future: false }
-            : { gap: "await-non-async" };
-        break;
-      }
-      default:
-        result = { gap: str(r.w) || "syntax" };
-    }
-    if (!isGap(result) && r.im === true && result.borrow === "owned")
-      result = { ...result, mutable: false };
-    return result;
+      if (!isGap(result) && r.im === true && result.borrow === "owned")
+        result = { ...result, mutable: false };
+      return result;
     });
   }
   /** The number of receiver recipes nested inside . */
