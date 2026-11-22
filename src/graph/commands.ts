@@ -31,7 +31,7 @@ import {
   type ToolchainState,
 } from "./command-toolchain.js";
 import { loadConfig } from "../project/config.js";
-import { graphToolchains } from "../shared/config.js";
+import { graphToolchains, type ProjectTrust } from "../shared/config.js";
 import { dirname, join } from "node:path";
 
 export type GraphCommand = "index" | "status" | QueryCommand;
@@ -105,6 +105,8 @@ export interface GraphResponse {
    * absent when the project has not opted in (off).
    */
   toolchain?: ToolchainState;
+  /** D22: the project's trust answer from init, when one is recorded. */
+  trust?: ProjectTrust;
 }
 export interface GraphExecutionOptions {
   signal?: AbortSignal;
@@ -221,8 +223,12 @@ export async function executeGraph(
     // unreadable one is off too, with a warning.
     let toolchains: Record<string, boolean | string> = {};
     let settingsError: string | null = null;
+    // D22: the project's recorded trust answer, reported when there is one.
+    let trust: ProjectTrust | undefined;
     try {
-      toolchains = graphToolchains((await loadConfig(root)).config);
+      const { config } = await loadConfig(root);
+      toolchains = graphToolchains(config);
+      trust = config.graph?.trust;
     } catch (error) {
       settingsError = error instanceof Error ? error.message : String(error);
     }
@@ -617,6 +623,7 @@ export async function executeGraph(
         },
         data: null,
       };
+      if (trust) response.trust = trust;
       if (toolchainOn)
         response.toolchain = report
           ? toolchainState(toolchains, report.toolchains)

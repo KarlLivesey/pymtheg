@@ -15,8 +15,8 @@ const commands = [
     "Capture an immutable graph of existing TypeScript/JavaScript code; does not execute it.",
   ],
   [
-    "init [DIRECTORY] [--name NAME] [--import-docs] [--resolutions FILE] [--allow-broken-links] [--format text|json]",
-    "Start here: create .pymtheg/ without overwriting existing work; old layouts are unused.",
+    "init [DIRECTORY] [--name NAME] [--trust | --source-only] [--import-docs] [--resolutions FILE] [--allow-broken-links] [--format text|json]",
+    "Start here: create .pymtheg/ without overwriting existing work; old layouts are unused. Asks once whether you trust the repository (--trust or --source-only answers it).",
   ],
   [
     "studio PATH [--port PORT] [--plugin TARGET=PATH]",

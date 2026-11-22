@@ -247,8 +247,8 @@ reader. The store is `.pymtheg/rebuildable/graph.sqlite`, schema 4; a schema-3
 unchanged) and read as having no library targets when opened read-only. Any
 other graph database is refused with a rebuild message; 0.1.0 refuses a
 schema-4 graph the same way. Nothing runs project code.
-Nothing runs a language toolchain unless the project opts in to the Go
-toolchain route (below); nothing reads or writes `.codegraph/`. Language
+Nothing runs a language toolchain unless the project is trusted at init
+(D22) or opts in to the Go toolchain route (below); nothing reads or writes `.codegraph/`. Language
 modules are discovered from `src/graph/languages/*/`;
 production discovery offers `go`, `rust` and `typescript` (the `toy` fixture is
 test-only). Each module's current version, and the versions the index was built
@@ -986,7 +986,16 @@ links or verify candidate sets; such links carry `decidedBy: "toolchain"`.
 Every answer reports `toolchain.go.state` (`used` with counts, `unavailable` with
 the reason, such as no `go.mod` at the project root, `go.work`, no `go`, or Go
 older than 1.22; `not-indexed`). Turning it on or off makes the next query sync.
-No MCP tool changes this setting; edit the file. Sources:
+No MCP tool changes this setting; edit the file.
+
+**Trust at init (decision D22).** `init` asks once whether the repository is
+trusted and records `"graph": {"trust": "trusted"}` or `"source-only"` in
+`.pymtheg/settings.json`. A trusted project runs the Go route above with its
+default policy, as if `toolchain.go` were `true`. A source-only project, or one
+with no answer, runs nothing. An explicit `graph.toolchain.go`, `true`, `false`
+or a path, wins over the answer either way. Graph answers report the recorded
+answer as `trust`. The question and how each path answers it are described in
+[project initialization](project-init.md#trusting-the-repository). Sources:
 [W3-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L.md), [W3-L2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L2.md).
 
 #### Not built yet

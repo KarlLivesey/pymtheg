@@ -25,6 +25,8 @@ export function ProjectSetup({
     [error, setError] = useState(""),
     [result, setResult] = useState<Setup | null>(null);
   const [allowBrokenLinks, setAllowBrokenLinks] = useState(false);
+  // D22: asked once, when setup creates the project; trusted is preselected.
+  const [trust, setTrust] = useState<"trusted" | "source-only">("trusted");
   async function run(
     importDocuments: boolean,
     resolutions?: z.infer<typeof importResolutionSchema>[],
@@ -37,6 +39,7 @@ export function ProjectSetup({
           name: projectName,
           importDocuments,
           allowBrokenLinks,
+          ...(workspace ? {} : { trust }),
           ...(resolutions ? { resolutions } : {}),
           ...(importDocuments || resolutions
             ? { previewToken: result?.documentation.previewToken }
@@ -86,6 +89,40 @@ export function ProjectSetup({
             onChange={(event) => setProjectName(event.target.value)}
           />
         </label>
+        {!workspace && !result && (
+          <fieldset className="trust-question">
+            <legend>Do you trust this repository?</legend>
+            <label>
+              <input
+                type="radio"
+                name="trust"
+                checked={trust === "trusted"}
+                disabled={busy}
+                onChange={() => setTrust("trusted")}
+              />{" "}
+              Trusted: the languages' official tools may run on it, which runs
+              its build scripts and macros as building it would.
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="trust"
+                checked={trust === "source-only"}
+                disabled={busy}
+                onChange={() => setTrust("source-only")}
+              />{" "}
+              Source only: Pymtheg never runs anything from this repository.
+            </label>
+          </fieldset>
+        )}
+        {result?.trust && (
+          <p>
+            {result.trust === "trusted"
+              ? "Trusted: the languages' official tools may run on this project."
+              : "Source only: nothing from this project is run."}{" "}
+            Change it in .pymtheg/settings.json (graph.trust).
+          </p>
+        )}
         {!result && (
           <button
             className="button primary"

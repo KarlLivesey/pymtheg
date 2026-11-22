@@ -102,7 +102,7 @@ test("D and H: refusals name the accepted arguments; project_info says files are
 test("E: the first MCP planning write initialises the project exactly as pymtheg init would", async () => {
   const reference = await mkdtemp(join(tmpdir(), "pym-r1j-init-"));
   try {
-    await initializeWorkspace(reference);
+    await initializeWorkspace(reference, undefined, { trust: "source-only" });
     await project(
       {
         "a.go": "package p\nfunc Save(n int) int { return n }\n",
@@ -119,9 +119,21 @@ test("E: the first MCP planning write initialises the project exactly as pymtheg
         if (index.state === "running")
           await s.call("graph_result", { jobId: index.jobId, wait: true });
         assert.equal((await s.call("project_info", {})).initialised, false);
+        // D22: without the trust answer the write returns the question and
+        // initialises nothing.
+        assert.match(
+          await errorText(s, "requirement_links", {
+            action: "requirement",
+            id: "R1",
+            title: "Save",
+          }),
+          /Do you trust this repository\?[\s\S]*trust: "trusted" or "source-only"/,
+        );
+        assert.equal((await s.call("project_info", {})).initialised, false);
         const created = await links(s, "requirement", {
           id: "R1",
           title: "Save",
+          trust: "source-only",
         });
         assert.equal(created.summary.status, "created");
         const after = await s.call("project_info", {});
@@ -348,7 +360,11 @@ test("G: messages say what is true", async () =>
       }),
       "The typed model for this run is no longer retained (only the three newest are kept). Check the design again and use the new runId.",
     );
-    await links(s, "requirement", { id: "R1", title: "Count" });
+    await links(s, "requirement", {
+      id: "R1",
+      title: "Count",
+      trust: "source-only",
+    });
     const versions = await s.call("read_implementation", {
       section: "versions",
     });

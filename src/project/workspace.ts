@@ -12,6 +12,7 @@ import {
   readFile,
   realpath,
   link,
+  rename,
   unlink,
 } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
@@ -21,6 +22,63 @@ import {
   type WorkspaceIdentity,
 } from "../shared/workspace.js";
 import { loadConfig } from "./config.js";
+import type { ProjectTrust } from "../shared/config.js";
+
+/** D22: the init answer to "do you trust this repository?". */
+export interface InitOptions {
+  trust?: ProjectTrust;
+  /**
+   * An answer nobody gave (a command-line init with no terminal) is only
+   * written into a settings file this init creates. Existing metadata is
+   * never changed without an explicit answer.
+   */
+  defaulted?: boolean;
+}
+/** The settings file a new project starts with, with its trust answer. */
+const initialSettings = (trust: ProjectTrust | undefined) =>
+  json({
+    version: 1,
+    scenarios: {},
+    ...(trust ? { graph: { trust } } : {}),
+  });
+/** The trust answer recorded in a project's settings, if any. */
+async function recordedTrust(root: string) {
+  return (await loadConfig(root)).config.graph?.trust;
+}
+/**
+ * Records `trust` in an existing settings file that has no answer yet, keeping
+ * everything else in it. Never replaces a recorded answer: re-running init
+ * does not change it (D22); the settings file is where it is changed.
+ */
+async function recordTrust(root: string, trust: ProjectTrust | undefined) {
+  if (!trust) return false;
+  const current = await recordedTrust(root);
+  if (current === trust) return false;
+  if (current)
+    throw Error(
+      `This project's trust answer is already "${current}". Init does not change it; edit graph.trust in ${identity.projectConfig} to change it.`,
+    );
+  const file = storagePath(root, "settings", true);
+  const value = JSON.parse(await readFile(file, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  const graph =
+    value.graph && typeof value.graph === "object"
+      ? (value.graph as Record<string, unknown>)
+      : {};
+  const staged = resolve(dirname(file), `.settings.${randomUUID()}.tmp`);
+  const handle = await open(staged, "wx", 0o600);
+  try {
+    await handle.writeFile(json({ ...value, graph: { ...graph, trust } }));
+    await handle.sync();
+  } finally {
+    await handle.close();
+  }
+  await rename(staged, file);
+  await validateInitConfig(root);
+  return true;
+}
 const missing = (error: unknown) =>
   (error as NodeJS.ErrnoException).code === "ENOENT";
 async function markerFile(root: string): Promise<string> {
@@ -132,9 +190,13 @@ async function protectLocalStorage(root: string): Promise<string[]> {
     filesCreated.push(".pymtheg/.gitignore");
   return filesCreated;
 }
-export async function initializeWorkspace(input: string, name?: string) {
+export async function initializeWorkspace(
+  input: string,
+  name?: string,
+  options: InitOptions = {},
+) {
   try {
-    return await initialize(input, name);
+    return await initialize(input, name, options);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (!["EACCES", "EPERM", "EROFS"].includes(code ?? "")) throw error;
@@ -156,7 +218,11 @@ async function validateInitConfig(root: string) {
     );
   }
 }
-async function initialize(input: string, name?: string) {
+async function initialize(
+  input: string,
+  name: string | undefined,
+  options: InitOptions,
+) {
   const requested = name?.trim();
   if (name !== undefined && (!requested || requested.length > 160))
     throw Error("Choose a project name of 1–160 characters");
@@ -168,7 +234,19 @@ async function initialize(input: string, name?: string) {
       throw Error(
         `This folder belongs to “${ancestor.workspace.name}” at ${ancestor.root}. Initialize outside that project to create a separate workspace.`,
       );
-    return { ...ancestor, created: false, filesCreated: [] };
+    // A nested folder uses its project's answer (D22).
+    const trust = await recordedTrust(ancestor.root);
+    if (options.trust && options.trust !== trust)
+      throw Error(
+        `This folder belongs to “${ancestor.workspace.name}” at ${ancestor.root}, whose trust answer is ${trust ? `"${trust}"` : "not recorded"}. Change it in that project's ${identity.projectConfig}.`,
+      );
+    return {
+      ...ancestor,
+      created: false,
+      filesCreated: [],
+      trust: trust ?? null,
+      trustRecorded: false,
+    };
   }
   await validateInitConfig(root);
   const previous = await readWorkspace(root);
@@ -178,29 +256,46 @@ async function initialize(input: string, name?: string) {
         `Project is already initialized as “${previous.name}”. Its identity and name were preserved.`,
       );
     const filesCreated = await protectLocalStorage(root);
+    let trustRecorded = false;
     if (
       await createOnce(
         storagePath(root, "settings", true),
-        json({ version: 1, scenarios: {} }),
+        initialSettings(options.trust),
       )
-    )
+    ) {
       filesCreated.push(identity.projectConfig);
+      trustRecorded = !!options.trust;
+    }
     await validateInitConfig(root);
-    return { root, workspace: previous, created: false, filesCreated };
+    if (!trustRecorded && !options.defaulted)
+      trustRecorded = await recordTrust(root, options.trust);
+    return {
+      root,
+      workspace: previous,
+      created: false,
+      filesCreated,
+      trust: (await recordedTrust(root)) ?? null,
+      trustRecorded,
+    };
   }
   await validateInitConfig(root); // Validate existing configuration before creating metadata.
   const marker = await markerFile(root);
   await mkdir(dirname(marker), { recursive: true });
   const filesCreated: string[] = [];
   filesCreated.push(...(await protectLocalStorage(root)));
+  let trustRecorded = false;
   if (
     await createOnce(
       storagePath(root, "settings", true),
-      json({ version: 1, scenarios: {} }),
+      initialSettings(options.trust),
     )
-  )
+  ) {
     filesCreated.push(identity.projectConfig);
+    trustRecorded = !!options.trust;
+  }
   await validateInitConfig(root); // A concurrent writer's configuration must also validate.
+  if (!trustRecorded && !options.defaulted)
+    trustRecorded = await recordTrust(root, options.trust);
   const workspace: WorkspaceIdentity = {
     schema: "pymtheg.workspace/v1",
     id: randomUUID(),
@@ -215,7 +310,14 @@ async function initialize(input: string, name?: string) {
     throw Error(
       `Another initializer named this project “${actual.name}”; no identity was overwritten.`,
     );
-  return { root, workspace: actual, created, filesCreated };
+  return {
+    root,
+    workspace: actual,
+    created,
+    filesCreated,
+    trust: (await recordedTrust(root)) ?? null,
+    trustRecorded,
+  };
 }
 /**
  * Initialise `root` exactly as `pymtheg init` with no options would, unless it

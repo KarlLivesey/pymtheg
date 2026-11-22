@@ -173,7 +173,7 @@ export function registerLinkTools(
     "requirement_links",
     {
       description:
-        "Connect planning requirements to Go/Rust/TS code. requirement creates a record; add links record+selector (exact/qualified name, path:line[:column], or unchanged symbol: ref); remove/refresh require link ID. list filters record/symbol/file; check reports non-ok links with differences and suggestions (moved is unconfirmed unless allowMoved); requirements_for selects symbol OR file with optional definite-caller impact; unlinked finds records and optionally public symbols; history reads receipts. Suggestions are NEVER applied. No application source is written. Queries sync the graph unless noSync. Waits up to 5s by default, returning the first bounded page or a progress handle; wait:false opts out. Finish graph indexing before link work on a cold project. Arguments by action (others are refused; wait, section, limit and noSync apply to all): requirement id, title, text, owner; add record, selector, note; remove link; refresh link; list record, symbol, file; check allowMoved; requirements_for symbol or file, impact, depth; unlinked symbols, symbolLimit; history none. The first planning write in a project that was never initialised initialises it first, as pymtheg init would.",
+        "Connect planning requirements to Go/Rust/TS code. requirement creates a record; add links record+selector (exact/qualified name, path:line[:column], or unchanged symbol: ref); remove/refresh require link ID. list filters record/symbol/file; check reports non-ok links with differences and suggestions (moved is unconfirmed unless allowMoved); requirements_for selects symbol OR file with optional definite-caller impact; unlinked finds records and optionally public symbols; history reads receipts. Suggestions are NEVER applied. No application source is written. Queries sync the graph unless noSync. Waits up to 5s by default, returning the first bounded page or a progress handle; wait:false opts out. Finish graph indexing before link work on a cold project. Arguments by action (others are refused; wait, section, limit and noSync apply to all): requirement id, title, text, owner; add record, selector, note; remove link; refresh link; list record, symbol, file; check allowMoved; requirements_for symbol or file, impact, depth; unlinked symbols, symbolLimit; history none. The first planning write in a project that was never initialised initialises it first, as pymtheg init would, and needs trust (trusted or source-only: whether the repository may run its build tools); without it the call returns the question.",
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -203,6 +203,12 @@ export function registerLinkTools(
             .max(1000)
             .optional()
             .describe("unlinked only; default 200"),
+          trust: z
+            .enum(["trusted", "source-only"])
+            .optional()
+            .describe(
+              "requirement or add on a project that was never initialised: the answer to whether this repository is trusted (D22). Ask your user or follow your standing instructions.",
+            ),
           noSync: z.boolean().default(false),
           wait: z.boolean().default(true),
           section: page.section,
@@ -238,6 +244,7 @@ export function registerLinkTools(
           "section",
           "limit",
           "noSync",
+          "trust",
         ]);
         const input: Record<string, unknown> = { noSync: a.noSync };
         for (const [key, value] of Object.entries(a))
@@ -267,6 +274,8 @@ export function registerLinkTools(
             ),
             { code: "busy" },
           );
+        if (a.action === "requirement" || a.action === "add")
+          await workspace.initialiseForWrite(a.trust);
         const job = workspace.links.start(a.action, input);
         if (a.wait)
           await wait(job, ctx, () => workspace.links.cancel(job.id), true);

@@ -11,12 +11,25 @@ export interface Scenario {
   scope: Record<string, unknown>;
 }
 /**
- * Code-graph settings. `toolchain`: the explicit per-project opt-in to
- * toolchain-backed links, by language module (`go`: true finds `go` on the
- * user's PATH; an absolute path names the trusted `go`). Running a language's
- * toolchain on a project is as trusted as building it. Off when absent.
+ * D22: whether the project's owner trusts the repository. `trusted` lets each
+ * language's official tooling run on the project, as building it would run
+ * its build scripts and macros; `source-only` runs nothing of the project.
+ * Absent is source only, as before D22.
+ */
+export type ProjectTrust = "trusted" | "source-only";
+export const projectTrustValues: readonly ProjectTrust[] = [
+  "trusted",
+  "source-only",
+];
+/**
+ * Code-graph settings. `trust`: the project-wide answer of D22, given at
+ * `init`. `toolchain`: per-language overrides (D17), which win over `trust`
+ * either way (`go`: true finds `go` on the user's PATH; an absolute path
+ * names the trusted `go`; false keeps it off). Running a language's toolchain
+ * on a project is as trusted as building it. Off when both are absent.
  */
 export interface GraphConfig {
+  trust?: ProjectTrust;
   toolchain?: { go?: boolean | string };
 }
 export interface ProjectConfig {
@@ -29,8 +42,16 @@ export interface ProjectConfig {
 export function graphConfig(value: unknown): GraphConfig {
   if (!object(value)) throw Error("graph must be an object");
   for (const key of Object.keys(value))
-    if (key !== "toolchain") throw Error(`Unknown graph setting: ${key}`);
-  if (value.toolchain === undefined) return {};
+    if (key !== "toolchain" && key !== "trust")
+      throw Error(`Unknown graph setting: ${key}`);
+  const trust = value.trust;
+  if (
+    trust !== undefined &&
+    !projectTrustValues.includes(trust as ProjectTrust)
+  )
+    throw Error('graph.trust must be "trusted" or "source-only"');
+  const answered = trust === undefined ? {} : { trust: trust as ProjectTrust };
+  if (value.toolchain === undefined) return answered;
   const toolchain = value.toolchain;
   if (!object(toolchain)) throw Error("graph.toolchain must be an object");
   for (const key of Object.keys(toolchain))
@@ -44,7 +65,7 @@ export function graphConfig(value: unknown): GraphConfig {
     throw Error(
       "graph.toolchain.go must be true, false or an absolute path to go",
     );
-  return { toolchain: go === undefined ? {} : { go } };
+  return { ...answered, toolchain: go === undefined ? {} : { go } };
 }
 const object = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
@@ -149,10 +170,16 @@ export function machineScope(
     );
   return scope.assumptions as string[];
 }
-/** The opted-in toolchain routes, as IndexOptions.toolchains (empty when off). */
+/**
+ * The toolchain routes that may run, as IndexOptions.toolchains (empty when
+ * off). An explicit per-language setting wins; otherwise a trusted project
+ * runs each route with its default policy (D22).
+ */
 export function graphToolchains(
   config: ProjectConfig,
 ): Record<string, boolean | string> {
-  const go = config.graph?.toolchain?.go;
-  return go === undefined || go === false ? {} : { go };
+  const explicit = config.graph?.toolchain?.go;
+  const go =
+    explicit !== undefined ? explicit : config.graph?.trust === "trusted";
+  return go === false ? {} : { go };
 }

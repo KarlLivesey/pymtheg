@@ -257,15 +257,20 @@ capped at 64 KiB, so pages may hold fewer items than `limit`; always follow
 later tells you when that symbol changed. The first planning write in a project
 that was never initialised initialises it exactly as `pymtheg init` would
 (`.pymtheg/project.json`, `.pymtheg/settings.json` and `.pymtheg/.gitignore`;
-the planning database itself is ignored by Git).
+the planning database itself is ignored by Git). That write needs the answer
+to init's question, whether the repository is trusted (decision D22):
+`trust: "trusted"` lets the languages' official tools run on it, as building
+it would, and `trust: "source-only"` runs nothing from it. Without it, the
+call returns the question and initialises nothing; ask your user or follow
+your standing instructions, then call again with `trust`.
 
 Arguments by action (anything else is refused, naming what the action
 accepts; `wait`, `section`, `limit` and `noSync` apply to all):
 
 | Action             | Arguments                                         |
 | ------------------ | ------------------------------------------------- |
-| `requirement`      | `id`, `title` (both required), `text`, `owner`     |
-| `add`              | `record`, `selector` (both required), `note`       |
+| `requirement`      | `id`, `title` (both required), `text`, `owner`, `trust` |
+| `add`              | `record`, `selector` (both required), `note`, `trust` |
 | `remove`           | `link` (required)                                  |
 | `refresh`          | `link` (required)                                  |
 | `list`             | `record`, `symbol`, `file`                         |
@@ -282,7 +287,10 @@ async function links_(action, args = {}) {
     ? call("link_result", { jobId: first.jobId, wait: true, section: args.section ?? "items" })
     : first;
 }
-const record = await links_("requirement", { id: "R1", title: "Restocking records the amount" });
+const asked = await call("requirement_links", { action: "requirement", id: "R1", title: "Restocking records the amount" }).catch((e) => String(e));
+expect(asked.includes("Do you trust this repository?"));
+// => the question comes back; nothing is initialised until it is answered.
+const record = await links_("requirement", { id: "R1", title: "Restocking records the amount", trust: "source-only" });
 expect(record.items[0].id === "plan:R1");
 const after = await call("project_info", {});
 expect(after.initialised === true && after.workspace.name.length > 0);

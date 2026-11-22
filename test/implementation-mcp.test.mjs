@@ -35,6 +35,7 @@ test("MCP lists pinned candidate files before a workspace exists, then captures 
         files: ["missing.ts"],
         label: "Missing",
         expectedRevision: null,
+        trust: "source-only",
       },
     });
     assert.equal(missing.isError, true);
@@ -115,6 +116,7 @@ test("real MCP retains code versions, pages both graphs and records explicit stu
       files: ["main.ts"],
       label: "Code one",
       expectedRevision: versions.activeRevision,
+      trust: "source-only",
     });
     const plan = await call(client, "read_implementation", {
       section: "graph",

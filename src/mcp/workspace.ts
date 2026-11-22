@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: MIT
 import { LinkJobs } from "./links-jobs.js";
 import { GraphJobs } from "./graph-jobs.js";
-import { findWorkspace } from "../project/workspace.js";
+import {
+  findWorkspace,
+  initializeWorkspace,
+  readWorkspace,
+} from "../project/workspace.js";
+import { trustQuestion } from "../project/trust.js";
+import type { ProjectTrust } from "../shared/config.js";
 import { ProjectInventories, type InventoryQuery } from "./inventories.js";
 import { agentLimits } from "./limits.js";
 import { EmissionStore } from "./emissions.js";
@@ -62,6 +68,24 @@ export class AgentWorkspace {
     this.links = new LinkJobs(root);
     this.graph = new GraphJobs(root);
   }
+  /**
+   * D22: before the first planning write initialises the project, its owner
+   * must say whether the repository is trusted. Without that answer nothing
+   * is guessed: the trust question goes back to the calling model, which
+   * answers from its user or its standing instructions and calls again with
+   * `trust`. An initialised project needs no answer.
+   */
+  async initialiseForWrite(trust: ProjectTrust | undefined): Promise<void> {
+    if (await readWorkspace(this.root)) return;
+    if (!trust)
+      throw Object.assign(
+        Error(
+          `${trustQuestion}\nThis project is not initialised yet. Ask your user (or follow your standing instructions), then call again with trust: "trusted" or "source-only".`,
+        ),
+        { code: "trust_required" },
+      );
+    await initializeWorkspace(this.root, undefined, { trust });
+  }
   static async open(
     path: string,
     outputs: OutputRegistry = OutputRegistry.empty(),
@@ -89,7 +113,7 @@ export class AgentWorkspace {
       ...(page.workspace === null
         ? {
             initialisation:
-              "This project is not initialised: it has no .pymtheg/project.json. The first planning write (requirement_links requirement or add, observe_implementation, link_implementation) initialises it exactly as pymtheg init would; or run pymtheg init in the project first.",
+              'This project is not initialised: it has no .pymtheg/project.json. The first planning write (requirement_links requirement or add, observe_implementation, link_implementation) initialises it as pymtheg init would, and needs trust: "trusted" or "source-only", the answer to whether the repository is trusted (trusted lets the languages\' official tools run on it, as building it would; source only runs nothing from it). Ask your user or follow your standing instructions. Or run pymtheg init in the project first.',
           }
         : {}),
       runIds: [...this.runs.keys()],

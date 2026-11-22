@@ -87,15 +87,45 @@ try {
       await import("../implementation/cli.js")
     ).observeCommand(args.slice(1), cancel.signal);
   } else if (args[0] === "init") {
+    const { askTrust } = await import("../project/trust.js");
+    const { findWorkspace } = await import("../project/workspace.js");
+    /**
+     * D22: the trust answer for a new project. A flag answers it; a
+     * terminal is asked; with neither, source only is recorded and said.
+     */
+    const initTrust = async (
+      directory: string,
+      flag: "trusted" | "source-only" | undefined,
+    ): Promise<{
+      answer?: "trusted" | "source-only";
+      asked?: "terminal" | "no-terminal";
+    }> => {
+      if (flag) return { answer: flag };
+      const existing = await findWorkspace(directory).catch(() => null);
+      if (existing) return {};
+      if (process.stdin.isTTY && process.stderr.isTTY)
+        return {
+          answer: await askTrust(process.stdin, process.stderr),
+          asked: "terminal",
+        };
+      return { answer: "source-only", asked: "no-terminal" };
+    };
     const { setupProject } = await import("../project/setup.js");
     const values = new Map<string, string>();
     let directory: string | undefined;
     let importDocs = false;
     let allowBrokenLinks = false;
+    // D22: the trust answer, given by flag instead of the prompt.
+    let trustFlag: "trusted" | "source-only" | undefined;
     for (let i = 1; i < args.length; i++) {
       const key = args[i]!;
       if (key === "--allow-broken-links") {
         allowBrokenLinks = true;
+        continue;
+      }
+      if (key === "--trust" || key === "--source-only") {
+        if (trustFlag) throw Error("Choose one of --trust and --source-only");
+        trustFlag = key === "--trust" ? "trusted" : "source-only";
         continue;
       }
       if (key === "--import-docs") {
@@ -123,12 +153,17 @@ try {
       !["text", "json"].includes(values.get("--format")!)
     )
       throw Error("Init format must be text or json");
+    // Ask only when this init creates the project: a nested folder uses its
+    // project's answer and re-running init never changes a recorded one.
+    const trust = await initTrust(directory ?? ".", trustFlag);
     const response = await setupProject(
       directory ?? ".",
       values.get("--name"),
       importDocs,
       cancel.signal,
       {
+        ...(trust.answer ? { trust: trust.answer } : {}),
+        ...(trust.asked === "no-terminal" ? { defaulted: true } : {}),
         allowBrokenLinks,
         resolutions: values.has("--resolutions")
           ? (await import("../architecture/schema.js")).importResolutionSchema
@@ -154,6 +189,11 @@ try {
               : `Already initialized: opened ${initialized.workspace.name} at ${initialized.root}${initialized.filesCreated.length ? " (completed missing metadata)" : " (no metadata changes)"}`,
             ...(initialized.filesCreated.length
               ? [`Created: ${initialized.filesCreated.join(", ")}`]
+              : []),
+            ...(initialized.trust
+              ? [
+                  `${trust.asked === "no-terminal" && initialized.trustRecorded ? "No terminal to ask whether you trust this repository, so recorded source only. " : ""}${(await import("../project/trust.js")).trustSummary(initialized.trust)} Change it in .pymtheg/settings.json (graph.trust).`,
+                ]
               : []),
             "Commit .pymtheg/project.json, .pymtheg/settings.json and .pymtheg/.gitignore with your designs.",
             "Planning/history in .pymtheg/shared/ and caches in .pymtheg/rebuildable/ stay local and ignored; share planning by exported history.",

@@ -16,9 +16,10 @@ Sharing uses explicit history archives. It is not live team synchronization.
 
 ## Contract for the first slice
 
-- `pymtheg init [DIRECTORY] [--name NAME] [--format text|json]` creates a local
-  workspace identity and a default `.pymtheg/settings.json` only when that config is
-  absent. Everything Pymtheg stores for the project is under `.pymtheg/` (see
+- `pymtheg init [DIRECTORY] [--name NAME] [--trust | --source-only] [--format text|json]`
+  creates a local workspace identity and a default `.pymtheg/settings.json`
+  only when that config is absent. It asks once whether you trust the
+  repository (see [Trusting the repository](#trusting-the-repository)). Everything Pymtheg stores for the project is under `.pymtheg/` (see
   [Local state and sharing](#local-state-and-sharing)).
   No sample program, requirement or decision is invented.
 - `.pymtheg/project.json` stores a versioned UUID/name, not an absolute path.
@@ -41,6 +42,47 @@ Sharing uses explicit history archives. It is not live team synchronization.
 - No global project registry or automatic agent-server installation is needed.
   MCP's project_info returns the initialized project's portable identity. An
   omitted MCP directory resolves from the current working directory.
+
+## Trusting the repository
+
+Decision D22: init asks once, as coding agents do, whether you trust the
+repository.
+
+- **Trusted** lets each language's official tooling run on the project. That
+  runs its build scripts and macros, as building it would. Today this turns on
+  the Go toolchain route, with its existing policy: offline by default and cgo
+  off.
+- **Source only** means Pymtheg never runs anything from the repository.
+
+The answer is stored as `"graph": {"trust": "trusted"}` or
+`"graph": {"trust": "source-only"}` in `.pymtheg/settings.json`. Graph answers
+report it as `trust`.
+
+How each path asks:
+
+- **Terminal init.** The question comes once, on the terminal, with trusted
+  preselected: Enter accepts it, and input that ends without an answer
+  records source only.
+- **Flags.** `--trust` and `--source-only` answer without a prompt, for
+  scripts.
+- **No terminal.** A command-line init with no terminal and no flag (piped
+  input, CI) records source only and says so.
+- **MCP.** The first planning write on a project that was never initialised
+  (`requirement_links` requirement or add, `observe_implementation`,
+  `link_implementation`) does not guess. It returns the trust question to the
+  calling model, which answers from its user or its standing instructions and
+  calls again with `trust: "trusted"` or `trust: "source-only"`.
+- **Studio.** Project setup shows the same question, with trusted
+  preselected, and shows the recorded answer afterwards.
+- **Nested folders.** A folder inside a project uses that project's answer.
+
+Re-running init never changes a recorded answer. An explicit flag on an
+initialised project with no answer records it. To change it later, edit
+`graph.trust` in `.pymtheg/settings.json`.
+
+A per-language setting such as `"graph": {"toolchain": {"go": false}}` or an
+absolute path to `go` overrides the project-wide answer for that language
+either way. A project with no answer behaves as before D22: nothing is run.
 
 ## Evidence to collect
 

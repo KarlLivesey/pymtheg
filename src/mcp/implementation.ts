@@ -140,12 +140,25 @@ export function registerImplementationTools(
         destructiveHint: false,
         openWorldHint: false,
       },
-      inputSchema: captureCodeSchema.omit({ runId: true }),
+      inputSchema: captureCodeSchema.omit({ runId: true }).extend({
+        trust: z
+          .enum(["trusted", "source-only"])
+          .optional()
+          .describe(
+            "On a project that was never initialised: the answer to whether this repository is trusted (D22). Ask your user or follow your standing instructions.",
+          ),
+      }),
     },
-    async (args, ctx) =>
+    async ({ trust, ...args }, ctx) =>
       output({
         revision: revisionReceipt(
-          await workspace.access.observeImplementation(args, ctx.mcpReq.signal),
+          await (async () => {
+            await workspace.initialiseForWrite(trust);
+            return workspace.access.observeImplementation(
+              args,
+              ctx.mcpReq.signal,
+            );
+          })(),
         ),
         meaning: "Observed source structure. No correctness proof.",
       }),
@@ -167,13 +180,22 @@ export function registerImplementationTools(
             .describe(
               "Confirm that you inspected this plan and observed declaration before linking or accepting the new version.",
             ),
+          trust: z
+            .enum(["trusted", "source-only"])
+            .optional()
+            .describe(
+              "On a project that was never initialised: the answer to whether this repository is trusted (D22). Ask your user or follow your standing instructions.",
+            ),
         })
         .strict(),
     },
-    async ({ reviewed, ...args }, ctx) =>
+    async ({ reviewed, trust, ...args }, ctx) =>
       output({
         revision: revisionReceipt(
-          await workspace.access.linkImplementation(args, ctx.mcpReq.signal),
+          await (async () => {
+            await workspace.initialiseForWrite(trust);
+            return workspace.access.linkImplementation(args, ctx.mcpReq.signal);
+          })(),
         ),
         reviewed,
         meaning:

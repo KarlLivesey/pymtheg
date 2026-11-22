@@ -113,6 +113,7 @@ test("real MCP agrees with negative-list trials, surfaces mixed caller findings 
       files: ["good.ts", "vendor.js"],
       label: "Partially captured",
       expectedRevision: null,
+      trust: "source-only",
     });
     const graph = await call("read_implementation", {
       section: "graph",

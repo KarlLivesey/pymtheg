@@ -33,6 +33,13 @@ export function formatGraph(response: GraphResponse): string {
     lines.push(
       `Indexed ${response.sync.report.indexed}; unchanged ${response.sync.report.unchanged}; removed ${response.sync.report.removed}`,
     );
+  // D22: the project's trust answer from init, when one is recorded.
+  if (response.trust)
+    lines.push(
+      response.trust === "trusted"
+        ? "Trust: trusted (build tools may run on this project)"
+        : "Trust: source only (nothing from this project is run)",
+    );
   // The opt-in toolchain route (absent when off).
   const toolchain = response.toolchain?.go;
   if (toolchain)
