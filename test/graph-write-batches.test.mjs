@@ -5,9 +5,17 @@
 // not blocked by an open batch and see the last commit; a write that fails
 // inside a batch undoes that batch and leaves the earlier commits.
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import { SqliteGraphStore } from "../dist/graph/index.js";
@@ -202,3 +210,63 @@ test("a writable open of a current store writes nothing and takes no write lock"
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("a store in memory and pymtheg doctor leave the working directory as it was", async () => {
+  const base = mkdtempSync(join(tmpdir(), "c37-cwd-"));
+  try {
+    const store = resolve("dist/graph/index.js");
+    const script = `import { SqliteGraphStore } from ${JSON.stringify(store)};
+      const s = new SqliteGraphStore(":memory:", "c37");
+      s.replaceFile(${JSON.stringify(record("a.syn"))});
+      await s.writeBatch(async () => s.replaceFile(${JSON.stringify(record("b.syn"))}));
+      s.close();`;
+    const ran = spawnSync(
+      process.execPath,
+      ["--input-type=module", "-e", script],
+      {
+        cwd: base,
+        encoding: "utf8",
+      },
+    );
+    assert.equal(ran.status, 0, ran.stderr);
+    assert.deepEqual(readdirSync(base), []);
+    spawnSync("git", ["init", "--quiet"], { cwd: base });
+    spawnSync(process.execPath, [resolve("dist/cli/main.js"), "doctor"], {
+      cwd: base,
+      encoding: "utf8",
+    });
+    assert.deepEqual(readdirSync(base), [".git"]);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test(
+  "with a turnstile file that cannot be written no batch forms: each write commits alone",
+  { skip: skip || (process.getuid?.() === 0 && "root writes any file") },
+  async () => {
+    const base = mkdtempSync(join(tmpdir(), "c37-batch-"));
+    const path = join(base, "graph.sqlite");
+    try {
+      new SqliteGraphStore(path, "c37").close();
+      writeFileSync(`${path}-turnstile`, "");
+      chmodSync(`${path}-turnstile`, 0o444);
+      const store = new SqliteGraphStore(path, "c37");
+      try {
+        await withBudget(1000, () =>
+          store.writeBatch(async () => {
+            store.replaceFile(record("a.syn"));
+            // Committed at once: no batch is open.
+            assert.deepEqual(paths(path), ["a.syn"]);
+            store.replaceFile(record("b.syn"));
+            assert.deepEqual(paths(path), ["a.syn", "b.syn"]);
+          }),
+        );
+      } finally {
+        store.close();
+      }
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  },
+);

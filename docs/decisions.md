@@ -3220,7 +3220,8 @@ blocked under the write-ahead log. A run overtaken between two batches
 stops at the next batch. **Trade:** a run cut short loses up to one batch
 more of progress, which its mark makes the next run redo; the log reaches
 the checkpoint threshold plus about one batch (474 MiB on cli/cli, 499 MiB
-on Vector). **Rules out:**
+on Vector). Waiters are not served first in, first out, and nothing gives
+the run fairness against a continuous stream of short writers. **Rules out:**
 savepoints per write (several times slower inserts), batches bounded by
 time, batching under a rollback journal (a batch larger than the page cache
 would lock readers out), and 50,000 pages or fewer per checkpoint (most of
