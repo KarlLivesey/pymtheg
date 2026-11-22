@@ -2,6 +2,7 @@
 // C-37: the longest second-writer waits of contend.sh runs, in seconds and in
 // the index's commits that fell inside each wait, and any errors.
 //   node scripts/store-cost/waits.mjs <out dir> <label>...
+import "../isolated-home.mjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 

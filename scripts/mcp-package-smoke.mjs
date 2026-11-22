@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-home.mjs";
 import {Client} from '@modelcontextprotocol/client';import {StdioClientTransport} from '@modelcontextprotocol/client/stdio';
 import {mkdtemp,writeFile,rm} from 'node:fs/promises';import {join,resolve} from 'node:path';import {tmpdir} from 'node:os';import assert from 'node:assert/strict';
 const packageRoot=resolve(process.argv[2]??'/tmp/pym-rework-package/node_modules/pymtheg');

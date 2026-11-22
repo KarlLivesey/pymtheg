@@ -15,8 +15,9 @@
  * own name may contain). If the listing does not finish with exit 0 within
  * its limit, Git is not run.
  */
-import { readFile, stat } from "node:fs/promises";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { constants } from "node:fs";
+import { lstat, open, realpath, stat, type FileHandle } from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { runProcess, type ProcessResult } from "../backends/process.js";
 
 /** Keys that can name a command, and the value that disables each. */
@@ -98,11 +99,76 @@ export async function safeGit(
 }
 
 const SHA = /^[0-9a-f]{40}$|^[0-9a-f]{64}$/;
-const readText = (path: string) =>
-  readFile(path, "utf8").then(
-    (text) => text,
-    () => null,
-  );
+/** The most a ref-like file (HEAD, a loose ref, .git, commondir) may hold. */
+const REF_LIMIT = 4096;
+/** The most `packed-refs` may hold; beyond it the commit is not read. */
+const PACKED_LIMIT = 32 * 1024 * 1024;
+
+/**
+ * A regular file's text, or null. Nothing that is not a regular file is
+ * read: a FIFO, a device or a socket is refused before it is opened, the
+ * file is opened non-blocking without following a final link, and the open
+ * descriptor is checked again (`fstat`) before reading. A symbolic link is
+ * followed only to a regular file inside one of `within` (the git folder or
+ * its common folder). A file larger than `limit` is not read. The abort
+ * signal is checked between steps.
+ */
+async function readRegular(
+  path: string,
+  limit: number,
+  within: readonly string[],
+  signal?: AbortSignal,
+): Promise<string | null> {
+  signal?.throwIfAborted();
+  let target = path;
+  const info = await lstat(path).catch(() => null);
+  if (!info) return null;
+  if (info.isSymbolicLink()) {
+    const real = await realpath(path).catch(() => null);
+    if (!real) return null;
+    const inside = await Promise.all(
+      within.map(async (folder) => {
+        const base = await realpath(folder).catch(() => null);
+        return base !== null && (real === base || real.startsWith(base + sep));
+      }),
+    );
+    if (!inside.some(Boolean)) return null;
+    target = real;
+    const linked = await lstat(target).catch(() => null);
+    if (!linked?.isFile()) return null;
+  } else if (!info.isFile()) return null;
+  signal?.throwIfAborted();
+  let handle: FileHandle;
+  try {
+    handle = await open(
+      target,
+      constants.O_RDONLY | constants.O_NONBLOCK | (constants.O_NOFOLLOW ?? 0),
+    );
+  } catch {
+    return null;
+  }
+  try {
+    const opened = await handle.stat();
+    if (!opened.isFile() || opened.size > limit) return null;
+    const buffer = Buffer.alloc(Math.min(opened.size, limit) + 1);
+    let read = 0;
+    while (read < buffer.length) {
+      signal?.throwIfAborted();
+      const { bytesRead } = await handle.read(
+        buffer,
+        read,
+        buffer.length - read,
+        read,
+      );
+      if (bytesRead === 0) break;
+      read += bytesRead;
+    }
+    if (read > limit) return null;
+    return buffer.toString("utf8", 0, read);
+  } finally {
+    await handle.close();
+  }
+}
 
 /**
  * The commit checked out in the repository containing \`start\`, read from
@@ -114,18 +180,23 @@ const readText = (path: string) =>
  */
 export async function gitCommitFromFiles(
   start: string,
+  signal?: AbortSignal,
 ): Promise<string | null> {
   let dir = resolve(start);
   let gitDir: string | null = null;
   for (;;) {
     const candidate = join(dir, ".git");
-    const info = await stat(candidate).catch(() => null);
+    signal?.throwIfAborted();
+    const info = await lstat(candidate).catch(() => null);
+    // A .git that is a link is not followed: it could lead anywhere.
+    if (info?.isSymbolicLink()) return null;
     if (info?.isDirectory()) {
       gitDir = candidate;
       break;
     }
     if (info?.isFile()) {
-      const text = (await readText(candidate)) ?? "";
+      const text =
+        (await readRegular(candidate, REF_LIMIT, [dir], signal)) ?? "";
       const named = /^gitdir:\s*(.+?)\s*$/m.exec(text)?.[1];
       if (!named) return null;
       gitDir = isAbsolute(named) ? named : resolve(dir, named);
@@ -135,25 +206,45 @@ export async function gitCommitFromFiles(
     if (parent === dir) return null;
     dir = parent;
   }
-  const common = await readText(join(gitDir, "commondir"));
+  if (!(await stat(gitDir).catch(() => null))?.isDirectory()) return null;
+  const common = await readRegular(
+    join(gitDir, "commondir"),
+    REF_LIMIT,
+    [gitDir],
+    signal,
+  );
   const commonDir = common?.trim()
     ? isAbsolute(common.trim())
       ? common.trim()
       : resolve(gitDir, common.trim())
     : gitDir;
-  let head = (await readText(join(gitDir, "HEAD")))?.trim() ?? "";
+  const within = [gitDir, commonDir];
+  let head =
+    (
+      await readRegular(join(gitDir, "HEAD"), REF_LIMIT, within, signal)
+    )?.trim() ?? "";
   for (let hops = 0; hops < 8; hops++) {
     if (SHA.test(head)) return head;
     const ref = /^ref:\s*(\S+)$/.exec(head)?.[1];
     if (!ref || ref.includes("..")) return null;
     const loose =
-      (await readText(join(gitDir, ref)))?.trim() ??
-      (await readText(join(commonDir, ref)))?.trim();
+      (
+        await readRegular(join(gitDir, ref), REF_LIMIT, within, signal)
+      )?.trim() ??
+      (
+        await readRegular(join(commonDir, ref), REF_LIMIT, within, signal)
+      )?.trim();
     if (loose !== undefined && loose !== null) {
       head = loose;
       continue;
     }
-    const packed = (await readText(join(commonDir, "packed-refs"))) ?? "";
+    const packed =
+      (await readRegular(
+        join(commonDir, "packed-refs"),
+        PACKED_LIMIT,
+        within,
+        signal,
+      )) ?? "";
     for (const line of packed.split("\n")) {
       const [sha, name] = line.trim().split(" ");
       if (name === ref && sha && SHA.test(sha)) return sha;

@@ -3,6 +3,10 @@
 # Runs scripts/reindex/jobs.txt on the dev server, at most 4 at a time.
 #   scripts/reindex/run-jobs.sh <before dist> <after dist> <main dist> <out root>
 set -u
+# The user's Pymtheg configuration and cache go to fresh folders in the
+# scratch, never the account's real ones (scripts/isolated-home.mjs).
+export PYMTHEG_CONFIG_HOME="${PYMTHEG_CONFIG_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-config-XXXXXX")}"
+export PYMTHEG_CACHE_HOME="${PYMTHEG_CACHE_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-cache-XXXXXX")}"
 export BEFORE="$1" AFTER="$2" MAIN="$3" OUT="$4"
 job() {
   set -- $1
