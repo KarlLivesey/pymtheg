@@ -772,7 +772,8 @@ async function main() {
     const pins = read("sweep/repos.json");
     const catalog = read("sweep/support-reasons.json");
     const legacy = read(values.items);
-    const document = renderRefresh(input, baseline, pins, catalog, legacy);
+    const folder = /(?:^|\/)evidence\/([^/]+)\/[^/]+$/.exec(values.results.replaceAll("\\", "/"))?.[1];
+    const document = renderRefresh(input, baseline, pins, catalog, legacy, folder);
     if (values.plan) writeFileSync(values.plan, document);
     if (values.scoreboard) writeFileSync(values.scoreboard, `${scoreTable(input.modes, baseline)}\n`);
     if (values.attempts) writeFileSync(values.attempts, runTables(input.modes));
