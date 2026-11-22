@@ -3170,7 +3170,11 @@ analysis would not return", with line and column) under C-13's containment
 and cap. On microsoft/TypeScript it flags exactly the three
 `unreachableFlowAfterThrowing*` conformance tests, and nothing on the seven
 identity pins. Under a stopped taint walk the judge's dependence graphs are
-not explored: their answers would be overridden by `taint-budget-exhausted`.
+not explored, for cost: on microsoft/TypeScript that search exhausted the
+heap. So a link whose receiver reaches a failed file only at depth is
+stored `taint-budget-exhausted` instead of `invalid-code` with a cause.
+Links that touch the failed file directly keep `invalid-code`. Both are
+unresolved, and within the budget nothing changes.
 A file the compiler throws on in a later project is failed for the store.
 Earlier projects' links into it become `target-unavailable`, and their other
 links are flagged `no-unseen-declarations`. The cap counts compiler failures

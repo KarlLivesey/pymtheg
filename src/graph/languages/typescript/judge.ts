@@ -569,12 +569,13 @@ export function createJudge(input: JudgeInput): Judge {
     }
     return parts;
   }
-  // Under an unknown taint (the walk stopped at its budget) every link these
-  // graphs could clear is reported `taint-budget-exhausted` anyway, and
-  // links that bind a failed file directly are answered from the direct
-  // causes: exploring the program's dependence graph would only cost. On
-  // microsoft/TypeScript one exploration from the global `Object` exhausted
-  // the heap (docs/changes/C-26.md).
+  // Under an unknown taint (the walk stopped at its budget) these graphs are
+  // not explored, for cost: on microsoft/TypeScript one exploration from
+  // the global `Object` exhausted the heap (docs/changes/C-26.md). A link
+  // whose receiver reaches a failed file only at depth is then
+  // `taint-budget-exhausted` without a cause, where an explored graph gives
+  // `invalid-code` with one; links that bind a failed file directly are
+  // still answered from the direct causes. Within the budget, unchanged.
   const unknown = taintUnknown(taint);
   const reachesGraph = unknown ? () => [] : dependenceGraph(valueParts);
   const typesGraph = unknown ? () => [] : dependenceGraph(typeParts);

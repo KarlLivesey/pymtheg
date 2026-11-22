@@ -75,8 +75,9 @@ const unknownTaints = new WeakSet<Taint>();
 /**
  * Whether this taint is unknown (its walk stopped at the budget). Then only
  * direct bindings of a failed file are answered; every other link of the
- * program is reported `taint-budget-exhausted` (index.ts), so nothing else
- * needs computing from it.
+ * program is reported `taint-budget-exhausted` (index.ts), including links
+ * whose receiver reaches a failed file at depth, which the judge does not
+ * search for then (cost; see judge.ts).
  */
 export const taintUnknown = (taint: Taint) => unknownTaints.has(taint);
 /** Checkers whose walk is skipped: treated as having reached the budget. */

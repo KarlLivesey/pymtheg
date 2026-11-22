@@ -475,8 +475,18 @@ const depthLinks = (result) =>
 test("a receiver that reaches a failed file at depth keeps that cause within the walk's budget", async () => {
   const result = await indexFiles(FAILED_AT_DEPTH);
   assert.deepEqual(depthLinks(result), [
-    ["use.ts", "unresolved", "invalid-code", ["broken.ts"]],
-    ["nested.ts", "unresolved", "invalid-code", ["bad.ts"]],
+    [
+      "use.ts",
+      "unresolved",
+      "invalid-code",
+      { file: "broken.ts", via: "callee make; binding conf" },
+    ],
+    [
+      "nested.ts",
+      "unresolved",
+      "invalid-code",
+      { file: "bad.ts", via: "receiver holder; binding thing" },
+    ],
   ]);
 });
 

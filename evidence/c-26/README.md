@@ -37,6 +37,8 @@ are observations on a shared, loaded machine. The change note is
   - `analyze.mjs`: C-13's direct analysis, with result sizes and a heap
     snapshot at return;
   - `regress.sh`, `on-main.sh`: the tests against reverted or main code;
+  - `checks.sh`, `hono.sh`: the review round's final checks (build, type
+    check, format, TypeScript graph and sweep tests; hono identity);
   - `dbg-index.sh`: a cold index whose invalid-link check names the link
     (found the namespace-in-a-block container);
   - `heap-index.sh`, `index-summary.mjs`, `failed-kinds.mjs`,
