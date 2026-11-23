@@ -3207,15 +3207,21 @@ coordinator terminates, as `check` does.
 
 ### C-50 The CLI's graph command runs in a worker
 
-A CLI `graph` command runs in a worker thread. The main thread relays
-progress and handles SIGINT and SIGTERM. A cancel that finds the worker
+A CLI `graph` command, and the graph work of a CLI `link` command, runs in
+a worker thread. The main thread relays progress and handles SIGINT,
+SIGTERM, SIGHUP and SIGQUIT. A cancel that finds the worker
 inside a language module's synchronous code terminates it; the store is
 left as a killed run leaves it, and the next index repairs it. Anywhere
 else, the cancel is acknowledged at the command's next checkpoint, as
 before. The worker and the coordinator use a cancel flag and a section in
-shared memory (the shape of C-48), so no clock decides which. **Rules
-out:** an index run that only SIGKILL can stop; a wall-clock deadline in
-place of deterministic bounds. [C-50](changes/C-50.md)
+shared memory (the shape of C-48), so no clock decides which. The section
+is a module's synchronous call, and any synchronous stretch the module marks
+after an await (`synchronousStretch`; Go marks its link notes and parse);
+an unmarked stretch is cancelled cooperatively, at the module's next await.
+Child process groups go into C-54's registry and are killed when the worker
+exits. **Rules out:** a CLI graph or link run that only SIGKILL can stop; a
+wall-clock deadline in place of deterministic bounds.
+[C-50](changes/C-50.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import { awaitingModuleCall } from "./sections.js";
 import { lstat, realpath, stat } from "node:fs/promises";
 import {
   checkpointSchema,
@@ -147,12 +148,13 @@ export interface GraphExecutionOptions {
    * so a caller that must cancel promptly ends the work another way. While
    * its promise is awaited, a module that honours the abort signal (Rust's
    * phase worker, a toolchain's child process) is cancelled through it at
-   * its next await. The module may still run synchronous code between its
-   * awaits during that time (Go's analysis with the toolchain route runs
-   * its notes pass and decision loops after awaiting the facts), so the
-   * abort can take effect only at its next await or when it settles. The
-   * abort signal is checked after the call is announced, so a cancellation
-   * set before it is never missed.
+   * its next await. A module that runs long synchronous code between its
+   * awaits marks it with `synchronousStretch` (sections.ts; Go marks its
+   * link notes and its parse): it is announced as `true` again, and as
+   * "awaiting" when it ends. Unmarked synchronous code between awaits is
+   * not covered: the abort takes effect at the module's next await or when
+   * it settles. The abort signal is checked after the call is announced,
+   * so a cancellation set before it is never missed.
    */
   onModuleCall?: (inside: boolean | "awaiting") => void;
 }
@@ -340,9 +342,13 @@ export async function executeGraph(
         throw error;
       }
       options.onModuleCall?.("awaiting");
+      // C-50: a synchronous stretch the module runs while awaited
+      // (`synchronousStretch`) is announced as inside the call again.
+      const removeListener = awaitingModuleCall(options.onModuleCall);
       try {
         return await pending;
       } finally {
+        removeListener();
         options.onModuleCall?.(false);
       }
     };

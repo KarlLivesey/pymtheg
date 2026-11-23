@@ -1,138 +1,100 @@
 // SPDX-License-Identifier: MIT
 // C-50: a CLI graph run stuck inside a language module's synchronous
-// analysis is ended by an abort (SIGINT/SIGTERM in the CLI), because the
-// command runs in a worker that the coordinator terminates. The worker that
-// cannot finish signals, through shared memory, that it is inside the
-// module call before the test aborts; nothing depends on time.
+// analysis is ended by an abort (SIGINT/SIGTERM/SIGHUP/SIGQUIT in the CLI),
+// because the command runs in a worker that the coordinator terminates. The
+// worker that cannot finish signals, through shared memory, that it is where
+// the scenario needs it before the abort; no wait decides an outcome.
+//
+// Each cancellation scenario runs in a child process
+// (graph-cli-cancel-scenario.mjs), so a regression that leaves a worker or a
+// process running fails the test instead of hanging the run: the child's
+// process group is killed after a few minutes, and any child process it
+// reported is killed too. That bound only turns a hang into a failure.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
+import { spawn } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { runGraphInWorker } from "../dist/cli/graph-runner.js";
-import { executeGraph } from "../dist/graph/commands.js";
-import { LanguageRegistry } from "../dist/graph/index.js";
-import { fixtureFiles, fixtureModule } from "./graph-kill-fixture.mjs";
+import { fixtureFiles } from "./graph-kill-fixture.mjs";
 
-test("an abort ends a graph run stuck inside a module call, and the next index repairs the store", async () => {
-  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-cli-cancel-"));
-  const root = join(scratch, "project");
-  try {
-    await mkdir(root);
-    for (const [path, text] of Object.entries(fixtureFiles(6)))
-      await writeFile(join(root, path), text);
-    await writeFile(join(root, "z.x"), "def stuck\n");
-    const flag = new SharedArrayBuffer(4);
-    const controller = new AbortController();
-    const run = runGraphInWorker(
-      { command: "index", root },
-      {
-        signal: controller.signal,
-        workerURL: new URL("./graph-cli-stuck-worker.mjs", import.meta.url),
-        workerData: { flag },
-      },
-    );
-    // Readiness: the module is inside its synchronous call.
-    const waited = Atomics.waitAsync(new Int32Array(flag), 0, 0);
-    if (waited.async) await waited.value;
-    controller.abort();
-    await assert.rejects(run, (error) => error.name === "AbortError");
-
-    // The store is left as a killed run leaves it; the next index (without
-    // the file that cannot be analysed) repairs it and equals a cold index.
-    await rm(join(root, "z.x"));
-    const registry = () => new LanguageRegistry([fixtureModule()]);
-    const after = await executeGraph(
-      { command: "index", root },
-      { registry: registry() },
-    );
-    assert.equal(after.status, "ok");
-    const cold = join(scratch, "cold");
-    await mkdir(cold);
-    for (const [path, text] of Object.entries(fixtureFiles(6)))
-      await writeFile(join(cold, path), text);
-    const fresh = await executeGraph(
-      { command: "index", root: cold },
-      { registry: registry() },
-    );
-    assert.deepEqual(after.counts, fresh.counts);
-  } finally {
-    await rm(scratch, { recursive: true, force: true });
-  }
-});
-
-// C-50 review: a child process the worker started (as a toolchain is) is
-// killed with its whole process group when the coordinator terminates the
-// worker; a terminated worker could not kill it itself. The child and a
-// grandchild each hold a connection to the test's socket, which closes only
-// when that process has died.
-test("an abort inside a module call kills the child processes the worker started", async () => {
-  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-cli-child-"));
-  const root = join(scratch, "project");
-  const socket = join(scratch, "child.sock");
-  const connections = [];
-  const sockets = [];
-  const pids = [];
-  let connected;
-  const both = new Promise((resolve) => (connected = resolve));
-  const server = createServer((connection) => {
-    sockets.push(connection);
-    connections.push(new Promise((resolve) => connection.on("close", resolve)));
-    connection.setEncoding("utf8");
-    connection.on("data", (text) => {
-      const pid = Number.parseInt(text, 10);
-      if (pid > 0) pids.push(pid);
-    });
-    if (connections.length === 2) connected();
-  });
-  await new Promise((resolve) => server.listen(socket, resolve));
-  try {
-    await mkdir(root);
-    for (const [path, text] of Object.entries(fixtureFiles(2)))
-      await writeFile(join(root, path), text);
-    await writeFile(join(root, "z.x"), "def stuck\n");
-    const flag = new SharedArrayBuffer(4);
-    const controller = new AbortController();
-    const run = runGraphInWorker(
-      { command: "index", root },
-      {
-        signal: controller.signal,
-        workerURL: new URL("./graph-cli-stuck-worker.mjs", import.meta.url),
-        workerData: { flag, socket },
-      },
-    );
-    // Readiness: the module is inside its synchronous call, and the child
-    // and the grandchild are both running.
-    const waited = Atomics.waitAsync(new Int32Array(flag), 0, 0);
-    if (waited.async) await waited.value;
-    await both;
-    controller.abort();
-    await assert.rejects(run, (error) => error.name === "AbortError");
-    // Both processes die: each connection closes. The coordinator has
-    // already sent SIGKILL when the run rejects; the guard only turns a
-    // regression (processes left running) into a failure instead of a hang.
-    // It decides nothing when the test passes.
-    let guard;
-    const closed = await Promise.race([
-      Promise.all(connections).then(() => true),
-      new Promise((resolve) => (guard = setTimeout(resolve, 60_000, false))),
-    ]);
-    clearTimeout(guard);
-    assert.equal(closed, true, "a child process survived the cancelled run");
-    assert.equal(connections.length, 2);
-  } finally {
-    // Whatever survived a failure is ended, so the test process can exit.
-    for (const pid of pids)
+const HANG_GUARD_MS = 3 * 60_000;
+/** Runs a scenario in its own process group; its JSON facts, or a failure. */
+async function scenario(name) {
+  const scratch = await mkdtemp(join(tmpdir(), `pymtheg-cli-${name}-`));
+  const child = spawn(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL("./graph-cli-cancel-scenario.mjs", import.meta.url),
+      ),
+      name,
+      scratch,
+    ],
+    { detached: true, stdio: ["ignore", "pipe", "inherit"] },
+  );
+  let out = "";
+  child.stdout.on("data", (chunk) => (out += chunk));
+  let guard;
+  const ended = await Promise.race([
+    new Promise((resolve) => child.on("exit", () => resolve(true))),
+    new Promise(
+      (resolve) => (guard = setTimeout(resolve, HANG_GUARD_MS, false)),
+    ),
+  ]);
+  clearTimeout(guard);
+  const facts = out
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+  if (!ended)
+    for (const pid of [-child.pid, ...facts.map((f) => f.pid).filter(Boolean)])
       try {
         process.kill(pid, "SIGKILL");
       } catch {
         /* already gone */
       }
-    for (const socket of sockets) socket.destroy();
-    server.close();
-    await rm(scratch, { recursive: true, force: true });
-  }
+  await rm(scratch, { recursive: true, force: true });
+  assert.ok(ended, `the ${name} scenario did not finish: ${out}`);
+  return Object.assign({}, ...facts.filter((f) => !f.pid));
+}
+
+test("an abort ends a graph run stuck inside a module call, and the next index repairs the store to a cold index's rows", async () => {
+  const facts = await scenario("stuck");
+  assert.equal(facts.rejected, "AbortError");
+  assert.equal(facts.status, "ok");
+  assert.equal(facts.same, true);
+});
+
+// C-50 review: a child process the worker started (as a toolchain is) is
+// killed with its whole process group when the coordinator terminates the
+// worker; a terminated worker could not kill it itself. The child and a
+// grandchild each hold a connection to the scenario's socket, which closes
+// only when that process has died.
+test("an abort inside a module call kills the child processes the worker started", async () => {
+  const facts = await scenario("child");
+  assert.equal(facts.rejected, "AbortError");
+  assert.equal(facts.closed, 2);
+});
+
+// C-50 review: synchronous work a module runs after an await, marked with
+// `synchronousStretch` (as Go marks its link notes and parse), is inside
+// the module call, so the abort terminates the worker there.
+test("an abort ends a module's synchronous stretch after an await", async () => {
+  const facts = await scenario("stretch");
+  assert.equal(facts.rejected, "AbortError");
+});
+
+// C-50 review: an abort that finds the worker outside a module call asks
+// for a cooperative cancel. If the worker reaches the next module call
+// before the cancel message is read, it refuses to enter it (the flag the
+// coordinator set): the call that cannot finish is never entered.
+test("after an abort the worker refuses to enter the next module call", async () => {
+  const facts = await scenario("block");
+  assert.equal(facts.rejected, "AbortError");
+  assert.equal(facts.entered, 0);
 });
 
 test("a run that is not aborted answers through the worker", async () => {

@@ -13,7 +13,11 @@
  * stdout/stderr, so CLI and MCP wrappers only format. */
 import { createHash } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
-import { executeGraph, type GraphResponse } from "../graph/commands.js";
+import {
+  executeGraph,
+  type GraphRequest,
+  type GraphResponse,
+} from "../graph/commands.js";
 import { GraphLocations } from "../graph/command-locations.js";
 import { SqliteGraphStore } from "../graph/store.js";
 import type { GraphSymbol } from "../graph/types.js";
@@ -450,17 +454,33 @@ function findLink(links: StoredCodeLink[], input: string): StoredCodeLink {
 }
 
 /** Syncs the graph exactly as `pymtheg graph` queries do and summarises completeness. */
+/** Runs one graph request (the link commands' syncs and queries). */
+type GraphRunner = (
+  request: GraphRequest,
+  signal: AbortSignal | undefined,
+) => Promise<GraphResponse>;
+let graphRunner: GraphRunner = (request, signal) =>
+  executeGraph(request, signal ? { signal } : {});
+/**
+ * C-50: the CLI runs the link commands' graph work in its cancellable
+ * worker (`runGraphInWorker`), so a sync stuck in a language module ends on
+ * a signal, as `graph` does. Elsewhere (the MCP links worker, already off
+ * the main thread) it runs in place.
+ */
+export function useGraphRunner(run: GraphRunner): void {
+  graphRunner = run;
+}
 async function syncGraph(root: string, options: CodeLinkOptions) {
   // A path query with a fixed name: the answer is unused; only the sync and
   // failure/stale reports are read.
-  const response = await executeGraph(
+  const response = await graphRunner(
     {
       command: "file",
       args: ["pymtheg-code-links-sync-probe"],
       root,
       noSync: options.noSync ?? false,
     },
-    options.signal ? { signal: options.signal } : {},
+    options.signal,
   );
   const summary: GraphSummary = {
     complete: response.sync.complete,
@@ -950,14 +970,14 @@ export async function createCodeLink(
           ? `“${input.record}” names several planning records; use a record ID. Nothing was linked.`
           : `No planning record “${input.record}”. Create it with “link requirement”. Nothing was linked.`,
       };
-    const response = await executeGraph(
+    const response = await graphRunner(
       {
         command: "symbol",
         args: [input.selector],
         root,
         noSync: input.noSync ?? false,
       },
-      input.signal ? { signal: input.signal } : {},
+      input.signal,
     );
     const graph: GraphSummary = {
       complete: response.sync.complete,
@@ -1231,14 +1251,14 @@ export async function listCodeLinks(
     }
     let selected: string | null = null;
     if (input.symbol !== undefined) {
-      const response = await executeGraph(
+      const response = await graphRunner(
         {
           command: "symbol",
           args: [input.symbol],
           root,
           noSync: input.noSync ?? false,
         },
-        input.signal ? { signal: input.signal } : {},
+        input.signal,
       );
       const symbol = (response.data as { symbol?: GraphSymbol } | null)?.symbol;
       if (!symbol)
@@ -1374,9 +1394,9 @@ export async function requirementsFor(
     );
     const starts: string[] = [];
     if (input.symbol !== undefined) {
-      const response = await executeGraph(
+      const response = await graphRunner(
         { command: "symbol", args: [input.symbol], root, noSync: true },
-        input.signal ? { signal: input.signal } : {},
+        input.signal,
       );
       const symbol = (response.data as { symbol?: GraphSymbol } | null)?.symbol;
       if (!symbol)
@@ -1388,7 +1408,7 @@ export async function requirementsFor(
         );
       starts.push(symbol.id);
     } else {
-      const response = await executeGraph(
+      const response = await graphRunner(
         {
           command: "file",
           args: [input.file!],
@@ -1396,7 +1416,7 @@ export async function requirementsFor(
           noSync: true,
           limit: 10000,
         },
-        input.signal ? { signal: input.signal } : {},
+        input.signal,
       );
       for (const s of (response.data?.symbols ?? []) as GraphSymbol[])
         starts.push(s.id);
@@ -1422,7 +1442,7 @@ export async function requirementsFor(
     };
     if (input.impact)
       for (const id of starts) {
-        const response = await executeGraph(
+        const response = await graphRunner(
           {
             command: "impact",
             args: [id],
@@ -1430,7 +1450,7 @@ export async function requirementsFor(
             noSync: true,
             depth: input.depth ?? 5,
           },
-          input.signal ? { signal: input.signal } : {},
+          input.signal,
         );
         if (response.truncated) impactIncomplete = true;
         for (const w of response.warnings)

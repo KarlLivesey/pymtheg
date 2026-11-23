@@ -59,7 +59,9 @@ if (a[0] === "env") {
 }
 if (a[0] === "build") {
   const child = cp.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
-  fs.writeFileSync(${JSON.stringify(join(dir, "ready.json"))}, JSON.stringify({ go: process.pid, child: child.pid }));
+  // Written whole, then renamed: a reader that sees ready.json sees it all.
+  fs.writeFileSync(${JSON.stringify(join(dir, "ready.json.tmp"))}, JSON.stringify({ go: process.pid, child: child.pid }));
+  fs.renameSync(${JSON.stringify(join(dir, "ready.json.tmp"))}, ${JSON.stringify(join(dir, "ready.json"))});
   setInterval(() => {}, 1000);
   return;
 }
