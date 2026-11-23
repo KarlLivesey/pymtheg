@@ -14,6 +14,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { executeGraph } from "../dist/graph/commands.js";
 import typescript from "../dist/graph/languages/typescript/index.js";
+import { registryRange } from "../dist/graph/languages/typescript/workspace.js";
 import { LanguageRegistry, SqliteGraphStore } from "../dist/graph/index.js";
 
 const fixtures = fileURLToPath(
@@ -1484,4 +1485,140 @@ test("a merged-member call keeps one identity for a same-package directory augme
     // Another package's overload: that package's declaration.
     assert.equal(target(call("main.ts", "c.setOption")).unit, "cm-extra");
   });
+});
+
+// C-39: the compiler's semver parser throws on some published ranges.
+test("a manifest range the compiler cannot parse does not fail the importing file", async () => {
+  const { request, read, write } = await project();
+  await write(
+    "package.json",
+    JSON.stringify({ dependencies: { "drizzle-orm": "^1.0.0-beta.9-8d6992" } }),
+  );
+  await write(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: { strict: true, types: [] },
+      include: ["src"],
+    }),
+  );
+  await write(
+    "node_modules/drizzle-orm/package.json",
+    manifest("drizzle-orm", "1.0.0-beta.9-8d6992"),
+  );
+  await write(
+    "node_modules/drizzle-orm/index.d.ts",
+    "export declare function sql(): void;\n",
+  );
+  await write("src/main.ts", 'import { sql } from "drizzle-orm";\nsql();\n');
+  // A registry range the parser cannot read is "unknown", never a throw.
+  assert.equal(registryRange("^1.0.0-beta.9-8d6992"), "unknown");
+  assert.equal(registryRange("^1.2.3"), "known");
+  assert.equal(registryRange("latest"), "known");
+  assert.equal(registryRange("github:owner/repo"), false);
+  await request("index");
+  read((store, call) => {
+    assert.notEqual(store.getFile("src/main.ts").result.status, "failed");
+    const link = target(call("src/main.ts", "sql"));
+    assert.equal(link.unit, "drizzle-orm");
+    assert.equal(link.symbol, "sql");
+    // The version comes from the installed package, not from the range.
+    assert.equal(link.versionSource, "node_modules/drizzle-orm/package.json");
+  });
+});
+
+test("a config extended by package name through an installed workspace link is read; an absent one stays incomplete", async () => {
+  const cases = {
+    "workspace config package": {
+      extendsName: "@scope/tsconfig/library.json",
+      link: ["packages/app/node_modules/@scope/tsconfig", "../../../tsconfig"],
+      files: {
+        "packages/tsconfig/package.json": JSON.stringify({
+          name: "@scope/tsconfig",
+          version: "0.0.0",
+        }),
+        "packages/tsconfig/library.json": JSON.stringify({
+          compilerOptions: { strict: true, types: [] },
+        }),
+      },
+      complete: true,
+    },
+    "exports-mapped shared configs": {
+      extendsName: "astro/tsconfigs/strict",
+      link: ["packages/app/node_modules/astro", "../../astro"],
+      files: {
+        "packages/astro/package.json": JSON.stringify({
+          name: "astro",
+          version: "0.0.0",
+          exports: { "./tsconfigs/*": "./tsconfigs/*.json" },
+        }),
+        "packages/astro/tsconfigs/base.json": JSON.stringify({
+          compilerOptions: { types: [] },
+        }),
+        "packages/astro/tsconfigs/strict.json": JSON.stringify({
+          extends: "./base.json",
+          compilerOptions: { strict: true },
+        }),
+      },
+      complete: true,
+    },
+    "absent package": {
+      extendsName: "@scope/missing/library.json",
+      files: {},
+      complete: false,
+    },
+    // tsc reports 1005 and drops what it cannot parse: settings are missing.
+    "workspace config package with a JSON syntax error": {
+      extendsName: "@scope/tsconfig/library.json",
+      link: ["packages/app/node_modules/@scope/tsconfig", "../../../tsconfig"],
+      files: {
+        "packages/tsconfig/package.json": JSON.stringify({
+          name: "@scope/tsconfig",
+          version: "0.0.0",
+        }),
+        "packages/tsconfig/library.json":
+          '{ "compilerOptions": { "strict": true "types": [] } }',
+      },
+      complete: false,
+    },
+  };
+  for (const [
+    variant,
+    { extendsName, link, files, complete },
+  ] of Object.entries(cases)) {
+    const { root, request, read, write } = await project();
+    await write("node_modules/kit/package.json", manifest("kit", "1.0.0"));
+    await write(
+      "node_modules/kit/index.d.ts",
+      "export interface Box { open(): void }\nexport declare const box: Box;\n",
+    );
+    for (const [path, text] of Object.entries(files)) await write(path, text);
+    await write(
+      "packages/app/tsconfig.json",
+      JSON.stringify({ extends: extendsName, include: ["src"] }),
+    );
+    await write(
+      "packages/app/src/a.ts",
+      'import { box } from "kit";\nbox.open();\n',
+    );
+    if (link) {
+      await mkdir(dirname(join(root, link[0])), { recursive: true });
+      await symlink(link[1], join(root, link[0]));
+    }
+    await request("index");
+    read((store, call) => {
+      const file = store.getFile("packages/app/src/a.ts").result;
+      const missing = file.diagnostics.some(({ message }) =>
+        message.includes("node_modules is never captured"),
+      );
+      const open = call("packages/app/src/a.ts", "box.open");
+      if (complete) {
+        assert.equal(missing, false, variant);
+        assert.equal(open.resolution, "library", variant);
+        assert.equal(open.libraries[0].symbol, "Box.prototype.open", variant);
+      } else {
+        assert.equal(missing, true, variant);
+        assert.equal(open.data.reason, "incomplete-config", variant);
+      }
+    });
+  }
 });
