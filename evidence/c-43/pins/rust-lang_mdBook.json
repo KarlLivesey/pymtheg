@@ -77,18 +77,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 34.4,
-  "cpuS": 136.2,
-  "peakMiB": 1902
+  "wallS": 25.7,
+  "cpuS": 106.1,
+  "peakMiB": 1900
  },
  "index": {
   "sourceOnly": {
-   "wallS": 22.4,
-   "cpuS": 33.3
+   "wallS": 19,
+   "cpuS": 30.8
   },
   "route": {
-   "wallS": 99.1,
-   "cpuS": 38.9
+   "wallS": 78.7,
+   "cpuS": 35
   }
  },
  "errors": {
@@ -106,7 +106,7 @@
    "no identity: library item": 155,
    "no answer: no-name-site": 43,
    "gate: kind/namespace": 6,
-   "gate: cfg on an enclosing module": 12,
+   "gate: conditional candidates": 12,
    "gate: cfg-variant guard": 2,
    "gate: cfg condition other than test": 27,
    "no answer: no-occurrence-at-site": 26,

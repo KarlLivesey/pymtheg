@@ -78,18 +78,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 43.2,
-  "cpuS": 72.8,
-  "peakMiB": 1204
+  "wallS": 24.6,
+  "cpuS": 48.4,
+  "peakMiB": 1211
  },
  "index": {
   "sourceOnly": {
-   "wallS": 52.3,
-   "cpuS": 60.1
+   "wallS": 36.4,
+   "cpuS": 47.4
   },
   "route": {
-   "wallS": 159.5,
-   "cpuS": 72.3
+   "wallS": 78.2,
+   "cpuS": 48.1
   }
  },
  "errors": {
@@ -110,8 +110,7 @@
    "gate: cfg condition other than test": 275,
    "no answer: no-name-site": 60,
    "gate: cfg-variant guard": 19,
-   "gate: cfg on an enclosing module": 579,
-   "gate: conditional candidates": 1,
+   "gate: conditional candidates": 580,
    "gate: known error classes": 8,
    "no answer: file-not-indexed": 62
   },

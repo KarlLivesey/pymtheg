@@ -77,18 +77,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 30.4,
-  "cpuS": 55.3,
-  "peakMiB": 927
+  "wallS": 14.6,
+  "cpuS": 33,
+  "peakMiB": 929
  },
  "index": {
   "sourceOnly": {
-   "wallS": 10.9,
-   "cpuS": 13.8
+   "wallS": 5.9,
+   "cpuS": 9.2
   },
   "route": {
-   "wallS": 69.6,
-   "cpuS": 17
+   "wallS": 33.9,
+   "cpuS": 11
   }
  },
  "errors": {
@@ -103,14 +103,14 @@
    "no identity: library item": 37,
    "gate: trait-method declaration": 37,
    "gate: known error classes": 51,
-   "gate: cfg on an enclosing module": 48,
+   "gate: cfg-variant guard": 47,
    "credited": 164,
    "no answer: no-occurrence-at-site": 294,
    "no answer: no-name-site": 5,
    "gate: cfg condition other than test": 150,
    "no identity: local binding": 99,
    "no answer: file-not-indexed": 673,
-   "gate: cfg-variant guard": 9
+   "gate: conditional candidates": 10
   },
   "libraryPassingCfg": 37,
   "notIndexed": {

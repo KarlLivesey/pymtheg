@@ -76,18 +76,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 26.6,
-  "cpuS": 42.6,
-  "peakMiB": 1090
+  "wallS": 13.8,
+  "cpuS": 25.7,
+  "peakMiB": 1100
  },
  "index": {
   "sourceOnly": {
-   "wallS": 26.2,
-   "cpuS": 30.7
+   "wallS": 13.3,
+   "cpuS": 19.8
   },
   "route": {
-   "wallS": 82,
-   "cpuS": 30.4
+   "wallS": 41.5,
+   "cpuS": 20.4
   }
  },
  "errors": {
@@ -106,7 +106,7 @@
    "no identity: local binding": 425,
    "gate: cfg-variant guard": 7,
    "no identity: library item": 71,
-   "gate: cfg on an enclosing module": 2,
+   "gate: conditional candidates": 2,
    "gate: cfg condition other than test": 127,
    "no answer: no-name-site": 13
   },

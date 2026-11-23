@@ -81,18 +81,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 52.3,
-  "cpuS": 111.8,
-  "peakMiB": 1945
+  "wallS": 38.9,
+  "cpuS": 88.3,
+  "peakMiB": 1953
  },
  "index": {
   "sourceOnly": {
-   "wallS": 68.4,
-   "cpuS": 73.4
+   "wallS": 41.6,
+   "cpuS": 57.9
   },
   "route": {
-   "wallS": 231.4,
-   "cpuS": 83.7
+   "wallS": 136.7,
+   "cpuS": 63.5
   }
  },
  "errors": {
@@ -107,16 +107,15 @@
    "gate: trait-method declaration": 459,
    "credited": 2690,
    "no identity: declaration without a graph symbol": 611,
-   "gate: cfg on an enclosing module": 995,
+   "gate: conditional candidates": 1002,
    "no identity: generated item": 197,
    "no answer: no-name-site": 81,
    "no identity: library item": 85,
    "no answer: no-occurrence-at-site": 178,
-   "gate: cfg-variant guard": 331,
+   "gate: cfg-variant guard": 340,
    "gate: known error classes": 44,
    "no answer: file-not-indexed": 10376,
    "gate: cfg condition other than test": 345,
-   "gate: conditional candidates": 16,
    "gate: kind/namespace": 34,
    "other": 12
   },
