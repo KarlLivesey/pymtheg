@@ -776,7 +776,12 @@ reference, package script or test runner config (Vitest `typecheck.tsconfig`,
 ts-jest `tsconfig`) names. A call on a member merged from several
 declarations of one receiver type links the declaration of the signature
 the checker selects, when no declaration from another body could also
-accept the arguments.
+accept the arguments. A const assertion (`as const`, `<const>x`) stores no link.
+A package-name `extends` whose base is reached through an installed
+workspace link is read (C-39). A base whose JSON has a syntax error keeps
+the missing-settings marker. A manifest range that the compiler's semver
+parser throws on is an unknown range: it identifies the registry dependency
+and never yields a version pin.
 
 - **Definite:** module imports; import and export bindings to the original
   declaration through barrels, `export *`, renames and default exports; CommonJS

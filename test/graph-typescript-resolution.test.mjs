@@ -8682,3 +8682,38 @@ test("K3: in a program with a failed file, unresolved links are flagged too", as
       `an unresolved ${reason} link is covered (${[...seen]})`,
     );
 });
+
+test("const assertions store no reference link, while real type references in assertions still link", async () => {
+  await project(
+    {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { strict: true },
+        include: ["src"],
+      }),
+      "src/a.ts": [
+        "export interface Point { x: number }",
+        'export const modes = ["a", "b"] as const;',
+        "export const one = <const>[1];",
+        "export const p = { x: 1 } as Point;",
+        "export const q = { x: 2 } satisfies Point;",
+        "",
+      ].join("\n"),
+    },
+    async (graph) => {
+      const links = graph.store
+        .links()
+        .filter((link) => link.file === "src/a.ts");
+      assert.deepEqual(
+        links.filter((link) => link.targetName === "const"),
+        [],
+      );
+      // `as Point` and `satisfies Point` are references to the interface.
+      const points = links.filter(
+        (link) => link.kind === "references" && link.targetName === "Point",
+      );
+      assert.equal(points.length, 2);
+      for (const link of points)
+        assert.equal(graph.target(link), "src/a.ts#Point");
+    },
+  );
+});

@@ -3150,6 +3150,19 @@ uses the importer's own conditions and workspace route. Invalid extracted
 source ranges fail the affected file through the compiler session's
 containment path. [C-32](changes/C-32.md)
 
+### C-39 Configs extended by package name; const assertions
+
+A package-name `extends` whose base is installed as a workspace link into
+the checkout is read like any other base: its settings are complete unless
+it is unreadable (6053/5083) or its JSON has syntax errors. A const
+assertion (`as const`, `<const>x`) is not a reference and stores no link. A
+manifest range the compiler's semver parser throws on is an unknown range:
+it identifies the registry dependency and never yields a version pin.
+Keeping a library target beside an unread file (item 4 of the change) was
+split out to C-51. Here, a program with an unread file withholds library
+targets as before (C-13).
+[C-39](changes/C-39.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000

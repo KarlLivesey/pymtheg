@@ -136,8 +136,11 @@ function registryDependency(name: string, value: string) {
   const actual = alias ? alias[1]! : name;
   const range = alias ? (alias[2] ?? "*") : value;
   const unit = registryUnit(actual);
-  return unit && registryRange(range)
-    ? { unit: unit.unit, range, alias: !!alias }
+  const known = registryRange(range);
+  // An unknown range still identifies the registry dependency by its unit,
+  // but never yields a version pin.
+  return unit && known
+    ? { unit: unit.unit, range, alias: !!alias, rangeKnown: known === "known" }
     : undefined;
 }
 
@@ -554,11 +557,14 @@ export function libraryReader(
         if (!first || rest.some((entry) => entry?.unit !== first.unit))
           return undefined;
         const pin =
+          first.rangeKnown &&
           first.range.length <= 256 &&
           exactVersion.test(first.range) &&
           rest.every(
             (entry) =>
-              entry?.range === first.range && entry.source === first.source,
+              entry?.rangeKnown &&
+              entry.range === first.range &&
+              entry.source === first.source,
           )
             ? { version: first.range, versionSource: first.source }
             : undefined;
