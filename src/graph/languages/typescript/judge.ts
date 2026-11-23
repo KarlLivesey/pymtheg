@@ -78,21 +78,37 @@ const SAME_CLASS_OVERLOADS = true;
 
 /**
  * C-47: the most steps one judgement may take, and the deepest nesting of
- * type and expression judgements. A step is one type, expression or
- * checker-type judgement actually computed (a memoised answer costs none).
- * Without a bound, a recursive generic type whose judgement meets a cycle
- * (and so is not memoised) is judged again at every level: work that grows
- * exponentially. The count depends only on the source and on the judgements
- * made before it in the same program, which the module makes in a fixed
- * order. The depth bound keeps the judgement below the stack limit, whose
- * overflow is not deterministic.
+ * its recursive paths (type, expression, taint check and key). A step is one
+ * type, expression, taint check or checker-type judgement actually computed
+ * (a memoised answer costs none). Every answer that does not depend on a
+ * judgement still in progress is memoised for the program, so the work is
+ * proportional to the distinct judgements reached; the bounds are the
+ * backstop. The counts depend only on the source and on the judgements made
+ * before in the same program, which the module makes in a fixed order. The
+ * depth bound counts every recursive path of the judgement, so a deep
+ * judgement ends at the count, not at the engine's stack; the checker's own
+ * recursion is not counted, and a stack overflow inside it counts as the
+ * depth bound.
  */
 export const JUDGE_BUDGET = 200_000;
+/**
+ * C-47: the most judgement steps one program's judge may take in all. Once it
+ * is reached, every further judgement of the program stops at the bound, so
+ * the worst case is bounded in total, not per link.
+ */
+export const JUDGE_PROGRAM_BUDGET = 8_000_000;
 export const JUDGE_DEPTH = 100;
-/** Budgets other than JUDGE_BUDGET, per checker (a test passes one in). */
+/** Budgets other than the defaults, per checker (a test passes them in). */
 const judgeBudgetFor = new WeakMap<ts.TypeChecker, number>();
+const judgeProgramBudgetFor = new WeakMap<ts.TypeChecker, number>();
 export function setJudgeBudget(checker: ts.TypeChecker, steps: number): void {
   judgeBudgetFor.set(checker, steps);
+}
+export function setJudgeProgramBudget(
+  checker: ts.TypeChecker,
+  steps: number,
+): void {
+  judgeProgramBudgetFor.set(checker, steps);
 }
 /** Observation counters: judgements, the most steps one took, judgements stopped. */
 export const judgeStatistics = {
@@ -192,15 +208,26 @@ export function createJudge(input: JudgeInput): Judge {
   // C-47: steps spent by the current judgement, its nesting, and whether a
   // public entry point is running (nested entries share one count).
   const budget = judgeBudgetFor.get(checker) ?? JUDGE_BUDGET;
+  const programBudget =
+    judgeProgramBudgetFor.get(checker) ?? JUDGE_PROGRAM_BUDGET;
+  let programSpent = 0;
   let spent = 0;
   let depth = 0;
   let entries = 0;
   const charge = (steps: number) => {
     spent += steps;
-    if (spent > budget) throw new JudgeLimit("steps");
+    programSpent += steps;
+    if (spent > budget || programSpent > programBudget)
+      throw new JudgeLimit("steps");
   };
   function nested<T>(run: () => T): T {
     charge(1);
+    return deeper(run);
+  }
+  // Every recursive path of the judgement counts its nesting here (type,
+  // expression, taint and key), so the bound, not the engine's stack, ends
+  // a deep judgement.
+  function deeper<T>(run: () => T): T {
     if (++depth > judgeStatistics.maxDepth) judgeStatistics.maxDepth = depth;
     if (depth > JUDGE_DEPTH) {
       depth--;
@@ -217,6 +244,9 @@ export function createJudge(input: JudgeInput): Judge {
       if (entries++ === 0) {
         spent = 0;
         depth = 0;
+        flight = 0;
+        lowest = Infinity;
+        lowestValue = Infinity;
         judgeStatistics.judgements++;
       }
       try {
@@ -276,32 +306,80 @@ export function createJudge(input: JudgeInput): Judge {
     if (!flat.length) return CLEAN;
     return flat.length === 1 ? flat[0]! : { k: "union", parts: flat };
   }
-  // A judgement that met a cycle (a value that depends on itself) is not
-  // memoised, so no answer depends on the order of evaluation.
-  let cycles = 0;
+  // C-47: every judgement in progress (a bound value, an expression, a type
+  // parameter's constraint, a key, a taint check) has an index on one stack.
+  // Re-entering one is a cycle, answered provisionally ("depends on itself",
+  // or "not tainted" in the taint check). An answer that consulted an entry
+  // in progress is provisional until that entry finishes, so it is memoised
+  // only if everything it consulted began after it: as in Tarjan's
+  // algorithm, the root of a strongly connected group settles the group's
+  // cycles, and its own answer is memoised when it finishes. No memoised
+  // answer depends on the order of evaluation, and a self-dependence costs
+  // one evaluation, not one per question.
+  let flight = 0;
+  /** The lowest index the current computation consulted (Infinity: none). */
+  let lowest = Infinity;
+  /** The same, counting only provisional answers other than the taint check's "not tainted". */
+  let lowestValue = Infinity;
+  const hit = (index: number, taintOnly = false) => {
+    lowest = Math.min(lowest, index);
+    if (!taintOnly) lowestValue = Math.min(lowestValue, index);
+  };
+  interface Settled<T> {
+    value: T;
+    /** Nothing that began before `start` was consulted. */
+    final: boolean;
+    low: number;
+    lowValue: number;
+  }
+  /** Runs a computation that began at depth `start`. */
+  function settled<T>(start: number, run: () => T): Settled<T> {
+    const outer = lowest;
+    const outerValue = lowestValue;
+    lowest = Infinity;
+    lowestValue = Infinity;
+    try {
+      const value = run();
+      return {
+        value,
+        final: lowest >= start,
+        low: lowest,
+        lowValue: lowestValue,
+      };
+    } finally {
+      lowest = Math.min(outer, lowest >= start ? Infinity : lowest);
+      lowestValue = Math.min(
+        outerValue,
+        lowestValue >= start ? Infinity : lowestValue,
+      );
+    }
+  }
   function lazy(compute: () => Judged): () => Judged {
     let state = 0;
     let value: Judged = CLEAN;
+    let index = -1;
     return () => {
       if (state === 2) return value;
       if (state === 1) {
-        cycles++;
+        hit(index);
         return failed("a type that depends on itself");
       }
       state = 1;
-      const before = cycles;
-      let computed: Judged;
+      index = flight++;
+      let computed: Settled<Judged>;
       try {
-        computed = compute();
+        computed = settled(index, compute);
       } catch (error) {
         state = 0;
         throw error;
+      } finally {
+        flight--;
       }
-      if (cycles === before) {
-        value = computed;
+      if (computed.final) {
+        value = computed.value;
         state = 2;
       } else state = 0;
-      return computed;
+      return computed.value;
     };
   }
   const typeParametersOf = (
@@ -399,12 +477,69 @@ export function createJudge(input: JudgeInput): Judge {
     if (id === undefined) ids.set(value, (id = nextId++));
     return id;
   };
+  // C-47: the type parameters a node's judgement can read from its
+  // environment: those it names. A name declared inside a function or
+  // class can name that scope's parameters too, so such a node reads all.
+  const namedParameters = new WeakMap<ts.Node, Set<ts.Symbol> | null>();
+  function parametersNamed(node: ts.Node): Set<ts.Symbol> | null {
+    const known = namedParameters.get(node);
+    if (known !== undefined) return known;
+    let named: Set<ts.Symbol> | null = new Set();
+    const visit = (child: ts.Node): void => {
+      if (!named) return;
+      // A type query judges its expression, which reads no type parameter.
+      if (ts.isTypeQueryNode(child)) {
+        child.typeArguments?.forEach(visit);
+        return;
+      }
+      if (ts.isIdentifier(child)) {
+        const symbol = symbolAt(child);
+        if (symbol && symbol.flags & ts.SymbolFlags.TypeParameter)
+          named.add(symbol);
+        else if (symbol)
+          for (const declaration of resolved(symbol).declarations ?? [])
+            if (
+              !ts.isTypeParameterDeclaration(declaration) &&
+              ts.findAncestor(
+                declaration.parent,
+                (up) =>
+                  ts.isSourceFile(up) ||
+                  ts.isFunctionLike(up) ||
+                  ts.isClassLike(up),
+              )?.kind !== ts.SyntaxKind.SourceFile
+            ) {
+              named = null;
+              return;
+            }
+        return;
+      }
+      ts.forEachChild(child, visit);
+    };
+    visit(node);
+    namedParameters.set(node, named);
+    return named;
+  }
+  /** The bindings of `env` that judging `nodes` can read (all, without nodes). */
+  function relevant(
+    env: Env,
+    nodes: readonly ts.Node[] | undefined,
+  ): [ts.Symbol, () => Judged][] {
+    if (!nodes) return [...env];
+    const named = new Set<ts.Symbol>();
+    for (const node of nodes) {
+      const found = parametersNamed(node);
+      if (!found) return [...env];
+      for (const symbol of found) named.add(symbol);
+    }
+    return [...env].filter(([symbol]) => named.has(symbol));
+  }
   // A bound value is compared by its own key, so a reference judged again
-  // (`DefaultContext<Arg<T, P>>`, a new literal each time) still matches. The
-  // keys end at the original, non-recursive bindings; a value whose key is
-  // being computed falls back to its identity.
+  // (`DefaultContext<Arg<T, P>>`, a new literal each time) still matches. A
+  // literal's or function's key holds only the bindings its type nodes name.
   const keys = new WeakMap<Judged, string>();
-  const computingKey = new Set<Judged>();
+  // A value whose key is being computed is named by its identity; a key
+  // that consulted one begun before it is not cached.
+  const computingKey = new Map<Judged, number>();
   function cycleKey(judged: Judged): Judged | string {
     switch (judged.k) {
       case "clean":
@@ -427,63 +562,129 @@ export function createJudge(input: JudgeInput): Judge {
     }
     const known = keys.get(judged);
     if (known !== undefined) return known;
-    if (computingKey.has(judged)) return `#${idOf(judged)}`;
-    computingKey.add(judged);
+    const at = computingKey.get(judged);
+    if (at !== undefined) {
+      hit(at);
+      return `#${idOf(judged)}`;
+    }
+    const index = flight++;
+    computingKey.set(judged, index);
     try {
-      const valueKey = (value: Judged): string => {
-        const key = cycleKey(value);
-        return typeof key === "string" ? `(${key})` : `#${idOf(key)}`;
-      };
-      if (judged.k === "union" || judged.k === "tuple") {
-        const parts =
-          judged.k === "union"
-            ? judged.parts.map(valueKey).sort()
-            : [...judged.elements, judged.rest ?? CLEAN].map(valueKey);
-        const key = `${judged.k}[${parts.join(",")}]`;
-        keys.set(judged, key);
-        return key;
-      }
-      if (
-        judged.k !== "literal" &&
-        judged.k !== "function" &&
-        judged.k !== "object"
-      )
-        return judged;
-      const anchor =
-        judged.k === "literal"
-          ? judged.node
-          : judged.k === "function"
-            ? judged.decls[0]
-            : judged.symbol;
-      const bindings = [...judged.env]
-        .map(([symbol, value]) => `${idOf(symbol)}=${valueKey(value())}`)
-        .sort()
-        .join(",");
-      const self = "self" in judged && judged.self ? valueKey(judged.self) : "";
-      const key = `${judged.k}:${idOf(anchor)}:${self}:${bindings}`;
-      keys.set(judged, key);
-      return key;
+      const computed = settled(index, () => deeper(() => keyOf(judged)));
+      if (computed.final && typeof computed.value === "string")
+        keys.set(judged, computed.value);
+      return computed.value;
     } finally {
       computingKey.delete(judged);
+      flight--;
     }
   }
-  // C-47: the checks in progress, across nested `tainted` calls (a type-level
-  // computation starts its own). Re-entering one is a cycle: the answer comes
-  // from the other parts of the outer check.
-  const inProgressTaint = new Set<Judged | string>();
-  function tainted(judged: Judged, seen = new Set<Judged | string>()): boolean {
+  function keyOf(judged: Judged): Judged | string {
+    if (judged.k === "union" || judged.k === "tuple") {
+      const parts =
+        judged.k === "union"
+          ? // A union's taint is any part's: a repeated part adds nothing
+            // (`A & B & B`, which an expanding type builds level by level).
+            [...new Set(judged.parts.map(valueKeyOf))].sort()
+          : [...judged.elements, judged.rest ?? CLEAN].map(valueKeyOf);
+      return `${judged.k}[${parts.join(",")}]`;
+    }
+    if (
+      judged.k !== "literal" &&
+      judged.k !== "function" &&
+      judged.k !== "object"
+    )
+      return judged;
+    // A function is its whole set of declarations (an overload subset is
+    // a different function).
+    const anchor =
+      judged.k === "literal"
+        ? `${idOf(judged.node)}`
+        : judged.k === "function"
+          ? judged.decls.map(idOf).join("+")
+          : `${idOf(judged.symbol)}`;
+    // The taint of a literal or function reads its declared type nodes.
+    const bindings = relevant(
+      judged.env,
+      judged.k === "literal"
+        ? judged.node.members.flatMap(typeNodesOf)
+        : judged.k === "function"
+          ? judged.decls.flatMap(typeNodesOf)
+          : undefined,
+    )
+      .map(([symbol, value]) => `${idOf(symbol)}=${valueKeyOf(value())}`)
+      .sort()
+      .join(",");
+    const self = "self" in judged && judged.self ? valueKeyOf(judged.self) : "";
+    return `${judged.k}:${anchor}:${self}:${bindings}`;
+  }
+  // C-47: the taint of a judgement is computed once per program and
+  // memoised by its key, under the rule above. Re-entering a check in
+  // progress answers "not tainted" for now (the answer comes from the other
+  // parts of the outer check). "Tainted" is final at once unless a value
+  // judged in progress was consulted (a failed part was found). "Not
+  // tainted" that consulted only taint checks in progress is final for its
+  // whole group when the group's root finishes not tainted; meanwhile it is
+  // answered from `pending`.
+  const taintMemo = new Map<string, boolean>();
+  const taintIndex = new Map<Judged | string, number>();
+  const pending = new Map<string, number>();
+  const pendingOrder: string[] = [];
+  function tainted(judged: Judged): boolean {
     charge(1);
-    const key = cycleKey(judged);
-    if (seen.has(key) || inProgressTaint.has(key)) return false;
-    seen.add(key);
-    inProgressTaint.add(key);
-    try {
-      return taintedParts(judged, seen);
-    } finally {
-      inProgressTaint.delete(key);
+    const keyed = settled(flight, () => cycleKey(judged));
+    const key = keyed.value;
+    const memoKey = keyed.final && typeof key === "string" ? key : undefined;
+    if (memoKey !== undefined) {
+      const known = taintMemo.get(memoKey);
+      if (known !== undefined) return known;
     }
+    const at =
+      taintIndex.get(key) ??
+      (memoKey !== undefined ? pending.get(memoKey) : undefined);
+    if (at !== undefined) {
+      hit(at, true);
+      return false;
+    }
+    const index = flight++;
+    taintIndex.set(key, index);
+    const pendingFrom = pendingOrder.length;
+    let checked: Settled<boolean>;
+    try {
+      checked = settled(index, () => deeper(() => taintedParts(judged)));
+    } catch (error) {
+      for (const entry of pendingOrder.splice(pendingFrom))
+        pending.delete(entry);
+      throw error;
+    } finally {
+      taintIndex.delete(key);
+      flight--;
+    }
+    const { value: result, final } = checked;
+    // The groups rooted here are finished: their members' "not tainted" is
+    // final if this check is final and not tainted, and open again otherwise.
+    let kept = pendingFrom;
+    for (let i = pendingFrom; i < pendingOrder.length; i++) {
+      const entry = pendingOrder[i]!;
+      if (pending.get(entry)! < index) {
+        pendingOrder[kept++] = entry;
+        continue;
+      }
+      pending.delete(entry);
+      if (final && !result) taintMemo.set(entry, false);
+    }
+    pendingOrder.length = kept;
+    if (memoKey !== undefined) {
+      if (final || (result && checked.lowValue >= index))
+        taintMemo.set(memoKey, result);
+      else if (!result && checked.lowValue >= index) {
+        pending.set(memoKey, checked.low);
+        pendingOrder.push(memoKey);
+      }
+    }
+    return result;
   }
-  function taintedParts(judged: Judged, seen: Set<Judged | string>): boolean {
+  function taintedParts(judged: Judged): boolean {
     switch (judged.k) {
       case "clean":
       case "checked":
@@ -497,7 +698,7 @@ export function createJudge(input: JudgeInput): Judge {
           typeParametersOf(judged.symbol).some((parameter) => {
             const symbol = symbolAt(parameter.name);
             const value = symbol && judged.env.get(symbol);
-            return !!value && tainted(value(), seen);
+            return !!value && tainted(value());
           })
         );
       case "literal":
@@ -509,7 +710,6 @@ export function createJudge(input: JudgeInput): Judge {
                 self: judged.self,
                 visiting: NONE,
               }),
-              seen,
             ),
           ),
         );
@@ -522,21 +722,20 @@ export function createJudge(input: JudgeInput): Judge {
                 self: judged.self,
                 visiting: NONE,
               }),
-              seen,
             ),
           ),
         );
       case "objectLiteral":
         return judged.node.properties.some((property) =>
-          tainted(declaration(property, EMPTY, undefined), seen),
+          tainted(declaration(property, EMPTY, undefined)),
         );
       case "static":
         return input.memberSetTainted(judged.symbol) || seed(judged.symbol);
       case "union":
-        return judged.parts.some((part) => tainted(part, seen));
+        return judged.parts.some((part) => tainted(part));
       case "tuple":
         return [...judged.elements, judged.rest ?? CLEAN].some((element) =>
-          tainted(element, seen),
+          tainted(element),
         );
     }
   }
@@ -927,7 +1126,42 @@ export function createJudge(input: JudgeInput): Judge {
    * anywhere inside it is tainted under the environment; otherwise its
    * inputs are clean and the checker's answer stands (R-2).
    */
+  // C-47: a computation's judgement depends only on its node, its
+  // environment, `self` and the aliases being expanded (a recursive alias's
+  // rule reads every bound value), so it is memoised per program by those,
+  // unless it met a value or a taint check in progress outside itself.
+  const computations = new Map<string, Judged>();
+  const valueKeyOf = (value: Judged): string => {
+    const key = cycleKey(value);
+    return typeof key === "string" ? `(${key})` : `#${idOf(key)}`;
+  };
   function computation(node: ts.TypeNode, context: TypeContext): Judged {
+    if (context.at) return computationUncached(node, context);
+    const start = flight;
+    const keyed = settled(start, () =>
+      [
+        idOf(node),
+        context.self ? valueKeyOf(context.self) : "",
+        [...context.visiting].map(idOf).sort().join(","),
+        relevant(context.env, [node])
+          .map(([symbol, value]) => `${idOf(symbol)}=${valueKeyOf(value())}`)
+          .sort()
+          .join(","),
+      ].join("|"),
+    );
+    if (keyed.final) {
+      const known = computations.get(keyed.value);
+      if (known) return known;
+    }
+    const computed = settled(start, () => computationUncached(node, context));
+    if (keyed.final && computed.final)
+      computations.set(keyed.value, computed.value);
+    return computed.value;
+  }
+  function computationUncached(
+    node: ts.TypeNode,
+    context: TypeContext,
+  ): Judged {
     let found = false;
     const inside = { ...context, at: undefined };
     const visit = (child: ts.Node): void => {
@@ -1045,8 +1279,13 @@ export function createJudge(input: JudgeInput): Judge {
       return typeParameter(symbol, context);
     const alias = symbol.declarations.find(ts.isTypeAliasDeclaration);
     if (alias) {
+      // C-47: a recursive reference's inputs are its own type arguments
+      // (the alias's body names nothing else that varies); the rest of the
+      // alias is judged at its first expansion.
       if (context.visiting.has(alias))
-        return [...context.env.values()].some((value) => tainted(value()))
+        return (args ?? []).some((argument) =>
+          tainted(type(argument, { ...context, at: undefined })),
+        )
           ? failed("a recursive type alias over a tainted input")
           : CLEAN;
       if (ALIAS_LIMIT && context.visiting.size >= ALIAS_LIMIT) return CLEAN;
@@ -1068,7 +1307,7 @@ export function createJudge(input: JudgeInput): Judge {
       return CLEAN;
     return unhandled(DENY_TYPE, "type", `reference to ${symbol.name}`);
   }
-  const resolvingParameters = new Set<ts.Symbol>();
+  const resolvingParameters = new Map<ts.Symbol, number>();
   function typeParameter(symbol: ts.Symbol, context: TypeContext): Judged {
     if (TYPE_PARAMETERS === "all") return failed("a type parameter");
     if (TYPE_PARAMETERS === "none") return CLEAN;
@@ -1076,9 +1315,10 @@ export function createJudge(input: JudgeInput): Judge {
     if (bound) return bound();
     // Unbound (abstract, as inside its own declaration): its constraint.
     // Re-entered through its own constraint: that occurrence adds no input
-    // the outer one does not already have (not memoised: a cycle).
-    if (resolvingParameters.has(symbol)) {
-      cycles++;
+    // the outer one does not already have (provisional: a cycle).
+    const at = resolvingParameters.get(symbol);
+    if (at !== undefined) {
+      hit(at);
       return CLEAN;
     }
     const declaration = symbol.declarations?.find(
@@ -1089,15 +1329,31 @@ export function createJudge(input: JudgeInput): Judge {
       (declaration.constraint ??
         ts.getEffectiveConstraintOfTypeParameter(declaration));
     if (!constraint) return CLEAN;
-    resolvingParameters.add(symbol);
+    const index = flight++;
+    resolvingParameters.set(symbol, index);
     try {
-      return type(constraint, { ...context, at: undefined });
+      return settled(index, () =>
+        type(constraint, { ...context, at: undefined }),
+      ).value;
     } finally {
       resolvingParameters.delete(symbol);
+      flight--;
     }
   }
-  /** A type the checker derived from untainted inputs. */
+  /**
+   * A type the checker derived from untainted inputs. C-47: one judgement
+   * per checker type, so a recursive type (`ReactNode`, which contains
+   * `Iterable<ReactNode>`) meets itself again by identity.
+   */
+  const fromTypes = new Map<ts.Type, Judged>();
   function fromType(target: ts.Type): Judged {
+    const known = fromTypes.get(target);
+    if (known) return known;
+    const judged = fromTypeUncached(target);
+    fromTypes.set(target, judged);
+    return judged;
+  }
+  function fromTypeUncached(target: ts.Type): Judged {
     charge(1);
     const primitive =
       ts.TypeFlags.Any |
@@ -1171,25 +1427,29 @@ export function createJudge(input: JudgeInput): Judge {
 
   // ---------------- expressions ----------------
   const expressions = new Map<ts.Node, Judged>();
-  const inProgress = new Set<ts.Node>();
+  const inProgress = new Map<ts.Node, number>();
   function expression(node: ts.Expression | ts.QualifiedName): Judged {
     const known = expressions.get(node);
     if (known) return known;
-    if (inProgress.has(node)) {
-      cycles++;
+    const at = inProgress.get(node);
+    if (at !== undefined) {
+      hit(at);
       return failed("an expression that depends on itself");
     }
-    inProgress.add(node);
-    const before = cycles;
+    const index = flight++;
+    inProgress.set(node, index);
     try {
       const handler = EXPRESSIONS.get(node.kind);
-      const judged = handler
-        ? nested(() => handler(node, undefined))
-        : unhandled(DENY_EXPRESSION, "expression", kindName(node.kind));
-      if (cycles === before) expressions.set(node, judged);
-      return judged;
+      const judged = settled(index, () =>
+        handler
+          ? nested(() => handler(node, undefined))
+          : unhandled(DENY_EXPRESSION, "expression", kindName(node.kind)),
+      );
+      if (judged.final) expressions.set(node, judged.value);
+      return judged.value;
     } finally {
       inProgress.delete(node);
+      flight--;
     }
   }
   const clean = () => CLEAN;
@@ -1991,9 +2251,7 @@ export function createJudge(input: JudgeInput): Judge {
     return invoke(expression(node.expression), node, true);
   }
   type Call =
-    | ts.CallExpression
-    | ts.NewExpression
-    | ts.TaggedTemplateExpression;
+    ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression;
   const argumentsOf = (call: Call): readonly ts.Expression[] =>
     ts.isTaggedTemplateExpression(call) ? [] : (call.arguments ?? []);
   function invoke(callee: Judged, call: Call, construct: boolean): Judged {
@@ -2009,10 +2267,11 @@ export function createJudge(input: JudgeInput): Judge {
   ): Prepared | Judged {
     const known = prepared.get(call);
     if (known) return known;
-    const before = cycles;
-    const result = prepareUncached(callee, call, construct);
-    if (cycles === before) prepared.set(call, result);
-    return result;
+    const result = settled(flight, () =>
+      prepareUncached(callee, call, construct),
+    );
+    if (result.final) prepared.set(call, result.value);
+    return result.value;
   }
   function prepareUncached(
     callee: Judged,

@@ -25,7 +25,7 @@ import { libraryKey, libraryReader } from "./library.js";
 import type { ProjectGroup } from "./project.js";
 import type { Renamed } from "./rename.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
-import { setJudgeBudget } from "./judge.js";
+import { setJudgeBudget, setJudgeProgramBudget } from "./judge.js";
 import { neutralizeAssumed } from "./untrusted.js";
 import { entryProvenance } from "./workspace-entries.js";
 import { unbuiltEntryAssumption } from "./entry-build.js";
@@ -61,6 +61,8 @@ export interface TypeScriptModuleOptions {
   taintSteps?: number;
   /** C-47: the structural judgement's step budget (judge.ts JUDGE_BUDGET). */
   judgeSteps?: number;
+  /** C-47: the judge's step budget for a whole program (JUDGE_PROGRAM_BUDGET). */
+  judgeProgramSteps?: number;
   /** The program budget in characters (project.ts; MAX_PROGRAM_SOURCE otherwise). */
   programCharacters?: number;
   /** Called before every checker call the module makes; may throw. */
@@ -234,6 +236,8 @@ function openSession(
         setTaintBudget(checker, hooks.taintSteps);
       if (hooks.judgeSteps !== undefined)
         setJudgeBudget(checker, hooks.judgeSteps);
+      if (hooks.judgeProgramSteps !== undefined)
+        setJudgeProgramBudget(checker, hooks.judgeProgramSteps);
       return { program, checker };
     } catch (error) {
       lastProgram = program;
@@ -252,8 +256,7 @@ function openSession(
   });
   /** Builds a program and its checker, or says what was thrown. */
   const attempt = ():
-    | { program: ts.Program; checker: ts.TypeChecker }
-    | Thrown => {
+    { program: ts.Program; checker: ts.TypeChecker } | Thrown => {
     try {
       return compile();
     } catch (error) {
@@ -1645,8 +1648,7 @@ export function typescriptModule(
                   ...((link.data ?? {}) as { [key: string]: Json }),
                 };
                 const outside = data.libraryFacts as unknown as
-                  | LibraryTarget[]
-                  | undefined;
+                  LibraryTarget[] | undefined;
                 if (
                   data.reason === "invalid-code" ||
                   (outside?.length &&

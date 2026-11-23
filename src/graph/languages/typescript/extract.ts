@@ -875,8 +875,7 @@ export function extractFile(
       return { targets: [], reason: found.reason ?? "no-symbol", receiver };
     const facts = new Map<string, TargetFact>();
     let libraryFacts:
-      | Map<string | ts.Symbol | ts.Declaration, LibraryTarget>
-      | undefined;
+      Map<string | ts.Symbol | ts.Declaration, LibraryTarget> | undefined;
     let external = 0;
     let local = 0;
     let viaAlias = false;
@@ -1360,7 +1359,9 @@ export function extractFile(
         }
       }
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no failed member set": it is unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(taint, "the receiver's member set");
     }
     const files = causesOf(membership);
     if (!files) return undefined;
@@ -1421,7 +1422,13 @@ export function extractFile(
     try {
       visit(receiver);
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no tainted name": it is unknown, so the
+      // receiver is judged (and fails at the bound if the judgement does).
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(
+        taint,
+        "whether a name in the receiver is tainted",
+      );
     }
     return found;
   }
@@ -1437,7 +1444,7 @@ export function extractFile(
     } catch (error) {
       // C-47: an overflow is not "does not reach": the dependence is unknown.
       if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
-      const causes = causesOf(programFailedFiles());
+      const causes = causesOf(programFailedFiles(taint));
       return (
         causes && {
           causes,
@@ -1448,11 +1455,27 @@ export function extractFile(
     const causes = causesOf(files);
     return causes && { causes, via: "the receiver depends on the failed file" };
   }
-  /** C-47: every failed file of this program, and every file a failed name is declared in. */
+  /** C-47: a dependence a bound left unknown: every failed file, with the bound. */
+  function unknownDependence(
+    taint: Taint,
+    what: string,
+  ): Dependence | undefined {
+    const causes = causesOf(programFailedFiles(taint));
+    return (
+      causes && { causes, via: `${what} is unknown: ${JUDGE_BOUND_REASON}` }
+    );
+  }
+  /**
+   * C-47: every failed file of this program, every failed file its bindings
+   * reach (a failed file is not itself in the program), and every file a
+   * failed name is declared in.
+   */
   let failedInProgram: string[] | undefined;
-  function programFailedFiles(): string[] {
+  function programFailedFiles(taint: Taint): string[] {
     if (!failedInProgram) {
       const files = new Set<string>();
+      for (const causes of taint.all.values())
+        for (const file of causes) files.add(file);
       for (const source of program.getSourceFiles()) {
         const path = fromVirtual(source.fileName);
         if (path !== undefined && context.moduleKind(path) === "invalid")
@@ -1597,7 +1620,7 @@ export function extractFile(
         }
     };
     try {
-      for (let node: ts.Node | undefined = receiver; node; ) {
+      for (let node: ts.Node | undefined = receiver; node;) {
         if (ts.isIdentifier(node) || ts.isPrivateIdentifier(node)) {
           const symbol = checker.getSymbolAtLocation(node);
           symbolCauses(symbol, "receiver");
@@ -1680,7 +1703,9 @@ export function extractFile(
         symbolCauses(part.aliasSymbol, "type");
       }
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no cause": the causes are unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(taint, "the receiver's causes");
     }
     const found = causesOf(causes);
     if (found) return { causes: found, via: via! };
@@ -2835,7 +2860,7 @@ export function extractFile(
         } catch (error) {
           // C-47: an overflow is not "depends on none": the dependence is unknown.
           if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
-          files = causesOf(programFailedFiles());
+          files = causesOf(programFailedFiles(taint));
           unknown = true;
         }
         if (files)
