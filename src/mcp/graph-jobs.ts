@@ -152,7 +152,9 @@ export class GraphJobs {
     return job;
   }
   /**
-   * Cancels a job (C-43 review). The worker is asked to abort first: its
+   * Cancels a job (C-54). The job's recorded process groups are killed at
+   * once by this server, so no child outlives a cancel whatever the worker
+   * does. The worker is also asked to abort: its
    * abort signal kills the process groups it is waiting on and lets the
    * toolchain route remove its run folder; the worker answers `aborted`
    * once the command has settled. The server waits for that answer only
@@ -169,8 +171,13 @@ export class GraphJobs {
     const job = this.get(id);
     if (!job.exited) {
       job.state = "cancelled";
+      const live = liveChildGroups(job.childGroups).length;
       job.worker.postMessage({ kind: "abort" });
-      if (liveChildGroups(job.childGroups).length) {
+      // The children are killed at once, by this server: none outlives a
+      // cancel, whatever the worker does. A worker that cooperates then sees
+      // its child end, unwinds, removes its folders and answers.
+      killChildGroups(job.childGroups);
+      if (live) {
         const clock = this.controls.clock ?? systemClock;
         let timer: unknown;
         await Promise.race([
