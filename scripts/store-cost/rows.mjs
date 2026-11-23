@@ -3,6 +3,7 @@
 // SHA-256 per table and the row count), so two cold stores can be compared
 // row for row after the stores themselves are deleted.
 //   node scripts/store-cost/rows.mjs <graph.sqlite>
+import "../isolated-home.mjs";
 import { createHash } from "node:crypto";
 import { storeRows } from "../reindex/dump.mjs";
 

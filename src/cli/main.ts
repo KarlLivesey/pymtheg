@@ -86,16 +86,94 @@ try {
     process.exitCode = await (
       await import("../implementation/cli.js")
     ).observeCommand(args.slice(1), cancel.signal);
+  } else if (args[0] === "trust") {
+    // D22: the user's trust answers, kept outside every checkout.
+    const { listTrust, revokeTrust, trustFile } = await import(
+      "../project/local-trust.js"
+    );
+    // --format takes a value (text or json); every other argument is positional.
+    const rest: string[] = [];
+    for (let i = 1; i < args.length; i++)
+      if (args[i] === "--format") {
+        if (!["text", "json"].includes(args[i + 1] ?? ""))
+          throw Error("Trust format must be text or json");
+        i++;
+      } else rest.push(args[i]!);
+    if (rest[0] === "--revoke") {
+      if (rest.length > 2)
+        throw Error("Usage: pymtheg trust --revoke [DIRECTORY]");
+      const target = resolve(rest[1] ?? ".");
+      const removed = await revokeTrust(target);
+      process.stdout.write(
+        removed
+          ? `Removed the trust answer for ${target}. The next init asks again; until then no build tool runs on it.\n`
+          : `No trust answer is recorded for ${target}.\n`,
+      );
+    } else if (rest.length === 0 || rest[0] === "--list") {
+      const answers = await listTrust();
+      if (wantsJson) process.stdout.write(json({ file: trustFile(), answers }));
+      else
+        process.stdout.write(
+          [
+            `Trust answers (${trustFile()}):`,
+            ...(answers.length
+              ? answers.map(
+                  (a) =>
+                    `  ${a.trust === "trusted" ? "trusted    " : "source only"}  ${a.root}`,
+                )
+              : ["  none"]),
+            "",
+          ].join("\n"),
+        );
+    } else
+      throw Error(
+        "Usage: pymtheg trust [--list] | pymtheg trust --revoke [DIRECTORY]",
+      );
   } else if (args[0] === "init") {
+    const { askTrust } = await import("../project/trust.js");
+    const { findWorkspace, checkoutTrust } = await import(
+      "../project/workspace.js"
+    );
+    /**
+     * D22: this machine's trust answer, asked when the checkout has none
+     * (a new project, or a clone of an initialised one). A flag answers it;
+     * a terminal is asked; with neither, source only is recorded and said.
+     * A committed "source-only" binds, so nothing is asked.
+     */
+    const initTrust = async (
+      directory: string,
+      flag: "trusted" | "source-only" | undefined,
+    ): Promise<{
+      answer?: "trusted" | "source-only";
+      asked?: "terminal" | "no-terminal";
+    }> => {
+      if (flag) return { answer: flag };
+      const existing = await findWorkspace(directory).catch(() => null);
+      if (existing && (await checkoutTrust(existing.root)) !== "unanswered")
+        return {};
+      if (process.stdin.isTTY && process.stderr.isTTY)
+        return {
+          answer: await askTrust(process.stdin, process.stderr, cancel.signal),
+          asked: "terminal",
+        };
+      return { answer: "source-only", asked: "no-terminal" };
+    };
     const { setupProject } = await import("../project/setup.js");
     const values = new Map<string, string>();
     let directory: string | undefined;
     let importDocs = false;
     let allowBrokenLinks = false;
+    // D22: the trust answer, given by flag instead of the prompt.
+    let trustFlag: "trusted" | "source-only" | undefined;
     for (let i = 1; i < args.length; i++) {
       const key = args[i]!;
       if (key === "--allow-broken-links") {
         allowBrokenLinks = true;
+        continue;
+      }
+      if (key === "--trust" || key === "--source-only") {
+        if (trustFlag) throw Error("Choose one of --trust and --source-only");
+        trustFlag = key === "--trust" ? "trusted" : "source-only";
         continue;
       }
       if (key === "--import-docs") {
@@ -123,12 +201,26 @@ try {
       !["text", "json"].includes(values.get("--format")!)
     )
       throw Error("Init format must be text or json");
+    // Ask only when this checkout has no answer on this machine: re-running
+    // init never changes a recorded one.
+    let trust: Awaited<ReturnType<typeof initTrust>>;
+    try {
+      trust = await initTrust(directory ?? ".", trustFlag);
+    } catch (error) {
+      const { TrustCancelled } = await import("../project/trust.js");
+      if (!(error instanceof TrustCancelled)) throw error;
+      // Ctrl-C at the question: say so, write nothing, exit 130.
+      process.stderr.write(`\n${error.message}\n`);
+      process.exit(130);
+    }
     const response = await setupProject(
       directory ?? ".",
       values.get("--name"),
       importDocs,
       cancel.signal,
       {
+        ...(trust.answer ? { trust: trust.answer } : {}),
+        ...(trust.asked === "no-terminal" ? { defaulted: true } : {}),
         allowBrokenLinks,
         resolutions: values.has("--resolutions")
           ? (await import("../architecture/schema.js")).importResolutionSchema
@@ -155,6 +247,9 @@ try {
             ...(initialized.filesCreated.length
               ? [`Created: ${initialized.filesCreated.join(", ")}`]
               : []),
+            initialized.trust === "unanswered"
+              ? (await import("../project/trust.js")).trustAnswerHow
+              : `${trust.asked === "no-terminal" && initialized.trustRecorded ? "No terminal to ask whether you trust this repository, so recorded source only. " : ""}${(await import("../project/trust.js")).trustSummary(initialized.trust)} Kept for this checkout in your own Pymtheg configuration, never in the repository; pymtheg trust lists answers and --revoke removes one.`,
             "Commit .pymtheg/project.json, .pymtheg/settings.json and .pymtheg/.gitignore with your designs.",
             "Planning/history in .pymtheg/shared/ and caches in .pymtheg/rebuildable/ stay local and ignored; share planning by exported history.",
             `Next: ${identity.cli} doctor`,

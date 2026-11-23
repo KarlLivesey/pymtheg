@@ -52,9 +52,13 @@ async function equalAfterEveryStep(
   for (const [path, text] of Object.entries(files)) write(path, text);
   const incremental = new SqliteGraphStore(join(base, "incremental.sqlite"));
   const compared = [];
+  // The work counters of the latest incremental index, for step checks.
+  let work = {};
   try {
     const compare = async (name) => {
+      resetGraphWork();
       await indexProject(root, incrementalRegistry, incremental);
+      work = { ...graphWork.counts };
       const cold = join(base, `cold-${compared.length}.sqlite`);
       const store = new SqliteGraphStore(cold, incremental.projectId);
       try {
@@ -99,7 +103,7 @@ async function equalAfterEveryStep(
       }
       step.edit(tree);
       await compare(step.name);
-      step.check?.(incremental);
+      step.check?.(incremental, work);
       if (omitted) {
         const store = new SqliteGraphStore(faulty);
         try {
@@ -834,6 +838,544 @@ test("Rust: incremental re-index equals a cold index after every kind of edit", 
     steps,
   );
   assert.equal(compared.length, steps.length + 2);
+});
+
+// C-36: a crate whose files read each other's surface.
+const rustWorkspace = {
+  "core/Cargo.toml":
+    '[package]\nname = "shapes_core"\nversion = "0.1.0"\nedition = "2021"\n\n[features]\nx = []\n',
+  "core/src/lib.rs": `#[macro_use]
+mod macros;
+pub mod names;
+pub mod shapes;
+pub mod util;
+
+pub use shapes::Shape;
+
+fn helper() -> u32 {
+    7
+}
+`,
+  "core/src/macros.rs": `macro_rules! double {
+    ($e:expr) => {
+        $e * 2
+    };
+}
+`,
+  "core/src/names.rs": `pub fn unrelated() -> u32 {
+    0
+}
+`,
+  "core/src/shapes.rs": `#[derive(Debug, Clone)]
+pub enum Shape {
+    Circle(u32),
+    Square(u32),
+}
+
+pub struct Point {
+    pub x: u32,
+    pub y: u32,
+    pub shape: Shape,
+}
+
+pub trait Area {
+    fn area(&self) -> u32;
+}
+
+impl Area for Shape {
+    fn area(&self) -> u32 {
+        match self {
+            Shape::Circle(r) => r * 3,
+            Shape::Square(s) => s * s,
+        }
+    }
+}
+
+impl Point {
+    pub fn sum(&self) -> u32 {
+        self.x + self.y
+    }
+}
+
+pub fn make() -> Point {
+    Point { x: 1, y: 2, shape: Shape::Square(1) }
+}
+`,
+  "core/src/util/mod.rs": `mod child;
+
+use crate::shapes::{Area, Shape};
+
+pub fn total(s: &Shape) -> u32 {
+    s.area() + crate::shapes::make().sum() + double!(1) + crate::helper()
+}
+
+pub fn via_field(p: &crate::shapes::Point) -> u32 {
+    p.shape.area()
+}
+
+pub fn classify(s: &Shape) -> u32 {
+    match s {
+        Shape::Circle(_) => 1,
+        Shape::Square(_) => 2,
+    }
+}
+`,
+  "core/src/util/child.rs": `use super::*;
+
+pub fn child(s: &Shape) -> u32 {
+    drop(1);
+    total(s)
+}
+
+pub fn via_root(s: &crate::Shape) -> u32 {
+    crate::shapes::extra_fn() + total(s)
+}
+`,
+};
+const rewrite = (path, from, to) => (t) => {
+  const text = rustWorkspace[path];
+  assert.ok(text.includes(from), `${path} contains ${from}`);
+  t.write(path, text.replace(from, to));
+};
+// Edits whose effect reaches another file. Each must equal a cold index, and
+// each must leave stale rows when only the edited file is re-decided.
+const rustCrossFileEdits = [
+  {
+    name: "add a pub fn another file calls",
+    edit: rewrite(
+      "core/src/shapes.rs",
+      "pub fn make()",
+      "pub fn extra_fn() -> u32 {\n    3\n}\n\npub fn make()",
+    ),
+  },
+  {
+    name: "remove a pub fn",
+    edit: rewrite(
+      "core/src/shapes.rs",
+      "pub fn make() -> Point {\n    Point { x: 1, y: 2, shape: Shape::Square(1) }\n}\n",
+      "",
+    ),
+  },
+  {
+    name: "rename a pub fn",
+    edit: rewrite("core/src/shapes.rs", "pub fn make()", "pub fn build()"),
+  },
+  {
+    name: "rename a private fn a sibling module uses",
+    edit: rewrite("core/src/lib.rs", "fn helper()", "fn assist()"),
+  },
+  {
+    name: "rename a method in an impl",
+    edit: rewrite(
+      "core/src/shapes.rs",
+      "pub fn sum(&self)",
+      "pub fn add(&self)",
+    ),
+  },
+  {
+    name: "rename a trait method with implementors elsewhere",
+    edit: (t) =>
+      t.write(
+        "core/src/shapes.rs",
+        rustWorkspace["core/src/shapes.rs"].replaceAll(
+          "fn area(&self)",
+          "fn surface(&self)",
+        ),
+      ),
+  },
+  {
+    name: "rename an enum variant another file matches",
+    edit: rewrite("core/src/shapes.rs", "    Circle(u32),", "    Round(u32),"),
+  },
+  {
+    name: "rename a struct field",
+    edit: rewrite(
+      "core/src/shapes.rs",
+      "    pub shape: Shape,",
+      "    pub form: Shape,",
+    ),
+  },
+  {
+    name: "change a return type used in a method chain",
+    edit: rewrite(
+      "core/src/shapes.rs",
+      "pub fn make() -> Point {\n    Point { x: 1, y: 2, shape: Shape::Square(1) }\n}",
+      "pub fn make() -> Shape {\n    Shape::Square(2)\n}",
+    ),
+  },
+  {
+    name: "remove a use a child module imports",
+    edit: rewrite(
+      "core/src/util/mod.rs",
+      "use crate::shapes::{Area, Shape};",
+      "use crate::shapes::Area;",
+    ),
+  },
+  {
+    name: "remove a pub use re-export",
+    edit: rewrite("core/src/lib.rs", "pub use shapes::Shape;\n", ""),
+  },
+  {
+    name: "add a glob import that shadows a prelude name",
+    edit: (t) => {
+      t.write(
+        "core/src/names.rs",
+        rustWorkspace["core/src/names.rs"] + "\npub fn drop(_: u32) {}\n",
+      );
+      rewrite(
+        "core/src/util/mod.rs",
+        "mod child;\n",
+        "mod child;\n\npub use crate::names::*;\n",
+      )(t);
+    },
+  },
+  {
+    name: "move a macro_rules! module after the module that uses it",
+    edit: rewrite(
+      "core/src/lib.rs",
+      "#[macro_use]\nmod macros;\npub mod names;\npub mod shapes;\npub mod util;\n",
+      "pub mod names;\npub mod shapes;\npub mod util;\n#[macro_use]\nmod macros;\n",
+    ),
+  },
+  {
+    name: "change a macro_rules! body",
+    edit: rewrite(
+      "core/src/macros.rs",
+      "$e * 2",
+      "$e * $crate::shapes::make().sum()",
+    ),
+  },
+  {
+    name: "add an attribute macro to a declaration",
+    edit: rewrite(
+      "core/src/shapes.rs",
+      "pub struct Point {",
+      "#[shapes_magic::wrap]\npub struct Point {",
+    ),
+  },
+  {
+    name: "add a cfg to a declaration",
+    edit: rewrite(
+      "core/src/shapes.rs",
+      "pub fn make()",
+      '#[cfg(feature = "x")]\npub fn make()',
+    ),
+  },
+  {
+    name: "remove a mod line",
+    edit: rewrite("core/src/lib.rs", "pub mod util;\n", ""),
+  },
+  {
+    name: "make a file unparseable",
+    edit: (t) =>
+      t.write(
+        "core/src/shapes.rs",
+        rustWorkspace["core/src/shapes.rs"] + "\npub fn broken( {\n",
+      ),
+  },
+];
+
+/** Test-only faulty scope: re-decide only the edited files, whatever they changed. */
+const rustNarrowed = (() => {
+  const rust = registry.modules.find((module) => module.id === "rust");
+  return new LanguageRegistry([
+    {
+      ...rust,
+      async analyze(context) {
+        if (!context.previousFiles?.size) return rust.analyze(context);
+        const { previousFiles: _previous, ...full } = context;
+        const files = await rust.analyze(full);
+        return {
+          files: files.filter((file) => context.previousFiles.has(file.path)),
+          resolutionFiles: [...context.previousFiles.keys()],
+        };
+      },
+    },
+  ]);
+})();
+
+test("Rust: comment and body edits re-decide only the edited file", async () => {
+  const scoped = (isomorphic) => (store, work) => {
+    const path = Object.keys(work).filter((key) =>
+      key.startsWith("analyze.rust."),
+    );
+    assert.equal(work["analyze.rust.scopedFiles"], 1, path.join());
+    assert.equal(work["resolve.rust.decisionFiles"], 1);
+    assert.equal(work["analyze.rust.isomorphicScopes"], isomorphic);
+  };
+  const compared = await equalAfterEveryStep(rustWorkspace, [
+    {
+      name: "comment-only edit",
+      edit: (t) =>
+        t.write(
+          "core/src/shapes.rs",
+          "// leading comment\n" + rustWorkspace["core/src/shapes.rs"],
+        ),
+      check: scoped(1),
+    },
+    {
+      name: "body-only edit",
+      edit: rewrite(
+        "core/src/shapes.rs",
+        "    Point { x: 1, y: 2, shape: Shape::Square(1) }",
+        "    let _ = 0;\n    Point { x: 1, y: 2, shape: Shape::Square(1) }",
+      ),
+      check: scoped(1),
+    },
+    {
+      // New calls move no surface link here (the file has no attribute or
+      // later item links), but its old lookups differ from its new ones and
+      // are checked separately.
+      name: "body edit that adds calls",
+      edit: rewrite(
+        "core/src/names.rs",
+        "    0\n",
+        "    let _ = crate::shapes::make().sum();\n    0\n",
+      ),
+      check: scoped(undefined),
+    },
+    {
+      name: "a new export changes the surface",
+      edit: rewrite(
+        "core/src/shapes.rs",
+        "pub fn make()",
+        "pub fn extra_fn() -> u32 {\n    3\n}\n\npub fn make()",
+      ),
+      check: (store, work) => {
+        assert.equal(work["analyze.rust.fullPass.surface"], 1);
+        assert.equal(work["analyze.rust.scopedFiles"], undefined);
+      },
+    },
+    {
+      name: "a new file",
+      edit: (t) => t.write("core/src/orphan.rs", "pub fn orphan() {}\n"),
+      check: (store, work) =>
+        assert.equal(work["analyze.rust.scopedFiles"], undefined),
+    },
+    {
+      name: "delete a file",
+      edit: (t) => t.remove("core/src/util/child.rs"),
+    },
+    {
+      name: "change a manifest",
+      edit: (t) =>
+        t.write(
+          "core/Cargo.toml",
+          rustWorkspace["core/Cargo.toml"].replace('"0.1.0"', '"0.2.0"'),
+        ),
+      check: (store, work) =>
+        assert.equal(work["analyze.rust.scopedFiles"], undefined),
+    },
+  ]);
+  assert.equal(compared.length, 9);
+});
+
+for (const shape of rustCrossFileEdits)
+  test(`Rust: ${shape.name} equals cold, and not when only the edited file is re-decided`, async () => {
+    await equalAfterEveryStep(rustWorkspace, [
+      shape,
+      {
+        name: "revert",
+        edit: (t) => {
+          for (const [path, text] of Object.entries(rustWorkspace))
+            t.write(path, text);
+        },
+      },
+    ]);
+    await assert.rejects(
+      equalAfterEveryStep(rustWorkspace, [shape], rustNarrowed),
+      new RegExp(`after ${shape.name.replace(/[!]/g, "\\$&")}`),
+    );
+  });
+
+test("Rust: an edit in one workspace crate re-decides its dependent crate", async () => {
+  const crates = {
+    "Cargo.toml": '[workspace]\nmembers = ["app", "dep"]\n',
+    "app/Cargo.toml":
+      '[package]\nedition = "2024"\nname = "app"\n[dependencies]\ndep = { path = "../dep" }\n',
+    "dep/Cargo.toml": '[package]\nedition = "2024"\nname = "dep"\n',
+    "dep/src/lib.rs": "pub fn f() {}\n",
+    "app/src/lib.rs": "fn run() {\n    dep::f();\n}\n",
+  };
+  const rename = {
+    name: "rename the function the dependent crate calls",
+    edit: (t) => t.write("dep/src/lib.rs", "pub fn g() {}\n"),
+    check: (store) =>
+      assert.equal(targetFile(store, "app/src/lib.rs", "dep::f"), null),
+  };
+  await equalAfterEveryStep(crates, [
+    {
+      name: "the call resolves across crates",
+      edit: () => {},
+      check: (store) =>
+        assert.equal(
+          targetFile(store, "app/src/lib.rs", "dep::f"),
+          "dep/src/lib.rs",
+        ),
+    },
+    rename,
+  ]);
+  await assert.rejects(
+    equalAfterEveryStep(crates, [rename], rustNarrowed),
+    /after rename the function the dependent crate calls/,
+  );
+});
+
+test("Rust: an unparseable file is repaired by the next index", async () => {
+  await equalAfterEveryStep(rustWorkspace, [
+    rustCrossFileEdits.find(
+      (shape) => shape.name === "make a file unparseable",
+    ),
+    {
+      name: "repair it",
+      edit: (t) =>
+        t.write("core/src/shapes.rs", rustWorkspace["core/src/shapes.rs"]),
+    },
+  ]);
+});
+
+// C-36 review: a method call through a three-module glob chain. The trait
+// risk of `prelude` once depended on which file's call computed it first.
+function preludeCrate(others) {
+  const files = {
+    "Cargo.toml":
+      '[package]\nname = "preludeprobe"\nversion = "0.1.0"\nedition = "2021"\n',
+    "src/prelude.rs": "pub use crate::shapes::*;\n",
+    "src/util.rs": "pub fn helper() -> u32 {\n    1\n}\n",
+    "src/shapes.rs":
+      "use crate::util::*;\n\npub struct Rect {\n    pub w: u32,\n}\n\nimpl Rect {\n    pub fn area(&self) -> u32 {\n        self.w * helper()\n    }\n}\n",
+    "src/widget.rs":
+      "use crate::prelude::*;\n\npub fn draw(r: Rect) -> u32 {\n    r.area()\n}\n",
+  };
+  const modules = ["prelude", "util", "shapes", "widget"];
+  for (let i = 0; i < others; i++) {
+    files[`src/other${i}.rs`] =
+      `use crate::prelude::*;\n\npub fn make${i}() -> Rect {\n    Rect { w: ${i} }\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    fn check(r: Rect) -> u32 {\n        r.area()\n    }\n}\n`;
+    modules.push(`other${i}`);
+  }
+  files["src/lib.rs"] = modules.map((m) => `pub mod ${m};\n`).join("");
+  return files;
+}
+/** File and identity of the target of the call named `name` in `file`. */
+function callTarget(store, file, name) {
+  const [link] = store
+    .links()
+    .filter((l) => l.file === file && l.targetName === name);
+  const target = link?.targetId ? store.getSymbol(link.targetId) : undefined;
+  return target ? `${target.file}:${target.identity}` : null;
+}
+
+test("Rust: a glob-chain method call re-decided alone equals cold", async () => {
+  await equalAfterEveryStep(preludeCrate(6), [
+    {
+      name: "doc comment in widget",
+      edit: (t) =>
+        t.write(
+          "src/widget.rs",
+          preludeCrate(0)["src/widget.rs"].replace(
+            "pub fn draw",
+            "/// Draws.\npub fn draw",
+          ),
+        ),
+      check: (store, work) => {
+        assert.equal(work["analyze.rust.scopedFiles"], 1);
+        assert.equal(
+          callTarget(store, "src/widget.rs", "r.area"),
+          "src/shapes.rs:impl Rect::area",
+        );
+      },
+    },
+  ]);
+});
+
+test("Rust: removing a glob-chain call leaves other files' decisions as cold", async () => {
+  await equalAfterEveryStep(preludeCrate(1), [
+    {
+      name: "remove the call in widget",
+      edit: (t) =>
+        t.write(
+          "src/widget.rs",
+          preludeCrate(0)["src/widget.rs"].replace("r.area()", "0"),
+        ),
+      check: (store, work) => assert.equal(work["analyze.rust.scopedFiles"], 1),
+    },
+  ]);
+});
+
+test("Rust: a glob-chain method call has one cold answer whatever other files call it", async () => {
+  const answers = [];
+  for (const others of [0, 6]) {
+    const root = mkdtempSync(join(tmpdir(), "c36-prelude-"));
+    try {
+      for (const [path, text] of Object.entries(preludeCrate(others))) {
+        mkdirSync(dirname(join(root, path)), { recursive: true });
+        writeFileSync(join(root, path), text);
+      }
+      const store = new SqliteGraphStore(join(root, "graph.sqlite"));
+      try {
+        await indexProject(root, registry, store);
+        answers.push(callTarget(store, "src/widget.rs", "r.area"));
+      } finally {
+        store.close();
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+  // rustc: `r.area()` on an owned `Rect` with no trait in scope calls the
+  // inherent `Rect::area`.
+  assert.deepEqual(answers, [
+    "src/shapes.rs:impl Rect::area",
+    "src/shapes.rs:impl Rect::area",
+  ]);
+});
+
+test("Rust: a body edit inside a glob cycle uses the full pass", async () => {
+  const runner = `pub use super::*;
+
+pub fn run(server: &AppServer) -> u32 {
+    server.port()
+}
+`;
+  await equalAfterEveryStep(
+    {
+      "Cargo.toml":
+        '[package]\nname = "cycle"\nversion = "0.1.0"\nedition = "2021"\n',
+      "src/lib.rs": "mod serve;\npub use serve::*;\n",
+      "src/serve/mod.rs":
+        "mod runner;\nmod server;\npub use runner::*;\npub use server::*;\n",
+      "src/serve/server.rs": `pub use super::*;
+
+pub struct AppServer;
+
+impl AppServer {
+    pub fn port(&self) -> u32 {
+        run_count()
+    }
+}
+
+pub fn run_count() -> u32 {
+    1
+}
+`,
+      "src/serve/runner.rs": runner,
+    },
+    [
+      {
+        name: "body edit in a module that globs its parent",
+        edit: (t) =>
+          t.write(
+            "src/serve/runner.rs",
+            runner.replace(
+              "    server.port()",
+              "    let _ = 0;\n    server.port()",
+            ),
+          ),
+        check: (store, work) =>
+          assert.equal(work["analyze.rust.fullPass.lookup-cut"], 1),
+      },
+    ],
+  );
 });
 
 const tsA = `export function hello(): string {

@@ -1,0 +1,60 @@
+{
+ "links": 24303,
+ "names": {
+  "the module specifier": 20213,
+  "a whole-module binding (*)": 3859,
+  "something else": 231
+ },
+ "examples": [
+  {
+   "pin": "dexie/Dexie.js",
+   "file": "samples/dexie-cloud-todo-app/src/sw.ts",
+   "targetName": "webworker"
+  },
+  {
+   "pin": "dexie/Dexie.js",
+   "file": "tools/build-configs/rollup.config.js",
+   "targetName": "default"
+  },
+  {
+   "pin": "dexie/Dexie.js",
+   "file": "tools/build-configs/rollup.config.mjs",
+   "targetName": "default"
+  },
+  {
+   "pin": "dexie/Dexie.js",
+   "file": "tools/build-configs/rollup.modern.config.js",
+   "targetName": "default"
+  },
+  {
+   "pin": "dexie/Dexie.js",
+   "file": "tools/build-configs/rollup.modern.config.mjs",
+   "targetName": "default"
+  },
+  {
+   "pin": "dexie/Dexie.js",
+   "file": "tools/build-configs/rollup.umd.config.js",
+   "targetName": "default"
+  },
+  {
+   "pin": "dexie/Dexie.js",
+   "file": "tools/build-configs/rollup.umd.config.mjs",
+   "targetName": "default"
+  },
+  {
+   "pin": "mermaid-js/mermaid",
+   "file": "packages/mermaid/src/diagrams/kanban/styles.ts",
+   "targetName": "darken"
+  },
+  {
+   "pin": "mermaid-js/mermaid",
+   "file": "packages/mermaid/src/diagrams/kanban/styles.ts",
+   "targetName": "lighten"
+  },
+  {
+   "pin": "mermaid-js/mermaid",
+   "file": "packages/mermaid/src/diagrams/kanban/styles.ts",
+   "targetName": "isDark"
+  }
+ ]
+}

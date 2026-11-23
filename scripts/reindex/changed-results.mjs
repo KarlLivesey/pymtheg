@@ -3,6 +3,7 @@
 // compares graph_files bodies of two stores and, for each changed file other
 // than the edited one, the first differing JSON paths of its result.
 //   node scripts/reindex/changed-results.mjs <before.sqlite> <after.sqlite> [limit]
+import "../isolated-home.mjs";
 import { DatabaseSync } from "node:sqlite";
 
 const [left, right, limitArg] = process.argv.slice(2);

@@ -6,6 +6,7 @@ import {
   readFileSync,
   writeFileSync,
   linkSync,
+  renameSync,
   unlinkSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -31,6 +32,24 @@ export function localHistoryWriter(
     lstatSync(directory).isSymbolicLink()
   )
     throw Error("Local identity directory must be real");
+  // The folder must ignore itself whatever the repository committed there:
+  // a committed .gitignore that ignores nothing would expose writer.json.
+  const ignore = join(directory, ".gitignore");
+  let current: string | null = null;
+  try {
+    const ignoreInfo = lstatSync(ignore);
+    current =
+      ignoreInfo.isFile() && !ignoreInfo.isSymbolicLink()
+        ? readFileSync(ignore, "utf8")
+        : "";
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  if (current !== null && current !== "*\n") {
+    const staged = join(directory, randomUUID() + ".tmp");
+    writeFileSync(staged, "*\n", { flag: "wx", mode: 0o600 });
+    renameSync(staged, ignore);
+  }
   const candidates: [string, () => string][] = [
     [".gitignore", () => "*\n"],
     [

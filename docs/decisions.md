@@ -2361,6 +2361,105 @@ wrong results in real shapes. Lesson recorded by the manager under D18 (13
 November 2026): measure a cheap, same-class fix on the corpus before asking for
 it.
 
+### D20: an import of a library module counts when it names the module
+
+**Decided (manager, 22 November 2026):** a link whose referent is a library
+module or package is complete when the graph names that module or package:
+a TypeScript `import … from "pkg"` module link or whole-module binding, a Go
+`import "pkg"`, a Rust whole-crate `use x;` or `extern crate x;`. Such
+library module links count at Level 2, as a separately counted part that
+every scoreboard shows beside proven and assumption-marked links. Headlines
+are given with and without them. **Why:** the owner's rule is that a link
+from project code into a library counts when the graph names the library and
+the symbol. For an import of a module, the module is the whole target, and
+there is no further symbol to name. **Rules out:** crediting a member link
+that names only its package (`vi.fn`, `screen.getByRole`): it has a symbol
+to name, and it stays Level 1.
+
+### D21: the opt-in Rust route may use rust-analyzer
+
+**Decided (Karl, 22 November 2026):** "This is fine you are allowed to use the
+languages official builder for these I stated this ages ago". This lifts the
+one restriction D17 left ("`rust-analyzer` unless Karl asks") and was given in
+answer to three stated consequences: opted-in projects have their build
+scripts and procedural macros run, as a build would; the route needs the
+crates present; and the Rust coverage goal is judged with the route switched
+on, as D19 does for installed dependencies. Everything else in D17 stands:
+explicit per-project opt-in, offline by default, one recorded build
+configuration, the project never written, no claim of a security boundary.
+The measured shape is in [C-19](changes/C-19.md): answers are taken only for
+links the source-only route leaves open, under the strict join and the gates
+(no answers under a cfg condition other than `test`; trait methods stay
+candidate sets); an edit re-indexes source-only at once and no stale toolchain
+answer is shown as definite. **Why:** the owner's standing rule is that a
+language's own build chain is an allowed dependency; source-only Rust stays
+near 43% because most open links need type inference. **Rules out:** running
+the route on a project that has not opted in; reporting the opted-in figure
+without also giving the source-only one.
+
+### D22: init asks once whether the repository is trusted
+
+**Decided (Karl, 22 November 2026):** "When the user runs init it should ask
+them of source only or build tools allowed (in general) for this aka do you
+trust the repo", and then: "you generally trust a repo because you're gonna
+want to build whatever's on there. So it's not usually a problem. But yeah, it
+should be like a. Hey, do you trust the repo, much like how chat agents" ask
+it. So the opt-in of D17 becomes one project-wide answer given at `init`,
+covering every language, put as a trust question in the manner of coding
+agents: **trusted** (each language's official tooling may run on the project,
+which runs its build scripts and macros as a build would) or **source only**
+(nothing of the project is ever run). As implemented by the manager: trusting
+is the preselected answer of the prompt, since that is the usual case. Over
+MCP the question is still asked (Karl, same day: it "should still respond with
+something saying like, do you trust this repo and like maybe that model might
+have a pre-existing instruction to approve it"): an initialisation without the
+answer does not guess; it returns the trust question to the calling model,
+which answers from its user or its standing instructions and calls again.
+Studio setup shows the same question. Only a command-line init with no
+terminal and no flag records source only, and says so. As implemented in C-44
+(manager's rulings, 22 November 2026): the answer belongs to the user, never
+to the repository. It is kept outside every checkout, in the user's own configuration (`$PYMTHEG_CONFIG_HOME`, else `$XDG_CONFIG_HOME/pymtheg/`, `~/.config/pymtheg/`, `~/Library/Application Support/pymtheg/` on macOS or `%APPDATA%\pymtheg\` on Windows; file `trust.json`, user-only), keyed by
+the checkout's real path with the project's identity as a cross-check, so a
+clone, a copy or a moved checkout is unanswered and is asked again. Nothing
+under a checkout is ever read as an answer or a tool path: anything in a
+working tree is under the repository's control (a file can be force-added,
+and checkout paths are often predictable). Nothing
+committed can grant trust: a committed `graph.trust: "trusted"` is at most
+init's preselected answer, while a committed `"source-only"` binds on every
+machine. The committed per-language settings of D17 may only turn a route off;
+a committed tool path is never run, and tool paths are local only. A checkout
+with no answer runs nothing and reports `unanswered` with how to answer. The
+answer is shown in graph answers; `pymtheg trust` lists answers and
+`pymtheg trust --revoke` removes one. **Why:** running a toolchain on a project
+is as trusted as building it (D17), and that is a single judgement about the
+repository, not one per language. **Rules out:** running build tools on a
+project whose owner was never asked.
+
+### D23: a global declared by several typings is one named target
+
+**Decided (manager, 22 November 2026):** where the compiler itself holds ONE
+global symbol whose declarations sit in several library units (`URL`,
+`fetch`, `setTimeout`, `console.log` declared by both the DOM library and the
+Node typings), and the graph names that symbol in every declaring unit, the
+link is complete: it counts at Level 2 as proven. The stored form stays a
+candidate set carrying the merged-global mark, so storage, queries and the
+conformance kit are unchanged. **Why:** the units are not alternatives; the
+declarations merge into one symbol, so naming all of them names the target
+exactly, which is what the owner's library rule asks (library and symbol).
+**Rules out:** counting a candidate set whose members are different symbols
+(union arms such as `toString` on several types); counting a set that includes
+a checkout or synthesised target; a mark given without the compiler's own
+single-symbol proof. **Narrowed in review (22 November 2026):** the compiler
+also merges globals that two competing packages declare (`describe` and `it`
+from two test frameworks loaded together, `expect` from two assertion
+libraries). Those units ARE alternatives: a file runs under one of them. So
+no set is marked when any of its units is a test framework, or when its
+variable declarations disagree on the type (the compiler's own
+"subsequent variable declarations must have the same type" condition, which
+`skipLibCheck` hides). The mark is for environment globals: the language
+library, DOM, workers, Node and compatible runtimes, and packages that
+augment them.
+
 ### D19: coverage is judged with dependencies installed
 
 **Decided (Karl, 21 November 2026):** "we will assume in 99% of cases
@@ -2796,6 +2895,8 @@ or one transaction per phase: W3-P1 measured readers and second writers locked
 out, and under a write-ahead log batches of 64 were no faster), and
 `synchronous=OFF` (the database itself may be corrupted by a power loss).
 See [C-6](changes/C-6.md).
+**Superseded in part by C-37:** one commit per file and the checkpoint every
+10,000 pages (see below).
 
 ### C-9 Rust library paths
 
@@ -3049,6 +3150,19 @@ uses the importer's own conditions and workspace route. Invalid extracted
 source ranges fail the affected file through the compiler session's
 containment path. [C-32](changes/C-32.md)
 
+### C-39 Configs extended by package name; const assertions
+
+A package-name `extends` whose base is installed as a workspace link into
+the checkout is read like any other base: its settings are complete unless
+it is unreadable (6053/5083) or its JSON has syntax errors. A const
+assertion (`as const`, `<const>x`) is not a reference and stores no link. A
+manifest range the compiler's semver parser throws on is an unknown range:
+it identifies the registry dependency and never yields a version pin.
+Keeping a library target beside an unread file (item 4 of the change) was
+split out to C-51. Here, a program with an unread file withholds library
+targets as before (C-13).
+[C-39](changes/C-39.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000
@@ -3159,6 +3273,46 @@ metadata-only change or hide an edit. Scoped Go resolution and validation use
 projections of existing facts. No second copy of the global indexes is kept
 in the store. [C-33](changes/C-33.md)
 
+### Rust re-index can reuse decisions outside the edited files (C-36)
+
+**Decided (C-36).** The Rust module uses the C-27 scoped analysis contract
+unchanged. It returns the edited paths alone when three conditions hold:
+
+- every edited file is clean before and after;
+- it keeps its surface;
+- no cut occurs while its links are decided.
+
+The surface is everything another file's resolution reads from the file:
+its symbols, file data and `imports`, `contains`, `macros` and `modules`
+links. They are listed in the resolver's path and position order, with
+source offsets replaced by their rank. A cut is a lookup cycle cut, a depth
+cut or a re-entry guard. The cut check runs with the new facts and, unless
+all facts are the same up to offset ranks, with the old ones, in both Rust
+passes.
+
+The guarantee rests on the resolver's caches: no cached answer depends on
+its caller.
+
+- A lookup memo entry holds no cut met at an ancestor (C-24), and a hit is
+  ignored if it would carry a lookup past the depth limit.
+- A lazily cached computation starts its lookups with an empty stack and is
+  keyed by the global lookup mode. Its answer is kept even when it met cuts
+  inside, unless a helper re-entry occurred, because a re-entry answers for
+  the caller's stack.
+- Trait risk and receiver typing use limits that depend only on the facts.
+- No answer is evicted.
+
+A key whose computation meets no cut then has the same answer in every
+history, so a cut-free scoped decision equals the cold one. The same holds
+when the edited file's answers are added or removed: another file's
+decision does not change.
+
+Every other edit uses the full Rust pass. So do a changed Cargo context,
+an added, removed or failed file, and missing completion evidence. The
+scoped resolve pass rebuilds every link from the stored records and
+orders them like the full pass. The C-22 cold equality rule and run
+ownership apply. [C-36](changes/C-36.md)
+
 ### C-26 Non-returning analysis: a deterministic check before any deadline
 
 A file whose analysis would not return fails with a reason. Where the cause
@@ -3189,6 +3343,66 @@ link names a container only if that container is a symbol. One link
 without a source rejects a module's whole output, so a namespace that is
 no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).
+
+### C-37 Graph index writes commit in bounded batches
+
+**Decided (C-37):** under the write-ahead log, an index run's writes (parse
+results, analysed results and each module's resolution write) share one
+transaction until about 50,000 rows are written (a fixed count of each
+write statement's direct changes; rows changed by triggers and cascades are
+not counted), then commit; the rest commits at the end of each write phase.
+Every batch is one commit with the run's checks at its start: the
+unfinished-run mark at the first, and at each one the proof that no other
+run has written since. Every store write by a connection that chose the
+write-ahead log at its first write, and every batch, first takes a
+turnstile, a lock-only database beside the store (`graph.sqlite-turnstile`,
+SQLite's own file lock), and leaves it once it holds the write lock. A
+writable open that finds its schema and identity in place writes nothing.
+A write that fails undoes its open batch; the store is then its earlier
+commits, as after a crash. With a rollback journal, or where the turnstile
+cannot be opened, each write still commits alone. The log checkpoints
+every 100,000 pages and is cut back to 64 MiB afterwards. This supersedes
+C-6's one commit per file and checkpoint every 10,000 pages; its
+write-ahead log, `synchronous=NORMAL` and the fully synced completion
+record are unchanged.
+**Why:** on disk, repeated commits rewrote the same index pages into the
+log (cli/cli wrote 9.23 GiB for a 463 MiB store). **Bound:** a writer that
+waits holds the turnstile, so the run finishes at most the batch in progress
+before the writer has the write lock (a counted test proves it); a dead
+holder's lock is released by the operating system. Readers are never
+blocked under the write-ahead log. A run overtaken between two batches
+stops at the next batch. **Trade:** a run cut short loses up to one batch
+more of progress, which its mark makes the next run redo; the log reaches
+the checkpoint threshold plus about one batch (474 MiB on cli/cli, 499 MiB
+on Vector; 553 MiB on cli/cli counting direct changes). Only a connection
+that chose the write-ahead log at its first write takes the turnstile; with
+a rollback journal every write commits alone and takes no turn, as before.
+A connection that kept the rollback journal because another connection
+blocked its switch takes no turn for its life; if the store is later moved
+to the write-ahead log while it is open, its writes are correct but wait
+without the one-batch bound.
+Waiters are not served first in, first out, and nothing gives the run
+fairness against a continuous stream of writers. **Rules out:**
+savepoints per write (several times slower inserts), batches bounded by
+time, batching under a rollback journal (a batch larger than the page cache
+would lock readers out), and 50,000 pages or fewer per checkpoint (most of
+the gain lost). See [C-37](changes/C-37.md).
+
+### C-40 An analysis leaves no TypeScript program behind
+
+**Decided (C-40):** when the TypeScript module's `analyze` returns or
+throws, its cache of parsed compiler library files is cleared, and so is the
+last syntax node it passed to a checker. **Why:** programs share the cached
+library files and each checker records its facts on their symbols, so the
+cache kept the last program and its checker alive for the rest of the run:
+on microsoft/TypeScript the 27,000-file program, 2.75 GB of a 4.2 GB heap,
+through every later write and resolution. It ran out of the default heap at
+the Go resolution input. With the cache released it finishes at the default
+heap. **Trade:** each analysis parses the library files again (once per CLI
+command, as before; once per sync in a long-lived process). **Rules out
+for now:** streaming a module's results to the store. The results were
+small (298 MiB as JSON on microsoft/TypeScript); the retained program was
+the cost. See [C-40](changes/C-40.md).
 
 ### C-41 TypeScript type-literal members as call targets
 

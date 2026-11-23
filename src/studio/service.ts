@@ -31,7 +31,11 @@ import {
 } from "../implementation/versions.js";
 import { versionCatalogQuerySchema } from "../implementation/protocol.js";
 import { updateSourceBaselines } from "../architecture/source-baselines.js";
-import { initializeBeforeWrite, readWorkspace } from "../project/workspace.js";
+import {
+  checkoutTrust,
+  initializeBeforeWrite,
+  readWorkspace,
+} from "../project/workspace.js";
 import { captureImplementation } from "../implementation/capture.js";
 import { ImplementationFileCatalog } from "../implementation/files.js";
 import { implementationComparisonQuerySchema } from "../implementation/comparison-protocol.js";
@@ -196,6 +200,12 @@ export class StudioService {
   /** MCP and link commands: initialise an uninitialised project (as
    * `pymtheg init` would) before the first architecture write. */
   initializeOnFirstWrite = false;
+  /**
+   * D22: the trust answer the first write's initialisation records, set by
+   * a caller for one write (MCP's observe/link_implementation), so a
+   * project is initialised only once that write proceeds.
+   */
+  firstWriteTrust: import("../shared/config.js").ProjectTrust | undefined;
   private sourceCatalogues = new Map<string, SourceCatalogue>();
   private sourceCatalogueFiles = new Map<
     string,
@@ -931,7 +941,7 @@ export class StudioService {
     if (this.closed) throw new StudioError(503, "Studio is closing");
     if (create) {
       if (!this.architectureStore && this.initializeOnFirstWrite)
-        await initializeBeforeWrite(this.root);
+        await initializeBeforeWrite(this.root, this.firstWriteTrust);
       return (this.architectureStore ??= ArchitectureStore.open(this.root));
     }
     if (this.architectureStore) return this.architectureStore;
@@ -1217,6 +1227,12 @@ export class StudioService {
         );
         planDocument = { path: sourceContractsPath, text: json(catalogue) };
       }
+      // D22: an expected revision an empty project cannot have fails before
+      // the first write initialises anything.
+      if (request.expectedRevision !== null && !(await this.architecture()))
+        throw new ArchitectureConflict(
+          "Architecture changed. Refresh before retaining this code version.",
+        );
       const store = (await this.architecture(true))!;
       return retainObservation(
         store,
@@ -3244,9 +3260,11 @@ export class StudioService {
     const inventory = await this.inventory(
       this.initialFile ?? config.defaultFile,
     );
+    const workspace = await readWorkspace(this.root);
     return {
       inventoryWarnings: inventory.warnings,
-      workspace: await readWorkspace(this.root),
+      workspace,
+      ...(workspace ? { trust: await checkoutTrust(this.root) } : {}),
       root: this.root,
       outputTargets: this.outputRegistry.targets(),
       architectureAvailable: existsSync(storagePath(this.root, "planning")),

@@ -13,7 +13,8 @@
 //                                 (statement journals) in memory
 // Timings are observations; counts are deterministic.
 //   node scripts/store-cost/measure.mjs <dist> <root> <graph.sqlite> <out.json> [--variant V]
-import { readFileSync, writeFileSync } from "node:fs";
+import "../isolated-home.mjs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import sqlite from "node:sqlite";
@@ -35,7 +36,9 @@ for (const part of parts)
       "late-indexes",
       "temp-memory",
     ].includes(part) &&
-    !/^batch=[1-9][0-9]*$/.test(part)
+    !/^batch=[1-9][0-9]*$/.test(part) &&
+    !/^checkpoint=[0-9]+$/.test(part) &&
+    !/^rows=[1-9][0-9]*$/.test(part)
   )
     throw Error(`unknown variant ${part}`);
 
@@ -74,9 +77,63 @@ let inStatement = false;
 const batch = Number(
   [...parts].find((part) => part.startsWith("batch="))?.slice(6) ?? 1,
 );
+// checkpoint=N (measurement only): the write-ahead log checkpoints every N
+// pages instead of the store's interval; 0 leaves the whole log to the
+// checkpoint on close.
+const checkpoint = [...parts]
+  .find((part) => part.startsWith("checkpoint="))
+  ?.slice(11);
 let held = 0;
+// C-37: wall-clock time of every write commit, to count the batches a
+// waiter's wait spans, and the largest size the log reached.
+const commitTimes = [];
+let maxWalBytes = 0;
+// The write lock's longest hold: BEGIN IMMEDIATE to COMMIT or ROLLBACK.
+let lockedAt;
+let longestHoldMs = 0;
+let holds = 0;
+// Holds over a second, with the first writing statement and the count of
+// statements in them, to say what held the lock.
+const longHolds = [];
+let holdFirst;
+let holdStatements = 0;
 let heldDeferred = 0;
 proto.exec = function (sql) {
+  // The store's own connection only: not the turnstile beside it (C-37).
+  const store_ = !String(this.location?.() ?? "").endsWith("-turnstile");
+  if (store_ && sql === "COMMIT" && lockedAt !== undefined) {
+    commitTimes.push(Date.now());
+    try {
+      maxWalBytes = Math.max(maxWalBytes, statSync(`${graph}-wal`).size);
+    } catch {
+      // No log (rollback journal).
+    }
+  }
+  if (!store_) {
+    // Not the store's lock.
+  } else if (sql === "BEGIN IMMEDIATE") lockedAt = performance.now();
+  else if (
+    lockedAt !== undefined &&
+    (sql === "COMMIT" || sql.startsWith("ROLLBACK;") || sql === "ROLLBACK")
+  ) {
+    const held = performance.now() - lockedAt;
+    longestHoldMs = Math.max(longestHoldMs, held);
+    if (held > 1000)
+      longHolds.push({
+        ms: Math.round(held),
+        first: holdFirst,
+        statements: holdStatements,
+      });
+    holds++;
+    lockedAt = undefined;
+    holdFirst = undefined;
+    holdStatements = 0;
+  }
+  if (checkpoint !== undefined && /wal_autocheckpoint=\d+/.test(sql))
+    sql = sql.replace(
+      /wal_autocheckpoint=\d+/,
+      `wal_autocheckpoint=${checkpoint}`,
+    );
   if (parts.has("temp-memory") && sql.includes("PRAGMA foreign_keys=ON"))
     exec.call(this, "PRAGMA temp_store=MEMORY");
   if (batch > 1) {
@@ -137,6 +194,11 @@ proto.prepare = function (sql, ...rest) {
     const original = statement[method];
     statement[method] = function (...args) {
       if (inStatement) return original.apply(this, args);
+      if (lockedAt !== undefined) {
+        holdStatements++;
+        if (holdFirst === undefined && !/^(SELECT|PRAGMA)/.test(sql))
+          holdFirst = key(sql).slice(0, 80);
+      }
       inStatement = true;
       const started = performance.now();
       try {
@@ -159,6 +221,9 @@ const { discoverLanguages, indexProject, SqliteGraphStore } =
   await load("graph/index.js");
 const { graphWork, resetGraphWork } = await load("graph/work.js");
 const registry = await discoverLanguages();
+// rows=N: the store's write batch budget instead of its default.
+const rows = [...parts].find((part) => part.startsWith("rows="))?.slice(5);
+if (rows !== undefined) SqliteGraphStore.writeBatchRows = Number(rows);
 const store = new SqliteGraphStore(graph, "c35-measure");
 // The schema changes of a variant go through their own connection, before
 // the run: the store's connection sees them as another writer's commit.
@@ -194,13 +259,16 @@ const cpu = process.cpuUsage();
 const wall = performance.now();
 let report;
 let lateIndexMs = 0;
+let closeMs = 0;
 try {
   report = await indexProject(root, registry, store, {
     excludeDirectories: [".pymtheg"],
     signal: new AbortController().signal,
   });
 } finally {
+  const closing = performance.now();
   store.close();
+  closeMs = performance.now() - closing;
 }
 if (parts.has("late-indexes")) {
   const db = new sqlite.DatabaseSync(graph);
@@ -213,7 +281,7 @@ if (parts.has("late-indexes")) {
 const used = process.cpuUsage(cpu);
 const wallMs = performance.now() - wall;
 
-const db = new sqlite.DatabaseSync(graph, { readOnly: true });
+const db = new sqlite.DatabaseSync(graph, { readOnly: true, timeout: 30_000 });
 const objects = db
   .prepare(
     `SELECT s.name, m.type, m.tbl_name AS tbl, count(*) AS pages,
@@ -255,6 +323,13 @@ writeFileSync(
       wallMs: Math.round(wallMs),
       cpuMs: Math.round((used.user + used.system) / 1000),
       lateIndexMs: Math.round(lateIndexMs),
+      closeMs: Math.round(closeMs),
+      writeBatchRows: SqliteGraphStore.writeBatchRows,
+      longestHoldMs: Math.round(longestHoldMs),
+      maxWalBytes,
+      commitTimes,
+      holds,
+      longHolds: longHolds.sort((a, b) => b.ms - a.ms).slice(0, 20),
       maxRssKiB: process.resourceUsage().maxRSS,
       // Bytes this process wrote: write_bytes reached the storage layer
       // (page cache of the disk or memory-backed file system).

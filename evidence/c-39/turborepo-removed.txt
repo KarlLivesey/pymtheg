@@ -1,0 +1,21 @@
+symbols only on main: 12
+   examples/with-svelte/apps/docs/eslint.config.js | module | examples/with-svelte/apps/docs/eslint.config.js | module@0
+   examples/with-svelte/apps/docs/svelte.config.js | module | examples/with-svelte/apps/docs/svelte.config.js | module@0
+   examples/with-svelte/apps/docs/svelte.config.js | constant | config | constant@156
+   examples/with-svelte/apps/docs/svelte.config.js | property | config.[object].preprocess | property@279
+   examples/with-svelte/apps/docs/svelte.config.js | property | config.[object].kit | property@310
+   examples/with-svelte/apps/docs/svelte.config.js | property | config.[object].kit.adapter | property@593
+   examples/with-svelte/apps/web/eslint.config.js | module | examples/with-svelte/apps/web/eslint.config.js | module@0
+   examples/with-svelte/apps/web/svelte.config.js | module | examples/with-svelte/apps/web/svelte.config.js | module@0
+   examples/with-svelte/apps/web/svelte.config.js | constant | config | constant@156
+   examples/with-svelte/apps/web/svelte.config.js | property | config.[object].preprocess | property@279
+   examples/with-svelte/apps/web/svelte.config.js | property | config.[object].kit | property@310
+   examples/with-svelte/apps/web/svelte.config.js | property | config.[object].kit.adapter | property@593
+sites only on main (not as const): 22
+   examples/with-svelte/apps/docs/eslint.config.js 3 imports:@repo/eslint-config, imports:config
+   examples/with-svelte/apps/docs/svelte.config.js 8 imports:@sveltejs/adapter-auto, imports:default
+   examples/with-svelte/apps/web/eslint.config.js 3 imports:@repo/eslint-config, imports:config
+   examples/with-svelte/apps/web/svelte.config.js 8 imports:@sveltejs/adapter-auto, imports:default
+examples/with-svelte/apps/docs/eslint.config.js main: clean null | cand: failed undefined [{"message":"TypeScript config examples/with-svelte/apps/docs/tsconfig.json extends \"./.svelte-kit/tsconfig.json\", which is missing from the snapshot"}]
+examples/with-svelte/apps/docs/svelte.config.js main: clean null | cand: failed undefined [{"message":"TypeScript config examples/with-svelte/apps/docs/tsconfig.json extends \"./.svelte-kit/tsconfig.json\", which is missing from the snapshot"}]
+examples/with-svelte/apps/web/eslint.config.js main: clean null | cand: failed undefined [{"message":"TypeScript config examples/with-svelte/apps/web/tsconfig.json extends \"./.svelte-kit/tsconfig.json\", which is missing from the snapshot"}]

@@ -10,6 +10,7 @@
 // Edges without metadata are `direct`. References CodeGraph could not resolve
 // (`unresolved_refs`) are kept as unresolved edges.
 
+import "../../isolated-home.mjs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import {

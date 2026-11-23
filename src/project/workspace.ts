@@ -12,6 +12,7 @@ import {
   readFile,
   realpath,
   link,
+  rename,
   unlink,
 } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
@@ -21,6 +22,54 @@ import {
   type WorkspaceIdentity,
 } from "../shared/workspace.js";
 import { loadConfig } from "./config.js";
+import {
+  trustState,
+  type ProjectTrust,
+  type TrustState,
+} from "../shared/config.js";
+import { readLocalTrust, writeLocalTrust } from "./local-trust.js";
+
+/** D22: the init answer to "do you trust this repository?". */
+export interface InitOptions {
+  trust?: ProjectTrust;
+  /** The answer nobody gave (a command-line init with no terminal): source only. */
+  defaulted?: boolean;
+}
+/** The settings file a new project starts with. It never holds a trust answer. */
+const initialSettings = () => json({ version: 1, scenarios: {} });
+/**
+ * The trust that applies to the checkout at `root`: the user's answer (kept
+ * outside the checkout, local-trust.ts), unless the committed settings say
+ * source only.
+ */
+export async function checkoutTrust(root: string): Promise<TrustState> {
+  return trustState(
+    (await loadConfig(root)).config,
+    await readLocalTrust(root),
+  );
+}
+/**
+ * Records the user's answer when the checkout has none, in the user's own
+ * configuration (never in the checkout). Never replaces an answer: re-running init
+ * does not change it. A committed `graph.trust: "source-only"` binds, so
+ * "trusted" is refused there.
+ */
+async function recordTrust(root: string, trust: ProjectTrust | undefined) {
+  if (!trust) return false;
+  const committed = (await loadConfig(root)).config.graph?.trust;
+  if (committed === "source-only" && trust === "trusted")
+    throw Error(
+      `${identity.projectConfig} says graph.trust "source-only": the repository allows no build tools on any machine. Remove it there to trust this checkout.`,
+    );
+  const local = await readLocalTrust(root);
+  if (local?.trust === trust) return false;
+  if (local)
+    throw Error(
+      `This checkout's trust answer is already "${local.trust}". Init does not change it; run pymtheg trust --revoke to answer again.`,
+    );
+  await writeLocalTrust(root, trust);
+  return true;
+}
 const missing = (error: unknown) =>
   (error as NodeJS.ErrnoException).code === "ENOENT";
 async function markerFile(root: string): Promise<string> {
@@ -132,9 +181,13 @@ async function protectLocalStorage(root: string): Promise<string[]> {
     filesCreated.push(".pymtheg/.gitignore");
   return filesCreated;
 }
-export async function initializeWorkspace(input: string, name?: string) {
+export async function initializeWorkspace(
+  input: string,
+  name?: string,
+  options: InitOptions = {},
+) {
   try {
-    return await initialize(input, name);
+    return await initialize(input, name, options);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (!["EACCES", "EPERM", "EROFS"].includes(code ?? "")) throw error;
@@ -156,7 +209,11 @@ async function validateInitConfig(root: string) {
     );
   }
 }
-async function initialize(input: string, name?: string) {
+async function initialize(
+  input: string,
+  name: string | undefined,
+  options: InitOptions,
+) {
   const requested = name?.trim();
   if (name !== undefined && (!requested || requested.length > 160))
     throw Error("Choose a project name of 1–160 characters");
@@ -168,7 +225,23 @@ async function initialize(input: string, name?: string) {
       throw Error(
         `This folder belongs to “${ancestor.workspace.name}” at ${ancestor.root}. Initialize outside that project to create a separate workspace.`,
       );
-    return { ...ancestor, created: false, filesCreated: [] };
+    // A nested folder uses its project's answer (D22), and answers it for
+    // the project when it has none on this machine.
+    const before = await checkoutTrust(ancestor.root);
+    if (options.trust && before !== "unanswered" && options.trust !== before)
+      throw Error(
+        `This folder belongs to “${ancestor.workspace.name}” at ${ancestor.root}, whose trust answer on this machine is "${before}". Revoke it with pymtheg trust --revoke ${ancestor.root} to answer again.`,
+      );
+    const trustRecorded =
+      before === "unanswered" &&
+      (await recordTrust(ancestor.root, options.trust));
+    return {
+      ...ancestor,
+      created: false,
+      filesCreated: [],
+      trust: await checkoutTrust(ancestor.root),
+      trustRecorded,
+    };
   }
   await validateInitConfig(root);
   const previous = await readWorkspace(root);
@@ -179,26 +252,31 @@ async function initialize(input: string, name?: string) {
       );
     const filesCreated = await protectLocalStorage(root);
     if (
-      await createOnce(
-        storagePath(root, "settings", true),
-        json({ version: 1, scenarios: {} }),
-      )
+      await createOnce(storagePath(root, "settings", true), initialSettings())
     )
       filesCreated.push(identity.projectConfig);
     await validateInitConfig(root);
-    return { root, workspace: previous, created: false, filesCreated };
+    // An initialised checkout with no answer on this machine (a clone) is
+    // answered now; nothing else changes.
+    const trustRecorded =
+      (await checkoutTrust(root)) === "unanswered" &&
+      (await recordTrust(root, options.trust));
+    if (!trustRecorded) await recordTrust(root, options.trust);
+    return {
+      root,
+      workspace: previous,
+      created: false,
+      filesCreated,
+      trust: await checkoutTrust(root),
+      trustRecorded,
+    };
   }
   await validateInitConfig(root); // Validate existing configuration before creating metadata.
   const marker = await markerFile(root);
   await mkdir(dirname(marker), { recursive: true });
   const filesCreated: string[] = [];
   filesCreated.push(...(await protectLocalStorage(root)));
-  if (
-    await createOnce(
-      storagePath(root, "settings", true),
-      json({ version: 1, scenarios: {} }),
-    )
-  )
+  if (await createOnce(storagePath(root, "settings", true), initialSettings()))
     filesCreated.push(identity.projectConfig);
   await validateInitConfig(root); // A concurrent writer's configuration must also validate.
   const workspace: WorkspaceIdentity = {
@@ -215,7 +293,19 @@ async function initialize(input: string, name?: string) {
     throw Error(
       `Another initializer named this project “${actual.name}”; no identity was overwritten.`,
     );
-  return { root, workspace: actual, created, filesCreated };
+  // The answer is recorded once the project has its identity.
+  const trustRecorded =
+    (await checkoutTrust(root)) === "unanswered" &&
+    (await recordTrust(root, options.trust));
+  if (!trustRecorded) await recordTrust(root, options.trust);
+  return {
+    root,
+    workspace: actual,
+    created,
+    filesCreated,
+    trust: await checkoutTrust(root),
+    trustRecorded,
+  };
 }
 /**
  * Initialise `root` exactly as `pymtheg init` with no options would, unless it
@@ -224,7 +314,10 @@ async function initialize(input: string, name?: string) {
  * `.pymtheg/` (no project.json, settings or .gitignore). Null when the
  * project was already initialised.
  */
-export async function initializeBeforeWrite(root: string) {
+export async function initializeBeforeWrite(
+  root: string,
+  trust?: ProjectTrust,
+) {
   if (await readWorkspace(root)) return null;
-  return initializeWorkspace(root);
+  return initializeWorkspace(root, undefined, trust ? { trust } : {});
 }

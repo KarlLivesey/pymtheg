@@ -31,7 +31,7 @@
   },
   "scripts": {
     "build": "node scripts/schema.mjs && tsc && tsc -p web/tsconfig.json && vite build --configLoader runner --config web/vite.config.ts",
-    "test": "npm run build:core && node --test --test-concurrency=4 test/*.test.mjs",
+    "test": "npm run build:core && node --import ./test/isolated-config.mjs --test --test-concurrency=4 test/*.test.mjs",
     "check": "node dist/cli/main.js check",
     "bench": "npm run build && node test/bench.mjs",
     "test:backend": "npm run build && node --test --test-concurrency=1 test/*.integration.mjs",

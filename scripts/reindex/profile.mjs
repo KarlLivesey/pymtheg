@@ -2,6 +2,7 @@
 // Summarises a V8 .cpuprofile: self time by function and inclusive time of
 // selected functions (main thread only; worker threads are not in it).
 //   node scripts/reindex/profile.mjs <file.cpuprofile> [top N]
+import "../isolated-home.mjs";
 import { readFileSync } from "node:fs";
 
 const [file, topArg] = process.argv.slice(2);
