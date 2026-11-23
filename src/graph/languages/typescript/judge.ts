@@ -2304,7 +2304,9 @@ export function createJudge(input: JudgeInput): Judge {
     return invoke(expression(node.expression), node, true);
   }
   type Call =
-    ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression;
+    | ts.CallExpression
+    | ts.NewExpression
+    | ts.TaggedTemplateExpression;
   const argumentsOf = (call: Call): readonly ts.Expression[] =>
     ts.isTaggedTemplateExpression(call) ? [] : (call.arguments ?? []);
   function invoke(callee: Judged, call: Call, construct: boolean): Judged {
