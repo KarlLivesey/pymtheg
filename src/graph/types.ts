@@ -350,7 +350,7 @@ export interface GraphStorage {
   writeMark?(): number;
   pathsWrittenSince?(mark: number): Set<string>;
   /** C-55: each path's symbols, as `findSymbols({ file })` returns them. */
-  symbolsAt?(
+  symbolsOfFiles?(
     paths: readonly string[],
   ): StorageResult<Map<string, GraphSymbol[]>>;
   /**

@@ -755,7 +755,7 @@ export class SqliteGraphStore implements GraphStorage {
     return new Set(this.pathWrites.slice(mark));
   }
   /** Each path's symbols, as `findSymbols({ file })` returns them. */
-  symbolsAt(paths: readonly string[]): Map<string, GraphSymbol[]> {
+  symbolsOfFiles(paths: readonly string[]): Map<string, GraphSymbol[]> {
     const select = this.db.prepare(
       "SELECT body FROM graph_symbols WHERE file=? ORDER BY id",
     );

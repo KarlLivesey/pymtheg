@@ -111,7 +111,7 @@ export async function indexProject(
       !state ||
       runMark === undefined ||
       !store.pathsWrittenSince ||
-      !store.symbolsAt ||
+      !store.symbolsOfFiles ||
       !store.filesAt ||
       !store.fileSummaries ||
       !store.resolutionFiles
@@ -934,7 +934,8 @@ async function runResolve(
               ),
             projection: async (paths) =>
               await read(() => store.resolutionFiles!(scopedKinds!, paths)),
-            symbols: async (paths) => await read(() => store.symbolsAt!(paths)),
+            symbols: async (paths) =>
+              await read(() => store.symbolsOfFiles!(paths)),
           },
           store.writeMark!(),
         );
