@@ -179,6 +179,32 @@ export class KeptInputs {
     };
   }
 
+  /**
+   * Every stored file's record, for a resolver given no scope: this run's
+   * analysis records where nothing has written them since they were read,
+   * fresh reads for the rest (other modules' files, and files written
+   * since), in the order `files()` returns them.
+   */
+  async allRecords(
+    paths: readonly string[],
+    read: (paths: readonly string[]) => Promise<GraphFile[]>,
+    writtenSince: (mark: number) => Set<string>,
+  ): Promise<GraphFile[]> {
+    const records = this.records;
+    const stale =
+      this.recordsMark === undefined
+        ? new Set<string>()
+        : writtenSince(this.recordsMark);
+    const usable = (path: string) =>
+      records?.has(path) === true && !stale.has(path);
+    const fresh = await read(paths.filter((path) => !usable(path)));
+    count("kept.input.resolverRecordsReused", paths.filter(usable).length);
+    return [
+      ...paths.filter(usable).map((path) => records!.get(path)!),
+      ...fresh.map((file) => deepFreeze(file)),
+    ].sort((a, b) => compare(a.path, b.path));
+  }
+
   private previousBytes(key: string, value: unknown): number {
     return previousSizes.get(this.previous!)?.get(key) ?? size(value);
   }

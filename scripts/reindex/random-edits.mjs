@@ -153,6 +153,7 @@ async function incrementalMcp(metrics) {
       wallMs: Math.round(performance.now() - started),
       cpuMs: Math.round((used.user + used.system) / 1000),
       counts: job.work?.counts ?? {},
+      stages: job.work?.stages ?? {},
       memory: job.memory,
       session: job.session,
       generation: jobs.generation,

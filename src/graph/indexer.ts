@@ -958,6 +958,17 @@ async function runResolve(
           module.resolutionNeedsFiles === false
             ? []
             : (fromKept?.projection ??
+              (keptInput && !scopedKinds
+                ? await input("Files", async () =>
+                    keptInput.allRecords(
+                      (await read(() => store.fileSummaries!())).map(
+                        (file) => file.path,
+                      ),
+                      async (paths) => await read(() => store.filesAt!(paths)),
+                      (mark) => store.pathsWrittenSince!(mark),
+                    ),
+                  )
+                : undefined) ??
               (await input("Files", async () =>
                 own(
                   await read(() =>
