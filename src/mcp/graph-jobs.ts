@@ -6,6 +6,11 @@ import { randomUUID } from "node:crypto";
 import type { GraphRequest, GraphProgress } from "../graph/commands.js";
 import { GraphView } from "./graph-view.js";
 import { agentLimits } from "./limits.js";
+import {
+  createChildGroups,
+  killChildGroups,
+  liveChildGroups,
+} from "../backends/child-groups.js";
 export interface GraphJob {
   id: string;
   state: "running" | "complete" | "error" | "cancelled";
@@ -16,13 +21,23 @@ export interface GraphJob {
   view?: GraphView;
   error?: string | ReturnType<typeof operationError>;
   listeners: Set<(p: GraphProgress) => void>;
+  /** The process groups the job's worker started, owned by this server. */
+  childGroups: SharedArrayBuffer;
+  /** Settles when the worker answers an abort with no live child group. */
+  aborted: Promise<void>;
 }
+
+/** Every job registry of this server, killed when the server exits. */
+const registries = new Set<SharedArrayBuffer>();
+let exitHook = false;
 export class GraphJobs {
   private readonly jobs = new Map<string, GraphJob>();
   private closed = false;
   constructor(
     private readonly root: string,
-    private readonly launch: (request: GraphRequest) => Worker = (request) =>
+    private readonly launch: (
+      request: GraphRequest & { childGroups: SharedArrayBuffer },
+    ) => Worker = (request) =>
       new Worker(new URL("./graph-worker.js", import.meta.url), {
         workerData: request,
         stdout: true,
@@ -42,11 +57,22 @@ export class GraphJobs {
       throw Error(
         "A graph job is running. Read or cancel its jobId with graph_result before starting another.",
       );
-    const worker = this.launch({ ...request, root: this.root });
+    const childGroups = createChildGroups();
+    registries.add(childGroups);
+    if (!exitHook) {
+      exitHook = true;
+      // The backstop that needs no worker: a server that exits kills every
+      // process group its jobs recorded.
+      process.once("exit", () => {
+        for (const registry of registries) killChildGroups(registry);
+      });
+    }
+    const worker = this.launch({ ...request, root: this.root, childGroups });
     // Only parentPort messages enter the protocol; module logging must not corrupt stdio.
     worker.stdout?.resume();
     worker.stderr?.resume();
     let settle!: () => void;
+    let abortAnswered!: () => void;
     const job: GraphJob = {
       id: randomUUID(),
       state: "running",
@@ -57,6 +83,10 @@ export class GraphJobs {
         settle = r;
       }),
       listeners: new Set(),
+      childGroups,
+      aborted: new Promise((r) => {
+        abortAnswered = r;
+      }),
     };
     worker.on(
       "message",
@@ -67,6 +97,10 @@ export class GraphJobs {
         message?: string;
         error?: ReturnType<typeof operationError>;
       }) => {
+        if (m.kind === "aborted") {
+          abortAnswered();
+          return;
+        }
         if (job.state !== "running") return;
         if (m.kind === "progress") {
           job.progress = m.progress!;
@@ -93,6 +127,10 @@ export class GraphJobs {
         job.state = "error";
         job.error ??= `Graph worker exited (${code}); restart indexing. Completion may be missing.`;
       }
+      // Whatever the worker left running, this server kills.
+      killChildGroups(childGroups);
+      registries.delete(childGroups);
+      abortAnswered();
       settle();
     });
     this.jobs.set(job.id, job);
@@ -108,13 +146,29 @@ export class GraphJobs {
       );
     return job;
   }
+  /**
+   * Cancels a job (C-43 review). The worker is asked to abort first: its
+   * abort signal kills the process groups it is waiting on and lets the
+   * toolchain route remove its run folder; the worker answers `aborted`
+   * once the command has settled. The server waits for that answer only
+   * while the job has a live child process group: a group is live only
+   * while the worker awaits it (`runProcess`), so its event loop is free
+   * and the answer comes; no clock decides. With no live group there is
+   * nothing to clean up, and the worker is terminated at once, as before.
+   * Any group still recorded after the worker has gone is killed by this
+   * server, which needs no help from the worker.
+   */
   async cancel(id: string) {
     const job = this.get(id);
     if (!job.exited) {
       job.state = "cancelled";
+      job.worker.postMessage({ kind: "abort" });
+      if (liveChildGroups(job.childGroups).length)
+        await Promise.race([job.aborted, job.done]);
       await job.worker.terminate();
       await job.done;
     }
+    killChildGroups(job.childGroups);
     return job;
   }
   async close() {

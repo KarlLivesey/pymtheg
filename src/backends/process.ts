@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
+import { forgetChildGroup, recordChildGroup } from "./child-groups.js";
 export interface ProcessClock {
   schedule(callback: () => void, milliseconds: number): unknown;
   cancel(handle: unknown): void;
@@ -42,7 +43,9 @@ export async function runProcess(
       bytes = 0,
       done = false,
       killTimer: unknown = null,
-      finishTimer: unknown = null;
+      finishTimer: unknown = null,
+      // The group's slot in the server's registry (child-groups.ts).
+      slot = -1;
     const outDecoder = new StringDecoder("utf8"),
       errDecoder = new StringDecoder("utf8");
     const max = options.maxBytes ?? 1024 * 1024;
@@ -67,6 +70,7 @@ export async function runProcess(
       if (finishTimer) clock.cancel(finishTimer);
       options.signal?.removeEventListener("abort", abort);
       kill("SIGKILL");
+      if (child.pid) forgetChildGroup(slot, child.pid);
       child.stdout?.destroy();
       child.stderr?.destroy();
       stdout += outDecoder.end();
@@ -108,6 +112,9 @@ export async function runProcess(
       });
       return;
     }
+    // Recorded at once, so the server can kill the group even if this
+    // thread never runs again (a terminated worker).
+    if (child.pid) slot = recordChildGroup(child.pid);
     if (options.input !== undefined && child.stdin) {
       child.stdin.on("error", () => {
         /* Early child exit is classified by exit/output. */
