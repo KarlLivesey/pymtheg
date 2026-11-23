@@ -347,11 +347,18 @@ export async function indexProject(
           await writeParsed(file);
         }
       }
-      // A run holding files marks the store here, where its parse write
-      // used to: from now on any other run finds it unfinished and takes
-      // over, so this run cannot later write analysis of a tree that
-      // another run has already found current.
-      if ([...deferred.values()].some((files) => files.length))
+      // A run holding files that its parse write used to write marks the
+      // store here, as that write did: from now on any other run finds it
+      // unfinished and takes over, so this run cannot later write analysis
+      // of a tree that another run has already found current. Files of a
+      // module reusing its analysis were held before C-53 too (C-27, C-36):
+      // they claim nothing, so a run stopped in that analysis still leaves
+      // the previous complete graph.
+      if (
+        [...deferred].some(
+          ([module, files]) => files.length && !reusing.has(module),
+        )
+      )
         await store.claimIndexRun?.();
     }),
   );
