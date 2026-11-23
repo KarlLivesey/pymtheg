@@ -1,0 +1,374 @@
+{
+  "kinds": {
+    "unresolved:receiver-unverified": 248,
+    "ambiguous": 5
+  },
+  "total": 253,
+  "sample": [
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/adapters/fetch.test.ts",
+      "line": 106,
+      "code": "const unsubscribe = next(op).subscribe({",
+      "targetName": "(expression).subscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:10 method subscribe",
+      "after": null
+    },
+    {
+      "repo": "nestjs/nest",
+      "file": "integration/http-adapters/src/adapters.ts",
+      "line": 49,
+      "code": "await adapter.getInstance().ready();",
+      "targetName": "adapter.getInstance",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/platform-fastify/adapters/fastify-adapter.ts:981 method getInstance",
+      "after": null
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "test/unit/test/module.test.ts",
+      "line": 46,
+      "code": "expect(mod.default).not.toHaveProperty('default')",
+      "targetName": "(expression).toHaveProperty",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/expect/src/types.ts:411 property toHaveProperty",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.encoder.test.ts",
+      "line": 191,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "colinhacks/zod",
+      "file": "packages/zod/src/v4/classic/from-json-schema.ts",
+      "line": 910,
+      "code": "baseSchema = baseSchema.describe(schema.description);",
+      "targetName": "baseSchema.describe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/zod/src/v4/classic/schemas.ts:142 method describe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.test.ts",
+      "line": 575,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/httpSubscriptionLink.test.ts",
+      "line": 987,
+      "code": "sub.unsubscribe();",
+      "targetName": "sub.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "test/unit/test/jest-expect.test.ts",
+      "line": 596,
+      "code": "expect(fn).not.toThrow(new globalObject.TypeError('message'))",
+      "targetName": "(expression).toThrow",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/expect/src/types.ts:518 property toThrow",
+      "after": null
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "test/e2e/test/signal.test.ts",
+      "line": 134,
+      "code": "expect(results[0].children.at(0)?.meta()).toEqual({",
+      "targetName": "(expression).at",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/vitest/src/node/reporters/reported-tasks.ts:284 method at",
+      "after": null
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "test/e2e/test/benchmarking.test.ts",
+      "line": 572,
+      "code": "expect([...(results[0]?.children.allTests() ?? [])][0]?.result()?.state).toBe('passed')",
+      "targetName": "(expression).result",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/vitest/src/node/reporters/reported-tasks.ts:154 method result",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/httpSubscriptionLink.errors.test.ts",
+      "line": 52,
+      "code": "subscription.unsubscribe(),",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "dexie/Dexie.js",
+      "file": "src/classes/dexie/dexie.ts",
+      "line": 348,
+      "code": "this.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.",
+      "targetName": "(expression).catch",
+      "kind": "unresolved:receiver-unverified",
+      "before": "src/public/types/promise-extended.d.ts:202 method catch",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tanstack-react-query/test/streamedQuery.test.tsx",
+      "line": 75,
+      "code": "next(op).subscribe({",
+      "targetName": "(expression).subscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:10 method subscribe",
+      "after": null
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "test/e2e/test/retry.test.ts",
+      "line": 295,
+      "code": "expect(skipsOnRetry.result().state).toBe('skipped')",
+      "targetName": "skipsOnRetry.result",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/vitest/src/node/reporters/reported-tasks.ts:154 method result",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/procedureErrors.test.ts",
+      "line": 633,
+      "code": "sub.unsubscribe();",
+      "targetName": "sub.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.test.ts",
+      "line": 3429,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/errors.test.ts",
+      "line": 480,
+      "code": "const unsubscribe = next(op).subscribe({",
+      "targetName": "(expression).subscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:10 method subscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.test.ts",
+      "line": 2377,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.test.ts",
+      "line": 5777,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.test.ts",
+      "line": 2340,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/procedureErrors.test.ts",
+      "line": 592,
+      "code": "sub.unsubscribe();",
+      "targetName": "sub.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.reconnectErrors.test.ts",
+      "line": 277,
+      "code": "sub.unsubscribe();",
+      "targetName": "sub.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.retryLink.test.ts",
+      "line": 85,
+      "code": "sub.unsubscribe();",
+      "targetName": "sub.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "test/e2e/test/reporters/junit.test.ts",
+      "line": 394,
+      "code": "expect(xml).not.toContain('name=\"MyModule &gt; feature A &gt; works correctly\"')",
+      "targetName": "(expression).toContain",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/expect/src/types.ts:275 property toContain",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/transformer.test.ts",
+      "line": 382,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "pmndrs/zustand",
+      "file": "src/middleware/subscribeWithSelector.ts",
+      "line": 55,
+      "code": "let currentSlice = selector(api.getState())",
+      "targetName": "api.getState",
+      "kind": "unresolved:receiver-unverified",
+      "before": "src/vanilla.ts:11 property getState",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.test.ts",
+      "line": 4965,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "test/unit/test/mocking/vi-mockObject.test.ts",
+      "line": 264,
+      "code": "mocked.generator.mockImplementation(function* () {})",
+      "targetName": "mocked.generator.mockImplementation",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/spy/src/types.ts:263 method mockImplementation",
+      "after": null
+    },
+    {
+      "repo": "trpc/trpc",
+      "file": "packages/tests/server/websockets.test.ts",
+      "line": 3944,
+      "code": "subscription.unsubscribe();",
+      "targetName": "subscription.unsubscribe",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/server/src/observable/types.ts:4 method unsubscribe",
+      "after": null
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "test/e2e/test/benchmarking.test.ts",
+      "line": 409,
+      "code": "const testCases = [...(results[0]?.children.allTests() ?? [])]",
+      "targetName": "(expression).allTests",
+      "kind": "unresolved:receiver-unverified",
+      "before": "packages/vitest/src/node/reporters/reported-tasks.ts:311 method allTests",
+      "after": null
+    },
+    {
+      "repo": "dexie/Dexie.js",
+      "file": "src/classes/dexie/transaction-helpers.ts",
+      "line": 124,
+      "code": ".then((x) => {",
+      "targetName": "(expression).then",
+      "kind": "ambiguous",
+      "before": "src/public/types/promise-extended.d.ts:192 method then",
+      "after": [
+        "[\"typescript\",\"src/helpers/promise.d.ts\",\"method\",\"DexiePromise.then\",0]",
+        "[\"typescript\",\"src/public/types/promise-extended.d.ts\",\"method\",\"PromiseExtended.then\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 674,
+      "code": "const url = await provider.getDownloadUrl(downloadOptions);",
+      "targetName": "provider.getDownloadUrl",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:107 method getDownloadUrl",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getDownloadUrl\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getDownloadUrl\",0]"
+      ]
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "packages/expect/src/jest-expect.ts",
+      "line": 215,
+      "code": "actual.contains(item),",
+      "targetName": "actual.contains",
+      "kind": "ambiguous",
+      "before": "packages/expect/src/jest-expect.ts:28 method contains",
+      "after": [
+        "[\"typescript\",\"packages/expect/src/jest-expect.ts\",\"method\",\"DOMTokenList.contains\",0]",
+        "[\"typescript\",\"packages/expect/src/jest-expect.ts\",\"method\",\"Node.contains\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 671,
+      "code": "if (!(await provider.supports(downloadOptions))) {",
+      "targetName": "provider.supports",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:71 method supports",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.supports\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.supports\",0]"
+      ]
+    },
+    {
+      "repo": "withastro/astro",
+      "file": "packages/astro/src/content/vite-plugin-content-imports.ts",
+      "line": 311,
+      "code": "const { rawData = '', data: unvalidatedData } = await entryConfig.getEntryInfo({",
+      "targetName": "entryConfig.getEntryInfo",
+      "kind": "ambiguous",
+      "before": "packages/astro/src/types/public/content.ts:150 method getEntryInfo",
+      "after": [
+        "[\"typescript\",\"packages/astro/src/types/public/content.ts\",\"method\",\"ContentEntryType.getEntryInfo\",0]",
+        "[\"typescript\",\"packages/astro/src/types/public/content.ts\",\"method\",\"DataEntryType.getEntryInfo\",0]"
+      ]
+    }
+  ]
+}

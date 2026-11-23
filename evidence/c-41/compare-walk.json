@@ -1,0 +1,1551 @@
+[
+  {
+    "id": "changesets/changesets",
+    "symbols": {
+      "before": 1653,
+      "after": 1797
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 144,
+    "links": {
+      "before": 12614,
+      "after": 12614
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 3793,
+    "definiteKept": 3793,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 2,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 15
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 7565,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "colinhacks/zod",
+    "symbols": {
+      "before": 12135,
+      "after": 12746
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 611,
+    "links": {
+      "before": 80899,
+      "after": 80899
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 49729,
+    "definiteKept": 49721,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/zod/src/v4/classic/from-json-schema.ts|calls|29163|29166|arraySchema.min",
+        "before": "[\"typescript\",\"packages/zod/src/v4/classic/schemas.ts\",\"method\",\"ZodArray.min\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/zod/src/v4/classic/from-json-schema.ts|calls|29282|29285|arraySchema.max",
+        "before": "[\"typescript\",\"packages/zod/src/v4/classic/schemas.ts\",\"method\",\"ZodArray.max\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/zod/src/v4/classic/from-json-schema.ts|calls|32411|32418|baseSchema.default",
+        "before": "[\"typescript\",\"packages/zod/src/v4/classic/schemas.ts\",\"method\",\"ZodType.default\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/zod/src/v4/classic/from-json-schema.ts|calls|34791|34799|baseSchema.describe",
+        "before": "[\"typescript\",\"packages/zod/src/v4/classic/schemas.ts\",\"method\",\"ZodType.describe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/zod/src/v4/classic/tests/discriminated-unions.test.ts|calls|28137|28143|o.shape.type.unwrap",
+        "before": "[\"typescript\",\"packages/zod/src/v4/classic/schemas.ts\",\"method\",\"ZodDefault.unwrap\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/zod/src/v4/classic/tests/string.test.ts|calls|2849|2854|schema.check",
+        "before": "[\"typescript\",\"packages/zod/src/v4/classic/schemas.ts\",\"method\",\"ZodType.check\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/zod/src/v4/core/parse.ts|calls|2907|2910|schema._zod.run",
+        "before": "[\"typescript\",\"packages/zod/src/v4/core/schemas.ts\",\"method\",\"_$ZodTypeInternals.run\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/zod/src/v4/core/parse.ts|calls|4828|4831|schema._zod.run",
+        "before": "[\"typescript\",\"packages/zod/src/v4/core/schemas.ts\",\"method\",\"_$ZodTypeInternals.run\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1813,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 26
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 28497,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "dexie/Dexie.js",
+    "symbols": {
+      "before": 5841,
+      "after": 5995
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 154,
+    "links": {
+      "before": 36421,
+      "after": 36421
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 14100,
+    "definiteKept": 14097,
+    "definiteChanged": [
+      {
+        "site": "typescript|src/classes/dexie/dexie.ts|calls|13628|13633|(expression).catch",
+        "before": "[\"typescript\",\"src/public/types/promise-extended.d.ts\",\"method\",\"PromiseExtended.catch\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/classes/dexie/transaction-helpers.ts|calls|5096|5101|(expression).catch",
+        "before": "[\"typescript\",\"src/public/types/promise-extended.d.ts\",\"method\",\"PromiseExtended.catch\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/classes/dexie/transaction-helpers.ts|calls|4724|4728|(expression).then",
+        "before": "[\"typescript\",\"src/public/types/promise-extended.d.ts\",\"method\",\"PromiseExtended.then\",0]",
+        "after": "ambiguous"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 789,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 64
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 7479,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "excalidraw/excalidraw",
+    "symbols": {
+      "before": 13405,
+      "after": 14768
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 1363,
+    "links": {
+      "before": 104294,
+      "after": 104294
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 61615,
+    "definiteKept": 61613,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/excalidraw/actions/actionAddToLibrary.ts|calls|990|1006|app.library.getLatestLibrary",
+        "before": "[\"typescript\",\"packages/excalidraw/data/library.ts\",\"property\",\"Library.getLatestLibrary\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/excalidraw/history.ts|calls|5912|5922|prevSnapshot.maybeClone",
+        "before": "[\"typescript\",\"packages/element/src/store.ts\",\"method\",\"StoreSnapshot.maybeClone\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1369,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 243
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 39229,
+    "libraryTargetsChanged": [
+      {
+        "site": "typescript|packages/common/src/promise-pool.ts|calls|1275|1291|this.pool.addEventListener",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:4df0af0781747685df19f6c07e6463fcf5f8d61864cf6ef2bdff6e117496de60\",\"dom\",\"EventTarget.prototype.addEventListener\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|packages/common/src/promise-pool.ts|calls|1402|1421|this.pool.removeEventListener",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:cd059ccb5a15dda05c32bdf65b20151e09ce575a8e1c59efa3674e2d499b9f7e\",\"dom\",\"EventTarget.prototype.removeEventListener\",\"declaring-owner\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "honojs/hono",
+    "symbols": {
+      "before": 5773,
+      "after": 6088
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 315,
+    "links": {
+      "before": 72314,
+      "after": 72314
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 36143,
+    "definiteKept": 36139,
+    "definiteChanged": [
+      {
+        "site": "typescript|src/client/client.test.ts|calls|44719|44723|ws.send",
+        "before": "[\"typescript\",\"src/helper/websocket/index.ts\",\"method\",\"WSContext.send\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/client/client.test.ts|calls|46469|46473|ws.send",
+        "before": "[\"typescript\",\"src/helper/websocket/index.ts\",\"method\",\"WSContext.send\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/client/client.test.ts|calls|52036|52040|ws.send",
+        "before": "[\"typescript\",\"src/helper/websocket/index.ts\",\"method\",\"WSContext.send\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/helper/ssg/middleware.ts|calls|1258|1266|c.notFound",
+        "before": "[\"typescript\",\"src/context.ts\",\"property\",\"Context.notFound\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 2146,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 259
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 32186,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "mermaid-js/mermaid",
+    "symbols": {
+      "before": 23639,
+      "after": 24430
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 791,
+    "links": {
+      "before": 125395,
+      "after": 125395
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 54313,
+    "definiteKept": 54313,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 489,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 52
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 60682,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "nestjs/nest",
+    "symbols": {
+      "before": 19464,
+      "after": 19980
+    },
+    "symbolKeysRemoved": 21,
+    "symbolKeysAdded": 537,
+    "links": {
+      "before": 165227,
+      "after": 165227
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 79156,
+    "definiteKept": 79154,
+    "definiteChanged": [
+      {
+        "site": "typescript|integration/http-adapters/src/adapters.ts|calls|1438|1449|adapter.getInstance",
+        "before": "[\"typescript\",\"packages/platform-fastify/adapters/fastify-adapter.ts\",\"method\",\"FastifyAdapter.getInstance\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/common/test/exceptions/http.exception.spec.ts|calls|17285|17296|error.getResponse",
+        "before": "[\"typescript\",\"packages/common/exceptions/http.exception.ts\",\"method\",\"HttpException.getResponse\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 661,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 64
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 78942,
+    "libraryTargetsChanged": [
+      {
+        "site": "typescript|packages/platform-fastify/adapters/fastify-adapter.ts|calls|32231|32235|response.view",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:02c4ea1180bfdd68fe651d4abe67e0dcc679522eccf919af1be4506a1ce8ca2e\",\"@fastify/view\",\"FastifyReply.prototype.view\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|packages/platform-fastify/multipart/multipart/multipart.parser.ts|calls|18039|18050|req.isMultipart",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:54c01e44f7a3f1d07d2b9b61276294ac008a957443e8a272e5babbe52146ae4b\",\"@fastify/multipart\",\"FastifyRequest.prototype.isMultipart\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|packages/platform-fastify/multipart/multipart/multipart.parser.ts|calls|18573|18578|req.parts",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:7c31d35506e798d607a354a0ca0a157d3d4a3d3cea92d32f88e3cf285dab947e\",\"@fastify/multipart\",\"FastifyRequest.prototype.parts\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|packages/platform-fastify/multipart/multipart/multipart.parser.ts|calls|21522|21533|req.isMultipart",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:54c01e44f7a3f1d07d2b9b61276294ac008a957443e8a272e5babbe52146ae4b\",\"@fastify/multipart\",\"FastifyRequest.prototype.isMultipart\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|packages/platform-fastify/multipart/multipart/multipart.parser.ts|calls|21772|21777|req.parts",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:7c31d35506e798d607a354a0ca0a157d3d4a3d3cea92d32f88e3cf285dab947e\",\"@fastify/multipart\",\"FastifyRequest.prototype.parts\",\"declaring-owner\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "oclif/core",
+    "symbols": {
+      "before": 2723,
+      "after": 2925
+    },
+    "symbolKeysRemoved": 1,
+    "symbolKeysAdded": 203,
+    "links": {
+      "before": 14182,
+      "after": 14182
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 7495,
+    "definiteKept": 7495,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 215,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 18
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 6362,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "pingdotgg/t3code",
+    "skipped": true
+  },
+  {
+    "id": "pmndrs/zustand",
+    "symbols": {
+      "before": 598,
+      "after": 603
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 5,
+    "links": {
+      "before": 7092,
+      "after": 7092
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 2725,
+    "definiteKept": 2717,
+    "definiteChanged": [
+      {
+        "site": "typescript|src/middleware/devtools.ts|calls|8600|8608|api.getState",
+        "before": "[\"typescript\",\"src/vanilla.ts\",\"property\",\"StoreApi.getState\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/middleware/devtools.ts|calls|15411|15419|api.getState",
+        "before": "[\"typescript\",\"src/vanilla.ts\",\"property\",\"StoreApi.getState\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/middleware/devtools.ts|calls|16292|16300|api.getState",
+        "before": "[\"typescript\",\"src/vanilla.ts\",\"property\",\"StoreApi.getState\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/middleware/devtools.ts|calls|16505|16513|api.getState",
+        "before": "[\"typescript\",\"src/vanilla.ts\",\"property\",\"StoreApi.getState\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/middleware/devtools.ts|calls|16868|16876|api.getState",
+        "before": "[\"typescript\",\"src/vanilla.ts\",\"property\",\"StoreApi.getState\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/middleware/devtools.ts|calls|17405|17413|api.getState",
+        "before": "[\"typescript\",\"src/vanilla.ts\",\"property\",\"StoreApi.getState\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/middleware/persist.ts|calls|10675|10685|storage?.removeItem",
+        "before": "[\"typescript\",\"src/middleware/persist.ts\",\"property\",\"PersistStorage.removeItem\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|src/middleware/subscribeWithSelector.ts|calls|1800|1808|api.getState",
+        "before": "[\"typescript\",\"src/vanilla.ts\",\"property\",\"StoreApi.getState\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 19,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 56
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 3330,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "puppeteer/puppeteer",
+    "symbols": {
+      "before": 8412,
+      "after": 8700
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 288,
+    "links": {
+      "before": 58189,
+      "after": 58189
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 23486,
+    "definiteKept": 23482,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/browsers/src/install.ts|calls|19305|19313|provider.supports",
+        "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.supports\",0]",
+        "after": "ambiguous"
+      },
+      {
+        "site": "typescript|packages/browsers/src/install.ts|calls|19388|19402|provider.getDownloadUrl",
+        "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getDownloadUrl\",0]",
+        "after": "ambiguous"
+      },
+      {
+        "site": "typescript|packages/puppeteer-core/src/cdp/Target.ts|calls|6968|6981|openerPage.listenerCount",
+        "before": "[\"typescript\",\"packages/puppeteer-core/src/common/EventEmitter.ts\",\"method\",\"EventEmitter.listenerCount\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/puppeteer-core/src/cdp/Target.ts|calls|7099|7103|openerPage.emit",
+        "before": "[\"typescript\",\"packages/puppeteer-core/src/common/EventEmitter.ts\",\"method\",\"EventEmitter.emit\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 742,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 3
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 23423,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "react-hook-form/react-hook-form",
+    "symbols": {
+      "before": 3382,
+      "after": 3598
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 216,
+    "links": {
+      "before": 48865,
+      "after": 48865
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 15539,
+    "definiteKept": 15539,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 134,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 1193
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 26947,
+    "libraryTargetsChanged": [
+      {
+        "site": "typescript|src/logic/createFormControl.ts|calls|44773|44778|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/logic/createFormControl.ts|calls|50909|50914|fieldRef.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/useFieldArray.ts|calls|14854|14859|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/__tests__/logic/iterateFieldsByAction.test.ts|calls|448|453|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/__tests__/logic/iterateFieldsByAction.test.ts|calls|992|997|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/__tests__/logic/iterateFieldsByAction.test.ts|calls|1278|1283|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/__tests__/logic/iterateFieldsByAction.test.ts|calls|1954|1959|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/__tests__/logic/iterateFieldsByAction.test.ts|calls|2865|2870|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/__tests__/logic/iterateFieldsByAction.test.ts|calls|4303|4308|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      },
+      {
+        "site": "typescript|src/__tests__/logic/iterateFieldsByAction.test.ts|calls|5826|5831|ref.focus",
+        "before": [],
+        "after": [
+          "[\"candidate\",\"library:ffd95311e0e2a5cdbbc2457b435b23698dd7e16fc4e2859ceac0d81956eb1617\",\"dom\",\"HTMLOrSVGElement.prototype.focus\",\"declaring-owner\"]"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "reduxjs/redux-toolkit",
+    "symbols": {
+      "before": 7918,
+      "after": 8416
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 498,
+    "links": {
+      "before": 57054,
+      "after": 57054
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 24045,
+    "definiteKept": 24039,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/toolkit/bench/dispatch.bench.ts|calls|2518|2524|(expression).concat",
+        "before": "[\"typescript\",\"packages/toolkit/src/utils.ts\",\"method\",\"Tuple.concat\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/toolkit/src/query/tests/middlewareState.test.ts|calls|1627|1647|stateA.getSubscriptionCount",
+        "before": "[\"typescript\",\"packages/toolkit/src/query/core/module.ts\",\"method\",\"ApiMiddlewareState.getSubscriptionCount\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/toolkit/src/query/tests/middlewareState.test.ts|calls|1849|1869|stateA.getSubscriptionCount",
+        "before": "[\"typescript\",\"packages/toolkit/src/query/core/module.ts\",\"method\",\"ApiMiddlewareState.getSubscriptionCount\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/toolkit/src/query/tests/middlewareState.test.ts|calls|1912|1932|stateB.getSubscriptionCount",
+        "before": "[\"typescript\",\"packages/toolkit/src/query/core/module.ts\",\"method\",\"ApiMiddlewareState.getSubscriptionCount\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/toolkit/src/query/tests/middlewareState.test.ts|calls|2000|2020|stateA.getSubscriptionCount",
+        "before": "[\"typescript\",\"packages/toolkit/src/query/core/module.ts\",\"method\",\"ApiMiddlewareState.getSubscriptionCount\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/toolkit/src/query/tests/middlewareState.test.ts|calls|2088|2108|stateA.getSubscriptionCount",
+        "before": "[\"typescript\",\"packages/toolkit/src/query/core/module.ts\",\"method\",\"ApiMiddlewareState.getSubscriptionCount\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 522,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 1796
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 23312,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "trpc/trpc",
+    "symbols": {
+      "before": 17804,
+      "after": 19361
+    },
+    "symbolKeysRemoved": 4,
+    "symbolKeysAdded": 1561,
+    "links": {
+      "before": 107126,
+      "after": 107126
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 53822,
+    "definiteKept": 53698,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/client/src/__tests__/testClientResource.ts|calls|3381|3385|(expression).pipe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Observable.pipe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/client/src/links/internals/dedupeLink.ts|calls|1129|1138|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/client/src/links/internals/dedupeLink.ts|calls|1417|1428|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/client/src/links/loggerLink.ts|calls|7352|7361|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/client/src/links/loggerLink.ts|calls|7126|7130|(expression).pipe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Observable.pipe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/client/src/links/retryLink.ts|calls|2300|2309|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/client/src/links/retryLink.ts|calls|3608|3619|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/client/src/links/wsLink/wsClient/wsClient.ts|calls|5905|5913|request.callbacks.complete",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"property\",\"Observer.complete\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/client/src/links/wsLink/wsClient/wsClient.ts|calls|6026|6031|request.callbacks.error",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"property\",\"Observer.error\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/react-query/test/__testHelpers.tsx|calls|7862|7871|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/react-query/test/streamedQuery.test.tsx|calls|2371|2380|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/src/unstable-handles/handles.test.tsx|calls|29649|29665|trpc.post.list.infiniteQueryKey",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateInfiniteQueryProcedure.infiniteQueryKey\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/src/unstable-handles/handles.test.tsx|calls|33969|33981|trpc.post.byId.queryOptions",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateQueryProcedure.queryOptions\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/src/unstable-handles/handles.test.tsx|calls|34151|34171|trpc.post.list.infiniteQueryOptions",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateInfiniteQueryProcedure.infiniteQueryOptions\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/src/unstable-handles/handles.test.tsx|calls|48516|48528|client.viewer.queryOptions",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateQueryProcedure.queryOptions\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/src/unstable-handles/handles.test.tsx|calls|48636|48648|client.post.byId.queryOptions",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateQueryProcedure.queryOptions\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/test/queryOptions.test.tsx|calls|9949|9961|ctx.optionsProxyServer.post.byId.queryOptions",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateQueryProcedure.queryOptions\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/test/streamedQuery.test.tsx|calls|2305|2314|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/test/streamedQuery.test.tsx|calls|2924|2936|ctx.optionsProxyClient.stream.queryOptions",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateQueryProcedure.queryOptions\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/test/streamedQuery.test.tsx|calls|10161|10173|t.optionsProxyClient.stream.queryOptions",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateQueryProcedure.queryOptions\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tanstack-react-query/test/streamedQuery.test.tsx|calls|11107|11119|t.optionsProxyClient.stream.queryOptions",
+        "before": "[\"typescript\",\"packages/tanstack-react-query/src/internals/createOptionsProxy.ts\",\"property\",\"DecorateQueryProcedure.queryOptions\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/adapters/fastify.test.ts|calls|6142|6151|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/adapters/fetch.test.ts|calls|2727|2736|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/adapters/fetch.test.ts|calls|6634|6638|(expression).pipe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Observable.pipe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/errors.test.ts|calls|11943|11952|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/errors.test.ts|calls|13082|13091|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/errors.test.ts|calls|14338|14347|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.errors.test.ts|calls|1714|1725|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.headers.retryLink.test.ts|calls|2512|2521|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.headers.retryLink.test.ts|calls|6927|6938|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.memory.test.ts|calls|1636|1647|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|3603|3612|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|5375|5386|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|10139|10150|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|12074|12085|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|13955|13966|subscription.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|24727|24738|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|25855|25866|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|26622|26633|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|28146|28155|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|33328|33339|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|35912|35923|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|37809|37820|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|40453|40464|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|42505|42516|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|44776|44787|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|46416|46425|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/httpSubscriptionLink.test.ts|calls|48351|48362|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/links.test.ts|calls|17400|17409|(expression).subscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Subscribable.subscribe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/tests/server/pathSeparator.test.ts|calls|4742|4753|sub.unsubscribe",
+        "before": "[\"typescript\",\"packages/server/src/observable/types.ts\",\"method\",\"Unsubscribable.unsubscribe\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 1717,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 535
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 46122,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vercel/turborepo",
+    "symbols": {
+      "before": 59426,
+      "after": 59772
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 346,
+    "links": {
+      "before": 743594,
+      "after": 743594
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 247781,
+    "definiteKept": 247776,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/turbo-workspaces/src/managers/aube.ts|calls|1604|1610|underlyingHandler.detect",
+        "before": "[\"typescript\",\"packages/turbo-workspaces/src/types.ts\",\"property\",\"ManagerHandler.detect\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/turbo-workspaces/src/managers/aube.ts|calls|1664|1668|underlyingHandler.read",
+        "before": "[\"typescript\",\"packages/turbo-workspaces/src/types.ts\",\"property\",\"ManagerHandler.read\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/turbo-workspaces/src/managers/nub.ts|calls|1798|1804|underlyingHandler.detect",
+        "before": "[\"typescript\",\"packages/turbo-workspaces/src/types.ts\",\"property\",\"ManagerHandler.detect\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/turbo-workspaces/src/managers/nub.ts|calls|1858|1862|underlyingHandler.read",
+        "before": "[\"typescript\",\"packages/turbo-workspaces/src/types.ts\",\"property\",\"ManagerHandler.read\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|crates/turborepo-trace-lang-js/tests/flow_oracle/cases/each2.cjs|calls|2382|2386|describe.only.each",
+        "before": "[\"typescript\",\"crates/turborepo-trace-lang-js/tests/flow_oracle/cases/each2.cjs\",\"function\",\"each\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 786,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 15
+    },
+    "rust": {
+      "before": 226013,
+      "after": 226013,
+      "total": 689591
+    },
+    "receiverGaps": {
+      "written-type": 19478,
+      "callee-unresolved": 40827,
+      "no-recipe": 44404,
+      "receiver-method-unresolved": 22371,
+      "outside-type": 5393,
+      "closure-parameter": 9272,
+      "iterator-item": 4411,
+      "annotation-shape": 4028,
+      "pattern-binding": 11503,
+      "non-local-value": 1704,
+      "macro": 1931,
+      "control-flow": 1537,
+      "aggregate": 624,
+      "literal": 5919,
+      "field-owner": 1621,
+      "generic-call": 643,
+      "destructured": 9606,
+      "try-wrapper": 1089,
+      "type_cast": 113,
+      "range": 524,
+      "generic-field": 283,
+      "binding-unproved": 764,
+      "closure-call": 774,
+      "operator": 120,
+      "path-value": 318,
+      "index": 4803,
+      "binary": 454,
+      "struct-literal-owner": 166,
+      "impl-trait": 291,
+      "callee-kind": 39,
+      "field-unknown": 63,
+      "self-type": 59,
+      "receiver-too-long": 6,
+      "generic-return": 49,
+      "future-receiver": 1,
+      "call-expression": 23,
+      "deref-owned": 17,
+      "trait-object": 88,
+      "parameter-shape": 4,
+      "uninitialized": 12,
+      "await-non-async": 2,
+      "declaration-placement": 676
+    },
+    "outsideReceivers": 5393,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 95587,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vitejs/vite",
+    "symbols": {
+      "before": 10186,
+      "after": 10528
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 342,
+    "links": {
+      "before": 55530,
+      "after": 55530
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 23471,
+    "definiteKept": 23466,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/vite/src/node/plugins/css.ts|calls|13279|13284|environment.safeModulePaths.addId",
+        "before": "[\"typescript\",\"packages/vite/src/node/server/safeModulePaths.ts\",\"method\",\"SafeModulePaths.addId\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/vite/src/node/plugins/resolve.ts|calls|11272|11293|(expression).registerMissingImport",
+        "before": "[\"typescript\",\"packages/vite/src/node/optimizer/index.ts\",\"property\",\"DepsOptimizer.registerMissingImport\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/vite/src/node/plugins/resolve.ts|calls|11410|11427|(expression).getOptimizedDepId",
+        "before": "[\"typescript\",\"packages/vite/src/node/optimizer/index.ts\",\"property\",\"DepsOptimizer.getOptimizedDepId\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/vite/src/node/plugins/worker.ts|calls|27601|27614|moduleGraph?.getModuleById",
+        "before": "[\"typescript\",\"packages/vite/src/node/server/moduleGraph.ts\",\"method\",\"EnvironmentModuleGraph.getModuleById\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/vite/src/node/server/middlewares/proxy.ts|calls|3177|3186|opts.configure",
+        "before": "[\"typescript\",\"packages/vite/src/node/server/middlewares/proxy.ts\",\"property\",\"ProxyOptions.configure\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 398,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 23
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 24756,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "vitest-dev/vitest",
+    "symbols": {
+      "before": 17973,
+      "after": 18590
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 617,
+    "links": {
+      "before": 116096,
+      "after": 116096
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 74498,
+    "definiteKept": 74420,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/browser/src/client/tester/context.ts|calls|11440|11447|target.element",
+        "before": "[\"typescript\",\"packages/browser/context.d.ts\",\"method\",\"Locator.element\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/expect/src/jest-expect.ts|calls|6695|6703|actual.contains",
+        "before": "[\"typescript\",\"packages/expect/src/jest-expect.ts\",\"method\",\"Node.contains\",0]",
+        "after": "ambiguous"
+      },
+      {
+        "site": "typescript|packages/vitest/src/node/reporters/reported-tasks.ts|calls|8413|8421|child.children.allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/vitest/src/node/reporters/reported-tasks.ts|calls|9541|9550|child.children.allSuites",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allSuites\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|3768|3776|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|3845|3851|(expression).result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|12872|12880|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|12954|12960|(expression).result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|13010|13016|(expression).result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|13672|13680|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|13749|13755|(expression).result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|19003|19009|(expression).result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|18980|18988|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|21580|21586|(expression).result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|21557|21565|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|22978|22984|(expression).result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|22955|22963|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|49031|49037|(expression).result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/benchmarking.test.ts|calls|49008|49016|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/config/browser-configs.test.ts|calls|4598|4602|(expression).toBe",
+        "before": "[\"typescript\",\"packages/expect/src/types.ts\",\"property\",\"JestAssertion.toBe\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/node-builtins.test.ts|calls|679|681|(expression).ok",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"property\",\"TestModule.ok\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/pre-parse.test.ts|calls|9464|9469|testModule.state",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestModule.state\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/projects.test.ts|calls|28916|28918|module.ok",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"property\",\"TestModule.ok\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/projects.test.ts|calls|40507|40509|module.ok",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"property\",\"TestModule.ok\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/repeats.test.ts|calls|1950|1958|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/repeats.test.ts|calls|1975|1981|test.result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/repeats.test.ts|calls|2964|2972|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/repeats.test.ts|calls|2989|2999|test.diagnostic",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.diagnostic\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/repeats.test.ts|calls|3037|3047|test.diagnostic",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.diagnostic\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/reporters/junit.test.ts|calls|5900|5909|(expression).toContain",
+        "before": "[\"typescript\",\"packages/expect/src/types.ts\",\"property\",\"JestAssertion.toContain\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/reporters/junit.test.ts|calls|9003|9012|(expression).toContain",
+        "before": "[\"typescript\",\"packages/expect/src/types.ts\",\"property\",\"JestAssertion.toContain\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/reporters/junit.test.ts|calls|14474|14483|(expression).toContain",
+        "before": "[\"typescript\",\"packages/expect/src/types.ts\",\"property\",\"JestAssertion.toContain\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/reporters/junit.test.ts|calls|15413|15422|(expression).toContain",
+        "before": "[\"typescript\",\"packages/expect/src/types.ts\",\"property\",\"JestAssertion.toContain\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/reporters/junit.test.ts|calls|15901|15910|(expression).toContain",
+        "before": "[\"typescript\",\"packages/expect/src/types.ts\",\"property\",\"JestAssertion.toContain\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry-clear-mocks.test.ts|calls|795|797|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry-clear-mocks.test.ts|calls|1460|1462|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry-clear-mocks.test.ts|calls|2276|2278|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry.test.ts|calls|4171|4179|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry.test.ts|calls|4206|4214|test.attempts",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.attempts\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry.test.ts|calls|7636|7644|(expression).allTests",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.allTests\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry.test.ts|calls|7669|7675|skipsOnRetry.result",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.result\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry.test.ts|calls|7735|7743|skipsOnRetry.attempts",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.attempts\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/retry.test.ts|calls|8099|8107|skippedStatically.attempts",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCase.attempts\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/signal.test.ts|calls|767|769|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/signal.test.ts|calls|1466|1468|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/signal.test.ts|calls|2234|2236|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/signal.test.ts|calls|2312|2314|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/signal.test.ts|calls|2390|2392|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/signal.test.ts|calls|4245|4247|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|test/e2e/test/signal.test.ts|calls|5352|5354|(expression).at",
+        "before": "[\"typescript\",\"packages/vitest/src/node/reporters/reported-tasks.ts\",\"method\",\"TestCollection.at\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 879,
+    "ambiguousChanged": 10,
+    "newDefinite": {
+      "other": 698
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 23615,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "withastro/astro",
+    "symbols": {
+      "before": 26243,
+      "after": 27081
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 838,
+    "links": {
+      "before": 152393,
+      "after": 152393
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 66867,
+    "definiteKept": 66863,
+    "definiteChanged": [
+      {
+        "site": "typescript|packages/astro/src/content/vite-plugin-content-imports.ts|calls|10001|10013|entryConfig.getEntryInfo",
+        "before": "[\"typescript\",\"packages/astro/src/types/public/content.ts\",\"method\",\"DataEntryType.getEntryInfo\",0]",
+        "after": "ambiguous"
+      },
+      {
+        "site": "typescript|packages/astro/src/vite-plugin-adapter-config/index.ts|calls|1811|1831|clientConfig.internalFetchHeaders",
+        "before": "[\"typescript\",\"packages/astro/src/types/public/integrations.ts\",\"property\",\"AstroAdapterClientConfig.internalFetchHeaders\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/runtime/src/internal/server/render/component.ts|calls|10902|10908|renderTemplateResult.render",
+        "before": "[\"typescript\",\"packages/runtime/src/internal/server/render/astro/render-template.ts\",\"method\",\"RenderTemplateResult.render\",0]",
+        "after": "unresolved"
+      },
+      {
+        "site": "typescript|packages/runtime/src/internal/server/render/streaming.ts|calls|11168|11188|node.templateResult.catchExpressionError",
+        "before": "[\"typescript\",\"packages/runtime/src/internal/server/render/astro/render-template.ts\",\"method\",\"RenderTemplateResult.catchExpressionError\",0]",
+        "after": "unresolved"
+      }
+    ],
+    "libraryChanged": 0,
+    "ambiguousBefore": 5272,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 120
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 74823,
+    "libraryTargetsChanged": []
+  },
+  {
+    "id": "yargs/yargs",
+    "symbols": {
+      "before": 1180,
+      "after": 1199
+    },
+    "symbolKeysRemoved": 0,
+    "symbolKeysAdded": 19,
+    "links": {
+      "before": 12201,
+      "after": 12201
+    },
+    "sitesOnlyBefore": 0,
+    "sitesOnlyAfter": 0,
+    "definiteBefore": 3967,
+    "definiteKept": 3967,
+    "definiteChanged": [],
+    "libraryChanged": 0,
+    "ambiguousBefore": 104,
+    "ambiguousChanged": 0,
+    "newDefinite": {
+      "other": 24
+    },
+    "rust": {
+      "before": 0,
+      "after": 0,
+      "total": 0
+    },
+    "receiverGaps": {},
+    "outsideReceivers": 0,
+    "outsideChanged": 0,
+    "libraryTargetLinks": 2630,
+    "libraryTargetsChanged": []
+  }
+]
