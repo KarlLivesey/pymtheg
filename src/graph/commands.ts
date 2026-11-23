@@ -490,7 +490,18 @@ export async function executeGraph(
           if (typeof value !== "function") return value;
           return (...args: unknown[]) => {
             signal.throwIfAborted();
-            return value.apply(target, args);
+            const result = value.apply(target, args);
+            // C-45: kept state is confirmed against the completion record
+            // the run's ownership baseline read, in the same snapshot; the
+            // record read before the run began can be stale.
+            if (key === "beginIndexRun")
+              sessionRun?.confirm(
+                checkpointFrom(
+                  currentStore.baselineCommandState(),
+                  currentStore.projectId,
+                )?.fingerprint ?? null,
+              );
+            return result;
           };
         },
       });

@@ -3409,10 +3409,13 @@ the cost. See [C-40](changes/C-40.md).
 **Decided (C-45):** a process that indexes more than once may pass an
 `IndexSession`. The session loads the modules once and keeps per-module
 values between runs, returned only under the validity key the module kept
-them with. Everything is dropped unless the store's completion record is
-the one the session's last completed run wrote, and the project, store,
-module versions and index settings are unchanged. Values set by a run
-are kept only if it writes its completion record. The session holds no
+them with. Everything is dropped unless the store's completion record, as
+the run's own ownership baseline reads it (the same snapshot as its data
+version and mark), is the one the session's last completed run wrote, and
+the project, store, module versions and index settings are unchanged.
+A run takes what was kept; only values it sets again are kept after it,
+and only if it writes its completion record. Modules treat kept values as
+immutable. Kept state is bounded by count; the embedder bounds memory. The session holds no
 connection or lock between runs; each run is an ordinary index run.
 **Why:** a one-file edit rebuilds per-process and per-language state that
 did not change (C-45 measurements). The completion record already proves
