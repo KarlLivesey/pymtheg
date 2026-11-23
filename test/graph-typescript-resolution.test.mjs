@@ -1969,9 +1969,9 @@ test("object-member calls account for every explicit producer and withhold opaqu
           // An element access the producers cannot follow: the checker's
           // answer stands (docs/changes/C-41.md, "Found, not built").
           "legacyList[key].inspect();": [
-        "use.ts#legacyFirst.inspect",
-        "use.ts#legacySecond.inspect",
-      ],
+            "use.ts#legacyFirst.inspect",
+            "use.ts#legacySecond.inspect",
+          ],
         },
       );
     },

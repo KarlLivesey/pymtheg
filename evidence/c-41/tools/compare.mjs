@@ -12,9 +12,7 @@ import { DatabaseSync } from "node:sqlite";
 const [baseScratch, baseRun, candScratch, candRun, out, sampleSize] =
   process.argv.slice(2);
 const runs = (path) =>
-  new Map(
-    JSON.parse(readFileSync(path, "utf8")).repos.map((r) => [r.id, r]),
-  );
+  new Map(JSON.parse(readFileSync(path, "utf8")).repos.map((r) => [r.id, r]));
 const base = runs(baseRun),
   cand = runs(candRun);
 
@@ -26,7 +24,9 @@ function load(scratch, repo) {
   );
   try {
     const symbols = new Map();
-    for (const { body } of db.prepare("SELECT body FROM graph_symbols").iterate()) {
+    for (const { body } of db
+      .prepare("SELECT body FROM graph_symbols")
+      .iterate()) {
       const s = JSON.parse(body);
       symbols.set(s.id, {
         key: JSON.stringify([s.module, s.file, s.kind, s.identity, s.ordinal]),
@@ -47,11 +47,15 @@ function load(scratch, repo) {
     // Library targets (graph schema 4): every row, by role and identity.
     const libraries = new Map();
     const hasLibraries = db
-      .prepare("SELECT name FROM sqlite_master WHERE name = 'graph_library_targets'")
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE name = 'graph_library_targets'",
+      )
       .get();
     if (hasLibraries)
       for (const r of db
-        .prepare("SELECT link, role, id, unit, symbol, evidence FROM graph_library_targets")
+        .prepare(
+          "SELECT link, role, id, unit, symbol, evidence FROM graph_library_targets",
+        )
         .iterate()) {
         const list = libraries.get(r.link) ?? [];
         list.push(JSON.stringify([r.role, r.id, r.unit, r.symbol, r.evidence]));
@@ -62,7 +66,14 @@ function load(scratch, repo) {
       .prepare("SELECT id, target, resolution, body FROM graph_links")
       .iterate()) {
       const l = JSON.parse(row.body);
-      let site = [l.module, l.file, l.kind, l.range.start, l.range.end, l.targetName].join("|");
+      let site = [
+        l.module,
+        l.file,
+        l.kind,
+        l.range.start,
+        l.range.end,
+        l.targetName,
+      ].join("|");
       while (links.has(site)) site += "+";
       links.set(site, {
         module: l.module,
@@ -71,7 +82,9 @@ function load(scratch, repo) {
         start: l.range.start,
         targetName: l.targetName,
         resolution: row.resolution,
-        target: row.target ? (symbols.get(row.target)?.key ?? row.target) : null,
+        target: row.target
+          ? (symbols.get(row.target)?.key ?? row.target)
+          : null,
         targetSymbol: row.target ? symbols.get(row.target) : undefined,
         candidates: (candidates.get(row.id) ?? []).sort(),
         libraries: (libraries.get(row.id) ?? []).sort(),
@@ -94,9 +107,15 @@ const mechanism = (l) =>
           ? "method-inferred-receiver"
           : "method-written-receiver"
         : "other";
-const hash = (s) => createHash("sha256").update("c41|" + s).digest("hex");
+const hash = (s) =>
+  createHash("sha256")
+    .update("c41|" + s)
+    .digest("hex");
 const summary = [];
 const samples = [];
+// C-41 review: every definite link that changes, for its own sample.
+const changes = [];
+const changeKinds = {};
 for (const [id, b] of base) {
   const c = cand.get(id);
   // An incomplete index (failed files) still has a graph; compare like with like.
@@ -147,13 +166,31 @@ for (const [id, b] of base) {
     }
     if (l.resolution === "resolved") {
       row.definiteBefore++;
-      if (a.resolution === "resolved" && a.target === l.target) row.definiteKept++;
-      else
+      if (a.resolution === "resolved" && a.target === l.target)
+        row.definiteKept++;
+      else {
         row.definiteChanged.push({
           site,
           before: l.target,
           after: a.resolution === "resolved" ? a.target : a.resolution,
         });
+        const kind =
+          a.resolution === "resolved"
+            ? "retargeted"
+            : a.resolution === "unresolved"
+              ? `unresolved:${a.data.reason ?? ""}`
+              : a.resolution;
+        changeKinds[kind] = (changeKinds[kind] ?? 0) + 1;
+        changes.push({
+          repo: id,
+          checkout: after.checkout,
+          site,
+          before: l,
+          after: a,
+          kind,
+          rank: hash(id + "|" + site),
+        });
+      }
     } else if (l.resolution === "library") {
       if (a.resolution !== "library") row.libraryChanged++;
     } else if (l.resolution === "ambiguous") {
@@ -168,17 +205,31 @@ for (const [id, b] of base) {
     if (l.libraries.length || a.libraries.length) {
       if (l.libraries.length) row.libraryTargetLinks++;
       if (JSON.stringify(l.libraries) !== JSON.stringify(a.libraries))
-        row.libraryTargetsChanged.push({ site, before: l.libraries, after: a.libraries });
+        row.libraryTargetsChanged.push({
+          site,
+          before: l.libraries,
+          after: a.libraries,
+        });
     }
     // A call whose receiver has a proven library type keeps its outcome.
-    if (a.data.receiverTyping?.outside &&
-      (a.resolution !== l.resolution || a.target !== l.target ||
-        JSON.stringify(a.candidates) !== JSON.stringify(l.candidates)))
+    if (
+      a.data.receiverTyping?.outside &&
+      (a.resolution !== l.resolution ||
+        a.target !== l.target ||
+        JSON.stringify(a.candidates) !== JSON.stringify(l.candidates))
+    )
       row.outsideChanged++;
     if (l.resolution !== "resolved" && a.resolution === "resolved") {
       const m = mechanism(a);
       row.newDefinite[m] = (row.newDefinite[m] ?? 0) + 1;
-      samples.push({ repo: id, checkout: after.checkout, site, mechanism: m, link: a, rank: hash(id + "|" + site) });
+      samples.push({
+        repo: id,
+        checkout: after.checkout,
+        site,
+        mechanism: m,
+        link: a,
+        rank: hash(id + "|" + site),
+      });
     }
     if (a.module === "rust" && a.data.method && a.resolution !== "resolved") {
       const gap =
@@ -195,7 +246,15 @@ for (const [id, b] of base) {
   row.definiteChanged = row.definiteChanged.slice(0, 50);
   row.libraryTargetsChanged = row.libraryTargetsChanged.slice(0, 50);
   summary.push(row);
-  console.error(id, JSON.stringify({ kept: row.definiteKept, of: row.definiteBefore, changed: row.definiteChanged.length, newDefinite: row.newDefinite }));
+  console.error(
+    id,
+    JSON.stringify({
+      kept: row.definiteKept,
+      of: row.definiteBefore,
+      changed: row.definiteChanged.length,
+      newDefinite: row.newDefinite,
+    }),
+  );
 }
 writeFileSync(out, JSON.stringify(summary, null, 2) + "\n");
 if (sampleSize) {
@@ -212,7 +271,9 @@ if (sampleSize) {
     for (const s of list.slice(0, Number(sampleSize))) {
       const source = readFileSync(join(s.checkout, s.link.file), "utf8");
       const t = s.link.targetSymbol;
-      const targetSource = t ? readFileSync(join(s.checkout, t.file), "utf8") : "";
+      const targetSource = t
+        ? readFileSync(join(s.checkout, t.file), "utf8")
+        : "";
       picked.push({
         mechanism: m,
         repo: s.repo,
@@ -223,10 +284,49 @@ if (sampleSize) {
         target: t
           ? `${t.file}:${lineOf(targetSource, t.start)} ${t.kind} ${t.name}`
           : null,
-        targetLine: t ? targetSource.split("\n")[lineOf(targetSource, t.start) - 1].trim() : null,
+        targetLine: t
+          ? targetSource.split("\n")[lineOf(targetSource, t.start) - 1].trim()
+          : null,
         binding: s.link.data.localBinding ?? s.link.data.typeParameter ?? null,
       });
     }
   }
-  writeFileSync(out.replace(/\.json$/, "") + ".sample.json", JSON.stringify(picked, null, 2) + "\n");
+  writeFileSync(
+    out.replace(/\.json$/, "") + ".sample.json",
+    JSON.stringify(picked, null, 2) + "\n",
+  );
+  // The lowest-hash definite links that change, with the code and both answers.
+  const at = (checkout, symbol) => {
+    if (!symbol) return null;
+    const text = readFileSync(join(checkout, symbol.file), "utf8");
+    return `${symbol.file}:${lineOf(text, symbol.start)} ${symbol.kind} ${symbol.name}`;
+  };
+  changes.sort((x, y) => (x.rank < y.rank ? -1 : 1));
+  const changed = changes.slice(0, Number(sampleSize)).map((c) => {
+    const source = readFileSync(join(c.checkout, c.after.file), "utf8");
+    const line = lineOf(source, c.after.start);
+    return {
+      repo: c.repo,
+      file: c.after.file,
+      line,
+      code: source.split("\n")[line - 1].trim(),
+      targetName: c.after.targetName,
+      kind: c.kind,
+      before: at(c.checkout, c.before.targetSymbol),
+      after:
+        c.after.resolution === "resolved"
+          ? at(c.checkout, c.after.targetSymbol)
+          : c.after.resolution === "ambiguous"
+            ? c.after.candidates
+            : null,
+    };
+  });
+  writeFileSync(
+    out.replace(/\.json$/, "") + ".changed.json",
+    JSON.stringify(
+      { kinds: changeKinds, total: changes.length, sample: changed },
+      null,
+      2,
+    ) + "\n",
+  );
 }

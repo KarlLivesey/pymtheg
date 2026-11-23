@@ -312,7 +312,9 @@ export function receiverArms(
   }
 
   function declarationArms(declaration: ts.Declaration): DeclarationArms {
-    return guarded(declared, declaration, () => computeDeclaration(declaration));
+    return guarded(declared, declaration, () =>
+      computeDeclaration(declaration),
+    );
   }
 
   function computeDeclaration(declaration: ts.Declaration): DeclarationArms {
@@ -355,8 +357,7 @@ export function receiverArms(
         value = checker.getAliasedSymbol(value);
       return value ? symbolArms(value) : undefined;
     }
-    if (ts.isExportAssignment(declaration))
-      return arms(declaration.expression);
+    if (ts.isExportAssignment(declaration)) return arms(declaration.expression);
     // A JavaScript assignment declaration (`x = value`, `exports.x = value`).
     if (
       ts.isBinaryExpression(declaration) &&
@@ -386,7 +387,10 @@ export function receiverArms(
     const values: (ts.Expression | undefined)[] = [];
     if (declaration.initializer) values.push(declaration.initializer);
     // A pattern's bindings are assigned one by one (see binding).
-    if (!(list.flags & ts.NodeFlags.Const) && ts.isIdentifier(declaration.name)) {
+    if (
+      !(list.flags & ts.NodeFlags.Const) &&
+      ts.isIdentifier(declaration.name)
+    ) {
       const writes = assignments(declaration);
       if (!writes) return undefined;
       values.push(...writes);
@@ -405,7 +409,8 @@ export function receiverArms(
     // A script's top-level `var` can be assigned from any file.
     if (
       !ts.isExternalModule(file) &&
-      !(file as { commonJsModuleIndicator?: ts.Node }).commonJsModuleIndicator &&
+      !(file as { commonJsModuleIndicator?: ts.Node })
+        .commonJsModuleIndicator &&
       !ts.findAncestor(declaration, (node) => ts.isFunctionLike(node))
     )
       return undefined;
@@ -679,14 +684,19 @@ export function receiverArms(
     ) {
       const writes = assignments(declaration);
       if (!writes) return undefined;
-      result = merge([result, ...writes.map((value) => (value ? arms(value) : undefined))]);
+      result = merge([
+        result,
+        ...writes.map((value) => (value ? arms(value) : undefined)),
+      ]);
     }
     return result;
   }
 
   /** The value returned by calling the body `fn`, as arms. */
   /** The expressions `fn` returns, or undefined for a generator. */
-  function returnExpressions(fn: Callable): readonly ts.Expression[] | undefined {
+  function returnExpressions(
+    fn: Callable,
+  ): readonly ts.Expression[] | undefined {
     if (!fn.body) return undefined;
     if ("asteriskToken" in fn && fn.asteriskToken) return undefined;
     const known = returnLists.get(fn);
@@ -716,7 +726,8 @@ export function receiverArms(
    * expression: the call's value is its value.
    */
   function onlyReturn(node: ts.CallExpression): ts.Expression | undefined {
-    if (!ts.isIdentifier(node.expression) || node.typeArguments) return undefined;
+    if (!ts.isIdentifier(node.expression) || node.typeArguments)
+      return undefined;
     let symbol = checker.getSymbolAtLocation(node.expression);
     if (symbol && symbol.flags & ts.SymbolFlags.Alias)
       symbol = checker.getAliasedSymbol(symbol);
@@ -881,7 +892,12 @@ export function receiverArms(
           return merge(
             array.elements.map((item) =>
               ts.isSpreadElement(item)
-                ? element(arms(item.expression), undefined, item, item.expression)
+                ? element(
+                    arms(item.expression),
+                    undefined,
+                    item,
+                    item.expression,
+                  )
                 : ts.isOmittedExpression(item)
                   ? NO_ARMS
                   : arms(item),

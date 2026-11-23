@@ -164,9 +164,15 @@ test("a computed union of identical type literals is never one definite member",
     "src/use.ts",
   );
   assert.deepEqual(got, {
-    "(pick ? one : two).run();": ["src/use.ts#one.[type].run", "src/use.ts#two.[type].run"],
+    "(pick ? one : two).run();": [
+      "src/use.ts#one.[type].run",
+      "src/use.ts#two.[type].run",
+    ],
     "chosen.run();": ["src/use.ts#one.[type].run", "src/use.ts#two.[type].run"],
-    "choose().run();": ["src/use.ts#one.[type].run", "src/use.ts#two.[type].run"],
+    "choose().run();": [
+      "src/use.ts#one.[type].run",
+      "src/use.ts#two.[type].run",
+    ],
   });
 });
 
@@ -398,7 +404,8 @@ test("no step of a member call's receiver is a value the checker reduced from se
     ],
     "(pick ? f1 : f2)().run(); @(expression)": "unresolved:no-symbol",
     // Each arm's member is in a function type's return: no symbol.
-    "(pick ? f1 : f2)().run(); @(expression).run": "unresolved:reduced-receiver",
+    "(pick ? f1 : f2)().run(); @(expression).run":
+      "unresolved:reduced-receiver",
     // The literal arm's member has no anchor: its producers decide.
     "ctx.log.info('x'); @ctx.log.info": "unresolved:object-producer-unverified",
     "same(pick ? a : b).util.run(); @same": "src/use.ts#same",
@@ -446,7 +453,30 @@ test("anchored object-literal members through elements, iteration and callbacks 
     "src/use.ts",
     true,
   );
-  assert.deepEqual(got, {"list[i].setup(); @(expression).setup":["src/use.ts#a.setup","src/use.ts#b.setup"],"list[0].setup(); @(expression).setup":"src/use.ts#a.setup","for (const p of list) p.setup(); @p.setup":["src/use.ts#a.setup","src/use.ts#b.setup"],"for (const q of [a, b]) q.setup(); @q.setup":["src/use.ts#a.setup","src/use.ts#b.setup"],"list.forEach((r) => r.setup()); @list.forEach":"library:","list.forEach((r) => r.setup()); @r.setup":["src/use.ts#a.setup","src/use.ts#b.setup"],"api.run(); @api.run":["src/use.ts#given.[type].[|0].run","src/use.ts#impl.run"]});
+  assert.deepEqual(got, {
+    "list[i].setup(); @(expression).setup": [
+      "src/use.ts#a.setup",
+      "src/use.ts#b.setup",
+    ],
+    "list[0].setup(); @(expression).setup": "src/use.ts#a.setup",
+    "for (const p of list) p.setup(); @p.setup": [
+      "src/use.ts#a.setup",
+      "src/use.ts#b.setup",
+    ],
+    "for (const q of [a, b]) q.setup(); @q.setup": [
+      "src/use.ts#a.setup",
+      "src/use.ts#b.setup",
+    ],
+    "list.forEach((r) => r.setup()); @list.forEach": "library:",
+    "list.forEach((r) => r.setup()); @r.setup": [
+      "src/use.ts#a.setup",
+      "src/use.ts#b.setup",
+    ],
+    "api.run(); @api.run": [
+      "src/use.ts#given.[type].[|0].run",
+      "src/use.ts#impl.run",
+    ],
+  });
 });
 
 test("nested type positions have their places; a type literal's overloads are one symbol", async () => {
@@ -538,7 +568,10 @@ test("a file's listing shows type-literal members after its other symbols, by po
     assert.ok(others.some((symbol) => symbol.identity === "config.load"));
     // Members in source order.
     const starts = members.map((symbol) => symbol.range.start);
-    assert.deepEqual(starts, [...starts].sort((a, b) => a - b));
+    assert.deepEqual(
+      starts,
+      [...starts].sort((a, b) => a - b),
+    );
   } finally {
     store.close();
     await rm(scratch, { recursive: true, force: true });
