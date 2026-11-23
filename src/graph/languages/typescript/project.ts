@@ -788,6 +788,8 @@ export function projectModel(
   // Reference redirects reuse the parsed snapshot config across programs.
   const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
   const emitConfigs = new Map<string, ts.ParsedCommandLine>();
+  /** Configs whose settings are incomplete (a base that was not read). */
+  const incompleteConfigs = new Set<string>();
   const claimed = new Map<string, ProjectGroup[]>();
   const claim = (path: string, group: ProjectGroup) => {
     const list = claimed.get(path) ?? [];
@@ -1006,7 +1008,7 @@ export function projectModel(
         if (!group.limitations.length) {
           parsedConfigs.set(toVirtual(config.path), parsed);
           if (emitPathsScoped) emitConfigs.set(toVirtual(config.path), parsed);
-        }
+        } else incompleteConfigs.add(toVirtual(config.path));
         group.notes.push(
           ...parsed.errors
             // 18003: "No inputs were found" is a normal state for solution-style configs.
@@ -1286,7 +1288,14 @@ export function projectModel(
   const syntaxFailures = new Map<string, SyntaxFailure>();
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
   const asked = new WeakMap<ts.CompilerHost, Set<string>>();
-  const entries = workspaceEntries(manifests, emitConfigs, fs.files, originals);
+  const entries = workspaceEntries(
+    manifests,
+    emitConfigs,
+    fs.files,
+    originals,
+    parsedConfigs,
+    incompleteConfigs,
+  );
   const redirects = new WeakMap<
     ts.CompilerHost,
     Map<ts.ResolvedModuleFull, UnbuiltEntry>

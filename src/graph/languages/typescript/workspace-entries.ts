@@ -107,6 +107,14 @@ export function workspaceEntries(
   parsedConfigs: ReadonlyMap<string, ts.ParsedCommandLine>,
   files: ReadonlyMap<string, string>,
   captured: ReadonlyMap<string, string>,
+  /**
+   * Every config read completely, also those whose `extends` names a
+   * package (left out of `parsedConfigs`, which only holds configs whose
+   * emit paths are scoped): their `stripInternal` counts (C-46 review).
+   */
+  allConfigs: ReadonlyMap<string, ts.ParsedCommandLine> = parsedConfigs,
+  /** Configs whose settings are incomplete: a base that was not read. */
+  incompleteConfigs: ReadonlySet<string> = new Set(),
 ) {
   const packages = new Map(
     manifests.map((manifest) => [posix.dirname("/" + manifest.path), manifest]),
@@ -474,11 +482,15 @@ export function workspaceEntries(
     // Every compiler configuration that governs the source (its files
     // include it: the package's own, a build config elsewhere, a root
     // config), not only the package's: one with stripInternal withholds.
+    // A config of this package whose base was not read: whether it strips
+    // internals is unknown, so no convention route (C-46 review).
+    if ([...incompleteConfigs].some((path) => packageOf(path) === root))
+      return undefined;
     const compilerStrips =
       (configs.get(root) ?? []).some(
         ({ parsed }) => parsed.options.stripInternal,
       ) ||
-      [...parsedConfigs.values()].some(
+      [...allConfigs.values()].some(
         (parsed) =>
           parsed.options.stripInternal && parsed.fileNames.includes(source),
       );
