@@ -468,6 +468,8 @@ const go: LanguageModule = {
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work", "**/vendor/modules.txt"],
   incrementalAnalysis: true,
+  // C-55: in a session the indexer keeps the decoded inputs.
+  keepsInput: true,
   scopedFileLinkKinds: ["embeds"],
   parse,
   analyze,

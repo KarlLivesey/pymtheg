@@ -265,6 +265,13 @@ export interface LanguageModule {
   dependencyInputs?: true;
   /** Accepts previousFiles and can prove that some files' decisions still hold. */
   incrementalAnalysis?: true;
+  /**
+   * C-55: in an index session, the indexer keeps this module's decoded
+   * inputs (analysis records, resolver projection and symbols) between
+   * runs and re-reads only the files written since. The module receives
+   * deep-frozen records: it must not change its inputs in place.
+   */
+  keepsInput?: true;
   /** For scoped resolution only, the file-level parsed link kinds read across files. */
   scopedFileLinkKinds?: readonly string[];
   /** This resolver uses symbol and link facts without reading file records. */
@@ -332,7 +339,20 @@ export interface GraphStorage {
   /** Compact resolution input, with only the requested parsed link kinds. */
   resolutionFiles?(
     linkKinds: readonly string[],
+    /** C-55: only these paths (all when absent). */
+    paths?: readonly string[],
   ): StorageResult<ResolutionFile[]>;
+  /**
+   * C-55: a point in this connection's `replaceFile` and `removeFile`
+   * calls, and the paths written after one. Every file-level fact (record,
+   * symbols, resolver projection) is written only by those two.
+   */
+  writeMark?(): number;
+  pathsWrittenSince?(mark: number): Set<string>;
+  /** C-55: each path's symbols, as `findSymbols({ file })` returns them. */
+  symbolsAt?(
+    paths: readonly string[],
+  ): StorageResult<Map<string, GraphSymbol[]>>;
   /**
    * Optional light listing (path, module, status) that decodes no records.
    * The indexer otherwise derives it from files().

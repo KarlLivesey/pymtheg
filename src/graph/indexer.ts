@@ -11,6 +11,12 @@ import {
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import { count, stage } from "./work.js";
 import type { KeptState } from "./session.js";
+import {
+  KEPT_INPUT,
+  KeptInputs,
+  keptInputKey,
+  type KeptInput,
+} from "./kept-input.js";
 import type {
   AnalyzedFile,
   ContextFile,
@@ -93,6 +99,36 @@ export async function indexProject(
     if (!options.kept) return undefined;
     if (!keptFor.has(module.id)) keptFor.set(module.id, options.kept(module));
     return keptFor.get(module.id);
+  };
+  // C-55: a module that opts in has its decoded inputs kept by the session;
+  // this run re-reads only what the store wrote since they were read.
+  const runMark = store.writeMark?.();
+  const keptInputs = new Map<string, KeptInputs>();
+  const keptInput = (module: LanguageModule): KeptInputs | undefined => {
+    const state = kept(module);
+    if (
+      !module.keepsInput ||
+      !state ||
+      runMark === undefined ||
+      !store.pathsWrittenSince ||
+      !store.symbolsAt ||
+      !store.filesAt ||
+      !store.fileSummaries ||
+      !store.resolutionFiles
+    )
+      return undefined;
+    let inputs = keptInputs.get(module.id);
+    if (!inputs) {
+      const previous = state.get(
+        KEPT_INPUT,
+        keptInputKey(module.id, module.version),
+      ) as KeptInput | undefined;
+      inputs = new KeptInputs(previous, () =>
+        store.pathsWrittenSince!(runMark),
+      );
+      keptInputs.set(module.id, inputs);
+    }
+    return inputs;
   };
   const report: IndexReport = {
     discovered: 0,
@@ -392,14 +428,23 @@ export async function indexProject(
   const resolutionScopes = new Map<string, ReadonlySet<string>>();
   const analyzeModule = async (module: LanguageModule): Promise<void> => {
     // Only this module's records are decoded when the store can list them.
+    const keeping = keptInput(module);
     const files = await stage(`analyze.${module.id}.input`, async () =>
-      store.filesAt && store.fileSummaries
-        ? await store.filesAt(
+      keeping
+        ? await keeping.analysisInput(
             [...claims]
               .filter(([, owner]) => owner.id === module.id)
               .map(([path]) => path),
+            async (paths) => await store.filesAt!(paths),
+            store.writeMark!(),
           )
-        : (await store.files()).filter((file) => file.module === module.id),
+        : store.filesAt && store.fileSummaries
+          ? await store.filesAt(
+              [...claims]
+                .filter(([, owner]) => owner.id === module.id)
+                .map(([path]) => path),
+            )
+          : (await store.files()).filter((file) => file.module === module.id),
     );
     count(`analyze.${module.id}.inputFiles`, files.length);
     const heldRecords = deferred.get(module.id);
@@ -633,6 +678,7 @@ export async function indexProject(
             options.signal,
             scope,
             kept(module),
+            keptInput(module),
           )
         : [];
       count(
@@ -720,6 +766,18 @@ export async function indexProject(
   const incremental = registry.modules.filter(
     (module) => module.incrementalAnalysis,
   );
+  // C-55: what each module's inputs are now, kept if the run completes.
+  for (const module of registry.modules) {
+    const inputs = keptInputs.get(module.id);
+    if (!inputs) continue;
+    const value = inputs.result((mark) => store.pathsWrittenSince!(mark));
+    if (value)
+      kept(module)!.set(
+        KEPT_INPUT,
+        keptInputKey(module.id, module.version),
+        value,
+      );
+  }
   await stage("store.finishRun", () =>
     store.finishIndexRun?.(
       [...report.analysisErrors, ...report.resolutionErrors].some((error) =>
@@ -844,6 +902,7 @@ async function runResolve(
   signal?: AbortSignal,
   resolutionFiles?: ReadonlySet<string>,
   kept?: KeptState,
+  keptInput?: KeptInputs,
 ): Promise<readonly LinkResolution[] | ResolutionResult> {
   if (!module.resolve) return [];
   // Only a store that declares independent reads is trusted not to share
@@ -858,6 +917,33 @@ async function runResolve(
       count(`resolve.${module.id}.input${what}`, list.length);
       return list;
     });
+  // C-55: the kept resolver input, brought up to date (scoped projection
+  // and symbols); a module without one reads both afresh below.
+  const scopedKinds =
+    resolutionFiles && module.scopedFileLinkKinds && store.resolutionFiles
+      ? module.scopedFileLinkKinds
+      : undefined;
+  const fromKept = keptInput
+    ? await stage(`resolve.${module.id}.input`, async () => {
+        const value = await keptInput.resolverInput(
+          scopedKinds,
+          {
+            allPaths: async () =>
+              (await read(() => store.fileSummaries!())).map(
+                (file) => file.path,
+              ),
+            projection: async (paths) =>
+              await read(() => store.resolutionFiles!(scopedKinds!, paths)),
+            symbols: async (paths) => await read(() => store.symbolsAt!(paths)),
+          },
+          store.writeMark!(),
+        );
+        count(`resolve.${module.id}.inputSymbols`, value.symbols.length);
+        if (value.projection)
+          count(`resolve.${module.id}.inputFiles`, value.projection.length);
+        return value;
+      })
+    : undefined;
   return (
     (await stage(`resolve.${module.id}.withInput`, async () =>
       module.resolve!({
@@ -870,7 +956,8 @@ async function runResolve(
         files:
           module.resolutionNeedsFiles === false
             ? []
-            : await input("Files", async () =>
+            : (fromKept?.projection ??
+              (await input("Files", async () =>
                 own(
                   await read(() =>
                     resolutionFiles &&
@@ -880,11 +967,13 @@ async function runResolve(
                       : store.files(),
                   ),
                 ),
-              ),
+              ))),
         contextFiles: structuredClone(contexts),
-        symbols: await input("Symbols", async () =>
-          own(await read(() => store.findSymbols())),
-        ),
+        symbols:
+          fromKept?.symbols ??
+          (await input("Symbols", async () =>
+            own(await read(() => store.findSymbols())),
+          )),
         // Only the parsed link records: their targets are cleared below anyway.
         // Presented unresolved: no target, candidates or library targets
         // from the previous run.

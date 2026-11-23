@@ -594,7 +594,10 @@ export class SqliteGraphStore implements GraphStorage {
     }
     return files;
   }
-  resolutionFiles(linkKinds: readonly string[]): ResolutionFile[] {
+  resolutionFiles(
+    linkKinds: readonly string[],
+    paths?: readonly string[],
+  ): ResolutionFile[] {
     return this.db
       .prepare(
         `SELECT path,status,body ->> '$.module' AS module,
@@ -602,9 +605,12 @@ export class SqliteGraphStore implements GraphStorage {
       (SELECT json_group_array(json(value) ORDER BY key)
        FROM json_each(f.body,'$.result.links')
        WHERE value ->> '$.kind' IN (SELECT value FROM json_each(?))) AS links
-      FROM graph_files f ORDER BY path`,
+      FROM graph_files f ${paths ? "WHERE path IN (SELECT value FROM json_each(?))" : ""} ORDER BY path`,
       )
-      .all(JSON.stringify(linkKinds))
+      .all(
+        JSON.stringify(linkKinds),
+        ...(paths ? [JSON.stringify([...new Set(paths)])] : []),
+      )
       .map((row) => {
         const diagnostics = row.diagnostics as string;
         const links = row.links as string;
@@ -731,7 +737,39 @@ export class SqliteGraphStore implements GraphStorage {
       })
       .sort((a, b) => compare(a.path, b.path));
   }
+  /**
+   * C-55: the paths this connection has passed to `replaceFile` and
+   * `removeFile`, in order. Every file-level fact (record, symbols,
+   * resolver projection) is written only by those two, so a reader that
+   * kept decoded facts knows what to read again. A write rolled back later
+   * is still listed: the list may name a path that need not be re-read,
+   * never miss one that must.
+   */
+  private readonly pathWrites: string[] = [];
+  /** A point in this connection's path writes (`pathsWrittenSince`). */
+  writeMark(): number {
+    return this.pathWrites.length;
+  }
+  /** The paths written by `replaceFile` or `removeFile` after `mark`. */
+  pathsWrittenSince(mark: number): Set<string> {
+    return new Set(this.pathWrites.slice(mark));
+  }
+  /** Each path's symbols, as `findSymbols({ file })` returns them. */
+  symbolsAt(paths: readonly string[]): Map<string, GraphSymbol[]> {
+    const select = this.db.prepare(
+      "SELECT body FROM graph_symbols WHERE file=? ORDER BY id",
+    );
+    return new Map(
+      [...new Set(paths)].map((path) => [
+        path,
+        select
+          .all(path)
+          .map((row) => JSON.parse(row.body as string) as GraphSymbol),
+      ]),
+    );
+  }
   replaceFile(file: GraphFile, parseFailure = false): void {
+    this.pathWrites.push(file.path);
     let facts: ReturnType<typeof fileFacts>;
     try {
       this.validateFile(file);
@@ -844,6 +882,7 @@ export class SqliteGraphStore implements GraphStorage {
       );
   }
   removeFile(path: string): void {
+    this.pathWrites.push(path);
     count("store.filesRemoved");
     const remove = () =>
       this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);
