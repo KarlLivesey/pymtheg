@@ -71,6 +71,12 @@ function writeReport() {
 const onSignal = (): void => cancel.abort();
 process.on("SIGINT", onSignal);
 process.on("SIGTERM", onSignal);
+// C-54: a closed terminal (SIGHUP) ends the command the same orderly way, so
+// the exit hooks kill the toolchain processes it started; by default Node
+// would die at once and kill nothing (the children are in their own groups).
+process.on("SIGHUP", onSignal);
+// SIGQUIT would also end Node at once, killing nothing it started.
+process.on("SIGQUIT", onSignal);
 try {
   if (args.includes("--help")) {
     process.stdout.write(help());
@@ -1111,4 +1117,6 @@ try {
 } finally {
   process.removeListener("SIGINT", onSignal);
   process.removeListener("SIGTERM", onSignal);
+  process.removeListener("SIGHUP", onSignal);
+  process.removeListener("SIGQUIT", onSignal);
 }

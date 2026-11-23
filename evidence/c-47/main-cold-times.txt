@@ -1,0 +1,6 @@
+t2 900.00 s 1648 KiB exit 0
+t3 54.30 s 1464444 KiB exit 2
+t4 322.47 s 1718400 KiB exit 2
+t5 900.00 s 1644 KiB exit 0
+again t1 400.00 s exit 0
+again t3 207.19 s exit 2

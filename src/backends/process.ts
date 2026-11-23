@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
+import {
+  CHILD_GROUP_SLOTS,
+  forgetChildGroup,
+  recordChildGroup,
+} from "./child-groups.js";
 export interface ProcessClock {
   schedule(callback: () => void, milliseconds: number): unknown;
   cancel(handle: unknown): void;
@@ -42,13 +47,20 @@ export async function runProcess(
       bytes = 0,
       done = false,
       killTimer: unknown = null,
-      finishTimer: unknown = null;
+      finishTimer: unknown = null,
+      // The group's slot in the server's registry (child-groups.ts).
+      slot = -1;
     const outDecoder = new StringDecoder("utf8"),
       errDecoder = new StringDecoder("utf8");
     const max = options.maxBytes ?? 1024 * 1024;
     const kill = (signal: NodeJS.Signals): void => {
       try {
-        if (child.pid) process.kill(-child.pid, signal);
+        // The child's process group; Windows has none, so the process.
+        if (child.pid)
+          process.kill(
+            process.platform === "win32" ? child.pid : -child.pid,
+            signal,
+          );
       } catch {
         /* already gone */
       }
@@ -67,6 +79,7 @@ export async function runProcess(
       if (finishTimer) clock.cancel(finishTimer);
       options.signal?.removeEventListener("abort", abort);
       kill("SIGKILL");
+      if (child.pid) forgetChildGroup(slot, child.pid);
       child.stdout?.destroy();
       child.stderr?.destroy();
       stdout += outDecoder.end();
@@ -107,6 +120,17 @@ export async function runProcess(
         cleanup: "not spawned",
       });
       return;
+    }
+    // Recorded at once, so the server can kill the group even if this
+    // thread never runs again (a terminated worker).
+    if (child.pid) {
+      const recorded = recordChildGroup(child.pid);
+      if (recorded === "full") {
+        // Never run a child the owner could not kill: refused, and said so.
+        kind = "spawn_failed";
+        stderr += `the child-process registry is full (${CHILD_GROUP_SLOTS} live process groups); ${command} was not run`;
+        kill("SIGKILL");
+      } else slot = recorded;
     }
     if (options.input !== undefined && child.stdin) {
       child.stdin.on("error", () => {

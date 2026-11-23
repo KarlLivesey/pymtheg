@@ -9,6 +9,26 @@ import type { GraphRequest, GraphProgress } from "../graph/commands.js";
 import { GraphView } from "./graph-view.js";
 import { agentLimits } from "./limits.js";
 import { CONTROL, SECTION, controlLength } from "./graph-control.js";
+import {
+  jobChildGroups,
+  killChildGroups,
+  liveChildGroups,
+  releaseJobChildGroups,
+} from "../backends/child-groups.js";
+import type { ProcessClock } from "../backends/process.js";
+
+/**
+ * C-54: how long a cancel waits for the worker's answer while a child
+ * process group it started is live. The answer normally comes at once (the
+ * worker is awaiting the child, so its event loop is free); the bound only
+ * keeps a worker that will not answer from holding the cancel for ever. The
+ * groups are killed either way.
+ */
+export const CANCEL_GRACE_MS = 30_000;
+const systemClock: ProcessClock = {
+  schedule: (callback, milliseconds) => setTimeout(callback, milliseconds),
+  cancel: (handle) => clearTimeout(handle as NodeJS.Timeout),
+};
 export interface GraphJob {
   id: string;
   state: "running" | "complete" | "error" | "cancelled";
@@ -34,8 +54,17 @@ export interface GraphJob {
   abortedAt?: number;
 }
 export interface GraphJobsOptions {
-  /** Starts a worker that shares `control` (tests supply their own). */
-  launch?: (control: SharedArrayBuffer) => Worker;
+  /**
+   * Starts a worker that shares `control` and records the process groups
+   * it starts in `childGroups` (C-54; tests supply their own).
+   */
+  launch?: (
+    control: SharedArrayBuffer,
+    childGroups: SharedArrayBuffer,
+  ) => Worker;
+  /** The clock and bound of a cancel's grace (C-54; tests control them). */
+  cancelClock?: ProcessClock;
+  graceMs?: number;
   /** The clock idleness is measured with (tests control it). */
   clock?: () => number;
   /** A worker with no job for this long is ended, with its session. */
@@ -119,7 +148,14 @@ export const defaultRestingBytes = 512 * 1024 * 1024;
 export class GraphJobs {
   private readonly jobs = new Map<string, GraphJob>();
   private closed = false;
-  private readonly launch: (control: SharedArrayBuffer) => Worker;
+  private readonly launch: (
+    control: SharedArrayBuffer,
+    childGroups: SharedArrayBuffer,
+  ) => Worker;
+  private readonly cancelClock: ProcessClock;
+  private readonly graceMs: number;
+  /** The process groups the current worker started, owned by this server. */
+  private childGroups: SharedArrayBuffer | undefined;
   private readonly clock: () => number;
   private readonly idleMs: number;
   private readonly restingBytes: number;
@@ -139,9 +175,9 @@ export class GraphJobs {
   ) {
     this.launch =
       options.launch ??
-      ((control) =>
+      ((control, childGroups) =>
         new Worker(new URL("./graph-worker-main.js", import.meta.url), {
-          workerData: { control },
+          workerData: { control, childGroups },
           stdout: true,
           stderr: true,
         }));
@@ -149,6 +185,8 @@ export class GraphJobs {
     this.idleMs = options.idleMs ?? 10 * 60_000;
     this.restingBytes = options.restingBytes ?? defaultRestingBytes;
     this.codeVersion = options.codeVersion ?? installedCodeVersion;
+    this.cancelClock = options.cancelClock ?? systemClock;
+    this.graceMs = options.graceMs ?? CANCEL_GRACE_MS;
   }
   activeId() {
     return this.current && !this.current.exited ? this.current.id : null;
@@ -211,7 +249,13 @@ export class GraphJobs {
     const control = new Int32Array(
       new SharedArrayBuffer(controlLength * Int32Array.BYTES_PER_ELEMENT),
     );
-    const worker = this.launch(control.buffer as SharedArrayBuffer);
+    // The worker's own registry; a server that exits kills it (C-54).
+    const childGroups = jobChildGroups();
+    const worker = this.launch(
+      control.buffer as SharedArrayBuffer,
+      childGroups,
+    );
+    this.childGroups = childGroups;
     this.generation++;
     this.worker = worker;
     this.workerCode = code;
@@ -261,9 +305,12 @@ export class GraphJobs {
       }
     });
     worker.on("exit", (code) => {
+      // Whatever the worker left running, this server kills (C-54).
+      releaseJobChildGroups(childGroups);
       if (this.worker === worker) {
         this.worker = undefined;
         this.control = undefined;
+        this.childGroups = undefined;
       }
       const job = this.current;
       if (job && job.worker === worker) {
@@ -310,15 +357,35 @@ export class GraphJobs {
     if (!job.exited) {
       job.state = "cancelled";
       const control = job.worker === this.worker ? this.control : undefined;
+      const groups = job.worker === this.worker ? this.childGroups : undefined;
       if (control) {
         Atomics.store(control, CONTROL.cancel, 1);
         // Wakes a worker waiting on the flag (tests do).
         Atomics.notify(control, CONTROL.cancel);
-        // Inside a module call there may be no checkpoint for long.
-        if (Atomics.load(control, CONTROL.section) === SECTION.module)
+        // C-54: the job's children are killed at once, by this server, and
+        // the worker is asked to abort through its signal, which unwinds
+        // the command and lets the toolchain route remove its folder.
+        const live = groups ? liveChildGroups(groups).length : 0;
+        job.worker.postMessage({ kind: "abort" });
+        if (groups) killChildGroups(groups);
+        if (live) {
+          // The worker awaits its children, so it answers; a worker that
+          // does not is ended when the grace ends.
+          let timer: unknown;
+          await Promise.race([
+            job.done,
+            new Promise<void>((resolve) => {
+              timer = this.cancelClock.schedule(resolve, this.graceMs);
+            }),
+          ]);
+          this.cancelClock.cancel(timer);
+          if (!job.exited) await this.retire();
+        } else if (Atomics.load(control, CONTROL.section) === SECTION.module)
+          // Inside a module call there may be no checkpoint for long.
           await this.retire();
       } else await job.worker.terminate();
       await job.done;
+      if (groups) killChildGroups(groups);
     }
     return job;
   }

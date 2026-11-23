@@ -26,6 +26,7 @@ import { graphWork, resetGraphWork } from "../graph/work.js";
 import { getHeapStatistics, setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
 import { CONTROL } from "./graph-control.js";
+import { useChildGroups } from "../backends/child-groups.js";
 
 export interface GraphWorkerOptions {
   /** Tests run the worker with their own modules. */
@@ -68,24 +69,43 @@ function collect(): void {
 }
 
 export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
-  const control = new Int32Array(
-    (workerData as { control: SharedArrayBuffer }).control,
-  );
+  const data = workerData as {
+    control: SharedArrayBuffer;
+    childGroups?: SharedArrayBuffer;
+  };
+  const control = new Int32Array(data.control);
+  // C-54: every child process this worker starts is recorded in the
+  // server's registry for it, so the server can kill it whatever this
+  // thread does.
+  useChildGroups(data.childGroups);
+  // The running request's controller: a cancel that finds the worker
+  // awaiting a child (its event loop free) aborts through it, so
+  // runProcess kills the process groups it waits on and the command
+  // unwinds; the worker answers `cancelled` and lives on.
+  let current: AbortController | undefined;
   const session = new IndexSession(
     options.registry ? { registry: options.registry } : {},
   );
   let running = false;
-  parentPort!.on("message", (message: GraphWorkerMessage) => {
-    if (message.kind !== "request" || running) return;
-    running = true;
-    void run(message.id, message.request).finally(() => {
-      running = false;
-    });
-  });
+  parentPort!.on(
+    "message",
+    (message: GraphWorkerMessage | { kind: "abort" }) => {
+      if (message.kind === "abort") {
+        if (current && !current.signal.aborted) current.abort(new Cancelled());
+        return;
+      }
+      if (message.kind !== "request" || running) return;
+      running = true;
+      void run(message.id, message.request).finally(() => {
+        running = false;
+      });
+    },
+  );
   async function run(id: string, request: GraphRequest): Promise<void> {
     // The work counters of this request alone (C-22 observations).
     resetGraphWork();
     const controller = new AbortController();
+    current = controller;
     const signal = controller.signal;
     const check = signal.throwIfAborted.bind(signal);
     // Every abort check of the command is a checkpoint; the one that acts
@@ -132,6 +152,7 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
             };
     } finally {
       Atomics.store(control, CONTROL.section, 0);
+      current = undefined;
     }
     // Between jobs the worker keeps only what its session keeps: the job's
     // own objects are released here, before it answers, and what is still

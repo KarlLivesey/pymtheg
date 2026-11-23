@@ -1,0 +1,74 @@
+{
+ "vitest-dev_vitest": {
+  "rows": {
+   "graph_files": 2490,
+   "graph_contexts": 17857,
+   "graph_parse_failures": 3,
+   "graph_symbols": 17973,
+   "graph_links": 116220,
+   "graph_candidates": 618,
+   "graph_library_targets": 24175,
+   "project": 1
+  },
+  "differences": [
+   {
+    "table": "graph_files",
+    "rows": 2490,
+    "note": "module version string only (44 -> 48); identical after normalising it"
+   },
+   {
+    "table": "graph_parse_failures",
+    "rows": 3,
+    "note": "module version string only (44 -> 48); identical after normalising it"
+   }
+  ]
+ },
+ "vitejs_vite": {
+  "rows": {
+   "graph_files": 1697,
+   "graph_contexts": 11892,
+   "graph_parse_failures": 2,
+   "graph_symbols": 10186,
+   "graph_links": 55576,
+   "graph_candidates": 152,
+   "graph_library_targets": 25037,
+   "project": 1
+  },
+  "differences": [
+   {
+    "table": "graph_files",
+    "rows": 1697,
+    "note": "module version string only (44 -> 48); identical after normalising it"
+   },
+   {
+    "table": "graph_parse_failures",
+    "rows": 2,
+    "note": "module version string only (44 -> 48); identical after normalising it"
+   }
+  ]
+ },
+ "puppeteer_puppeteer": {
+  "rows": {
+   "graph_files": 509,
+   "graph_contexts": 8318,
+   "graph_parse_failures": 1,
+   "graph_symbols": 8412,
+   "graph_links": 58244,
+   "graph_candidates": 57,
+   "graph_library_targets": 24140,
+   "project": 1
+  },
+  "differences": [
+   {
+    "table": "graph_files",
+    "rows": 509,
+    "note": "module version string only (44 -> 48); identical after normalising it"
+   },
+   {
+    "table": "graph_parse_failures",
+    "rows": 1,
+    "note": "module version string only (44 -> 48); identical after normalising it"
+   }
+  ]
+ }
+}
