@@ -4,3 +4,9 @@ FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaS
 Command exited with non-zero status 134
 5092168 4522.44
 FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+
+# cause cap 8, 12 GB heap (--max-old-space-size=12288): peak RSS KiB, wall s
+Command exited with non-zero status 134
+15135540 10423.41
+[3863006:0x174bd000] 10336196 ms: Mark-Compact (reduce) 12256.6 (12475.8) -> 12238.5 (12465.0) MB, pooled: 0 MB, 12098.45 / 0.00 ms  (+ 277.0 ms in 55 steps since start of marking, biggest step 5.9 ms, walltime since start of marking 12420 ms) (average mu
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
