@@ -313,9 +313,12 @@ export function createJudge(input: JudgeInput): Judge {
   // in progress is provisional until that entry finishes, so it is memoised
   // only if everything it consulted began after it: as in Tarjan's
   // algorithm, the root of a strongly connected group settles the group's
-  // cycles, and its own answer is memoised when it finishes. No memoised
-  // answer depends on the order of evaluation, and a self-dependence costs
-  // one evaluation, not one per question.
+  // cycles, and its own answer is memoised when it finishes. A
+  // self-dependence costs one evaluation, not one per question. One known
+  // order dependence remains: a cycle holding both an expression re-entry
+  // (provisionally failed) and a taint-check re-entry (provisionally not
+  // tainted) memoises whichever its first entrant computes; that can only
+  // add a failure.
   let flight = 0;
   /** The lowest index the current computation consulted (Infinity: none). */
   let lowest = Infinity;

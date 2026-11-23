@@ -3175,9 +3175,11 @@ values, expressions, type parameter constraints, keys and taint checks.
 
 - **An answer is memoised for the program only if everything it consulted
   began after it.** A cycle is settled at the root of its group, as in
-  Tarjan's algorithm. No memoised answer depends on the order of
-  evaluation, and the work is proportional to the distinct judgements
-  reached.
+  Tarjan's algorithm. The work is proportional to the distinct judgements
+  reached. In one known shape a memoised answer depends on which link
+  enters a cycle first (a cycle holding both an expression re-entry and a
+  taint-check re-entry); the effect can only add a failure, never a clean
+  answer.
 - **What is memoised:** taint checks and type-level computations, by keys
   that hold only the bindings their type nodes name; and checker types.
 - **A recursive alias reference is judged by its own type arguments.**
@@ -3186,8 +3188,10 @@ values, expressions, type parameter constraints, keys and taint checks.
   A stack overflow counts as the depth bound.
 - **Overflows are unknown, never answers.** Every handler in the module
   that can meet a stack overflow treats it as unknown: a link whose
-  judgement or dependence a bound left unknown is `invalid-code`, with one
-  reason, `judge-budget-exhausted`, whichever bound fired.
+  judgement a bound left unknown is `invalid-code`, with one reason,
+  `judge-budget-exhausted`, whichever bound fired. Where a bound leaves
+  only the gate unknown (whether the receiver could depend on a failed
+  file at all), the receiver goes to the judgement, which decides.
 
 **Rules out:**
 
