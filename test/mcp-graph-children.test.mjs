@@ -198,7 +198,7 @@ wait();`,
   }
 });
 
-for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"])
+for (const signal of ["SIGTERM", "SIGINT", "SIGHUP", "SIGQUIT"])
   test(`C-54: a CLI graph index stopped by ${signal} kills its toolchain children`, async () => {
     const root = await mkdtemp(join(tmpdir(), "pym-cli-children-"));
     try {
@@ -298,6 +298,8 @@ test("C-54: a worker that never answers the abort is terminated when the cancel'
     await until(() => existsSync(ready), "the child did not start");
     const pid = Number(readFileSync(ready, "utf8"));
     const cancelling = jobs.cancel(job.id);
+    // The child is killed at once, before any grace ends.
+    await until(() => !running(pid), "the child outlived the cancel's kill");
     // The worker does not answer; only the grace ends the wait.
     await until(() => clock.pending > 0, "the cancel set no grace");
     assert.equal(clock.fireNext(), 30_000);
