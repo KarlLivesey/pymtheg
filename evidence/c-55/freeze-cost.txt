@@ -1,0 +1,2 @@
+restic: {"files":562,"mb":20,"parseMs":297,"freezeMs":186}
+cli/cli: {"files":1192,"mb":78,"parseMs":993,"freezeMs":643}

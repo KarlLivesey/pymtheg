@@ -3524,3 +3524,21 @@ and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall
 result; the 30 s grace only bounds how long an unanswering worker is
 given. See [C-48](changes/C-48.md).
 
+
+### A module may have its decoded inputs kept by the index session (C-55)
+
+**Decided (C-55):** in an index session the indexer keeps the decoded
+inputs of a module that opts in (`keepsInput`, Go): its analysis records,
+every file's resolver projection and every symbol, as session kept state
+under C-45's rules. A run re-reads only the paths the store has written
+since they were read; the store records every path its `replaceFile` and
+`removeFile` calls write, and those are the only writers of file-level
+facts. Inputs are assembled in the store's own order. The module must not
+change its inputs in place; the test suite freezes them, production does
+not (freezing costs about two thirds of decoding). A kept value above
+128 MiB of stored JSON is not kept. **Why:** a Go body edit decoded every
+stored record twice per run (about 3.9 s of a cli/cli body edit through
+the MCP worker); kept, those reads take 0.4 s. **Trade:** the worker's
+resting heap grows by the kept value (cli/cli 94 → 247 MiB, under the
+512 MiB bound). **Unchanged:** without a session, every read and every
+stored row as before. See [C-55](changes/C-55.md).
