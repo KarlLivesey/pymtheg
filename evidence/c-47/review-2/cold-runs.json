@@ -1,0 +1,5940 @@
+{
+ "note": "Cold indexes on the dev server, several at once; seconds are wall time and observations only. Head is this branch after merging main (49ddae13); main is 49ddae13; the previous head is c19202a. Each broken pin has `const = ;` appended to the named file. Row comparisons normalise the module version string (48 on head, 45 on main).",
+ "broken": {
+  "reduxjs/redux-toolkit": {
+   "file": "packages/toolkit/src/createSlice.ts",
+   "head": {
+    "exit": 0,
+    "seconds": 73,
+    "judge": {
+     "judgements": 6293,
+     "maxSteps": 13327,
+     "maxDepth": 71,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 279,
+     "library": 7522,
+     "resolved": 22853,
+     "unresolved": 25725
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "main": {
+    "exit": 137,
+    "seconds": 1500
+   }
+  },
+  "excalidraw/excalidraw": {
+   "file": "packages/element/src/types.ts",
+   "head": {
+    "exit": 0,
+    "seconds": 196,
+    "judge": {
+     "judgements": 21990,
+     "maxSteps": 681,
+     "maxDepth": 44,
+     "exhausted": 0
+    },
+    "links": {
+     "library": 3765,
+     "resolved": 55710,
+     "unresolved": 44557
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "main": {
+    "exit": 134,
+    "seconds": 226
+   },
+   "mainHeap16GB": {
+    "exit": 0,
+    "seconds": 348,
+    "judge": null,
+    "links": {
+     "library": 3740,
+     "resolved": 55458,
+     "unresolved": 44455
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "previousHead": {
+    "exit": 0,
+    "seconds": 219,
+    "judge": {
+     "judgements": 21990,
+     "maxSteps": 86987,
+     "maxDepth": 40,
+     "exhausted": 0
+    },
+    "links": {
+     "library": 3765,
+     "resolved": 55704,
+     "unresolved": 44788
+    },
+    "bound": 95,
+    "taintBound": 0
+   },
+   "headVsMain16GB": {
+    "equal": false,
+    "rows": {
+     "graph_files": 733,
+     "graph_contexts": 7249,
+     "graph_parse_failures": 1,
+     "graph_symbols": 13317,
+     "graph_links": 104032,
+     "graph_candidates": 0,
+     "graph_library_targets": 3765,
+     "project": 1
+    },
+    "links": [
+     104032,
+     103653
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {
+     "resolved/null -> unresolved/null": 8,
+     "library/null -> absent": 25,
+     "resolved/null -> absent": 244,
+     "unresolved/external -> absent": 65,
+     "unresolved/local -> absent": 34,
+     "unresolved/invalid-code -> absent": 11,
+     "unresolved/invalid-code -> unresolved/local": 45,
+     "unresolved/invalid-code -> unresolved/external": 7
+    },
+    "differences": [
+     {
+      "table": "graph_files",
+      "onlyA": 10,
+      "onlyB": 10
+     },
+     {
+      "table": "graph_symbols",
+      "onlyA": 43,
+      "onlyB": 0
+     },
+     {
+      "table": "graph_links",
+      "onlyA": 439,
+      "onlyB": 60
+     },
+     {
+      "table": "graph_library_targets",
+      "onlyA": 25,
+      "onlyB": 0
+     }
+    ],
+    "changed": [
+     {
+      "file": "packages/excalidraw/actions/actionLinearEditor.tsx",
+      "name": "../components/CommandPalette/CommandPalette",
+      "at": 379,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": [
+       "unresolved",
+       null,
+       null,
+       null
+      ]
+     },
+     {
+      "file": "packages/excalidraw/actions/actionLinearEditor.tsx",
+      "name": "DEFAULT_CATEGORIES",
+      "at": 353,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": [
+       "unresolved",
+       null,
+       null,
+       null
+      ]
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "clsx",
+      "at": 17,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "default",
+      "at": 7,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "fuzzy",
+      "at": 43,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "default",
+      "at": 32,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "react",
+      "at": 105,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useEffect",
+      "at": 61,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useRef",
+      "at": 72,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useMemo",
+      "at": 80,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useState",
+      "at": 89,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "@excalidraw/common",
+      "at": 202,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "DEFAULT_SIDEBAR",
+      "at": 126,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "EVENT",
+      "at": 145,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "KEYS",
+      "at": 154,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "arrayToMap",
+      "at": 162,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "isWritableElement",
+      "at": 176,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "@excalidraw/common/utility-types",
+      "at": 259,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "MarkRequired",
+      "at": 239,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../actions/actionToggleShapeSwitch",
+      "at": 336,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionToggleShapeSwitch",
+      "at": 305,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../shortcut",
+      "at": 408,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getShortcutKey",
+      "at": 386,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../actions",
+      "at": 525,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionClearCanvas",
+      "at": 438,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionLink",
+      "at": 459,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionToggleSearchMenu",
+      "at": 473,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionToggleTheme",
+      "at": 499,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../actions/actionElementLink",
+      "at": 606,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionCopyElementLink",
+      "at": 553,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionLinkToElement",
+      "at": 578,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../actions/shortcuts",
+      "at": 685,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getShortcutFromShortcutName",
+      "at": 650,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../analytics",
+      "at": 739,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "trackEvent",
+      "at": 721,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../context/ui-appState",
+      "at": 788,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useUIAppState",
+      "at": 767,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../deburr",
+      "at": 840,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "deburr",
+      "at": 826,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../editor-jotai",
+      "at": 904,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "atom",
+      "at": 865,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useAtom",
+      "at": 871,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "editorJotaiStore",
+      "at": 880,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../i18n",
+      "at": 944,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 935,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../App",
+      "at": 1057,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useApp",
+      "at": 969,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useAppProps",
+      "at": 979,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useExcalidrawActionManager",
+      "at": 994,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useExcalidrawSetAppState",
+      "at": 1024,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../Dialog",
+      "at": 1090,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Dialog",
+      "at": 1076,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../InlineIcon",
+      "at": 1130,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "InlineIcon",
+      "at": 1112,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../TextField",
+      "at": 1173,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "TextField",
+      "at": 1156,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../scene",
+      "at": 1225,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getSelectedElements",
+      "at": 1198,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../icons",
+      "at": 1422,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "LockedIcon",
+      "at": 1251,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "UnlockedIcon",
+      "at": 1265,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "searchIcon",
+      "at": 1281,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "boltIcon",
+      "at": 1295,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "bucketFillIcon",
+      "at": 1307,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "ExportImageIcon",
+      "at": 1325,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "mermaidLogoIcon",
+      "at": 1344,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "brainIconThin",
+      "at": 1363,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "LibraryIcon",
+      "at": 1380,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "historyCommandIcon",
+      "at": 1395,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../Tools",
+      "at": 1472,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "TOOLS",
+      "at": 1444,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getToolLetter",
+      "at": 1451,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../Actions",
+      "at": 1547,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "canChangeBackgroundColor",
+      "at": 1493,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "canChangeStrokeColor",
+      "at": 1519,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../hooks/useStableCallback",
+      "at": 1595,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useStableCallback",
+      "at": 1570,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../ActiveConfirmDialog",
+      "at": 1668,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "activeConfirmDialogAtom",
+      "at": 1637,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../hooks/useStable",
+      "at": 1720,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useStable",
+      "at": 1703,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../Ellipsify",
+      "at": 1772,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Ellipsify",
+      "at": 1755,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../data/library",
+      "at": 1863,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "distributeLibraryItemsOnSquareGrid",
+      "at": 1800,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "libraryItemsAtom",
+      "at": 1838,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../hooks/useLibraryItemSvg",
+      "at": 1942,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useLibraryCache",
+      "at": 1897,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useLibraryItemSvg",
+      "at": 1916,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "./defaultCommandPaletteItems",
+      "at": 2006,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "*",
+      "at": 1983,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "./CommandPalette.scss",
+      "at": 2045,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "./types",
+      "at": 2111,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 2085,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../Tools",
+      "at": 2159,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "ToolbarToolType",
+      "at": 2136,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../types",
+      "at": 2236,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "AppProps",
+      "at": 2185,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "AppState",
+      "at": 2195,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "LibraryItem",
+      "at": 2205,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "UIAppState",
+      "at": 2218,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../actions/shortcuts",
+      "at": 2285,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "ShortcutName",
+      "at": 2265,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../i18n",
+      "at": 2349,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "TranslationKeys",
+      "at": 2326,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "../../actions/types",
+      "at": 2391,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Action",
+      "at": 2377,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "lastUsedPaletteItem",
+      "at": 2415,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "atom",
+      "at": 2443,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 2448,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "DEFAULT_CATEGORIES",
+      "at": 2483,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getCategoryOrder",
+      "at": 2659,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandShortcutHint",
+      "at": 3077,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "React.ReactNode",
+      "at": 3205,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).split",
+      "at": 3279,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "shortcut.replace",
+      "at": 3259,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "clsx",
+      "at": 3323,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "shortcuts.map",
+      "at": 3370,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "isCommandPaletteToggleShortcut",
+      "at": 3652,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "KeyboardEvent",
+      "at": 3699,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "event.key.toLowerCase",
+      "at": 3816,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteProps",
+      "at": 3886,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 3945,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPalette",
+      "at": 3971,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Object.assign",
+      "at": 4008,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteProps",
+      "at": 4026,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useUIAppState",
+      "at": 4075,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useExcalidrawSetAppState",
+      "at": 4116,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useEffect",
+      "at": 4149,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPalette.[callback:1f535f66ab52a8e0].[callback:759bdeab55676f78].commandPaletteShortcut",
+      "at": 4173,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "KeyboardEvent",
+      "at": 4212,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "isCommandPaletteToggleShortcut",
+      "at": 4244,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "event.preventDefault",
+      "at": 4301,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "event.stopPropagation",
+      "at": 4335,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 4364,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "trackEvent",
+      "at": 4607,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "window.addEventListener",
+      "at": 4792,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "commandPaletteShortcut",
+      "at": 4824,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "window.removeEventListener",
+      "at": 4917,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteInner",
+      "at": 5137,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteInner",
+      "at": 5208,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteProps",
+      "at": 5271,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useApp",
+      "at": 5308,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useUIAppState",
+      "at": 5339,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useExcalidrawSetAppState",
+      "at": 5378,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useAppProps",
+      "at": 5425,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useExcalidrawActionManager",
+      "at": 5464,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useAtom",
+      "at": 5529,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useState",
+      "at": 5599,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "MarkRequired",
+      "at": 5613,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 5626,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useRef",
+      "at": 5708,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "HTMLInputElement",
+      "at": 5715,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useStable",
+      "at": 5762,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useAtom",
+      "at": 5871,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 5923,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useMemo",
+      "at": 5946,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).map",
+      "at": 6157,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "libraryItemsData.libraryItems?.filter",
+      "at": 6021,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "MarkRequired",
+      "at": 6069,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "LibraryItem",
+      "at": 6082,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "LibraryItemIcon",
+      "at": 6247,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getCategoryOrder",
+      "at": 6419,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "deburr",
+      "at": 6468,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "app.onInsertElements",
+      "at": 6537,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "packages/element/src/types.ts",
+       "type AppClassProperties; the type argument T inferred from a tainted argument"
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "distributeLibraryItemsOnSquareGrid",
+      "at": 6569,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useEffect",
+      "at": 6720,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteInner.[callback:fbc29481bf8bfa81].getActionLabel",
+      "at": 7097,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Action",
+      "at": 7129,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 7258,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "action.label",
+      "at": 7280,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "app.scene.getNonDeletedElements",
+      "at": 7311,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "packages/element/src/types.ts",
+       "receiver scene (type argument); the type argument T inferred from a tainted argument"
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "TranslationKeys",
+      "at": 7409,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 7474,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "TranslationKeys",
+      "at": 7503,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteInner.[callback:fbc29481bf8bfa81].getActionIcon",
+      "at": 7571,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Action",
+      "at": 7602,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "action.icon",
+      "at": 7684,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "app.scene.getNonDeletedElements",
+      "at": 7711,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "packages/element/src/types.ts",
+       "receiver scene (type argument); the type argument T inferred from a tainted argument"
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 7808,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteInner.[callback:fbc29481bf8bfa81].actionToCommand",
+      "at": 7840,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Action",
+      "at": 7880,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 7951,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Action",
+      "at": 7987,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 8006,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 8033,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 8078,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getActionLabel",
+      "at": 8116,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getActionIcon",
+      "at": 8154,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getShortcutFromShortcutName",
+      "at": 8213,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "ShortcutName",
+      "at": 8256,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionManager.executeAction",
+      "at": 8427,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "transformer",
+      "at": 8516,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 8646,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).map",
+      "at": 10074,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Action",
+      "at": 10087,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionToCommand",
+      "at": 10106,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getSelectedElements",
+      "at": 10411,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 10648,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).map",
+      "at": 11381,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionToCommand",
+      "at": 11397,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 11479,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).map",
+      "at": 11688,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionToCommand",
+      "at": 11704,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getActionLabel",
+      "at": 11871,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getActionIcon",
+      "at": 11922,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getShortcutFromShortcutName",
+      "at": 11976,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "ShortcutName",
+      "at": 12043,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "editorJotaiStore.set",
+      "at": 12243,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 12339,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getShortcutFromShortcutName",
+      "at": 12465,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 12732,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 12879,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionToCommand",
+      "at": 12912,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 12999,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 13204,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 13306,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 13550,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionManager.executeAction",
+      "at": 13720,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 13810,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "actionManager.executeAction",
+      "at": 13963,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 14054,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getSelectedElements",
+      "at": 14314,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "canChangeStrokeColor",
+      "at": 14435,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 14551,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 14691,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getSelectedElements",
+      "at": 14952,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "canChangeBackgroundColor",
+      "at": 15073,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "arrayToMap",
+      "at": 15175,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 15280,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 15424,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 15630,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).reduce",
+      "at": 15874,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Object.keys",
+      "at": 15840,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "ToolbarToolType",
+      "at": 15855,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 15898,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Extract",
+      "at": 16058,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "value",
+      "at": 16092,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "AppProps",
+      "at": 16123,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getToolLetter",
+      "at": 16284,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 16355,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 16399,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "app.setActiveTool",
+      "at": 16648,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "packages/element/src/types.ts",
+       "type AppClassProperties; the type argument T inferred from a tainted argument"
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "acc.push",
+      "at": 16748,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 16853,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "KEYS.Q.toLocaleUpperCase",
+      "at": 17019,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "app.toggleLock",
+      "at": 17110,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "packages/element/src/types.ts",
+       "type AppClassProperties; the type argument T inferred from a tainted argument"
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 17178,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 17394,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "t",
+      "at": 17629,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 17854,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).map",
+      "at": 18534,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "getCategoryOrder",
+      "at": 18668,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "deburr",
+      "at": 18727,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "command.label.toLocaleLowerCase",
+      "at": 18748,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "packages/element/src/types.ts",
+       "receiver command; unhandled element Array (default)"
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "command.keywords?.join",
+      "at": 18803,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "packages/element/src/types.ts",
+       "receiver command; unhandled element Array (default)"
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAllCommands",
+      "at": 18861,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setLastUsed",
+      "at": 18896,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).find",
+      "at": 18954,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useState",
+      "at": 19250,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useState",
+      "at": 19314,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 19323,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useState",
+      "at": 19411,
+      "head": [
+       "library",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Record",
+      "at": 19425,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 19440,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteInner.[local].closeCommandPalette",
+      "at": 19474,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setAppState",
+      "at": 19529,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setCommandSearch",
+      "at": 19606,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteInner.[local].executeCommand",
+      "at": 19636,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 19674,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "React.MouseEvent",
+      "at": 19705,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "React.KeyboardEvent",
+      "at": 19724,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "KeyboardEvent",
+      "at": 19746,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "event.stopPropagation",
+      "at": 19842,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "event.preventDefault",
+      "at": 19873,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "document.body.classList.add",
+      "at": 19921,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "closeCommandPalette",
+      "at": 19966,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "command.perform",
+      "at": 20010,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setLastUsed",
+      "at": 20053,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "requestAnimationFrame",
+      "at": 20084,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "document.body.classList.remove",
+      "at": 20148,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useStableCallback",
+      "at": 20253,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "CommandPaletteItem",
+      "at": 20286,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "command.predicate",
+      "at": 20483,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "app.scene.getNonDeletedElements",
+      "at": 20516,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "packages/element/src/types.ts",
+       "receiver scene (type argument); the type argument T inferred from a tainted argument"
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "AppState",
+      "at": 20567,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "useStableCallback",
+      "at": 20729,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "KeyboardEvent",
+      "at": 20755,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "isWritableElement",
+      "at": 20813,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "isCommandPaletteToggleShortcut",
+      "at": 20854,
+      "head": [
+       "resolved",
+       null,
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "(expression).flat",
+      "at": 21166,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "Object.values",
+      "at": 21139,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "isCommandAvailable",
+      "at": 21245,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "event.preventDefault",
+      "at": 21327,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "matchingCommands.findIndex",
+      "at": 21382,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setCurrentCommand",
+      "at": 21532,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setCurrentCommand",
+      "at": 21745,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "setCurrentCommand",
+      "at": 22163,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "event.preventDefault",
+      "at": 22275,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     },
+     {
+      "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+      "name": "matchingCommands.findIndex",
+      "at": 22330,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": null
+     }
+    ]
+   }
+  },
+  "honojs/hono": {
+   "file": "src/context.ts",
+   "head": {
+    "exit": 0,
+    "seconds": 61,
+    "judge": {
+     "judgements": 12660,
+     "maxSteps": 1034,
+     "maxDepth": 25,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 204,
+     "library": 3303,
+     "resolved": 32907,
+     "unresolved": 35434
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "main": {
+    "exit": 0,
+    "seconds": 63,
+    "judge": null,
+    "links": {
+     "ambiguous": 204,
+     "library": 3303,
+     "resolved": 32907,
+     "unresolved": 35434
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "headVsMain": {
+    "equal": true,
+    "rows": {
+     "graph_files": 460,
+     "graph_contexts": 5757,
+     "graph_parse_failures": 1,
+     "graph_symbols": 5692,
+     "graph_links": 71848,
+     "graph_candidates": 0,
+     "graph_library_targets": 3743,
+     "project": 1
+    },
+    "links": [
+     71848,
+     71848
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  },
+  "oclif/core (the hanging tree)": {
+   "file": "the tree after seed 4242's 17 edits",
+   "head": {
+    "exit": 0,
+    "seconds": 33,
+    "judge": {
+     "judgements": 2884,
+     "maxSteps": 2346,
+     "maxDepth": 35,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 116,
+     "library": 2350,
+     "resolved": 7105,
+     "unresolved": 4514
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "headAgain": {
+    "exit": 0,
+    "seconds": 32,
+    "judge": {
+     "judgements": 2884,
+     "maxSteps": 2346,
+     "maxDepth": 35,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 116,
+     "library": 2350,
+     "resolved": 7105,
+     "unresolved": 4514
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "main": {
+    "exit": 137,
+    "seconds": 900
+   },
+   "mainAgain": {
+    "exit": 137,
+    "seconds": 900
+   },
+   "headAgainstItself": {
+    "equal": true,
+    "rows": {
+     "graph_files": 196,
+     "graph_contexts": 1389,
+     "graph_parse_failures": 4,
+     "graph_symbols": 2707,
+     "graph_links": 14085,
+     "graph_candidates": 154,
+     "graph_library_targets": 2428,
+     "project": 1
+    },
+    "links": [
+     14085,
+     14085
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  },
+  "react-hook-form/react-hook-form": {
+   "file": "src/types/form.ts",
+   "head": {
+    "exit": 0,
+    "seconds": 38,
+    "judge": {
+     "judgements": 2797,
+     "maxSteps": 1929,
+     "maxDepth": 32,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 5,
+     "library": 13955,
+     "resolved": 14446,
+     "unresolved": 19834
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "main": {
+    "exit": 0,
+    "seconds": 37,
+    "judge": null,
+    "links": {
+     "ambiguous": 5,
+     "library": 13955,
+     "resolved": 14446,
+     "unresolved": 19834
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "headVsMain": {
+    "equal": false,
+    "rows": {
+     "graph_files": 436,
+     "graph_contexts": 3679,
+     "graph_parse_failures": 1,
+     "graph_symbols": 3218,
+     "graph_links": 48240,
+     "graph_candidates": 10,
+     "graph_library_targets": 13955,
+     "project": 1
+    },
+    "links": [
+     48240,
+     48240
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {
+     "unresolved/external -> unresolved/invalid-code": 2,
+     "unresolved/invalid-code -> unresolved/invalid-code": 13,
+     "unresolved/local -> unresolved/invalid-code": 2
+    },
+    "differences": [
+     {
+      "table": "graph_files",
+      "onlyA": 3,
+      "onlyB": 3
+     },
+     {
+      "table": "graph_links",
+      "onlyA": 17,
+      "onlyB": 17
+     }
+    ],
+    "changed": [
+     {
+      "file": "src/__typetest__/useController.test-d.ts",
+      "name": "field.value.includes",
+      "at": 574,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver field; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/__typetest__/useController.test-d.ts",
+      "name": "field.value.push",
+      "at": 610,
+      "head": [
+       "unresolved",
+       "external",
+       null,
+       null
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver field; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "field._f.refs.every",
+      "at": 29572,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver _f; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver _f; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "fieldReference.refs.forEach",
+      "at": 31669,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver fieldReference; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver fieldReference; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "fieldReference.refs.forEach",
+      "at": 32210,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver fieldReference; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver fieldReference; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "field._f.onBlur",
+      "at": 40736,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver _f; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "field._f.onChange",
+      "at": 40989,
+      "head": [
+       "unresolved",
+       "local",
+       null,
+       null
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver _f; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "refs.find",
+      "at": 58564,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver refs; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver refs; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "refs.filter",
+      "at": 58848,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver refs; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver refs; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "currentField._f.refs.forEach",
+      "at": 60295,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver _f; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver _f; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "fieldReference.closest",
+      "at": 66696,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver fieldReference; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver fieldReference; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "form.reset",
+      "at": 66764,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver form; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver form; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/createFormControl.ts",
+      "name": "fieldReference.refs.find",
+      "at": 71346,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver fieldReference; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver fieldReference; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/validateField.ts",
+      "name": "refs?.find",
+      "at": 1959,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver refs; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver refs; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/validateField.ts",
+      "name": "refs.forEach",
+      "at": 2145,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver refs; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver refs; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/validateField.ts",
+      "name": "ref.setCustomValidity",
+      "at": 2238,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver ref; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver ref; a type-level computation over a tainted input"
+      ]
+     },
+     {
+      "file": "src/logic/validateField.ts",
+      "name": "validationRef.reportValidity",
+      "at": 2381,
+      "head": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver validationRef; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+      ],
+      "main": [
+       "unresolved",
+       "invalid-code",
+       "src/types/form.ts",
+       "receiver validationRef; a type-level computation over a tainted input"
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "clean": {
+  "vitest-dev/vitest": {
+   "head": {
+    "exit": 0,
+    "seconds": 153,
+    "judge": {
+     "judgements": 0,
+     "maxSteps": 0,
+     "maxDepth": 0,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 879,
+     "library": 22893,
+     "resolved": 74498,
+     "unresolved": 17826
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "main": {
+    "exit": 0,
+    "seconds": 147,
+    "judge": null,
+    "links": {
+     "ambiguous": 879,
+     "library": 22893,
+     "resolved": 74498,
+     "unresolved": 17826
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "headVsMain": {
+    "equal": true,
+    "rows": {
+     "graph_files": 2490,
+     "graph_contexts": 17857,
+     "graph_parse_failures": 3,
+     "graph_symbols": 17973,
+     "graph_links": 116096,
+     "graph_candidates": 618,
+     "graph_library_targets": 24175,
+     "project": 1
+    },
+    "links": [
+     116096,
+     116096
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  },
+  "vitejs/vite": {
+   "head": {
+    "exit": 0,
+    "seconds": 60,
+    "judge": {
+     "judgements": 0,
+     "maxSteps": 0,
+     "maxDepth": 0,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 398,
+     "library": 24372,
+     "resolved": 23471,
+     "unresolved": 7289
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "main": {
+    "exit": 0,
+    "seconds": 63,
+    "judge": null,
+    "links": {
+     "ambiguous": 398,
+     "library": 24372,
+     "resolved": 23471,
+     "unresolved": 7289
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "headVsMain": {
+    "equal": true,
+    "rows": {
+     "graph_files": 1697,
+     "graph_contexts": 11892,
+     "graph_parse_failures": 2,
+     "graph_symbols": 10186,
+     "graph_links": 55530,
+     "graph_candidates": 152,
+     "graph_library_targets": 25037,
+     "project": 1
+    },
+    "links": [
+     55530,
+     55530
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  },
+  "puppeteer/puppeteer": {
+   "head": {
+    "exit": 0,
+    "seconds": 42,
+    "judge": {
+     "judgements": 0,
+     "maxSteps": 0,
+     "maxDepth": 0,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 742,
+     "library": 22700,
+     "resolved": 23486,
+     "unresolved": 11261
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "main": {
+    "exit": 0,
+    "seconds": 43,
+    "judge": null,
+    "links": {
+     "ambiguous": 742,
+     "library": 22700,
+     "resolved": 23486,
+     "unresolved": 11261
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "headVsMain": {
+    "equal": true,
+    "rows": {
+     "graph_files": 509,
+     "graph_contexts": 8318,
+     "graph_parse_failures": 1,
+     "graph_symbols": 8412,
+     "graph_links": 58189,
+     "graph_candidates": 57,
+     "graph_library_targets": 24140,
+     "project": 1
+    },
+    "links": [
+     58189,
+     58189
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  }
+ },
+ "stackSizes": {
+  "reduxjs/redux-toolkit --stack-size=600": {
+   "run": {
+    "exit": 0,
+    "seconds": 91,
+    "judge": {
+     "judgements": 6293,
+     "maxSteps": 13327,
+     "maxDepth": 71,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 279,
+     "library": 7522,
+     "resolved": 22853,
+     "unresolved": 25725
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "againstDefault": {
+    "equal": true,
+    "rows": {
+     "graph_files": 647,
+     "graph_contexts": 8123,
+     "graph_parse_failures": 1,
+     "graph_symbols": 7800,
+     "graph_links": 56379,
+     "graph_candidates": 1173,
+     "graph_library_targets": 7817,
+     "project": 1
+    },
+    "links": [
+     56379,
+     56379
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  },
+  "reduxjs/redux-toolkit --stack-size=3500": {
+   "run": {
+    "exit": 0,
+    "seconds": 88,
+    "judge": {
+     "judgements": 6293,
+     "maxSteps": 13327,
+     "maxDepth": 71,
+     "exhausted": 0
+    },
+    "links": {
+     "ambiguous": 279,
+     "library": 7522,
+     "resolved": 22853,
+     "unresolved": 25725
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "againstDefault": {
+    "equal": true,
+    "rows": {
+     "graph_files": 647,
+     "graph_contexts": 8123,
+     "graph_parse_failures": 1,
+     "graph_symbols": 7800,
+     "graph_links": 56379,
+     "graph_candidates": 1173,
+     "graph_library_targets": 7817,
+     "project": 1
+    },
+    "links": [
+     56379,
+     56379
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  },
+  "excalidraw/excalidraw --stack-size=600": {
+   "run": {
+    "exit": 0,
+    "seconds": 240,
+    "judge": {
+     "judgements": 21990,
+     "maxSteps": 681,
+     "maxDepth": 44,
+     "exhausted": 0
+    },
+    "links": {
+     "library": 3765,
+     "resolved": 55710,
+     "unresolved": 44557
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "againstDefault": {
+    "equal": true,
+    "rows": {
+     "graph_files": 733,
+     "graph_contexts": 7249,
+     "graph_parse_failures": 1,
+     "graph_symbols": 13317,
+     "graph_links": 104032,
+     "graph_candidates": 0,
+     "graph_library_targets": 3765,
+     "project": 1
+    },
+    "links": [
+     104032,
+     104032
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  },
+  "excalidraw/excalidraw --stack-size=3500": {
+   "run": {
+    "exit": 0,
+    "seconds": 244,
+    "judge": {
+     "judgements": 21990,
+     "maxSteps": 681,
+     "maxDepth": 44,
+     "exhausted": 0
+    },
+    "links": {
+     "library": 3765,
+     "resolved": 55710,
+     "unresolved": 44557
+    },
+    "bound": 0,
+    "taintBound": 0
+   },
+   "againstDefault": {
+    "equal": true,
+    "rows": {
+     "graph_files": 733,
+     "graph_contexts": 7249,
+     "graph_parse_failures": 1,
+     "graph_symbols": 13317,
+     "graph_links": 104032,
+     "graph_candidates": 0,
+     "graph_library_targets": 3765,
+     "project": 1
+    },
+    "links": [
+     104032,
+     104032
+    ],
+    "boundA": 0,
+    "boundB": 0,
+    "transitions": {},
+    "differences": [],
+    "changed": []
+   }
+  }
+ },
+ "excalidrawPreviouslyBounded": {
+  "tally": {
+   "main resolved | head resolved": 6,
+   "main absent | head unresolved/external": 9,
+   "main absent | head unresolved/invalid-code": 4,
+   "main unresolved/local | head unresolved/invalid-code": 45,
+   "main unresolved/invalid-code | head unresolved/invalid-code": 20,
+   "main unresolved/local | head unresolved/local": 4,
+   "main unresolved/external | head unresolved/invalid-code": 7
+  },
+  "rows": [
+   {
+    "file": "packages/excalidraw/actions/actionExport.tsx",
+    "name": "Toast.ProgressBar",
+    "at": 4198,
+    "main": [
+     "resolved",
+     null,
+     null
+    ],
+    "head": [
+     "resolved",
+     null,
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "(expression).map",
+    "at": 18534,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "command.label.toLocaleLowerCase",
+    "at": 18748,
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver command; unhandled element Array (default)"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "command.keywords?.join",
+    "at": 18803,
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver command; unhandled element Array (default)"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "(expression).find",
+    "at": 18954,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "(expression).flat",
+    "at": 21166,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "matchingCommands.findIndex",
+    "at": 21382,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "matchingCommands.findIndex",
+    "at": 22330,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "(expression).push",
+    "at": 24104,
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; element access with a key that is not plainly clean"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "(expression).sort",
+    "at": 24419,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "(expression).sort",
+    "at": 24573,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "matchingCommands.filter",
+    "at": 24845,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "(expression).map",
+    "at": 27607,
+    "head": [
+     "unresolved",
+     "external",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/CommandPalette/CommandPalette.tsx",
+    "name": "(expression).map",
+    "at": 27836,
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; element access with a computed key"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+    "name": "Sidebar.Trigger",
+    "at": 1080,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+    "name": "Sidebar.Tabs",
+    "at": 3037,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+    "name": "Sidebar.Header",
+    "at": 3064,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+    "name": "Sidebar.TabTriggers",
+    "at": 3095,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+    "name": "Sidebar.TabTrigger",
+    "at": 3133,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+    "name": "Sidebar.TabTrigger",
+    "at": 3263,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+    "name": "Sidebar.Tab",
+    "at": 3515,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/DefaultSidebar.tsx",
+    "name": "Sidebar.Tab",
+    "at": 3624,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.LoadScene",
+    "at": 4244,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.SaveToActiveFile",
+    "at": 4286,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.Export",
+    "at": 4440,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.SaveAsImage",
+    "at": 4600,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.SearchMenu",
+    "at": 4653,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.Help",
+    "at": 4696,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.ClearCanvas",
+    "at": 4733,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.Separator",
+    "at": 4764,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.Group",
+    "at": 4793,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.Socials",
+    "at": 4856,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.Separator",
+    "at": 4907,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.ToggleTheme",
+    "at": 4949,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "MainMenu.DefaultItems.ChangeCanvasBackground",
+    "at": 5018,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "OverwriteConfirmDialog.Actions.SaveToDisk",
+    "at": 5204,
+    "main": [
+     "resolved",
+     null,
+     null
+    ],
+    "head": [
+     "resolved",
+     null,
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "OverwriteConfirmDialog.Actions.ExportToImage",
+    "at": 5256,
+    "main": [
+     "resolved",
+     null,
+     null
+    ],
+    "head": [
+     "resolved",
+     null,
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "name": "DefaultSidebar.Trigger",
+    "at": 16597,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "local",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/SidebarHeader.tsx",
+    "name": "props.onDock",
+    "at": 952,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "local",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/UserList.tsx",
+    "name": "next.collaborators.keys",
+    "at": 10214,
+    "main": [
+     "unresolved",
+     "external",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/UserList.tsx",
+    "name": "next.collaborators.get",
+    "at": 10338,
+    "main": [
+     "unresolved",
+     "external",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/UserList.tsx",
+    "name": "nextCollaboratorSocketIds.next",
+    "at": 10539,
+    "main": [
+     "unresolved",
+     "external",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; unhandled type member of a computation over substituted type parameters, not at an expression (default)"
+    ]
+   },
+   {
+    "file": "excalidraw-app/App.tsx",
+    "name": "OverwriteConfirmDialog.Actions.ExportToImage",
+    "at": 32630,
+    "main": [
+     "resolved",
+     null,
+     null
+    ],
+    "head": [
+     "resolved",
+     null,
+     null
+    ]
+   },
+   {
+    "file": "excalidraw-app/App.tsx",
+    "name": "OverwriteConfirmDialog.Actions.SaveToDisk",
+    "at": 32689,
+    "main": [
+     "resolved",
+     null,
+     null
+    ],
+    "head": [
+     "resolved",
+     null,
+     null
+    ]
+   },
+   {
+    "file": "excalidraw-app/App.tsx",
+    "name": "OverwriteConfirmDialog.Action",
+    "at": 32769,
+    "main": [
+     "resolved",
+     null,
+     null
+    ],
+    "head": [
+     "resolved",
+     null,
+     null
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.LoadScene",
+    "at": 802,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.SaveToActiveFile",
+    "at": 844,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.Export",
+    "at": 893,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.SaveAsImage",
+    "at": 932,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.LiveCollaborationTrigger",
+    "at": 1012,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.CommandPalette",
+    "at": 1190,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.SearchMenu",
+    "at": 1261,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.Help",
+    "at": 1304,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.ClearCanvas",
+    "at": 1341,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.Separator",
+    "at": 1372,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.ItemLink",
+    "at": 1401,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.Socials",
+    "at": 1677,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.ItemLink",
+    "at": 1704,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.Item",
+    "at": 2101,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.Separator",
+    "at": 2547,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.Preferences",
+    "at": 2589,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.ToggleTheme",
+    "at": 2633,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.ItemCustom",
+    "at": 2701,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppMainMenu.tsx",
+    "name": "MainMenu.DefaultItems.ChangeCanvasBackground",
+    "at": 2822,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppSidebar.tsx",
+    "name": "DefaultSidebar.TabTriggers",
+    "at": 1997,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "local",
+     null
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppSidebar.tsx",
+    "name": "Sidebar.TabTrigger",
+    "at": 2027,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppSidebar.tsx",
+    "name": "Sidebar.TabTrigger",
+    "at": 2223,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppSidebar.tsx",
+    "name": "Sidebar.Tab",
+    "at": 2460,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/components/AppSidebar.tsx",
+    "name": "Sidebar.Tab",
+    "at": 3202,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "excalidraw-app/tests/LanguageList.test.tsx",
+    "name": "MainMenu.ItemCustom",
+    "at": 647,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Header",
+    "at": 5347,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Header",
+    "at": 7011,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Header",
+    "at": 7945,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Header",
+    "at": 8306,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Header",
+    "at": 8668,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Header",
+    "at": 9213,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Header",
+    "at": 9979,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Tabs",
+    "at": 10473,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Tab",
+    "at": 10502,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/components/Sidebar/Sidebar.test.tsx",
+    "name": "Sidebar.Tab",
+    "at": 10565,
+    "main": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver Sidebar (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "name": "MainMenu.DefaultItems.ChangeCanvasBackground",
+    "at": 8034,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "name": "MainMenu.ItemCustom",
+    "at": 8989,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "name": "MainMenu.DefaultItems.LoadScene",
+    "at": 9285,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "name": "MainMenu.Item",
+    "at": 14270,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "name": "MainMenu.ItemLink",
+    "at": 14391,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "name": "MainMenu.ItemCustom",
+    "at": 14512,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "name": "MainMenu.DefaultItems.Help",
+    "at": 14797,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "name": "MainMenu.DefaultItems.ToggleTheme",
+    "at": 15232,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/interactivity.test.tsx",
+    "name": "MainMenu.Item",
+    "at": 23250,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "receiver MainMenu (type argument); the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/interactivity.test.tsx",
+    "name": "MainMenu.DefaultItems.SaveAsImage",
+    "at": 23339,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "name MainMenu in the receiver; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/interactivity.test.tsx",
+    "name": "DefaultSidebar.Trigger",
+    "at": 23477,
+    "main": [
+     "unresolved",
+     "local",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "local",
+     null
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/test-utils.ts",
+    "name": "renderResult.container.querySelector",
+    "at": 1826,
+    "main": [
+     "unresolved",
+     "external",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/test-utils.ts",
+    "name": "renderResult.container.querySelector",
+    "at": 2153,
+    "main": [
+     "unresolved",
+     "external",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/test-utils.ts",
+    "name": "renderResult.container.querySelector",
+    "at": 2271,
+    "main": [
+     "unresolved",
+     "external",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; the result of an overloaded callee with a tainted argument"
+    ]
+   },
+   {
+    "file": "packages/excalidraw/tests/test-utils.ts",
+    "name": "renderResult.container.querySelector",
+    "at": 2434,
+    "main": [
+     "unresolved",
+     "external",
+     null
+    ],
+    "head": [
+     "unresolved",
+     "invalid-code",
+     "the receiver depends on the failed file; the result of an overloaded callee with a tainted argument"
+    ]
+   }
+  ]
+ }
+}

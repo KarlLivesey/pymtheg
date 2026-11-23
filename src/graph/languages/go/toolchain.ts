@@ -134,7 +134,8 @@ export async function installation(
       }),
     },
   );
-  if (result.kind === "cancelled") throw Error("Indexing was cancelled");
+  if (result.kind === "cancelled")
+    throw signal?.reason ?? Error("Indexing was cancelled");
   if (result.kind !== "exited" || result.code !== 0)
     return {
       unavailable: `${go} did not answer go env (${result.kind}${result.code === null ? "" : ` ${result.code}`}): ${result.stderr.trim().split("\n")[0] ?? ""}`,
@@ -230,7 +231,8 @@ async function helper(
         }),
       },
     );
-    if (result.kind === "cancelled") throw Error("Indexing was cancelled");
+    if (result.kind === "cancelled")
+      throw signal?.reason ?? Error("Indexing was cancelled");
     if (result.kind !== "exited" || result.code !== 0)
       return {
         unavailable: `the helper did not build with ${install.version}: ${result.stderr.trim().split("\n").slice(0, 3).join(" ")}`,
@@ -373,7 +375,8 @@ export async function runHelper(
       JSON.stringify({ Replace: replace }),
     );
     const printed = await exec(["-fingerprint"]);
-    if (printed.kind === "cancelled") throw Error("Indexing was cancelled");
+    if (printed.kind === "cancelled")
+      throw signal?.reason ?? Error("Indexing was cancelled");
     const fingerprint = /^FP\t([0-9a-f]{64})$/m.exec(printed.stdout)?.[1];
     if (printed.kind !== "exited" || printed.code !== 0 || !fingerprint)
       return failure(printed);
@@ -403,7 +406,8 @@ export async function runHelper(
     const started = performance.now();
     const result = await exec([]);
     const elapsedMs = performance.now() - started;
-    if (result.kind === "cancelled") throw Error("Indexing was cancelled");
+    if (result.kind === "cancelled")
+      throw signal?.reason ?? Error("Indexing was cancelled");
     if (result.kind !== "exited" || result.code !== 0) return failure(result);
     // Kept only when complete: a later run with the same inputs reads it.
     const partial = `${facts}.${randomUUID()}.partial`;
