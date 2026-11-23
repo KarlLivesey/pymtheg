@@ -1,0 +1,94 @@
+{"main":
+{
+ "symbols": {
+  "offset class": 296,
+  "offset constant": 1759,
+  "offset constructor": 135,
+  "offset enum": 2,
+  "offset enum-member": 10,
+  "offset function": 2858,
+  "offset getter": 50,
+  "offset interface": 687,
+  "offset method": 1814,
+  "offset module": 2487,
+  "offset namespace": 48,
+  "offset property": 7281,
+  "offset setter": 8,
+  "offset type": 384,
+  "offset variable": 154
+ },
+ "symbolsInSharedGroups": 0,
+ "groups": {
+  "alone": 17973
+ },
+ "linkSources": {
+  "offset": 116220
+ },
+ "linksWithTargetKeys": 75012,
+ "targetKeys": {
+  "calls offset": 41710,
+  "contains offset": 11405,
+  "exports offset": 706,
+  "extends offset": 171,
+  "implements offset": 42,
+  "imports offset": 12698,
+  "references offset": 8656
+ }
+}
+,"head":
+{
+ "symbols": {
+  "module module": 2487,
+  "name class": 296,
+  "name constant": 1759,
+  "name constructor": 135,
+  "name enum": 2,
+  "name enum-member": 10,
+  "name function": 2858,
+  "name getter": 50,
+  "name interface": 687,
+  "name method": 1814,
+  "name namespace": 48,
+  "name property": 7281,
+  "name setter": 8,
+  "name type": 384,
+  "name variable": 154
+ },
+ "symbolsInSharedGroups": 0,
+ "ordinalMismatches": 0,
+ "groups": {
+  "alone": 17973
+ },
+ "linkSources": {
+  "module": 74480,
+  "name": 41740
+ },
+ "linksWithTargetKeys": 75012,
+ "targetKeys": {
+  "calls name": 41710,
+  "contains name": 11405,
+  "exports module": 4,
+  "exports name": 702,
+  "extends name": 171,
+  "implements name": 42,
+  "imports module": 4844,
+  "imports name": 7854,
+  "references module": 10,
+  "references name": 8646
+ }
+}
+,"meaning":
+{
+ "rows": {
+  "graph_files": 2490,
+  "graph_contexts": 17857,
+  "graph_parse_failures": 3,
+  "graph_symbols": 17973,
+  "graph_links": 116220,
+  "graph_candidates": 618,
+  "graph_library_targets": 24175,
+  "project": 1
+ },
+ "differences": {}
+}
+}

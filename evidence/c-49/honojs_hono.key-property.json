@@ -1,0 +1,42 @@
+{
+ "symbols": {
+  "module module": 460,
+  "name class": 60,
+  "name constant": 392,
+  "name constructor": 33,
+  "name enum": 4,
+  "name enum-member": 24,
+  "name function": 1503,
+  "name getter": 14,
+  "name interface": 235,
+  "name method": 240,
+  "name namespace": 17,
+  "name property": 2345,
+  "name setter": 1,
+  "name type": 425,
+  "name variable": 20
+ },
+ "symbolsInSharedGroups": 4,
+ "ordinalMismatches": 0,
+ "duplicateKeys": 0,
+ "groups": {
+  "alone": 5769,
+  "shared": 2
+ },
+ "linkSources": {
+  "module": 47987,
+  "name": 24353
+ },
+ "linksWithTargetKeys": 36158,
+ "targetKeys": {
+  "calls name": 13689,
+  "contains name": 4178,
+  "exports name": 296,
+  "extends name": 81,
+  "implements name": 8,
+  "imports module": 1205,
+  "imports name": 1821,
+  "references module": 222,
+  "references name": 14706
+ }
+}
