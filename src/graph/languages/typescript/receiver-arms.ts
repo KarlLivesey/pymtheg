@@ -37,6 +37,15 @@ interface Arm {
   readonly type: ts.Type;
   /** An array literal producer, whose elements an element access walks. */
   readonly array?: ts.ArrayLiteralExpression;
+  /**
+   * A generic call's result whose type arguments the walk could not prove
+   * unreduced: `type` is its instantiated type, `generic` the same type as
+   * declared, type parameters left open. A member is taken from such an arm
+   * only when the declared type has it with the same declarations: then it
+   * is the container's own member (`Assertion<T>.toBe`), whatever arm the
+   * checker reduced `T` to. A member reached through `T` itself is not.
+   */
+  readonly generic?: ts.Type;
 }
 type Arms = readonly Arm[] | undefined;
 /** The declaration's type is written (or otherwise never reduced). */
@@ -134,11 +143,18 @@ export function receiverArms(
     const arms: Arm[] = [];
     for (const list of lists) {
       if (!list) return undefined;
-      for (const arm of list) {
-        if (!arm.array && nullish(arm.type)) continue;
+      for (const found of list) {
+        if (!found.array && nullish(found.type)) continue;
+        // A primitive literal is its primitive: no member differs.
+        const arm =
+          !found.array && found.type.flags & ts.TypeFlags.Literal
+            ? { type: checker.getBaseTypeOfLiteralType(found.type) }
+            : found;
         if (
           arms.some((known) =>
-            arm.array ? known.array === arm.array : known.type === arm.type,
+            arm.array
+              ? known.array === arm.array
+              : known.type === arm.type && known.generic === arm.generic,
           )
         )
           continue;
@@ -263,22 +279,63 @@ export function receiverArms(
     }
     if (ts.isCallExpression(node)) return call(node);
     if (ts.isNewExpression(node)) {
-      const signature = checker.getResolvedSignature(node);
-      const declaration = signature?.declaration;
-      const generic =
-        !node.typeArguments &&
-        !!(
-          declaration &&
-          !ts.isJSDocSignature(declaration) &&
-          (declaration.typeParameters?.length ||
-            (ts.isClassLike(declaration.parent) &&
-              declaration.parent.typeParameters?.length))
-        );
-      if (generic && !argumentsUnreduced(node)) return undefined;
+      // Generic when the constructed class itself has type parameters
+      // inferred here; a constructor inherited from a generic base class has
+      // them fixed by the `extends` clause.
+      const generic = !node.typeArguments && constructsGeneric(node);
       const callee = arms(node.expression);
-      return callee && callee.length <= 1 ? leaf(node) : undefined;
+      if (!callee || callee.length > 1) return undefined;
+      if (generic && !argumentsUnreduced(node)) {
+        const declared = constructedType(node);
+        return declared
+          ? [{ type: typeAt(node), generic: declared }]
+          : undefined;
+      }
+      return leaf(node);
     }
     return undefined;
+  }
+
+  /** The constructed class's type as declared, type parameters open. */
+  function constructedType(node: ts.NewExpression): ts.Type | undefined {
+    let symbol = checker.getSymbolAtLocation(node.expression);
+    if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+      symbol = checker.getAliasedSymbol(symbol);
+    return symbol?.declarations?.some(ts.isClassLike)
+      ? checker.getDeclaredTypeOfSymbol(symbol)
+      : undefined;
+  }
+
+  function sameDeclarations(one: ts.Symbol, other: ts.Symbol): boolean {
+    const a = one.declarations ?? [];
+    const b = new Set(other.declarations ?? []);
+    return a.length === b.size && a.every((declaration) => b.has(declaration));
+  }
+
+  function constructsGeneric(node: ts.NewExpression): boolean {
+    let symbol = checker.getSymbolAtLocation(node.expression);
+    if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+      symbol = checker.getAliasedSymbol(symbol);
+    const declarations = symbol?.declarations ?? [];
+    const known = declarations.filter(
+      (declaration) =>
+        ts.isClassLike(declaration) || ts.isInterfaceDeclaration(declaration),
+    );
+    // An unknown constructor (a value of a constructor type): its resolved
+    // signature decides.
+    if (!known.length) {
+      const declaration = checker.getResolvedSignature(node)?.declaration;
+      return (
+        !!declaration &&
+        !ts.isJSDocSignature(declaration) &&
+        !!(
+          declaration.typeParameters?.length ||
+          (ts.isClassLike(declaration.parent) &&
+            declaration.parent.typeParameters?.length)
+        )
+      );
+    }
+    return known.some((declaration) => !!declaration.typeParameters?.length);
   }
 
   function identifier(node: ts.Identifier): Arms {
@@ -295,17 +352,28 @@ export function receiverArms(
   }
 
   function symbolArms(symbol: ts.Symbol): DeclarationArms {
-    const declarations = symbol.declarations ?? [];
+    // A value and a type of one name (`const t = …; type t = …`): the value.
+    const declarations = (symbol.declarations ?? []).filter(
+      (declaration) =>
+        !ts.isTypeAliasDeclaration(declaration) &&
+        !(
+          ts.isInterfaceDeclaration(declaration) &&
+          symbol.flags & ts.SymbolFlags.Variable
+        ),
+    );
     if (declarations.length === 1) return declarationArms(declarations[0]!);
     // Overloads, declaration merging (a class and an interface, a function
     // and a namespace): declared, not computed.
     return declarations.every(
       (declaration) =>
-        !ts.isVariableDeclaration(declaration) &&
-        !ts.isPropertyAssignment(declaration) &&
-        !ts.isShorthandPropertyAssignment(declaration) &&
-        !ts.isBindingElement(declaration) &&
-        !ts.isBinaryExpression(declaration),
+        // An ambient declaration (`interface Date` and `declare var Date`)
+        // is written.
+        declaration.getSourceFile().isDeclarationFile ||
+        (!ts.isVariableDeclaration(declaration) &&
+          !ts.isPropertyAssignment(declaration) &&
+          !ts.isShorthandPropertyAssignment(declaration) &&
+          !ts.isBindingElement(declaration) &&
+          !ts.isBinaryExpression(declaration)),
     )
       ? WRITTEN
       : undefined;
@@ -336,6 +404,9 @@ export function receiverArms(
       ts.isPropertySignature(declaration) ||
       ts.isImportEqualsDeclaration(declaration) ||
       ts.isNamespaceImport(declaration) ||
+      ts.isNamespaceExport(declaration) ||
+      ts.isNamespaceExportDeclaration(declaration) ||
+      ts.isExportDeclaration(declaration) ||
       ts.isImportClause(declaration) ||
       ts.isImportSpecifier(declaration) ||
       ts.isExportSpecifier(declaration) ||
@@ -562,6 +633,20 @@ export function receiverArms(
     return !generic || argumentsUnreduced(call, true);
   }
 
+  /**
+   * Whether the checker's union of these arms can have dropped one: subtype
+   * reduction removes an arm assignable to another, so arms none of which is
+   * assignable to another are all kept. (Assignability is wider than the
+   * subtype relation the reduction uses, so this errs towards "reducible".)
+   */
+  function reducible(found: readonly Arm[]): boolean {
+    for (const one of found)
+      for (const other of found)
+        if (one !== other && checker.isTypeAssignableTo(one.type, other.type))
+          return true;
+    return false;
+  }
+
   /** No argument of a generic call is a reduced value (its type arguments). */
   function argumentsUnreduced(
     call: ts.CallExpression | ts.NewExpression,
@@ -608,16 +693,16 @@ export function receiverArms(
               : arms(item),
           ),
         );
-        result = !!elements && elements.length <= 1;
+        result = !!elements && !reducible(elements);
       } else if (ts.isFunctionExpression(value) || ts.isArrowFunction(value)) {
         if (value.type) result = true;
         else {
           const out = returned(value);
-          result = !!out && out.length <= 1;
+          result = !!out && !reducible(out);
         }
       } else {
         const out = arms(value);
-        result = !!out && out.length <= 1;
+        result = !!out && !reducible(out);
       }
     } finally {
       depth--;
@@ -800,7 +885,17 @@ export function receiverArms(
     // signature: the type is not inferred from returns.
     if (!declaration || ts.isJSDocSignature(declaration)) return leaf(node);
     const generic = !node.typeArguments && !!declaration.typeParameters?.length;
-    if (generic && !argumentsUnreduced(node)) return undefined;
+    // Through a generic container, or with type arguments the walk cannot
+    // prove unreduced: the result keeps its declared type beside it.
+    if (callees[0]?.generic || (generic && !argumentsUnreduced(node)))
+      return declaration.type
+        ? [
+            {
+              type: typeAt(node),
+              generic: checker.getTypeFromTypeNode(declaration.type),
+            },
+          ]
+        : undefined;
     if (declaration.type) return leaf(node);
     if (!hasBody(declaration)) return undefined;
     const out = returned(declaration);
@@ -839,6 +934,43 @@ export function receiverArms(
       owners.map((arm) => {
         const type = checker.getApparentType(arm.type);
         const member = checker.getPropertyOfType(type, name);
+        if (arm.generic) {
+          const counterpart = checker.getPropertyOfType(
+            checker.getApparentType(arm.generic),
+            name,
+          );
+          if (!member || !counterpart || !sameDeclarations(member, counterpart))
+            return undefined;
+          const declaration = counterpart.declarations?.[0];
+          const written =
+            declaration &&
+            (ts.isPropertySignature(declaration) ||
+              ts.isPropertyDeclaration(declaration) ||
+              ts.isGetAccessorDeclaration(declaration))
+              ? declaration.type
+              : undefined;
+          if (
+            !written &&
+            !(
+              declaration &&
+              (ts.isMethodSignature(declaration) ||
+                ts.isMethodDeclaration(declaration))
+            )
+          )
+            return undefined;
+          return [
+            {
+              type: checker.getNonNullableType(
+                checked
+                  ? checker.getTypeAtLocation(at)
+                  : checker.getTypeOfSymbol(member),
+              ),
+              generic: written
+                ? checker.getTypeFromTypeNode(written)
+                : checker.getTypeOfSymbol(counterpart),
+            },
+          ];
+        }
         // An index signature, `any`: the checker's type, if it is the only arm.
         if (!member) {
           if (checked) return leaf(at);
@@ -879,6 +1011,7 @@ export function receiverArms(
     const checked = agrees(owners, owner);
     return merge(
       owners.map((arm): Arms => {
+        if (arm.generic) return undefined;
         const array = arm.array;
         if (array) {
           if (
@@ -956,6 +1089,14 @@ export function receiverArms(
         // own lookup decides, as before.
         if (found.length === 1) return undefined;
         return "unverified";
+      }
+      if (arm.generic) {
+        const counterpart = checker.getPropertyOfType(
+          checker.getApparentType(arm.generic),
+          name,
+        );
+        if (!counterpart || !sameDeclarations(member, counterpart))
+          return "unverified";
       }
       if (!members.includes(member)) members.push(member);
     }
