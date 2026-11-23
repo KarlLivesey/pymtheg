@@ -875,7 +875,11 @@ and never yields a version pin.
   - a set of different symbols, such as the arms of a union receiver;
   - a set that includes a test package (two test frameworks' `describe`,
     two assertion libraries' `expect`);
-  - a global whose variable declarations disagree on the type.
+  - a set whose units include two that the compiler finds in conflict
+    on any shared global (TS2403), such as `@cloudflare/workers-types`
+    and the DOM;
+  - a set merged by a module augmentation (`declare module "fastify"`), which
+    is one symbol but not a global.
 - **Unbuilt checkout packages:** The configured compiler emit can identify
   a unique source of a missing declaration entry. A plain `tsc` build can
   prove that mapping, including through `tsc -b` for a referenced child.

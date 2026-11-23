@@ -1,18 +1,20 @@
 {
  "totals": {
   "all": {
-   "(a) one global symbol in several units (merged)": 13568,
-   "(b) not marked: different compiler symbols": 1851,
+   "(a) one global symbol in several units (merged)": 13540,
+   "(b) not marked: not one compiler symbol, or no rule above": 1613,
    "(b) not marked: a test package among the units": 31,
-   "(b) not marked: a synthesised Node target present": 111,
-   "(b) not marked: variable declarations disagree on the type": 135
+   "(b) not marked: a synthesised Node target present": 112,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 241,
+   "(b) not marked: two units in conflict on a shared global (TS2403)": 570
   },
   "sw6Group": {
-   "(a) one global symbol in several units (merged)": 13568,
+   "(a) one global symbol in several units (merged)": 13540,
    "(b) not marked: a test package among the units": 31,
-   "(b) not marked: a synthesised Node target present": 111,
-   "(b) not marked: different compiler symbols": 522,
-   "(b) not marked: variable declarations disagree on the type": 135
+   "(b) not marked: a synthesised Node target present": 112,
+   "(b) not marked: not one compiler symbol, or no rule above": 283,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 241,
+   "(b) not marked: two units in conflict on a shared global (TS2403)": 570
   }
  },
  "byPin": {
@@ -21,31 +23,36 @@
   },
   "colinhacks/zod": {
    "(a) one global symbol in several units (merged)": 613,
-   "(b) not marked: different compiler symbols": 461,
+   "(b) not marked: not one compiler symbol, or no rule above": 461,
    "(b) not marked: a test package among the units": 4
   },
   "dexie/Dexie.js": {
    "(b) not marked: a synthesised Node target present": 2,
-   "(b) not marked: different compiler symbols": 93,
-   "(a) one global symbol in several units (merged)": 600
+   "(b) not marked: not one compiler symbol, or no rule above": 89,
+   "(a) one global symbol in several units (merged)": 600,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 4
   },
   "excalidraw/excalidraw": {
    "(a) one global symbol in several units (merged)": 806,
-   "(b) not marked: different compiler symbols": 250,
-   "(b) not marked: a test package among the units": 5
+   "(b) not marked: not one compiler symbol, or no rule above": 246,
+   "(b) not marked: a test package among the units": 5,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 4
   },
   "honojs/hono": {
    "(a) one global symbol in several units (merged)": 2008,
-   "(b) not marked: different compiler symbols": 123
+   "(b) not marked: not one compiler symbol, or no rule above": 122,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 1
   },
   "mermaid-js/mermaid": {
    "(a) one global symbol in several units (merged)": 406,
    "(b) not marked: a synthesised Node target present": 6,
-   "(b) not marked: different compiler symbols": 66
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 43,
+   "(b) not marked: not one compiler symbol, or no rule above": 23
   },
   "nestjs/nest": {
-   "(b) not marked: different compiler symbols": 185,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 138,
    "(a) one global symbol in several units (merged)": 436,
+   "(b) not marked: not one compiler symbol, or no rule above": 47,
    "(b) not marked: a synthesised Node target present": 14,
    "(b) not marked: a test package among the units": 6
   },
@@ -54,71 +61,74 @@
   },
   "pingdotgg/t3code": {
    "(a) one global symbol in several units (merged)": 530,
-   "(b) not marked: different compiler symbols": 183
+   "(b) not marked: not one compiler symbol, or no rule above": 181,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 2
   },
   "pmndrs/zustand": {
    "(a) one global symbol in several units (merged)": 15,
-   "(b) not marked: different compiler symbols": 2
+   "(b) not marked: not one compiler symbol, or no rule above": 2
   },
   "puppeteer/puppeteer": {
-   "(b) not marked: different compiler symbols": 56,
+   "(b) not marked: not one compiler symbol, or no rule above": 56,
    "(a) one global symbol in several units (merged)": 648
   },
   "react-hook-form/react-hook-form": {
    "(b) not marked: a synthesised Node target present": 22,
    "(a) one global symbol in several units (merged)": 106,
-   "(b) not marked: different compiler symbols": 1
+   "(b) not marked: not one compiler symbol, or no rule above": 1
   },
   "reduxjs/redux-toolkit": {
-   "(b) not marked: different compiler symbols": 76,
-   "(a) one global symbol in several units (merged)": 304,
-   "(b) not marked: variable declarations disagree on the type": 5
+   "(b) not marked: not one compiler symbol, or no rule above": 76,
+   "(a) one global symbol in several units (merged)": 286,
+   "(b) not marked: two units in conflict on a shared global (TS2403)": 23
   },
   "trpc/trpc": {
-   "(a) one global symbol in several units (merged)": 1476,
-   "(b) not marked: variable declarations disagree on the type": 116,
+   "(a) one global symbol in several units (merged)": 1232,
+   "(b) not marked: two units in conflict on a shared global (TS2403)": 362,
    "(b) not marked: a synthesised Node target present": 10,
-   "(b) not marked: different compiler symbols": 90,
+   "(b) not marked: not one compiler symbol, or no rule above": 81,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 9,
    "(b) not marked: a test package among the units": 16
   },
   "vercel/turborepo": {
-   "(b) not marked: different compiler symbols": 27,
-   "(a) one global symbol in several units (merged)": 218
+   "(b) not marked: not one compiler symbol, or no rule above": 19,
+   "(a) one global symbol in several units (merged)": 569,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 11,
+   "(b) not marked: a synthesised Node target present": 1
   },
   "vitejs/vite": {
    "(b) not marked: a synthesised Node target present": 57,
-   "(b) not marked: different compiler symbols": 45,
+   "(b) not marked: not one compiler symbol, or no rule above": 45,
    "(a) one global symbol in several units (merged)": 176
   },
   "vitest-dev/vitest": {
    "(a) one global symbol in several units (merged)": 488,
-   "(b) not marked: different compiler symbols": 32
+   "(b) not marked: not one compiler symbol, or no rule above": 32
   },
   "withastro/astro": {
-   "(a) one global symbol in several units (merged)": 4501,
-   "(b) not marked: different compiler symbols": 156,
-   "(b) not marked: variable declarations disagree on the type": 14
+   "(a) one global symbol in several units (merged)": 4384,
+   "(b) not marked: not one compiler symbol, or no rule above": 127,
+   "(b) not marked: one symbol merged by a module augmentation, not a global": 29,
+   "(b) not marked: two units in conflict on a shared global (TS2403)": 185
   },
   "yargs/yargs": {
    "(a) one global symbol in several units (merged)": 99,
-   "(b) not marked: different compiler symbols": 5
+   "(b) not marked: not one compiler symbol, or no rule above": 5
   }
  },
  "byUnits": {
   "(a) one global symbol in several units (merged)": {
-   "dom:dom + node:globals": 5464,
-   "dom:dom + node:url": 2353,
-   "dom:dom + node:console": 1844,
-   "node:globals + typescript-lib:es": 852,
-   "dom:dom + node:timers": 757,
+   "dom:dom + node:globals": 5513,
+   "dom:dom + node:url": 2383,
+   "dom:dom + node:console": 1873,
+   "node:globals + typescript-lib:es": 1135,
+   "dom:dom + node:timers": 770,
    "dom:dom + node:buffer": 310,
-   "dom:dom + node:globals + npm:@cloudflare/workers-types": 238,
    "dom:dom + node:util": 231,
    "dom:dom + npm:react": 226,
    "dom:dom + node:stream/web": 177,
    "dom:dom + node:globals + npm:bun-types": 135,
-   "dom:dom + npm:@cloudflare/workers-types": 125,
-   "dom:dom + node:console + npm:bun-types": 107,
+   "dom:dom + node:console + npm:bun-types": 109,
    "dom:dom + npm:@testing-library/user-event": 95,
    "node:process + npm:bun-types": 72,
    "dom:dom + node:timers + npm:bun-types": 58,
@@ -130,34 +140,36 @@
    "dom:dom + node:buffer + node:globals": 32,
    "node:url + npm:bun-types": 32,
    "npm:bun-types + typescript-lib:es": 28,
-   "dom:dom + node:console + npm:@cloudflare/workers-types + npm:bun-types": 22
+   "npm:effect + typescript-lib:es": 19,
+   "npm:bun-types + npm:effect + typescript-lib:es": 15,
+   "dom:dom + node:module": 13
   },
-  "(b) not marked: different compiler symbols": {
-   "typescript-lib:es": 514,
+  "(b) not marked: not one compiler symbol, or no rule above": {
+   "typescript-lib:es": 515,
    "dom:dom": 483,
    "node:fs": 105,
    "dom:dom + node:timers": 89,
-   "npm:@fastify/multipart + npm:fastify": 60,
    "node:url": 46,
-   "npm:d3-selection + npm:d3-transition": 43,
-   "node:buffer + typescript-lib:es": 40,
+   "node:buffer + typescript-lib:es": 42,
    "node:path": 39,
-   "node:stream + npm:@fastify/busboy": 32,
    "node:http + node:http2": 32,
    "npm:ast-types": 32,
    "dom:dom + typescript-lib:es": 27,
-   "npm:@fastify/static + npm:@fastify/view + npm:fastify": 27,
    "dom:dom + npm:react": 24,
    "node:buffer": 21,
    "node:process": 19,
-   "npm:@fastify/middie + npm:@fastify/multipart + npm:@fastify/view + npm:fastify": 15,
    "node:http + node:https": 15,
    "node:http2 + node:stream": 15,
-   "npm:@volar/language-core + npm:@volar/typescript": 14,
    "node:child_process": 13,
    "dom:dom + npm:bun-types": 11,
    "npm:lexical": 10,
-   "npm:@fastify/websocket + npm:fastify": 9
+   "node:v8": 8,
+   "node:vm": 7,
+   "node:os": 7,
+   "dom:dom + node:buffer": 7,
+   "node:zlib": 6,
+   "node:crypto": 5,
+   "node:fs/promises + npm:bun-types": 5
   },
   "(b) not marked: a test package among the units": {
    "npm:vite + npm:vitest": 26,
@@ -165,7 +177,7 @@
    "npm:chai + typescript-lib:es": 1
   },
   "(b) not marked: a synthesised Node target present": {
-   "dom:dom + node:console": 35,
+   "dom:dom + node:console": 36,
    "dom:dom + node:timers": 22,
    "dom:dom + node:globals": 20,
    "dom:dom + node:worker_threads": 11,
@@ -177,83 +189,104 @@
    "dom:dom + node:timers + npm:@cloudflare/workers-types": 1,
    "dom:dom + node:buffer": 1
   },
-  "(b) not marked: variable declarations disagree on the type": {
-   "dom:dom + node:globals + npm:@cloudflare/workers-types": 91,
+  "(b) not marked: one symbol merged by a module augmentation, not a global": {
+   "npm:@fastify/multipart + npm:fastify": 60,
+   "npm:d3-selection + npm:d3-transition": 43,
+   "node:stream + npm:@fastify/busboy": 32,
+   "npm:@fastify/static + npm:@fastify/view + npm:fastify": 27,
+   "npm:@fastify/middie + npm:@fastify/multipart + npm:@fastify/view + npm:fastify": 15,
+   "npm:@volar/language-core + npm:@volar/typescript": 14,
+   "npm:@fastify/websocket + npm:fastify": 9,
+   "npm:@radix-ui/react-primitive + npm:react": 7,
+   "npm:@fastify/middie + npm:fastify": 5,
+   "npm:dexie + npm:dexie-cloud-addon": 4,
+   "npm:@vitejs/plugin-react + npm:vite": 4,
+   "npm:rolldown + npm:vite": 4,
+   "npm:@volar/typescript + npm:typescript": 4,
+   "node:fs/promises + npm:bun-types": 3,
+   "npm:@fastify/error + npm:fastify": 3,
+   "npm:next + npm:react": 2,
+   "npm:fumadocs-core + npm:fumadocs-openapi": 2,
+   "npm:hast + npm:mdast-util-mdx-expression + npm:mdast-util-mdx-jsx + npm:mdast-util-mdxjs-esm + npm:mdast-util-to-hast": 2,
+   "npm:@graphql-tools/utils + npm:graphql": 1
+  },
+  "(b) not marked: two units in conflict on a shared global (TS2403)": {
+   "dom:dom + node:globals + npm:@cloudflare/workers-types": 329,
+   "dom:dom + npm:@cloudflare/workers-types": 125,
    "dom:dom + node:globals + npm:@cloudflare/workers-types + npm:bun-types": 37,
-   "dom:dom + node:globals + npm:react-native": 5,
-   "node:globals + npm:bun-types": 2
+   "dom:dom + node:console + npm:@cloudflare/workers-types + npm:bun-types": 22,
+   "dom:dom + node:timers + npm:@cloudflare/workers-types + npm:bun-types": 19,
+   "dom:dom + npm:react-native": 16,
+   "dom:dom + node:buffer + npm:@cloudflare/workers-types": 12,
+   "dom:dom + node:globals + npm:react-native": 7,
+   "node:globals + npm:bun-types": 2,
+   "dom:dom + node:console + npm:@cloudflare/workers-types": 1
   }
  },
  "byName": {
   "(a) one global symbol in several units (merged)": {
-   "URL": 2448,
-   "Request": 1610,
-   "Response": 1214,
-   "log": 1089,
-   "setTimeout": 1069,
-   "fetch": 640,
-   "Array": 488,
-   "error": 437,
+   "URL": 2478,
+   "Request": 1620,
+   "Response": 1099,
+   "log": 1093,
+   "setTimeout": 1063,
+   "Array": 759,
+   "fetch": 619,
+   "error": 438,
    "Headers": 303,
-   "Uint8Array": 270,
-   "AbortController": 266,
-   "FormData": 242,
-   "warn": 233,
+   "Uint8Array": 280,
+   "AbortController": 271,
+   "FormData": 244,
+   "warn": 235,
    "File": 216,
-   "clearTimeout": 213,
-   "URLSearchParams": 205,
-   "RequestInit": 149,
+   "clearTimeout": 215,
+   "URLSearchParams": 204,
    "Event": 145,
    "TextDecoder": 144,
    "ReadableStream": 143,
    "Blob": 138,
-   "AbortSignal": 130,
+   "AbortSignal": 136,
    "TextEncoder": 117,
-   "text": 103,
-   "debug": 102,
+   "debug": 101,
    "WebSocket": 94,
    "Element": 81,
    "KeyboardEvent": 78,
    "PointerEvent": 73,
    "info": 72,
    "ProcessEnv": 72,
-   "structuredClone": 48,
+   "RequestInit": 65,
+   "structuredClone": 51,
    "EventTarget": 48,
    "Date": 46,
-   "clearInterval": 44,
+   "clearInterval": 43,
    "MessageEvent": 42,
    "atob": 41,
    "Int32Array": 38,
    "CustomEvent": 36,
-   "btoa": 36
+   "Error": 34,
+   "setInterval": 33
   },
-  "(b) not marked: different compiler symbols": {
-   "toString": 540,
+  "(b) not marked: not one compiler symbol, or no rule above": {
+   "toString": 543,
    "addEventListener": 174,
    "(no name)": 126,
    "removeEventListener": 90,
-   "FastifyRequest": 67,
    "setTimeout": 44,
-   "Selection": 43,
    "requestAnimationFrame": 41,
    "dispatchEvent": 35,
    "check": 32,
    "cancelAnimationFrame": 31,
-   "Readable": 30,
    "clearTimeout": 28,
-   "FastifyReply": 27,
    "getComputedStyle": 25,
    "fileURLToPath": 24,
    "open": 24,
    "on": 22,
-   "FastifyInstance": 22,
-   "once": 18,
    "preventDefault": 17,
    "readFileSync": 16,
+   "once": 16,
    "exit": 14,
    "existsSync": 14,
    "matchMedia": 14,
-   "LanguagePlugin": 14,
    "writeFileSync": 12,
    "includes": 12,
    "alert": 12,
@@ -267,7 +300,13 @@
    "execFileSync": 7,
    "values": 7,
    "stopPropagation": 7,
-   "confirm": 7
+   "confirm": 7,
+   "addListener": 7,
+   "scrollTo": 6,
+   "setHeader": 6,
+   "getNode": 6,
+   "slice": 5,
+   "has": 5
   },
   "(b) not marked: a test package among the units": {
    "Plugin": 20,
@@ -278,7 +317,7 @@
   },
   "(b) not marked: a synthesised Node target present": {
    "setTimeout": 22,
-   "log": 18,
+   "log": 19,
    "error": 9,
    "debug": 9,
    "URL": 7,
@@ -303,10 +342,50 @@
    "Blob": 1,
    "stopPropagation": 1
   },
-  "(b) not marked: variable declarations disagree on the type": {
+  "(b) not marked: one symbol merged by a module augmentation, not a global": {
+   "FastifyRequest": 67,
+   "Selection": 43,
+   "Readable": 30,
+   "FastifyReply": 27,
+   "FastifyInstance": 22,
+   "LanguagePlugin": 14,
+   "CSSProperties": 7,
+   "Plugin": 4,
+   "OutputChunk": 4,
+   "LanguageServiceHost": 4,
+   "node:fs/promises": 3,
+   "FastifyError": 3,
+   "Dexie": 2,
+   "Table": 2,
+   "once": 2,
+   "HTMLAttributes": 2,
+   "PageData": 2,
+   "RootContentMap": 2,
+   "GraphQLError": 1
+  },
+  "(b) not marked: two units in conflict on a shared global (TS2403)": {
+   "Response": 128,
    "Request": 128,
+   "text": 102,
+   "RequestInit": 84,
+   "fetch": 28,
+   "setTimeout": 16,
+   "log": 13,
+   "btoa": 12,
+   "json": 12,
+   "get": 10,
+   "error": 10,
+   "arrayBuffer": 9,
    "URL": 5,
-   "Response": 2
+   "append": 4,
+   "setInterval": 2,
+   "URLSearchParams": 1,
+   "toString": 1,
+   "clearTimeout": 1,
+   "clearInterval": 1,
+   "debug": 1,
+   "clone": 1,
+   "blob": 1
   }
  }
 }
