@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-config.mjs";
 // R1-J: honest MCP surfaces. Each test drives the built product over real
 // stdio MCP (and the CLI where the CLI shares the behaviour).
 import test from "node:test";
@@ -102,7 +103,7 @@ test("D and H: refusals name the accepted arguments; project_info says files are
 test("E: the first MCP planning write initialises the project exactly as pymtheg init would", async () => {
   const reference = await mkdtemp(join(tmpdir(), "pym-r1j-init-"));
   try {
-    await initializeWorkspace(reference);
+    await initializeWorkspace(reference, undefined, { trust: "source-only" });
     await project(
       {
         "a.go": "package p\nfunc Save(n int) int { return n }\n",
@@ -119,9 +120,30 @@ test("E: the first MCP planning write initialises the project exactly as pymtheg
         if (index.state === "running")
           await s.call("graph_result", { jobId: index.jobId, wait: true });
         assert.equal((await s.call("project_info", {})).initialised, false);
+        // D22: without the trust answer the write returns the question and
+        // initialises nothing.
+        assert.match(
+          await errorText(s, "requirement_links", {
+            action: "requirement",
+            id: "R1",
+            title: "Save",
+          }),
+          /Do you trust this repository\?[\s\S]*trust: "trusted" or "source-only"/,
+        );
+        assert.equal((await s.call("project_info", {})).initialised, false);
+        // A first add that fails (no such record), with the answer, also
+        // initialises nothing: only a write that proceeds does.
+        const failed = await links(s, "add", {
+          record: "R9",
+          selector: "Save",
+          trust: "source-only",
+        });
+        assert.equal(failed.summary.status, "record-not-found");
+        assert.equal((await s.call("project_info", {})).initialised, false);
         const created = await links(s, "requirement", {
           id: "R1",
           title: "Save",
+          trust: "source-only",
         });
         assert.equal(created.summary.status, "created");
         const after = await s.call("project_info", {});
@@ -145,6 +167,14 @@ test("E: the first MCP planning write initialises the project exactly as pymtheg
         ]);
         const add = await links(s, "add", { record: "R1", selector: "Save" });
         assert.equal(add.summary.status, "created");
+        // trust means something only on the first planning writes.
+        assert.match(
+          await errorText(s, "requirement_links", {
+            action: "list",
+            trust: "trusted",
+          }),
+          /trust is not accepted by list/,
+        );
       },
     );
   } finally {
@@ -348,7 +378,11 @@ test("G: messages say what is true", async () =>
       }),
       "The typed model for this run is no longer retained (only the three newest are kept). Check the design again and use the new runId.",
     );
-    await links(s, "requirement", { id: "R1", title: "Count" });
+    await links(s, "requirement", {
+      id: "R1",
+      title: "Count",
+      trust: "source-only",
+    });
     const versions = await s.call("read_implementation", {
       section: "versions",
     });

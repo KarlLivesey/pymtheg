@@ -1849,6 +1849,17 @@ function App() {
               Project setup
             </button>
           )}
+          {project?.trust === "unanswered" && (
+            // D22: a checkout with no trust answer on this machine (a clone)
+            // runs nothing until the question is answered.
+            <button
+              className="quiet-action trust-unanswered"
+              title="No build tool runs on this repository until you answer."
+              onClick={() => setSetupOpen(true)}
+            >
+              Do you trust this repository? Answer
+            </button>
+          )}
           <button
             type="button"
             className="quiet-action"
@@ -4042,6 +4053,7 @@ function App() {
         <ProjectSetup
           name={basename(project.root)}
           workspace={project.workspace ?? null}
+          trust={project.trust ?? null}
           onClose={() => setSetupOpen(false)}
           onUpdate={(value) => {
             setProject((old) =>
@@ -4049,6 +4061,7 @@ function App() {
                 ? {
                     ...old,
                     workspace: value.workspace,
+                    ...(value.trust ? { trust: value.trust } : {}),
                     architectureAvailable:
                       old.architectureAvailable ||
                       value.documentation.status === "imported" ||

@@ -9,8 +9,10 @@
 //   no-secondary        without the secondary indexes
 //   temp-memory         PRAGMA temp_store=MEMORY (statement journals in memory)
 //   temp-memory-at-begin  MEMORY only while each write transaction begins
+//   at-begin-savepoint  the same, with each file's writes in a savepoint
 // Prints microseconds per row. Timings are observations.
 //   node scripts/store-cost/micro.mjs <dist> <dir> [files] [per]
+import "../isolated-home.mjs";
 import { existsSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -30,6 +32,7 @@ for (const variant of [
   "no-secondary",
   "temp-memory",
   "temp-memory-at-begin",
+  "at-begin-savepoint",
   "production",
 ]) {
   const path = join(dir, `micro-${variant}.sqlite`);
@@ -63,9 +66,12 @@ for (const variant of [
   let linkMs = 0;
   for (let f = 0; f < files; f++) {
     const path = `pkg${f % 20}/file${f}.go`;
-    if (variant === "temp-memory-at-begin")
-      db.exec("PRAGMA temp_store=MEMORY; BEGIN IMMEDIATE; PRAGMA temp_store=DEFAULT");
+    if (variant === "temp-memory-at-begin" || variant === "at-begin-savepoint")
+      db.exec(
+        "PRAGMA temp_store=MEMORY; BEGIN IMMEDIATE; PRAGMA temp_store=DEFAULT",
+      );
     else db.exec("BEGIN IMMEDIATE");
+    if (variant === "at-begin-savepoint") db.exec("SAVEPOINT micro");
     file.run(path, `{"path":"${path}","text":"${pad}"}`, "clean");
     let started = performance.now();
     for (let s = 0; s < per; s++)
@@ -91,6 +97,7 @@ for (const variant of [
         "unresolved",
       );
     linkMs += performance.now() - started;
+    if (variant === "at-begin-savepoint") db.exec("RELEASE micro");
     db.exec("COMMIT");
   }
   db.close();

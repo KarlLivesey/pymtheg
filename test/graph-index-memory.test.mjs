@@ -15,6 +15,8 @@ import {
   SqliteGraphStore,
 } from "../dist/graph/index.js";
 import { module as synthetic } from "./fixtures/graph-core/synthetic.mjs";
+import ts from "typescript";
+import typescriptModule from "../dist/graph/languages/typescript/index.js";
 
 /** Marks every decoded stored file record so live ones can be counted. */
 class DecodedFile {}
@@ -352,6 +354,46 @@ test("an added link without a file is a resolution error, not a crash", async ()
     assert.equal(report.symbols, 10);
     assert.equal(report.links, 10);
     assert.equal(report.unresolved, 10);
+  } finally {
+    store?.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+// C-40: the TypeScript module's programs share the parsed library files, and
+// each checker records its facts on their symbols, so a cache of those files
+// kept the last program and its checker alive after the analysis (2.7 GB on
+// microsoft/TypeScript, through every later write and resolution). Counted:
+// after the run no compiler source file and no checker type is alive.
+test("after a TypeScript analysis no compiler program or checker stays alive", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-index-memory-"));
+  let store;
+  try {
+    const root = join(scratch, "project");
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(
+      join(root, "tsconfig.json"),
+      JSON.stringify({ compilerOptions: { strict: true }, include: ["src"] }),
+    );
+    for (let i = 0; i < 6; i++)
+      await writeFile(
+        join(root, "src", `m${i}.ts`),
+        `import { f${(i + 1) % 6} } from "./m${(i + 1) % 6}";\n` +
+          `export function f${i}(): number {\n  return [1, 2].map((x) => x + 1).length;\n}\n` +
+          `export const v${i} = f${(i + 1) % 6};\n`,
+      );
+    store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "memory");
+    const report = await indexProject(
+      root,
+      new LanguageRegistry([typescriptModule]),
+      store,
+    );
+    assert.equal(report.analysisErrors.length, 0);
+    assert.ok(report.links > 0, `${report.links} links`);
+    const SourceFile = ts.objectAllocator.getSourceFileConstructor();
+    const Type = ts.objectAllocator.getTypeConstructor();
+    assert.equal(queryObjects(SourceFile, { format: "count" }), 0);
+    assert.equal(queryObjects(Type, { format: "count" }), 0);
   } finally {
     store?.close();
     await rm(scratch, { recursive: true, force: true });
