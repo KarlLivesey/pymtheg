@@ -146,7 +146,7 @@ test("type literals with the same member names stay distinct; a written union is
 
 test("a computed union of identical type literals is never one definite member", async () => {
   // The checker reduces `pick ? one : two` to one of the two identical
-  // literal types, so its declaration list names one member: no link.
+  // literal types, so its declaration list names one member: the walk gives both.
   const got = await outcomes(
     {
       "src/use.ts": [
@@ -164,9 +164,9 @@ test("a computed union of identical type literals is never one definite member",
     "src/use.ts",
   );
   assert.deepEqual(got, {
-    "(pick ? one : two).run();": "unresolved:local",
-    "chosen.run();": "unresolved:local",
-    "choose().run();": "unresolved:local",
+    "(pick ? one : two).run();": ["src/use.ts#one.[type].run", "src/use.ts#two.[type].run"],
+    "chosen.run();": ["src/use.ts#one.[type].run", "src/use.ts#two.[type].run"],
+    "choose().run();": ["src/use.ts#one.[type].run", "src/use.ts#two.[type].run"],
   });
 });
 
@@ -308,9 +308,12 @@ test("member symbols of literals leave every contains link resolved", async () =
   }
 });
 
-test("a type-literal member is definite only when the receiver's whole path is written", async () => {
-  // C-41 review: the object a property is read from can itself be computed;
-  // the checker reduces it to one arm, whose written type passes the last step.
+test("no step of a member call's receiver is a value the checker reduced from several producers", async () => {
+  // C-41 review: the object a property is read from can itself be computed,
+  // and the checker reduces identical types to one arm. The receiver's chain
+  // is walked to its producers: one producer keeps the link, several give a
+  // candidate set of each arm's member, and a value the walk cannot follow
+  // leaves the call unresolved. Interface and object-literal members too.
   const got = await outcomes(
     {
       "src/use.ts": [
@@ -332,42 +335,91 @@ test("a type-literal member is definite only when the receiver's whole path is w
         "function choose() { if (pick) return a; return b; }",
         "choose().util.run();",
         "const list = [a, b];",
-        "list[0].util.run();",
+        "list[1].util.run();",
         "for (const x of list) x.util.run();",
+        "list.forEach((c) => c.util.run());",
         "declare const f1: () => { run(): void };",
         "declare const f2: () => { run(): void };",
         "(pick ? f1 : f2)().run();",
         "declare const given: { log: { info(m: string): void } } | undefined;",
         "const ctx = given ?? { log: { info() {} } };",
         "ctx.log.info('x');",
+        "declare function same<T>(value: T): T;",
+        "same(pick ? a : b).util.run();",
+        "same(a).util.run();",
+        "[a, b][0]!.util.run();",
+        "interface IA { run(): void }",
+        "interface IB { run(): void }",
+        "declare const ia: IA;",
+        "declare const ib: IB;",
+        "const ichosen = pick ? ia : ib;",
+        "ichosen.run();",
+        "const csv = { format() {} };",
+        "const tsv = { format() {} };",
+        "const formats = [csv, tsv];",
+        "formats[1]!.format();",
+        "for (const f of formats) f.format();",
+        "declare function createApi<T>(config: T): { util: T };",
+        "const made = createApi({ run() {} });",
+        "made.util.run();",
         "",
       ].join("\n"),
     },
     "src/use.ts",
     true,
   );
-  const computed = [
-    "shim.process.argv();",
-    "api.shell.open();",
-    "choose().util.run();",
-    "list[0].util.run();",
-    "for (const x of list) x.util.run();",
-    "(pick ? f1 : f2)().run();",
-    "ctx.log.info('x');",
-  ];
-  for (const [key, outcome] of Object.entries(got)) {
-    const site = key.slice(0, key.lastIndexOf(" @"));
-    if (!computed.includes(site)) continue;
-    assert.ok(
-      typeof outcome !== "string" || !outcome.includes(".[type]."),
-      `${key}: ${JSON.stringify(outcome)}`,
-    );
-  }
-  // A written path stays definite.
-  const written = Object.entries(got).find(([key]) =>
-    key.startsWith("nodeShim.process.argv(); @"),
-  );
-  assert.equal(written?.[1], "src/use.ts#Shim.[type].process.argv");
+  assert.deepEqual(got, {
+    "shim.process.argv(); @shim.process.argv": [
+      "src/use.ts#Shim.[type].process.argv",
+      "src/use.ts#webShim.[type].process.argv",
+    ],
+    // A written path stays definite.
+    "nodeShim.process.argv(); @nodeShim.process.argv":
+      "src/use.ts#Shim.[type].process.argv",
+    "api.shell.open(); @api.shell.open": [
+      "src/use.ts#Api.[type].shell.open",
+      "src/use.ts#web.[type].shell.open",
+    ],
+    "choose().util.run(); @choose": "src/use.ts#choose",
+    "choose().util.run(); @(expression).run": [
+      "src/use.ts#a.[type].util.run",
+      "src/use.ts#b.[type].util.run",
+    ],
+    // One element: the right one, where the checker names the first.
+    "list[1].util.run(); @(expression).run": "src/use.ts#b.[type].util.run",
+    "for (const x of list) x.util.run(); @x.util.run": [
+      "src/use.ts#a.[type].util.run",
+      "src/use.ts#b.[type].util.run",
+    ],
+    "list.forEach((c) => c.util.run()); @list.forEach": "library:",
+    "list.forEach((c) => c.util.run()); @c.util.run": [
+      "src/use.ts#a.[type].util.run",
+      "src/use.ts#b.[type].util.run",
+    ],
+    "(pick ? f1 : f2)().run(); @(expression)": "unresolved:no-symbol",
+    // Each arm's member is in a function type's return: no symbol.
+    "(pick ? f1 : f2)().run(); @(expression).run": "unresolved:reduced-receiver",
+    // The literal arm's member has no anchor: its producers decide.
+    "ctx.log.info('x'); @ctx.log.info": "unresolved:object-producer-unverified",
+    "same(pick ? a : b).util.run(); @same": "src/use.ts#same",
+    // A generic call whose type argument was inferred from a reduced value.
+    "same(pick ? a : b).util.run(); @(expression).run":
+      "unresolved:reduced-receiver",
+    "same(a).util.run(); @same": "src/use.ts#same",
+    "same(a).util.run(); @(expression).run": "src/use.ts#a.[type].util.run",
+    "[a, b][0]!.util.run(); @(expression).run": "src/use.ts#a.[type].util.run",
+    // Interface members: main linked `IA.run` only.
+    "ichosen.run(); @ichosen.run": ["src/use.ts#IA.run", "src/use.ts#IB.run"],
+    // Object-literal members: main linked `csv.format`.
+    "formats[1]!.format(); @(expression).format": "src/use.ts#tsv.format",
+    "for (const f of formats) f.format(); @f.format": [
+      "src/use.ts#csv.format",
+      "src/use.ts#tsv.format",
+    ],
+    "const made = createApi({ run() {} }); @createApi": "src/use.ts#createApi",
+    // A literal in a call argument has no symbol (further work).
+    "made.util.run(); @made.util.run": "unresolved:local",
+  });
 });
 
 test("nested type positions have their places; a type literal's overloads are one symbol", async () => {

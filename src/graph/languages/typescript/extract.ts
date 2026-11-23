@@ -31,7 +31,7 @@ import {
   toVirtual,
 } from "./project.js";
 import type { entryProvenance, UnbuiltEntry } from "./workspace-entries.js";
-import { declaredLiteral, directValue } from "./literal-members.js";
+import { receiverArms } from "./receiver-arms.js";
 import {
   bundledLibraryUnit,
   importedTarget,
@@ -109,6 +109,10 @@ const programTestSetups = new WeakMap<
 const producerReaders = new WeakMap<
   ts.Program,
   ReturnType<typeof objectProducers>
+>();
+const receiverReaders = new WeakMap<
+  ts.Program,
+  ReturnType<typeof receiverArms>
 >();
 import {
   anchorOf,
@@ -882,7 +886,6 @@ export function extractFile(
     let installedType = false;
     let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
     let verifyObjectProducers = false;
-    let checkObjectProducers = false;
     const declarations: ts.Declaration[] = [];
     const usableLocalCall = (
       anchor: ts.Node,
@@ -912,16 +915,10 @@ export function extractFile(
           (found.memberCall &&
             ((ts.isObjectLiteralExpression(declaration.parent) &&
               !declaration.getSourceFile().isDeclarationFile) ||
-              // A call on a type-literal member, when the receiver's own
-              // declaration writes the type that holds that literal (C-41):
-              // a type computed from expressions can be a union the checker
-              // reduced to one of several identical literals.
-              (ts.isTypeLiteralNode(declaration.parent) &&
-                declaredLiteral(
-                  checker,
-                  found.receiver,
-                  declaration.parent,
-                ))) &&
+              // A call on a type-literal member (C-41). The receiver's
+              // chain was walked before: a member the checker took from a
+              // reduced union is not this one.
+              ts.isTypeLiteralNode(declaration.parent)) &&
             !!found.at &&
             checker.getSignaturesOfType(
               checker.getNonNullableType(checker.getTypeAtLocation(found.at)),
@@ -947,17 +944,10 @@ export function extractFile(
       }
       const key = anchor ? keyOf(anchor) : member!.key;
       if (
-        declaration.parent &&
+        (!anchor || found.recoveredMember) &&
         ts.isObjectLiteralExpression(declaration.parent)
-      ) {
-        if (!anchor || found.recoveredMember) verifyObjectProducers = true;
-        // An anchored member whose receiver's value can choose (C-41): the
-        // checker may have reduced `pick ? one : two` to one of two
-        // identical literal types, and its declaration list then names one
-        // member of the two. The producers decide when they can be followed.
-        else if (!directValue(checker, found.receiver))
-          checkObjectProducers = true;
-      }
+      )
+        verifyObjectProducers = true;
       facts.set(`${target}\0${key}`, { file: target, key });
       declarations.push(declaration);
       return true;
@@ -1199,7 +1189,41 @@ export function extractFile(
         if (!record(declaration, current)) local++;
       }
     };
-    visit(found.symbol, 0);
+    // C-41: a member call's receiver chain is walked to its producers. The
+    // checker can have reduced a union of identical types to one arm and
+    // named that arm's member only; the arms' members replace it then, and
+    // a receiver the walk cannot follow leaves the call unresolved.
+    if (
+      meaning === "call" &&
+      found.memberCall &&
+      receiver &&
+      found.name !== undefined
+    ) {
+      let arms = receiverReaders.get(program);
+      if (!arms) {
+        arms = receiverArms(checker, syntax.getAssignmentTargetKind);
+        receiverReaders.set(program, arms);
+      }
+      const verdict = arms(receiver, found.name, found.symbol);
+      if (verdict === "unverified")
+        return { targets: [], reason: "reduced-receiver", receiver };
+      if (verdict) {
+        for (const member of verdict) visit(member, 0);
+        if (local)
+          return {
+            targets: [],
+            // Several producers, one of whose members has no target.
+            reason: verdict.some((member) =>
+              member.declarations?.some((declaration) =>
+                ts.isObjectLiteralExpression(declaration.parent),
+              ),
+            )
+              ? "multiple-object-producers"
+              : "reduced-receiver",
+            receiver,
+          };
+      } else visit(found.symbol, 0);
+    } else visit(found.symbol, 0);
     if (
       !external &&
       !local &&
@@ -1231,11 +1255,7 @@ export function extractFile(
         }
       }
     }
-    if (
-      !external &&
-      !local &&
-      (verifyObjectProducers || checkObjectProducers)
-    ) {
+    if (!external && !local && verifyObjectProducers) {
       let producers = producerReaders.get(program);
       if (!producers) {
         producers = objectProducers(
@@ -1249,33 +1269,29 @@ export function extractFile(
         receiver && found.name !== undefined
           ? producers(receiver, found.name)
           : undefined;
-      // Only anchored members to check, and producers that cannot be
-      // followed: the checker's answer stands, as before C-41.
-      if (members || verifyObjectProducers) {
-        const verified =
-          members &&
-          declarations.every((declaration) => members.includes(declaration));
-        if (verified) {
-          for (const member of members) {
-            if (declarations.includes(member)) continue;
-            const name = (member as ts.NamedDeclaration).name;
-            const symbol = name && checker.getSymbolAtLocation(name);
-            if (!symbol || !record(member, symbol, true)) {
-              local++;
-              break;
-            }
+      const verified =
+        members &&
+        declarations.every((declaration) => members.includes(declaration));
+      if (verified) {
+        for (const member of members) {
+          if (declarations.includes(member)) continue;
+          const name = (member as ts.NamedDeclaration).name;
+          const symbol = name && checker.getSymbolAtLocation(name);
+          if (!symbol || !record(member, symbol, true)) {
+            local++;
+            break;
           }
         }
-        if (!verified || local)
-          return {
-            targets: [],
-            reason:
-              members && members.length > 1
-                ? "multiple-object-producers"
-                : "object-producer-unverified",
-            receiver,
-          };
       }
+      if (!verified || local)
+        return {
+          targets: [],
+          reason:
+            members && members.length > 1
+              ? "multiple-object-producers"
+              : "object-producer-unverified",
+          receiver,
+        };
     }
     const targets = [...facts.values()];
     const libraries = libraryFacts && [...libraryFacts.values()];
