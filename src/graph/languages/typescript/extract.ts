@@ -47,7 +47,13 @@ import {
   taintOf,
   type Taint,
 } from "./taint.js";
-import { createJudge, type Judge, type Judged } from "./judge.js";
+import {
+  createJudge,
+  JUDGE_BOUND_REASON,
+  JudgeLimit,
+  type Judge,
+  type Judged,
+} from "./judge.js";
 import {
   objectProducers,
   propertyWrite,
@@ -127,6 +133,8 @@ import {
   isLocalCallable,
   isScopedDeclaration,
   keyOf,
+  MODULE_KEY,
+  setKeyNames,
   kindOf,
   nameOf,
   objectMember,
@@ -295,6 +303,7 @@ const requiredProperty = (element: ts.BindingElement) =>
     ? undefined
     : staticName(element.propertyName ?? element.name);
 
+const namedPrograms = new WeakSet<ts.Program>();
 export function extractFile(
   file: ts.SourceFile,
   checker: ts.TypeChecker,
@@ -306,6 +315,14 @@ export function extractFile(
   context: RenameContext,
   library: ReturnType<typeof libraryReader>,
 ): ParseResult {
+  // Keys spell the source's names (setKeyNames): every file of the program
+  // learns the program's fresh names before any key of it is made.
+  if (!namedPrograms.has(program)) {
+    namedPrograms.add(program);
+    const fresh = context.fresh;
+    for (const source of program.getSourceFiles())
+      setKeyNames(source, (text) => restoreNames(text, fresh));
+  }
   const uncertainAt = new Set(context.renamed?.uncertain ?? []);
   const uncertainReason = (offset: number) =>
     context.renamed?.reasons[offset] ?? "dynamic-scope";
@@ -1373,7 +1390,13 @@ export function extractFile(
       try {
         judged = judgeOf(taint).expression(receiver);
       } catch (error) {
-        if (!isLimit(error)) throw error;
+        // C-47: a judgement stopped at its bound, or by a stack overflow, is
+        // not an answer: the receiver is failed with the bound as the reason.
+        if (error instanceof JudgeLimit)
+          judged = { k: "failed", why: error.message };
+        else if (isLimit(error))
+          judged = { k: "failed", why: new JudgeLimit("depth").message };
+        else throw error;
       }
       if (judged?.k === "failed")
         return { causes: through.causes, via: `${through.via}; ${judged.why}` };
@@ -1392,7 +1415,9 @@ export function extractFile(
         }
       }
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no failed member set": it is unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(taint, "the receiver's member set");
     }
     const files = causesOf(membership);
     if (!files) return undefined;
@@ -1453,7 +1478,13 @@ export function extractFile(
     try {
       visit(receiver);
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no tainted name": it is unknown, so the
+      // receiver is judged (and fails at the bound if the judgement does).
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(
+        taint,
+        "whether a name in the receiver is tainted",
+      );
     }
     return found;
   }
@@ -1467,11 +1498,50 @@ export function extractFile(
     try {
       files = judgeOf(taint).reaches(receiver);
     } catch (error) {
-      if (!isLimit(error)) throw error;
-      return undefined;
+      // C-47: an overflow is not "does not reach": the dependence is unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      const causes = causesOf(programFailedFiles(taint));
+      return (
+        causes && {
+          causes,
+          via: `the receiver's dependence on the failed files is unknown: ${JUDGE_BOUND_REASON}`,
+        }
+      );
     }
     const causes = causesOf(files);
     return causes && { causes, via: "the receiver depends on the failed file" };
+  }
+  /** C-47: a dependence a bound left unknown: every failed file, with the bound. */
+  function unknownDependence(
+    taint: Taint,
+    what: string,
+  ): Dependence | undefined {
+    const causes = causesOf(programFailedFiles(taint));
+    return (
+      causes && { causes, via: `${what} is unknown: ${JUDGE_BOUND_REASON}` }
+    );
+  }
+  /**
+   * C-47: every failed file of this program, every failed file its bindings
+   * reach (a failed file is not itself in the program), and every file a
+   * failed name is declared in.
+   */
+  let failedInProgram: string[] | undefined;
+  function programFailedFiles(taint: Taint): string[] {
+    if (!failedInProgram) {
+      const files = new Set<string>();
+      for (const causes of taint.all.values())
+        for (const file of causes) files.add(file);
+      for (const source of program.getSourceFiles()) {
+        const path = fromVirtual(source.fileName);
+        if (path !== undefined && context.moduleKind(path) === "invalid")
+          files.add(path);
+      }
+      for (const list of context.failedNames.values())
+        for (const file of list) files.add(file);
+      failedInProgram = [...files].sort();
+    }
+    return failedInProgram;
   }
   function judgeOf(taint: Taint): Judge {
     const known = judges.get(checker);
@@ -1689,7 +1759,9 @@ export function extractFile(
         symbolCauses(part.aliasSymbol, "type");
       }
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no cause": the causes are unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(taint, "the receiver's causes");
     }
     const found = causesOf(causes);
     if (found) return { causes: found, via: via! };
@@ -2422,7 +2494,7 @@ export function extractFile(
         ? // A file that cannot be read has failed: no target, its file the cause.
           invalid([file], "import of the failed file")
         : {
-            targets: [{ file, key: "module@0" }],
+            targets: [{ file, key: MODULE_KEY }],
             // A target whose analysis failed has no facts to link to.
             ...(kind === "unavailable" ? { reason: "target-unavailable" } : {}),
           }
@@ -2833,15 +2905,26 @@ export function extractFile(
             !(declaration as { body?: ts.Node }).body,
         );
         const judge = judgeOf(taint);
-        const files = causesOf(
-          signatures.flatMap((signature) =>
-            judge.signatureDependsOnFailed(signature),
-          ),
-        );
+        let unknown = false;
+        let files: Causes | undefined;
+        try {
+          files = causesOf(
+            signatures.flatMap((signature) =>
+              judge.signatureDependsOnFailed(signature),
+            ),
+          );
+        } catch (error) {
+          // C-47: an overflow is not "depends on none": the dependence is unknown.
+          if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+          files = causesOf(programFailedFiles(taint));
+          unknown = true;
+        }
         if (files)
           found = invalid(
             files,
-            "overloaded callee whose parameter types depend on the failed file",
+            unknown
+              ? `overloaded callee whose parameter types' dependence on the failed files is unknown: ${JUDGE_BOUND_REASON}`
+              : "overloaded callee whose parameter types depend on the failed file",
           );
       }
     }
@@ -3203,7 +3286,7 @@ export function extractFile(
                 captured.has(target) &&
                 uncertainReason(node.expression.getStart(file)) ===
                   "dynamic-scope"
-                  ? [{ file: target, key: "module@0" }]
+                  ? [{ file: target, key: MODULE_KEY }]
                   : [],
               reason: uncertainReason(node.expression.getStart(file)),
             },
@@ -3635,6 +3718,8 @@ export function extractFile(
         "The TypeScript checker exhausted its stack on some lookups; those links are unresolved (compiler-limit)",
     });
   // Facts of a renamed file report the original names (see rename.ts).
+  // Keys already do: they are made from restored names (setKeyNames), so
+  // they agree across programs, whose fresh names differ.
   if (context.renamed) {
     const fresh = context.fresh;
     for (const symbol of symbols) {

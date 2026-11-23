@@ -936,7 +936,15 @@ and never yields a version pin.
   of 8,000,000 steps. When it is reached, every link of that program that
   could have a target is unresolved with `taint-budget-exhausted`, except
   links that bind a failed file directly, which stay `invalid-code`; no pin
-  outside microsoft/TypeScript comes near it. The program budget counts
+  outside microsoft/TypeScript comes near it. The structural judgement of a receiver
+  that depends on a failed file is memoised per program and bounded
+  (C-47). It allows at most 100 nested judgements over all its recursive
+  paths, 200,000 steps per judgement and 8,000,000 per program. A stack
+  overflow inside it counts as the bound, and an overflow anywhere in the
+  failed-file checks is unknown, never an answer. A link whose judgement or
+  dependence a bound left unknown is `invalid-code`, with the failed files
+  as its cause and the reason `judge-budget-exhausted`. It is never treated
+  as clean. The program budget counts
   every checkout file a program loads, imported files included; a file past
   it is left out of that program only (installed declarations have their
   own budget). Invalid extracted UTF-16 ranges use the same per-file
@@ -1016,6 +1024,16 @@ an unfinished previous run. No answer the resolver caches depends on its
 caller, and the scoped path is used only when the edited file's decisions
 meet no cut. The same file tree therefore produces the same graph after a
 fresh or incremental index. [C-36](changes/C-36.md)
+
+**Toolchain processes (C-54).** Every child process the graph starts runs
+in its own process group, recorded in memory the server owns. Cancelling a
+`code_graph` or `requirement_links` job ends the processes it started; a
+server that exits ends them too, and the CLI (and `pymtheg mcp`) turns
+SIGINT, SIGTERM, SIGHUP and SIGQUIT into an orderly end that does the same;
+a cancel kills the job's children at once, whatever its worker does. Only a
+death the process cannot observe (SIGKILL, a crash of the runtime) leaves
+children running. On Windows the recorded
+process is killed, not its children. [C-54](changes/C-54.md)
 
 **Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted
 on this machine (below; [code guide](code-guide.md#the-go-toolchain-route)),

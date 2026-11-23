@@ -3163,6 +3163,48 @@ split out to C-51. Here, a program with an unread file withholds library
 targets as before (C-13).
 [C-39](changes/C-39.md)
 
+### C-47 The structural judgement is memoised per program and bounded by counts
+
+The structural judgement (C-13) recursed without end on oclif/core's
+recursive generic types beside a failed file. Its error handlers swallowed
+each stack overflow and went on, so the run's length depended on where
+V8's stack ran out: it could take more than 85 minutes, or never end.
+
+**Decided.** Every judgement in progress has an index on one stack: bound
+values, expressions, type parameter constraints, keys and taint checks.
+
+- **An answer is memoised for the program only if everything it consulted
+  began after it.** A cycle is settled at the root of its group, as in
+  Tarjan's algorithm. The work is proportional to the distinct judgements
+  reached. In one known shape a memoised answer depends on which link
+  enters a cycle first (a cycle holding both an expression re-entry and a
+  taint-check re-entry); the effect can only add a failure, never a clean
+  answer.
+- **What is memoised:** taint checks and type-level computations, by keys
+  that hold only the bindings their type nodes name; and checker types.
+- **A recursive alias reference is judged by its own type arguments.**
+- **Bounds by counts:** 100 nested judgements over every recursive path of
+  the judgement, 200,000 steps per judgement, and 8,000,000 per program.
+  A stack overflow counts as the depth bound.
+- **Overflows are unknown, never answers.** Every handler in the module
+  that can meet a stack overflow treats it as unknown: a link whose
+  judgement a bound left unknown is `invalid-code`, with one reason,
+  `judge-budget-exhausted`, whichever bound fired. Where a bound leaves
+  only the gate unknown (whether the receiver could depend on a failed
+  file at all), the receiver goes to the judgement, which decides.
+
+**Rules out:**
+
+- a wall-clock watchdog;
+- treating a stack overflow as an answer (clean, "no symbol", or a partial
+  set of causes);
+- memoising an answer that consulted a judgement in progress.
+
+**Further work:** an index run ignores SIGTERM during a synchronous
+analysis. Module analysis would have to run in a worker that the
+coordinator terminates, as `check` does.
+[C-47](changes/C-47.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000
@@ -3403,6 +3445,63 @@ command, as before; once per sync in a long-lived process). **Rules out
 for now:** streaming a module's results to the store. The results were
 small (298 MiB as JSON on microsoft/TypeScript); the retained program was
 the cost. See [C-40](changes/C-40.md).
+
+### TypeScript symbol keys are name paths, not offsets (C-49)
+
+**Decided (C-49):** a TypeScript symbol's key is its kind and identity
+(`function:splitPath`, `method:Box.open`), with `~n` for the n-th later
+declaration of the same kind and identity in the file, in source order (the
+same order the core numbers ordinals by), and `module` for the file. Keys
+are computed from the file's syntax alone and are unique only within the
+file; in a JavaScript file the compiler saw with renamed module-system
+names, keys report the original names, like identities. **Why:** keys were
+`kind@offset`, and links store their targets by key, so a body edit
+rewrote the stored rows of every file linking into a later declaration of
+the edited file without changing any fact. **Unchanged:** symbol ids,
+ordinals and requirement links (which store identity and ordinal, never a
+key); no migration is needed. **Trade:** inserting or removing a same-named
+sibling still renumbers the later ones, as their ordinals already did.
+See [C-49](changes/C-49.md).
+
+### C-45 Kept module state between index runs needs three proofs
+
+**Decided (C-45):** a process that indexes more than once may pass an
+`IndexSession`. The session loads the modules once and keeps per-module
+values between runs, returned only under the validity key the module kept
+them with. Everything is dropped unless the store's completion record, as
+the run's own ownership baseline reads it (the same snapshot as its data
+version and mark), is the one the session's last completed run wrote, and
+the project, store, module versions and index settings are unchanged.
+A run takes what was kept; only values it sets again are kept after it,
+and only if it writes its completion record. Modules treat kept values as
+immutable. Kept state is bounded by count; the embedder bounds memory. The session holds no
+connection or lock between runs; each run is an ordinary index run.
+**Why:** a one-file edit rebuilds per-process and per-language state that
+did not change (C-45 measurements). The completion record already proves
+what the store holds, so it is the proof for kept state too. **Rules out:**
+a file watcher as the source of truth for what changed (only a hint), and
+a separate index daemon for now. See [C-45](changes/C-45.md).
+
+
+
+### An analysing module's files are written once per run (C-53)
+
+**Decided (C-53):** the indexer holds the parse results of every module
+that analyses until that module's analysis and writes each file once, with
+its analysed result (or as parsed when the module returns none for it).
+A run holding files that main's parse write would have written commits its
+run mark at the end of the parse write, where its first commit used to be,
+so a run started after that point finds it unfinished and takes over
+(files of a module reusing its analysis, C-27 and C-36, were held before
+and claim nothing). **Why:** every Go and Rust file was stored as parsed
+and then replaced whole as analysed, and every TypeScript file as a
+placeholder and then as analysed; on four pins that was 46-57% of the rows
+a cold index changed. **Trade:** held results stay in memory until
+their module's analysis instead of being read back (helix peak +9%; lower
+on restic, cli/cli and dioxus). A run killed between the phases leaves its
+mark and no held file; the next run trusts no record, as before.
+**Unchanged:** the stored rows, row for row; module versions; C-33's
+no-edit run; C-37's batches. See [C-53](changes/C-53.md).
 
 ### C-41 TypeScript type-literal members as call targets
 

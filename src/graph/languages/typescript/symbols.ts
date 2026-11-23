@@ -531,7 +531,16 @@ function scopeOf(anchor: ts.Node, owner: ts.Node | undefined): string {
   return parts.length ? parts.reverse().join(".") + "." : "";
 }
 
+// Identities are syntax only; a node's is asked for by its key, its symbol
+// and every member's identity, so it is computed once.
+const identities = new WeakMap<ts.Node, string>();
 export function identityOf(anchor: ts.Node): string {
+  let identity = identities.get(anchor);
+  if (identity === undefined)
+    identities.set(anchor, (identity = computeIdentity(anchor)));
+  return identity;
+}
+function computeIdentity(anchor: ts.Node): string {
   if (ts.isSourceFile(anchor)) return nameOf(anchor);
   const container = containerOf(anchor);
   const prefix =
@@ -560,8 +569,87 @@ export function rangeOf(anchor: ts.Node): SourceRange {
     };
   return { start: anchor.getStart(file), end: anchor.end };
 }
-export const keyOf = (anchor: ts.Node) =>
-  `${kindOf(anchor)}@${rangeOf(anchor).start}`;
+/** The key of a file's module symbol. */
+export const MODULE_KEY = "module";
+
+/**
+ * Each symbol's key in its file: its kind and identity (a name path, never a
+ * source offset), and `~n` for the n-th later declaration sharing both, in
+ * source order. A body edit leaves every other key of the file as it was, so
+ * links into the file from other files keep their stored targets. Keys are
+ * computed from the file's syntax alone, so a file in two programs has the
+ * same keys; they are only unique within the file.
+ */
+const fileKeys = new WeakMap<ts.SourceFile, Map<ts.Node, string>>();
+/**
+ * How a file's compiler text spells names back to the source's (rename.ts:
+ * locally bound `require`/`module`/`exports` reach the compiler under fresh
+ * names). Keys are numbered by the restored kind and identity, the ones the
+ * core numbers ordinals by, so two declarations whose names differ only in
+ * the compiler's spelling share a group and never one key.
+ */
+const keyNames = new WeakMap<ts.SourceFile, (text: string) => string>();
+export function setKeyNames(
+  file: ts.SourceFile,
+  restore: (text: string) => string,
+): void {
+  if (!fileKeys.has(file)) keyNames.set(file, restore);
+}
+function keysOf(file: ts.SourceFile): Map<ts.Node, string> {
+  const known = fileKeys.get(file);
+  if (known) return known;
+  const groups = new Map<string, { node: ts.Node; range: SourceRange }[]>();
+  const restore = keyNames.get(file) ?? ((text: string) => text);
+  const add = (
+    node: ts.Node,
+    kind: string,
+    identity: string,
+    range: SourceRange,
+  ) => {
+    const group = `${kind}:${restore(identity)}`;
+    let members = groups.get(group);
+    if (!members) groups.set(group, (members = []));
+    members.push({ node, range });
+  };
+  // Every node the extractor may make a symbol of, by the same predicates.
+  const walk = (node: ts.Node): void => {
+    const anchor = anchorOf(node);
+    if (anchor === node) {
+      if (!ts.isSourceFile(node))
+        add(node, kindOf(node), identityOf(node), rangeOf(node));
+    } else if (!anchor) {
+      const member = memberDraft(node);
+      if (member) add(node, member.kind, member.identity, member.range);
+    }
+    ts.forEachChild(node, walk);
+  };
+  walk(file);
+  const keys = new Map<ts.Node, string>([[file, MODULE_KEY]]);
+  const used = new Set<string>([MODULE_KEY]);
+  for (const [group, members] of groups) {
+    // Stable sort: equal ranges keep the walk's order.
+    members.sort(
+      (a, b) => a.range.start - b.range.start || a.range.end - b.range.end,
+    );
+    members.forEach(({ node }, ordinal) => {
+      let key = ordinal ? `${group}~${ordinal}` : group;
+      // A computed member name can spell another group's suffix.
+      while (used.has(key)) key += "~";
+      used.add(key);
+      keys.set(node, key);
+    });
+  }
+  fileKeys.set(file, keys);
+  return keys;
+}
+export function keyOf(anchor: ts.Node): string {
+  const key = keysOf(anchor.getSourceFile()).get(anchor);
+  if (key === undefined)
+    throw Error(
+      `No symbol key for ${ts.SyntaxKind[anchor.kind]} in ${anchor.getSourceFile().fileName}`,
+    );
+  return key;
+}
 
 /** The existing graph owner of a declaration without its own symbol. */
 export function enclosingAnchor(node: ts.Node): ts.Node {
@@ -621,6 +709,10 @@ export function overloadHead(node: ts.Node): ts.Node {
 export function objectMember(node: ts.Node): SymbolDraft | undefined {
   const head = overloadHead(node);
   if (head !== node) return objectMember(head);
+  const draft = memberDraft(node);
+  return draft && { key: keyOf(node), ...draft };
+}
+function memberDraft(node: ts.Node): Omit<SymbolDraft, "key"> | undefined {
   const parent = node.parent;
   if (!parent) return undefined;
   const literal = ts.isObjectLiteralExpression(parent);
@@ -719,7 +811,6 @@ export function objectMember(node: ts.Node): SymbolDraft | undefined {
     : kindOf(node);
   const range = { start: node.getStart(), end: node.end };
   return {
-    key: `${kind}@${range.start}`,
     kind,
     name: names.at(-1)!,
     identity: `${identityOf(owner)}.${slot}[${literal ? "object" : "type"}].${names.join(".")}`,
