@@ -440,3 +440,82 @@ test("PR 67 review 2: a noEmit package config that strips internals withholds @i
   assert.match(String(got.hidden), /^unresolved:/);
   assert.match(String(got["core.rerunFiles"]), /^unresolved:/);
 });
+
+test("PR 67 review 3: the types entry's own config, API Extractor's extends and tokens, unreadable roll-ups and entries", async () => {
+  const extractorBase = JSON.stringify({
+    mainEntryPointFilePath: "<projectFolder>/lib/<unscopedPackageName>.d.ts",
+    dtsRollup: {
+      enabled: true,
+      untrimmedFilePath: "<projectFolder>/dist/<unscopedPackageName>.d.ts",
+    },
+  });
+  const got = await calls({
+    // A rollup array: the declaration bundle comes from a narrower input.
+    "packages/r/package.json": pkg("r", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "rollup -c" },
+    }),
+    "packages/r/rollup.config.mjs": [
+      "import dts from 'rollup-plugin-dts';",
+      "export default [",
+      "  { input: 'src/index.ts', output: { file: 'dist/index.js' } },",
+      "  { input: 'src/public-api.ts', output: { file: 'dist/index.d.ts' }, plugins: [dts()] },",
+      "];",
+    ].join("\n"),
+    "packages/r/src/index.ts":
+      "export * from './public-api';\nexport function internalHelper() {}\n",
+    "packages/r/src/public-api.ts": "export function api() {}\n",
+    // API Extractor under config/, extending a base, with the package-name token.
+    "packages/e/package.json": pkg("@scope/e", {
+      types: "./dist/e.d.ts",
+      scripts: { build: "wireit" },
+      wireit: {
+        build: {
+          command: "tsc -b && api-extractor run -c config/api-extractor.json",
+        },
+      },
+    }),
+    "packages/e/tsconfig.json":
+      '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"lib"},"include":["src"]}',
+    "packages/e/config/api-extractor.base.json": extractorBase,
+    "packages/e/config/api-extractor.json":
+      '{ "extends": "./api-extractor.base.json" }',
+    "packages/e/src/e.ts": "export function fromRollup() {}\n",
+    // API Extractor runs, but its config extends a package: unreadable, no twin.
+    "packages/n/package.json": pkg("n", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "api-extractor run" },
+    }),
+    "packages/n/api-extractor.json":
+      '{ "extends": "@company/configs/api-extractor.json" }',
+    "packages/n/src/index.ts": "export function notTwin() {}\n",
+    // A template-literal entry: present but not data, so no twin either.
+    "packages/t/package.json": pkg("t", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "tsup" },
+    }),
+    "packages/t/tsup.config.ts":
+      "const dir = 'lib';\nexport default { entry: [`${dir}/index.ts`] };",
+    "packages/t/src/index.ts": "export function templated() {}\n",
+    "app.ts": [
+      'import { api, internalHelper } from "r";',
+      'import { fromRollup } from "@scope/e";',
+      'import { notTwin } from "n";',
+      'import { templated } from "t";',
+      "api(); internalHelper(); fromRollup(); notTwin(); templated();",
+    ].join("\n"),
+  });
+  assert.deepEqual(got.api, [
+    "packages/r/src/public-api.ts#api",
+    ["ts-unbuilt-entry-is-bundler-entry"],
+    "packages/r/src/public-api.ts",
+  ]);
+  assert.match(String(got.internalHelper), /^unresolved:/);
+  assert.deepEqual(got.fromRollup, [
+    "packages/e/src/e.ts#fromRollup",
+    ["ts-unbuilt-entry-is-rollup-entry"],
+    "packages/e/src/e.ts",
+  ]);
+  for (const name of ["notTwin", "templated"])
+    assert.match(String(got[name]), /^unresolved:workspace-/, name);
+});

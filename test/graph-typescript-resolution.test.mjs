@@ -3079,9 +3079,12 @@ test("plain builds prove a declaration entry, and visible rollups and rewrites r
         {
           // The trimmed roll-up drops the @internal `open`: withheld.
           bundled: ["unresolved", "workspace-build-output-missing", undefined],
+          // dts-bundle-generator runs and has no readable config: its
+          // roll-up could drop what the twin names (C-46 review 3).
           generated: [
-            "packages/generated/src/index.ts#open",
-            ["ts-unbuilt-entry-is-src-twin"],
+            "unresolved",
+            "workspace-build-output-missing",
+            undefined,
           ],
           rollup: [
             "packages/rollup/src/index.ts#open",
@@ -3215,9 +3218,11 @@ test("a visible bundler config must name the mapped source literally", async () 
         alternate.data.unbuiltEntry.config,
         "packages/alternate/tsup.config.ts",
       );
+      // An entry that is present but not data could name any source: no
+      // twin (C-46 review 3).
       const opaque = graph.link("app.ts", "opaque", "calls");
-      assert.equal(graph.target(opaque), "packages/opaque/src/index.ts#run");
-      assert.deepEqual(opaque.data.assumes, ["ts-unbuilt-entry-is-src-twin"]);
+      assert.equal(graph.target(opaque), null);
+      assert.equal(opaque.resolution, "unresolved");
       const call = graph.link("app.ts", "matching", "calls");
       assert.equal(graph.target(call), "packages/matching/src/index.ts#run");
       assert.deepEqual(call.data.assumes, [

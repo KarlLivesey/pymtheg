@@ -250,6 +250,14 @@ export function entryConventions(
   packageOf: (file: string) => string | undefined,
   /** Per package root, the config files its scripts name (namedConfigs). */
   named: ReadonlyMap<string, readonly string[]> = new Map(),
+  /** The package's name (its manifest's `name`), for API Extractor tokens. */
+  packageName: (root: string) => string | undefined = () => undefined,
+  /**
+   * Whether the package's scripts run a declaration roll-up tool (API
+   * Extractor, `dts-bundle-generator`): with no readable roll-up config, the
+   * twin could name declarations the roll-up drops.
+   */
+  rollupNamed: (root: string) => boolean = () => false,
 ) {
   const bundlers = new Map<string, ConfigData[]>();
   const extractors = new Map<
@@ -276,7 +284,21 @@ export function entryConventions(
       continue;
     }
     const owner = packageOf(path);
-    if (owner === undefined || posix.dirname(path) !== owner) continue;
+    if (owner === undefined) continue;
+    // API Extractor's default place is `config/api-extractor.json`.
+    if (
+      extractorConfig.test(name) &&
+      posix.dirname(path) === posix.join(owner, "config")
+    ) {
+      const json = extractorJson(path);
+      if (json) {
+        const list = extractors.get(owner) ?? [];
+        list.push({ path, json });
+        extractors.set(owner, list);
+      } else unreadableRollup.add(owner);
+      continue;
+    }
+    if (posix.dirname(path) !== owner) continue;
     if (bundlerConfig.test(name)) {
       const list = bundlers.get(owner) ?? [];
       const data = readBundlerConfig(path, text);
@@ -285,15 +307,51 @@ export function entryConventions(
       list.push(data);
       bundlers.set(owner, list);
     } else if (extractorConfig.test(name)) {
-      const parsed = ts.parseConfigFileTextToJson(path, text);
-      if (parsed.error || !parsed.config || typeof parsed.config !== "object") {
+      const json = extractorJson(path);
+      if (!json) {
         unreadableRollup.add(owner);
         continue;
       }
       const list = extractors.get(owner) ?? [];
-      list.push({ path, json: parsed.config });
+      list.push({ path, json });
       extractors.set(owner, list);
     }
+  }
+
+  /**
+   * An API Extractor config as data, its `extends` chain (relative paths,
+   * plain data) merged under it: undefined when any link does not parse or
+   * extends a package.
+   */
+  function extractorJson(
+    path: string,
+    depth = 0,
+  ): Record<string, unknown> | undefined {
+    const text = files.get(path);
+    if (text === undefined || depth > 8) return undefined;
+    const parsed = ts.parseConfigFileTextToJson(path, text);
+    if (parsed.error || !parsed.config || typeof parsed.config !== "object")
+      return undefined;
+    const own = parsed.config as Record<string, unknown>;
+    if (own.extends === undefined) return own;
+    if (typeof own.extends !== "string" || !own.extends.startsWith("."))
+      return undefined;
+    const base = extractorJson(
+      posix.join(posix.dirname(path), own.extends),
+      depth + 1,
+    );
+    if (!base) return undefined;
+    const merged: Record<string, unknown> = { ...base, ...own };
+    for (const key of ["dtsRollup", "apiReport", "docModel"])
+      if (
+        base[key] &&
+        own[key] &&
+        typeof base[key] === "object" &&
+        typeof own[key] === "object"
+      )
+        merged[key] = { ...(base[key] as object), ...(own[key] as object) };
+    delete merged.extends;
+    return merged;
   }
   const isSource = (file: string, root: string) =>
     captured.has(file.slice(1)) &&
@@ -320,14 +378,24 @@ export function entryConventions(
     const relative = posix.relative(root, output);
     const sources = new Set<string>();
     let readable = false;
+    let opaque = false;
     let config = "";
     for (const data of configs) {
-      // An entry that is not data says nothing either way: the twin may apply.
-      if (!data.lists?.length) continue;
+      // An entry that is present but not data could name any source: no
+      // convention, not even the twin, for this package (review round 3).
+      if (!data.lists) {
+        opaque = true;
+        continue;
+      }
+      if (!data.lists.length) continue;
       readable = true;
-      // An `output.file` names this output: its config object's single input.
+      // An `output.file` names this output: its config object's single
+      // input. The config writing exactly this file wins over one writing
+      // a file of the same stem (`dist/index.d.ts` from a dts plugin beside
+      // `dist/index.js`).
       const bare = relative.replace(outputExtension, "");
-      for (const { entries, files } of data.pairs) {
+      const exact = data.pairs.filter(({ files }) => files.includes(relative));
+      for (const { entries, files } of exact.length ? exact : data.pairs) {
         if (!files.some((file) => file.replace(outputExtension, "") === bare))
           continue;
         if (entries.entries.length !== 1) return "conflicting";
@@ -336,6 +404,8 @@ export function entryConventions(
         sources.add(source);
         config = data.path;
       }
+      // A config whose objects name their output files: those decide.
+      if (data.pairs.length) continue;
       for (const dir of data.dirs.length ? data.dirs : ["dist"]) {
         if (!relative.startsWith(dir + "/")) continue;
         const stem = relative
@@ -357,6 +427,7 @@ export function entryConventions(
     if (sources.size > 1) return "conflicting";
     if (sources.size === 1)
       return { convention: "bundler-entry", source: [...sources][0]!, config };
+    if (opaque) return "conflicting";
     // Readable entries that name other outputs say this is not one of them.
     return readable ? "none" : undefined;
   }
@@ -389,10 +460,23 @@ export function entryConventions(
     const trims = new Set<"internal" | "alpha" | "beta">();
     for (const { path, json } of extractors.get(root) ?? []) {
       const rollup = json.dtsRollup as Record<string, unknown> | undefined;
-      const main = json.mainEntryPointFilePath;
       if (!rollup || rollup.enabled !== true) continue;
-      // A token other than <projectFolder> (`<unscopedPackageName>`) or a
-      // value that is not a string: the roll-up cannot be read.
+      // The package-name tokens are plain data; any other token, or a value
+      // that is not a string, and the roll-up cannot be read.
+      const name = packageName(root);
+      const expand = (value: unknown) =>
+        typeof value === "string" && name
+          ? value
+              .replaceAll(
+                "<unscopedPackageName>",
+                name.replace(/^@[^/]+\//, ""),
+              )
+              .replaceAll("<packageName>", name)
+          : value;
+      for (const key of ["mainEntryPointFilePath"])
+        json[key] = expand(json[key]);
+      for (const key of Object.keys(rollup)) rollup[key] = expand(rollup[key]);
+      const main = json.mainEntryPointFilePath;
       const readable = (value: unknown) =>
         typeof value === "string" && !/<(?!projectFolder>)[^>]*>/.test(value);
       if (
@@ -458,6 +542,14 @@ export function entryConventions(
     if (bundled === "conflicting") return "conflicting";
     if (bundled && bundled !== "none") return bundled;
     if (bundled === "none") return undefined;
+    // A roll-up tool runs, and no readable config of it says what it writes:
+    // the twin of a declaration entry could name what the roll-up drops.
+    if (
+      /\.d\.[cm]?ts$/.test(output) &&
+      rollupNamed(root) &&
+      !extractors.get(root)?.length
+    )
+      return "conflicting";
     return srcTwin(root, output, manifest);
   };
   return Object.assign(route, {

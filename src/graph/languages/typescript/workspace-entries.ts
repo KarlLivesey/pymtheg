@@ -205,6 +205,18 @@ export function workspaceEntries(
         namedConfigs(root, scriptsOf(manifest)),
       ]),
     ),
+    (root) => {
+      const name = packages.get(root)?.json.name;
+      return typeof name === "string" ? name : undefined;
+    },
+    (root) => {
+      const manifest = packages.get(root);
+      if (!manifest) return false;
+      const named =
+        JSON.stringify(scriptsOf(manifest) ?? {}) +
+        JSON.stringify(manifest.json.wireit ?? {});
+      return /\b(?:api-extractor|dts-bundle-generator)\b/.test(named);
+    },
   );
   /** Outputs whose tsc mapping a build guard refused for another producer,
    * with the guard. */
