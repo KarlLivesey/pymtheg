@@ -312,6 +312,9 @@ export class GraphView {
       command: response.command,
       toolchain: toolchainView,
       toolchainTruncated: !!toolchainClipped,
+      // D22: the trust that applies on this machine, and how to answer it.
+      ...(response.trust ? { trust: response.trust } : {}),
+      ...(response.trustAnswer ? { trustAnswer: response.trustAnswer } : {}),
       status: response.status,
       exitCode: response.exitCode,
       indexExists: response.indexExists,

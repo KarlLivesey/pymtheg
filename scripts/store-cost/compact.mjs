@@ -3,6 +3,7 @@
 // totals, the 15 costliest statements, every table and index size, the
 // stages above 0.5 s and the row digests. Prints one JSON document.
 //   node scripts/store-cost/compact.mjs <label>=<result.json>...
+import "../isolated-home.mjs";
 import { existsSync, readFileSync } from "node:fs";
 
 const out = {};
@@ -18,6 +19,13 @@ for (const argument of process.argv.slice(2)) {
     cpuMs: r.cpuMs,
     sqlMs: r.statements.reduce((sum, s) => sum + s.wallMs, 0),
     maxRssKiB: r.maxRssKiB,
+    closeMs: r.closeMs,
+    writeBatchRows: r.writeBatchRows,
+    longestHoldMs: r.longestHoldMs,
+    holds: r.holds,
+    longHolds: r.longHolds,
+    maxWalBytes: r.maxWalBytes,
+    commits: r.commitTimes?.length,
     io: r.io,
     databaseBytes: r.databaseBytes,
     report: r.report,

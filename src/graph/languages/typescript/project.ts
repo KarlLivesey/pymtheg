@@ -55,6 +55,17 @@ function libFile(path: string): ts.SourceFile | undefined {
   }
   return libCache.get(name) ?? undefined;
 }
+/**
+ * C-40: forgets the parsed library files. Programs share them, and each
+ * checker records its own facts on their symbols, so the cache keeps the
+ * last program and its checker alive after an analysis: on
+ * microsoft/TypeScript the 27,000-file program, 2.7 GB of a 4.2 GB heap,
+ * held through every later write and resolution. Called when an analysis
+ * returns; the next one parses them again.
+ */
+export function releaseLibraryFiles(): void {
+  libCache.clear();
+}
 
 export const toVirtual = (path: string) => "/" + path;
 export const fromVirtual = (path: string): string | undefined =>
@@ -578,6 +589,11 @@ class VirtualFileSystem {
 export const CONTEXT_PATTERNS = [
   "*tsconfig*.json",
   "*jsconfig*.json",
+  // Shared configs that other configs extend by package name (C-39):
+  // `astro/tsconfigs/strict`, `@turbo/tsconfig/library.json`,
+  // `@repo/typescript-config/nextjs.json`.
+  "**/*tsconfig*/*.json",
+  "**/typescript-config/*.json",
   "package.json",
   "pnpm-workspace.yaml",
   ...entryBuildContext,
@@ -749,11 +765,9 @@ export function projectModel(
     fileExists,
     readFile(name) {
       const text = readFile(name);
-      if (
-        text !== undefined &&
-        !fs.files.has(real(name)) &&
-        hasNodeModulesSegment(name)
-      )
+      // A package-name `extends` read through `node_modules`: an installed
+      // file, or a captured checkout file behind a workspace link (C-39).
+      if (text !== undefined && hasNodeModulesSegment(name))
         installedConfigRead = true;
       return text;
     },
@@ -967,9 +981,21 @@ export function projectModel(
         toVirtual(config.path),
       );
       if (!group.failure) {
+        // A base reached by package name was read. Its settings are complete
+        // unless it was unreadable (6053/5083) or its JSON has syntax errors
+        // (1xxx diagnostics in another file): then the compiler drops what
+        // it cannot parse, and the marker stays.
         if (
           installedConfigRead &&
-          !parsed.errors.some(({ code }) => code === 6053 || code === 5083)
+          !parsed.errors.some(
+            ({ code, file }) =>
+              code === 6053 ||
+              code === 5083 ||
+              (code >= 1000 &&
+                code < 2000 &&
+                file !== undefined &&
+                file.fileName !== toVirtual(config.path)),
+          )
         )
           group.limitations = group.limitations.filter(
             (note) =>

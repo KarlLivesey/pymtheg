@@ -2,6 +2,7 @@
 // C-22: a cold index of one tree by two builds, into stores with the same
 // project id, must be identical row for row (the change alters no result).
 //   node scripts/reindex/same-cold.mjs <dist a> <dist b> <root> <work dir> <out.json>
+import "../isolated-home.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

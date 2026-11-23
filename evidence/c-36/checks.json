@@ -1,0 +1,9 @@
+{
+ "note": "C-36 checks after the round-2 cost fix, on the dev server with Node 24, on the branch at main 5d97762.",
+ "build": "npm run build: pass",
+ "typeCheck": "tsc --noEmit -p tsconfig.json and -p web/tsconfig.json: pass",
+ "format": "npm run format:check: pass",
+ "sweepTests": "node --test scripts/sweep/*.test.mjs: 30 of 30 pass",
+ "fullSuite": "npm test: 3295 of 3295 pass",
+ "focused": "Rust equality, kill and finishing tests: 33 of 33 pass"
+}

@@ -7,6 +7,10 @@
 # <cold.sqlite>. Timing-dependent by design; never a test.
 #   scripts/reindex/link-churn.sh <dist> <root> <package dir> <cold.sqlite> <out.json>
 set -u
+# The user's Pymtheg configuration and cache go to fresh folders in the
+# scratch, never the account's real ones (scripts/isolated-home.mjs).
+export PYMTHEG_CONFIG_HOME="${PYMTHEG_CONFIG_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-config-XXXXXX")}"
+export PYMTHEG_CACHE_HOME="${PYMTHEG_CACHE_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-cache-XXXXXX")}"
 dist=$1 root=$2 package=$3 cold=$4 out=$5
 here=$(dirname "$0")
 mapfile -t files < <(find "$package" -type f -name '*.d.*ts')
