@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 import "./isolated-config.mjs";
-// C-43 review B3: cancelling a graph job over MCP ends the toolchain's
-// processes. The production job manager and graph worker run an index with
-// the Rust route on; a fake rust-analyzer starts a "build script" in its
-// process group that can never finish, writes both pids (the readiness
-// handshake) and waits. No test asserts a time.
+// C-54: cancelling a graph job over MCP ends the toolchain's processes. The
+// production job manager and graph worker run an index with the Go route
+// on; a fake `go` starts a child in its process group that can never finish
+// while it "builds" the helper, writes both pids (the readiness handshake)
+// and waits. No test asserts a time.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import {
@@ -22,7 +22,6 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { GraphJobs } from "../dist/mcp/graph-jobs.js";
-import { executeGraph } from "../dist/graph/commands.js";
 import { initializeWorkspace } from "../dist/project/workspace.js";
 import {
   toolchainWorkDirectory,
@@ -30,37 +29,35 @@ import {
 } from "../dist/project/local-trust.js";
 
 const PROJECT = {
-  "Cargo.toml":
-    '[package]\nname = "hang"\nversion = "0.1.0"\nedition = "2021"\n',
-  "src/lib.rs": "pub fn f() {}\n",
+  "go.mod": "module example.com/hang\n\ngo 1.22\n",
+  "a.go": "package hang\n\nfunc F() {}\n",
 };
 
-/** A fake toolchain whose rust-analyzer starts a grandchild and never finishes. */
-function fakeToolchain(dir) {
-  mkdirSync(join(dir, "sysroot", "lib", "rustlib", "src", "rust", "library"), {
-    recursive: true,
-  });
-  const head = `#!${process.execPath}\nconst fs = require("fs"), path = require("path"), cp = require("child_process");\nconst a = process.argv.slice(2);\n`;
-  const scripts = {
-    rustc: `if (a[0] === "--print") { console.log(${JSON.stringify(join(dir, "sysroot"))}); process.exit(0); }
-if (a[0] === "-vV") { console.log("rustc 1.98.1 (fake)\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.98.1"); process.exit(0); }
-process.exit(2);`,
-    cargo: `if (a[0] === "metadata") { console.log(JSON.stringify({ packages: [], workspace_members: [], resolve: { nodes: [] } })); process.exit(0); }
-process.exit(2);`,
-    "rust-analyzer": `if (a[0] === "--version") { console.log("rust-analyzer 1.98.1 (fake)"); process.exit(0); }
-if (a[0] === "scip") {
-  const script = cp.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
-  fs.writeFileSync(path.join(__dirname, "ready.json"), JSON.stringify({ analyzer: process.pid, script: script.pid }));
+/** A fake `go` at <dir>/goroot/bin/go whose `go build` starts a child and never finishes. */
+function fakeGo(dir) {
+  const goroot = join(dir, "goroot");
+  mkdirSync(join(goroot, "bin"), { recursive: true });
+  const go = join(goroot, "bin", "go");
+  writeFileSync(
+    go,
+    `#!${process.execPath}
+const fs = require("fs"), cp = require("child_process");
+const a = process.argv.slice(2);
+if (a[0] === "env") {
+  console.log(JSON.stringify({ GOVERSION: "go1.22.0", GOROOT: ${JSON.stringify(join(realpathSync(dir), "goroot"))}, GOHOSTOS: "linux", GOHOSTARCH: "amd64" }));
+  process.exit(0);
+}
+if (a[0] === "build") {
+  const child = cp.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
+  fs.writeFileSync(${JSON.stringify(join(dir, "ready.json"))}, JSON.stringify({ go: process.pid, child: child.pid }));
   setInterval(() => {}, 1000);
   return;
 }
-process.exit(2);`,
-  };
-  for (const [name, body] of Object.entries(scripts)) {
-    writeFileSync(join(dir, name), head + body);
-    chmodSync(join(dir, name), 0o755);
-  }
-  return join(dir, "rust-analyzer");
+process.exit(2);
+`,
+  );
+  chmodSync(go, 0o755);
+  return realpathSync(go);
 }
 
 /** Whether a process is running (a zombie is not). */
@@ -91,54 +88,55 @@ async function trustedProject(root) {
     writeFileSync(join(project, path), text);
   }
   await initializeWorkspace(project, undefined, { trust: "trusted" });
-  const analyzer = fakeToolchain(join(root, "tools"));
+  const go = fakeGo(join(root, "tools"));
   const file = trustFile();
   const answers = JSON.parse(readFileSync(file, "utf8"));
-  answers.checkouts[realpathSync(project)].toolchain = {
-    go: false,
-    rust: analyzer,
-  };
+  answers.checkouts[realpathSync(project)].toolchain = { go, rust: false };
   writeFileSync(file, JSON.stringify(answers));
-  process.env.CARGO_HOME = join(root, "cargo-home");
+  process.env.GOPATH = join(root, "gopath");
   return {
     project: realpathSync(project),
     ready: join(root, "tools", "ready.json"),
   };
 }
-const runFolders = (project) => {
-  const dir = join(toolchainWorkDirectory(project), "rust");
+const buildFolders = (project) => {
+  const dir = join(toolchainWorkDirectory(project), "go");
   return existsSync(dir)
-    ? readdirSync(dir).filter((n) => /^run-[0-9a-f-]{36}$/.test(n))
+    ? readdirSync(dir).filter((n) => n.startsWith("build-"))
     : [];
 };
 
-test("review B3: cancelling an MCP index ends rust-analyzer and the build script it started, and removes the run folder", async () => {
+test("C-54: cancelling an MCP index ends the Go toolchain and the child it started, and its folder is removed", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-mcp-children-"));
   try {
     const { project, ready } = await trustedProject(root);
     const jobs = new GraphJobs(project);
     const job = jobs.start({ command: "index" });
     await until(
-      () => existsSync(ready),
-      "the fake rust-analyzer did not start",
+      () => existsSync(ready) || job.state !== "running",
+      "the fake go did not start",
+    );
+    assert.ok(
+      existsSync(ready),
+      `job ${job.state}: ${JSON.stringify(job.error)}`,
     );
     const pids = JSON.parse(readFileSync(ready, "utf8"));
-    assert.ok(running(pids.analyzer) && running(pids.script));
+    assert.ok(running(pids.go) && running(pids.child));
     await jobs.cancel(job.id);
     assert.equal(job.state, "cancelled");
     await until(
-      () => !running(pids.analyzer) && !running(pids.script),
+      () => !running(pids.go) && !running(pids.child),
       "a toolchain process is still running",
     );
-    // The worker answered the abort after the route cleaned up.
-    assert.deepEqual(runFolders(project), []);
+    // The worker answered the abort after the route removed its folder.
+    assert.deepEqual(buildFolders(project), []);
     await jobs.close();
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
 
-test("review B3: a server that exits with a job running kills its toolchain processes; the next run sweeps the folder", async () => {
+test("C-54: a server that exits with a job running kills its toolchain processes", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-mcp-children-"));
   try {
     const { project, ready } = await trustedProject(root);
@@ -167,22 +165,56 @@ wait();`,
     assert.equal(code, 0);
     const pids = JSON.parse(readFileSync(ready, "utf8"));
     await until(
-      () => !running(pids.analyzer) && !running(pids.script),
+      () => !running(pids.go) && !running(pids.child),
       "a toolchain process outlived the server",
     );
-    // The killed run left its folder; its lock died with the server, so the
-    // next run removes it.
-    assert.equal(runFolders(project).length, 1);
-    await rm(ready);
-    const answers = JSON.parse(readFileSync(trustFile(), "utf8"));
-    answers.checkouts[project].toolchain = {
-      go: false,
-      rust: join(root, "none", "rust-analyzer"),
-    };
-    writeFileSync(trustFile(), JSON.stringify(answers));
-    await executeGraph({ command: "index", root: project });
-    assert.deepEqual(runFolders(project), []);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
+
+for (const signal of ["SIGTERM", "SIGINT"])
+  test(`C-54: a CLI graph index stopped by ${signal} kills its toolchain children`, async () => {
+    const root = await mkdtemp(join(tmpdir(), "pym-cli-children-"));
+    try {
+      const { project, ready } = await trustedProject(root);
+      const cli = spawn(
+        process.execPath,
+        [
+          fileURLToPath(new URL("../dist/cli/main.js", import.meta.url)),
+          "graph",
+          "index",
+          "--root",
+          project,
+          "--json",
+        ],
+        { stdio: ["ignore", "ignore", "inherit"], env: process.env },
+      );
+      let exited = false;
+      const exit = new Promise((resolve) =>
+        cli.once("exit", (code, sig) => {
+          exited = true;
+          resolve({ code, sig });
+        }),
+      );
+      await until(
+        () => existsSync(ready) || exited,
+        "the fake go did not start",
+      );
+      assert.ok(
+        existsSync(ready),
+        "the CLI ended before the fake go was ready",
+      );
+      const pids = JSON.parse(readFileSync(ready, "utf8"));
+      cli.kill(signal);
+      const { code } = await exit;
+      // An interrupted graph command exits 130.
+      assert.equal(code, 130);
+      await until(
+        () => !running(pids.go) && !running(pids.child),
+        "a toolchain process outlived the CLI",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
