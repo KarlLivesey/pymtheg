@@ -7,9 +7,12 @@
  * the paths written since (the store's record of `replaceFile` and
  * `removeFile` calls) and assembles each input in the store's own order.
  *
- * Everything kept is deep-frozen before any module sees it: a module that
- * changes its input in place throws instead of changing kept state, and a
- * run that fails keeps nothing (C-45).
+ * A module must not change its inputs in place (`keepsInput`). Under the
+ * test suite (PYMTHEG_TEST) everything kept is deep-frozen before any module
+ * sees it, so a module that changes its input throws there instead of
+ * changing kept state. Production does not freeze: freezing a record costs
+ * about two thirds of decoding it (C-55), more than keeping it saves on an
+ * edit that rewrites many files.
  */
 import { compare } from "./identity.js";
 import type { GraphFile, GraphSymbol, ResolutionFile } from "./types.js";
@@ -39,6 +42,9 @@ export interface KeptInput {
   readonly bytes: number;
 }
 
+/** Deep-frozen under the test suite only (see above). */
+const guard = <T>(value: T): T =>
+  process.env.PYMTHEG_TEST === "1" ? deepFreeze(value) : value;
 export function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -93,7 +99,7 @@ export class KeptInputs {
           this.bytes.set(`r:${path}`, this.previousBytes(`r:${path}`, file));
         }
     for (const file of fresh) {
-      records.set(file.path, deepFreeze(file));
+      records.set(file.path, guard(file));
       this.bytes.set(`r:${file.path}`, size(file));
     }
     count("kept.input.recordsReused", records.size - fresh.length);
@@ -134,7 +140,7 @@ export class KeptInputs {
     for (const path of paths) {
       const fresh = freshSymbols.get(path);
       if (fresh) {
-        symbols.set(path, deepFreeze(fresh));
+        symbols.set(path, guard(fresh));
         this.bytes.set(`s:${path}`, size(fresh));
       } else {
         const kept = oldSymbols!.get(path)!;
@@ -161,7 +167,7 @@ export class KeptInputs {
       for (const path of paths) {
         const row = fresh.get(path);
         if (row) {
-          rows.set(path, deepFreeze(row));
+          rows.set(path, guard(row));
           this.bytes.set(`p:${path}`, size(row));
         } else if (oldProjection?.has(path)) {
           rows.set(path, oldProjection.get(path)!);
@@ -205,7 +211,7 @@ export class KeptInputs {
     count("kept.input.resolverRecordsReused", paths.filter(usable).length);
     return [
       ...paths.filter(usable).map((path) => records!.get(path)!),
-      ...fresh.map((file) => deepFreeze(file)),
+      ...fresh.map((file) => guard(file)),
     ].sort((a, b) => compare(a.path, b.path));
   }
 

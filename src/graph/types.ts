@@ -268,8 +268,9 @@ export interface LanguageModule {
   /**
    * C-55: in an index session, the indexer keeps this module's decoded
    * inputs (analysis records, resolver projection and symbols) between
-   * runs and re-reads only the files written since. The module receives
-   * deep-frozen records: it must not change its inputs in place.
+   * runs and re-reads only the files written since. The module must not
+   * change its inputs in place: they may be handed to the next run. The
+   * test suite freezes them, so a module that does fails there.
    */
   keepsInput?: true;
   /** For scoped resolution only, the file-level parsed link kinds read across files. */
