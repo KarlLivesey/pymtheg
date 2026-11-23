@@ -39,6 +39,65 @@ const unbuiltAssumptions = new Set([
 const entryAssumption = (entry: { proof?: string } | undefined) =>
   conventionAssumptions[entry?.proof as Convention] ?? unbuiltEntryAssumption;
 
+/**
+ * The checkout files that can see an assumed workspace entry (C-25, C-46):
+ * the entries' sources and every file that imports one of them, directly
+ * or through other files, by the program's module resolution. Undefined
+ * (every file) when one of them declares globals or augments a module,
+ * which reaches files that do not import it.
+ */
+function assumedDependents(
+  program: ts.Program,
+  entries: ReadonlyMap<ts.ResolvedModuleFull, { assumed?: true }>,
+): Set<string> | undefined {
+  const seeds = new Set<string>();
+  for (const [resolved, entry] of entries)
+    if (entry.assumed) seeds.add(resolved.resolvedFileName);
+  const checker = program.getTypeChecker();
+  const importers = new Map<string, Set<string>>();
+  for (const file of program.getSourceFiles()) {
+    const imports =
+      (file as ts.SourceFile & { imports?: readonly ts.StringLiteralLike[] })
+        .imports ?? [];
+    for (const specifier of imports) {
+      const target = checker
+        .getSymbolAtLocation(specifier)
+        ?.declarations?.find(ts.isSourceFile);
+      if (!target) continue;
+      const list = importers.get(target.fileName) ?? new Set();
+      list.add(file.fileName);
+      importers.set(target.fileName, list);
+    }
+  }
+  const reached = new Set(seeds);
+  const queue = [...seeds];
+  while (queue.length) {
+    const file = queue.pop()!;
+    const source = program.getSourceFile(file);
+    if (
+      source &&
+      (!ts.isExternalModule(source) ||
+        source.statements.some(
+          (statement) =>
+            ts.isModuleDeclaration(statement) &&
+            (ts.isStringLiteral(statement.name) ||
+              statement.flags & ts.NodeFlags.GlobalAugmentation),
+        ))
+    )
+      return undefined;
+    for (const importer of importers.get(file) ?? [])
+      if (!reached.has(importer)) {
+        reached.add(importer);
+        queue.push(importer);
+      }
+  }
+  return new Set(
+    [...reached]
+      .map((file) => fromVirtual(file))
+      .filter((path): path is string => path !== undefined),
+  );
+}
+
 /** Program rebuilds per file after checker stack overflows before giving up. */
 const MAX_LIMIT_RETRIES = 25;
 /** Program rebuilds per project before the remaining files are not analysed. */
@@ -1569,6 +1628,12 @@ export function typescriptModule(
         const workspaceAssumed =
           projectedEntries &&
           [...projectedEntries.values()].some((entry) => entry.assumed);
+        // Only files that can see an assumed entry differ without it: those
+        // that import its source, directly or through other checkout files
+        // (C-46 review: the neutral pass extracted every file).
+        const dependents = workspaceAssumed
+          ? assumedDependents(normal.program, projectedEntries!)
+          : undefined;
         normal = undefined;
         const differential = (
           texts: ReadonlyMap<string, string>,
@@ -1618,19 +1683,23 @@ export function typescriptModule(
               : labelled(result, differing(result, withoutBundler(path))),
           ]);
         }
-        if (workspaceAssumed) {
+        if (workspaceAssumed && dependents?.size !== 0) {
           const withoutWorkspace = differential(new Map(), true);
           let plain: [string, ParseResult][] = analysed.map(
             ([path, result]) => [
               path,
-              result.status === "failed" ? result : withoutWorkspace(path),
+              result.status === "failed" ||
+              (dependents !== undefined && !dependents.has(path))
+                ? result
+                : withoutWorkspace(path),
             ],
           );
           if (assumedTexts.size) {
             const withoutEither = differential(assumedTexts, true);
             plain = plain.map(([path, result]) => [
               path,
-              result.status === "failed"
+              result.status === "failed" ||
+              (dependents !== undefined && !dependents.has(path))
                 ? result
                 : labelled(result, differing(result, withoutEither(path))),
             ]);

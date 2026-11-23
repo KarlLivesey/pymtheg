@@ -14,7 +14,9 @@ import {
   LanguageRegistry,
   SqliteGraphStore,
 } from "../dist/graph/index.js";
-import typescript from "../dist/graph/languages/typescript/index.js";
+import typescript, {
+  statistics,
+} from "../dist/graph/languages/typescript/index.js";
 
 const root = {
   "package.json": '{"private":true,"workspaces":["packages/*"]}',
@@ -320,7 +322,10 @@ test("PR 67 review: rollup output.file, unreadable roll-ups block the twin, stri
     }),
     "packages/y/api-extractor.json": JSON.stringify({
       mainEntryPointFilePath: "<projectFolder>/temp/<unscopedPackageName>.d.ts",
-      dtsRollup: { enabled: true, untrimmedFilePath: "<projectFolder>/dist/index.d.ts" },
+      dtsRollup: {
+        enabled: true,
+        untrimmedFilePath: "<projectFolder>/dist/index.d.ts",
+      },
     }),
     "packages/y/src/index.ts": "export function tokened() {}",
     // A rollup config whose entries are not data.
@@ -362,4 +367,37 @@ test("PR 67 review: rollup output.file, unreadable roll-ups block the twin, stri
     "packages/s/src/index.ts",
   ]);
   assert.match(String(got.hidden), /^unresolved:/);
+});
+
+test("PR 67 review: the pass without assumed entries extracts only the files that can see one", async () => {
+  // Cold cost: the neutral program re-extracted every file of the program.
+  const unrelated = Object.fromEntries(
+    Array.from({ length: 6 }, (_, i) => [
+      `lib/u${i}.ts`,
+      `export function u${i}() { return ${i}; }\n`,
+    ]),
+  );
+  const before = { ...statistics };
+  const got = await calls({
+    "tsconfig.json":
+      '{"compilerOptions":{"strict":true,"module":"ESNext","moduleResolution":"Bundler","target":"ES2022"},"files":["app.ts","lib/u0.ts","lib/u1.ts","lib/u2.ts","lib/u3.ts","lib/u4.ts","lib/u5.ts"]}',
+    "packages/a/package.json": pkg("a", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "tsup" },
+    }),
+    "packages/a/src/index.ts": "export function a() {}",
+    ...unrelated,
+    "app.ts": 'import { a } from "a"; a();',
+  });
+  assert.deepEqual(got.a, [
+    "packages/a/src/index.ts#a",
+    ["ts-unbuilt-entry-is-src-twin"],
+    "packages/a/src/index.ts",
+  ]);
+  const extracted = statistics.neutralExtracted - before.neutralExtracted;
+  // app.ts and the entry's source, not the six unrelated files.
+  assert.ok(
+    extracted > 0 && extracted <= 2,
+    `neutral extractions: ${extracted}`,
+  );
 });
