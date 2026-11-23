@@ -1003,6 +1003,16 @@ caller, and the scoped path is used only when the edited file's decisions
 meet no cut. The same file tree therefore produces the same graph after a
 fresh or incremental index. [C-36](changes/C-36.md)
 
+**Toolchain processes (C-54).** Every child process the graph starts runs
+in its own process group, recorded in memory the server owns. Cancelling a
+`code_graph` or `requirement_links` job ends the processes it started; a
+server that exits ends them too, and the CLI (and `pymtheg mcp`) turns
+SIGINT, SIGTERM, SIGHUP and SIGQUIT into an orderly end that does the same;
+a cancel kills the job's children at once, whatever its worker does. Only a
+death the process cannot observe (SIGKILL, a crash of the runtime) leaves
+children running. On Windows the recorded
+process is killed, not its children. [C-54](changes/C-54.md)
+
 **Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted
 on this machine (below; [code guide](code-guide.md#the-go-toolchain-route)),
 indexing also runs `go` from `PATH`, or the absolute path named in your own
