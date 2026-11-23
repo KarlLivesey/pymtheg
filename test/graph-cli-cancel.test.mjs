@@ -18,7 +18,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runGraphInWorker } from "../dist/cli/graph-runner.js";
-import { fixtureFiles } from "./graph-kill-fixture.mjs";
+import { executeGraph } from "../dist/graph/commands.js";
+import { LanguageRegistry } from "../dist/graph/index.js";
+import { synchronousStretch } from "../dist/graph/sections.js";
+import { fixtureFiles, fixtureModule } from "./graph-kill-fixture.mjs";
 
 const HANG_GUARD_MS = 3 * 60_000;
 /** Runs a scenario in its own process group; its JSON facts, or a failure. */
@@ -95,6 +98,51 @@ test("after an abort the worker refuses to enter the next module call", async ()
   const facts = await scenario("block");
   assert.equal(facts.rejected, "AbortError");
   assert.equal(facts.entered, 0);
+});
+
+// C-50 review: what a worker reads for a module's marked stretch. The CLI
+// worker and the MCP worker (src/mcp/graph-worker.ts) both map `true` to
+// the module section and "awaiting" to the awaited one, so a stretch marked
+// with `synchronousStretch` after an await reads as the module section in
+// both.
+test("a module's marked synchronous stretch is reported as inside the module call", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-cli-stretch-"));
+  try {
+    await writeFile(join(scratch, "a.x"), "def a\n");
+    const base = fixtureModule();
+    const states = [];
+    let inStretch;
+    const module = {
+      ...base,
+      async parse(input) {
+        await null;
+        return synchronousStretch(() => {
+          inStretch = states.at(-1);
+          return base.parse(input);
+        });
+      },
+    };
+    const response = await executeGraph(
+      { command: "index", root: scratch },
+      {
+        registry: new LanguageRegistry([module]),
+        onModuleCall: (inside) => states.push(inside),
+      },
+    );
+    assert.equal(response.status, "ok");
+    assert.equal(inStretch, true);
+    // The call, its awaited promise, the stretch, awaited again, settled.
+    const parse = states.indexOf(true);
+    assert.deepEqual(states.slice(parse, parse + 5), [
+      true,
+      "awaiting",
+      true,
+      "awaiting",
+      false,
+    ]);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
 });
 
 test("a run that is not aborted answers through the worker", async () => {

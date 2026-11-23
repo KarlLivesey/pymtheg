@@ -127,9 +127,12 @@ type WorkerMessage = {
  *
  * Cancelling sets the shared cancel flag and then reads the worker's
  * section. In the graph command itself the worker acknowledges at its next
- * checkpoint and lives on. Inside a language module's call it may pass no
- * checkpoint for long, so it is terminated there, as before C-48, and the
- * next job starts a new worker; a terminated worker leaves the store as a
+ * checkpoint and lives on. Inside a language module's call, or in a
+ * synchronous stretch a module marks after an await (`synchronousStretch`),
+ * it may pass no checkpoint for long, so it is terminated there, as before
+ * C-48, and the next job starts a new worker, unless a toolchain process
+ * group is live: then the cancel kills the groups and takes the grace path
+ * (`cancel`), as it does while a module's promise is awaited; a terminated worker leaves the store as a
  * killed CLI run does (the next run repairs it). The worker sets its section
  * before it checks the flag, and the flag is set before the section is
  * read, so a cancellation is never missed by both.

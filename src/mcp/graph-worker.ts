@@ -12,8 +12,11 @@
  * each captured file. At a checkpoint the worker counts it and, if the flag
  * is set, aborts the request and answers `cancelled`; it then stays alive
  * with its session. While it is inside a language module's call (section
- * 1) it may pass no checkpoint for long, so the parent terminates it there,
- * as before C-48, and the session ends with it.
+ * 1), or in a synchronous stretch the module marks after an await
+ * (`synchronousStretch`, src/graph/sections.ts), it may pass no checkpoint
+ * for long, so the parent terminates it there, as before C-48, and the
+ * session ends with it, unless a toolchain process group is live: then the
+ * cancel takes the grace path (graph-jobs.ts `cancel`).
  */
 import { operationError } from "./operation-errors.js";
 import { parentPort, workerData } from "node:worker_threads";
