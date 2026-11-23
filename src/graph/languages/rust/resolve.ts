@@ -4788,12 +4788,34 @@ export function resolveRust(
    * file is reached through (a place's conditions include its parents').
    * A file no module declaration reaches (`mod x;` written only inside a
    * macro invocation such as `cfg_if!`) may be conditional in ways the
-   * source cannot see: it is marked `?module-not-declared`.
+   * source cannot see: it is marked `?module-not-declared`. A module path
+   * reached through more than one file at some level of the chain
+   * (`#[cfg(unix)] #[path = ..] mod imp;` beside a `cfg(windows)` twin, or
+   * `#[cfg_attr(unix, path = ..)]` alternatives) is marked `?module-twin`:
+   * the same path names another item in another configuration.
    */
+  let modulePathFiles: Map<string, Set<string>> | undefined;
   const moduleGates = (symbol: GraphSymbol): string[] => {
     const owners = ownerPlace(symbol.file, str(data(symbol).scope));
     if (!owners.length) return ["?module-not-declared"];
-    return [...new Set(owners.flatMap((own) => own.conditions ?? []))];
+    if (!modulePathFiles) {
+      modulePathFiles = new Map();
+      for (const place of places) {
+        const key = `${place.crate.root}|${place.scope}`;
+        let set = modulePathFiles.get(key);
+        if (!set) modulePathFiles.set(key, (set = new Set()));
+        set.add(place.file);
+      }
+    }
+    const out = new Set(owners.flatMap((own) => own.conditions ?? []));
+    for (const own of owners)
+      for (let level: Place | null = own; level; level = level.parent)
+        if (
+          (modulePathFiles.get(`${level.crate.root}|${level.scope}`)?.size ??
+            0) > 1
+        )
+          out.add("?module-twin");
+    return [...out];
   };
   if (markPresence)
     for (const symbol of symbols) {

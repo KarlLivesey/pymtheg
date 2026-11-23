@@ -60,18 +60,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 45.2,
-  "cpuS": 110.5,
-  "peakMiB": 1679
+  "wallS": 37.1,
+  "cpuS": 91.7,
+  "peakMiB": 1686
  },
  "index": {
   "sourceOnly": {
-   "wallS": 35.7,
-   "cpuS": 46.8
+   "wallS": 27.7,
+   "cpuS": 39.4
   },
   "route": {
-   "wallS": 145.9,
-   "cpuS": 54.7
+   "wallS": 107.7,
+   "cpuS": 44.7
   }
  },
  "errors": {

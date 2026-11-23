@@ -1558,7 +1558,7 @@ test(
 /** The second reviewer's shapes in one crate (review B1 and the kind match). */
 const CFG_CRATE = {
   "Cargo.toml":
-    '[package]\nname = "cfgs"\nversion = "0.1.0"\nedition = "2021"\n',
+    '[package]\nname = "cfgs"\nversion = "0.1.0"\nedition = "2021"\n\n[features]\nnope = []\n',
   "src/lib.rs": [
     "// (b) module-level cfg twins through #[path]",
     "#[cfg(unix)]",
@@ -1625,6 +1625,33 @@ const CFG_CRATE = {
     "    S::SIDES",
     "}",
     "",
+    "// Second review: one name imported from two cfg-gated modules (the",
+    "// source-only uncertainty is compound)",
+    "mod q_a;",
+    "mod q_b;",
+    "#[cfg(unix)]",
+    "use q_a::q_helper;",
+    "#[cfg(windows)]",
+    "use q_b::q_helper;",
+    "pub fn q() -> u32 {",
+    "    q_helper()",
+    "}",
+    "",
+    "// Second review: cfg_attr(path) twins of one module",
+    '#[cfg_attr(unix, path = "s_sys/unix.rs")]',
+    '#[cfg_attr(windows, path = "s_sys/windows.rs")]',
+    "mod s_sys;",
+    "pub fn s() -> u32 {",
+    "    s_sys::s_open()",
+    "}",
+    "",
+    "// The narrowed guard: a module under cfg with no twin is answered",
+    '#[cfg(not(feature = "nope"))]',
+    "mod gated_ok;",
+    "pub fn g() -> u32 {",
+    "    gated_ok::g_fn()",
+    "}",
+    "",
     "// A plain call, decided by the route",
     "pub fn plain() -> u32 {",
     "    helper()",
@@ -1641,6 +1668,11 @@ const CFG_CRATE = {
   "src/fallback.rs":
     "pub struct FileBackend;\n\nimpl FileBackend {\n    pub fn new() -> Self {\n        FileBackend\n    }\n    pub fn size(&self) -> u32 {\n        2\n    }\n}\n",
   "src/c_unix.rs": "pub fn c_open() -> u32 {\n    1\n}\n",
+  "src/q_a.rs": "pub fn q_helper() -> u32 {\n    1\n}\n",
+  "src/q_b.rs": "pub fn q_helper() -> u32 {\n    2\n}\n",
+  "src/s_sys/unix.rs": "pub fn s_open() -> u32 {\n    1\n}\n",
+  "src/s_sys/windows.rs": "pub fn s_open() -> u32 {\n    2\n}\n",
+  "src/gated_ok.rs": "pub fn g_fn() -> u32 {\n    1\n}\n",
   "src/c_other.rs": "pub fn c_open() -> u32 {\n    2\n}\n",
 };
 
@@ -1668,6 +1700,8 @@ test(
         "imp::platform_a",
         "FileBackend::new",
         "c_sys::c_open",
+        "q_helper",
+        "s_sys::s_open",
       ]) {
         const l = link(name);
         assert.ok(l, name);
@@ -1682,6 +1716,13 @@ test(
           name + " stays open as source-only left it",
         );
       }
+      // The narrowed guard: a module under cfg with no twin is answered.
+      const g = link("gated_ok::g_fn");
+      assert.equal(
+        g?.data?.toolchain?.origin,
+        "toolchain",
+        JSON.stringify(g?.data),
+      );
       // Never the module e_width for the call e_width::e_width().
       const width = link("e_width::e_width");
       assert.notEqual(

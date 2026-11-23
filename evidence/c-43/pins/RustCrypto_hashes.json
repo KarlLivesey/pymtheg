@@ -64,18 +64,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 41.4,
-  "cpuS": 46.7,
-  "peakMiB": 933
+  "wallS": 54.3,
+  "cpuS": 60.6,
+  "peakMiB": 931
  },
  "index": {
   "sourceOnly": {
-   "wallS": 13.2,
-   "cpuS": 17.5
+   "wallS": 16,
+   "cpuS": 20
   },
   "route": {
-   "wallS": 100.8,
-   "cpuS": 19
+   "wallS": 138.8,
+   "cpuS": 24
   }
  },
  "errors": {
@@ -95,7 +95,7 @@
    "credited": 368,
    "no identity: generated item": 20,
    "gate: kind/namespace": 5,
-   "other": 202,
+   "gate: cfg on an enclosing module": 202,
    "no answer: file-not-indexed": 2308,
    "no answer: kind-not-joined": 2,
    "gate: cfg-variant guard": 1

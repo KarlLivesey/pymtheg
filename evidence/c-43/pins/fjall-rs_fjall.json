@@ -61,18 +61,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 16,
-  "cpuS": 28.7,
-  "peakMiB": 1099
+  "wallS": 21.6,
+  "cpuS": 37.3,
+  "peakMiB": 1096
  },
  "index": {
   "sourceOnly": {
-   "wallS": 12.8,
-   "cpuS": 19.7
+   "wallS": 18.6,
+   "cpuS": 25.8
   },
   "route": {
-   "wallS": 46.3,
-   "cpuS": 21.2
+   "wallS": 56.3,
+   "cpuS": 24
   }
  },
  "errors": {
@@ -90,7 +90,7 @@
    "no answer: no-occurrence-at-site": 193,
    "no identity: local binding": 425,
    "gate: cfg-variant guard": 7,
-   "other": 2,
+   "gate: cfg on an enclosing module": 2,
    "gate: cfg condition other than test": 25,
    "no answer: no-name-site": 13
   },

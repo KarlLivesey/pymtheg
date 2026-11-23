@@ -19,21 +19,21 @@
  },
  "route": {
   "links": 86640,
-  "level2": 46597,
+  "level2": 46885,
   "assumed": 3111,
   "proven": 33116,
-  "toolchainDecided": 10370,
+  "toolchainDecided": 10658,
   "libraryModuleLinks": 0,
-  "level2Percent": 53.78,
-  "withModuleLinksPercent": 53.78,
-  "toolchainDecidedPercent": 11.97
+  "level2Percent": 54.11,
+  "withModuleLinksPercent": 54.11,
+  "toolchainDecidedPercent": 12.3
  },
  "decided": {
-  "definite:unresolved": 10370,
-  "withheld:conditional-candidates": 2582,
-  "definite:definite": 9440,
-  "withheld:cfg-variant": 1088,
-  "withheld:cfg-link": 1951
+  "definite:unresolved": 10658,
+  "withheld:conditional-candidates": 2677,
+  "definite:definite": 10047,
+  "withheld:cfg-link": 1951,
+  "withheld:cfg-variant": 98
  },
  "join": {
   "answer": 25241,
@@ -53,7 +53,7 @@
   "filter:kind-incompatible": 21
  },
  "agreement": {
-  "confirmed": 9440,
+  "confirmed": 10047,
   "differs": 0,
   "percent": 100
  },
@@ -65,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 120.8,
-  "cpuS": 318.8,
-  "peakMiB": 3026
+  "wallS": 168.1,
+  "cpuS": 370.5,
+  "peakMiB": 3018
  },
  "index": {
   "sourceOnly": {
-   "wallS": 80.2,
-   "cpuS": 107.3
+   "wallS": 110.2,
+   "cpuS": 134.5
   },
   "route": {
-   "wallS": 334.9,
-   "cpuS": 123.7
+   "wallS": 499.5,
+   "cpuS": 152.2
   }
  },
  "errors": {
@@ -86,17 +86,18 @@
  "funnel": {
   "open": 49944,
   "buckets": {
-   "credited": 10370,
+   "credited": 10658,
    "no identity: declaration without a graph symbol": 1241,
    "gate: kind/namespace": 272,
    "no identity: library item": 22834,
-   "other": 3004,
+   "gate: cfg on an enclosing module": 2695,
    "no identity: generated item": 1040,
    "no identity: local binding": 3942,
    "gate: trait-method declaration": 1358,
    "no answer: no-name-site": 254,
    "gate: cfg condition other than test": 1285,
    "no answer: no-occurrence-at-site": 1856,
+   "gate: conditional candidates": 21,
    "gate: cfg-variant guard": 30,
    "gate: known error classes": 61,
    "no answer: file-not-indexed": 2397

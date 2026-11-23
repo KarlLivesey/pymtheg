@@ -19,20 +19,20 @@
  },
  "route": {
   "links": 70802,
-  "level2": 28850,
+  "level2": 29139,
   "assumed": 299,
   "proven": 22761,
-  "toolchainDecided": 5790,
+  "toolchainDecided": 6079,
   "libraryModuleLinks": 0,
-  "level2Percent": 40.75,
-  "withModuleLinksPercent": 40.75,
-  "toolchainDecidedPercent": 8.18
+  "level2Percent": 41.16,
+  "withModuleLinksPercent": 41.16,
+  "toolchainDecidedPercent": 8.59
  },
  "decided": {
-  "definite:unresolved": 5790,
-  "withheld:cfg-variant": 7198,
-  "definite:definite": 6380,
-  "withheld:conditional-candidates": 716,
+  "definite:unresolved": 6079,
+  "withheld:cfg-variant": 6680,
+  "definite:definite": 6554,
+  "withheld:conditional-candidates": 771,
   "withheld:cfg-link": 5004
  },
  "join": {
@@ -53,7 +53,7 @@
   "filter:collision": 44
  },
  "agreement": {
-  "confirmed": 6380,
+  "confirmed": 6554,
   "differs": 0,
   "percent": 100
  },
@@ -65,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 120.7,
-  "cpuS": 533.8,
-  "peakMiB": 2365
+  "wallS": 176.6,
+  "cpuS": 646.4,
+  "peakMiB": 2356
  },
  "index": {
   "sourceOnly": {
-   "wallS": 129.3,
-   "cpuS": 160.5
+   "wallS": 166.3,
+   "cpuS": 198.6
   },
   "route": {
-   "wallS": 312.9,
-   "cpuS": 175.8
+   "wallS": 428.8,
+   "cpuS": 216.5
   }
  },
  "errors": {
@@ -88,18 +88,19 @@
   "buckets": {
    "no answer: file-not-indexed": 134,
    "no identity: library item": 18482,
-   "credited": 5790,
+   "credited": 6079,
    "no answer: no-name-site": 96,
-   "other": 1060,
    "gate: cfg-variant guard": 6567,
    "no identity: declaration without a graph symbol": 2173,
    "no identity: generated item": 1263,
+   "gate: cfg on an enclosing module": 604,
    "gate: trait-method declaration": 1549,
    "gate: kind/namespace": 176,
    "no identity: local binding": 5166,
    "no answer: no-occurrence-at-site": 359,
    "gate: cfg condition other than test": 4807,
    "gate: known error classes": 47,
+   "gate: conditional candidates": 167,
    "no answer: kind-not-joined": 44
   },
   "libraryPassingCfg": 13605,

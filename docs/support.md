@@ -1061,11 +1061,14 @@ defined more than once, no non-macro item of a proc-macro crate from another
 package, no local binding, no trait-method declaration (dispatch stays open or
 a candidate set). No answer is taken on a link under a cfg condition other
 than `test`, nor for a target that has a cfg variant, nor out of a candidate
-set holding one; a target is gated by its own cfg and by that of every module
-declaration its file is reached through, and a file no module declaration
-reaches (a `mod` written only inside a macro such as `cfg_if!`) counts as
-gated. A link whose source-only answer records conditional candidates is
-only confirmed, never narrowed. The answer's graph symbol must be of a kind
+set holding one; a target is gated by its own cfg, and through its module
+chain only when another item can stand at its path in another configuration
+(a level of the chain reached through more than one file, as cfg or
+`cfg_attr(path)` twins) or the chain's conditions cannot be seen (a `mod`
+written only inside a macro such as `cfg_if!`). A link whose source-only
+answer records a name cfg may remove takes only the one target it recorded,
+and a set of several candidates holding one under cfg (its own or a
+module's) or cfg twins is only confirmed, never narrowed. The answer's graph symbol must be of a kind
 the SCIP descriptor allows. A trait's associated type or const named in
 generic code (`S::Error`) is answered with the trait's declaration and
 counted apart. A source-only definite target the toolchain disagrees with is

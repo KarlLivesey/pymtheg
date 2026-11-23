@@ -19,21 +19,20 @@
  },
  "route": {
   "links": 30714,
-  "level2": 9147,
+  "level2": 9170,
   "assumed": 0,
   "proven": 8297,
-  "toolchainDecided": 850,
+  "toolchainDecided": 873,
   "libraryModuleLinks": 0,
-  "level2Percent": 29.78,
-  "withModuleLinksPercent": 29.78,
-  "toolchainDecidedPercent": 2.77
+  "level2Percent": 29.86,
+  "withModuleLinksPercent": 29.86,
+  "toolchainDecidedPercent": 2.84
  },
  "decided": {
   "definite:definite": 584,
   "withheld:cfg-variant": 3917,
   "withheld:cfg-link": 2334,
-  "definite:unresolved": 850,
-  "withheld:conditional-candidates": 23
+  "definite:unresolved": 873
  },
  "join": {
   "filter:import-names-module": 72,
@@ -65,18 +64,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 31.1,
-  "cpuS": 53.9,
-  "peakMiB": 1151
+  "wallS": 38.2,
+  "cpuS": 58.8,
+  "peakMiB": 1149
  },
  "index": {
   "sourceOnly": {
-   "wallS": 42.5,
-   "cpuS": 56.8
+   "wallS": 55.8,
+   "cpuS": 63.5
   },
   "route": {
-   "wallS": 112.1,
-   "cpuS": 55.8
+   "wallS": 153.2,
+   "cpuS": 68.3
   }
  },
  "errors": {
@@ -96,10 +95,10 @@
    "gate: cfg condition other than test": 2332,
    "no identity: local binding": 2845,
    "gate: trait-method declaration": 908,
-   "credited": 850,
+   "credited": 873,
    "no identity: declaration without a graph symbol": 12,
    "gate: known error classes": 75,
-   "other": 46,
+   "gate: cfg on an enclosing module": 23,
    "no answer: file-not-indexed": 384
   },
   "libraryPassingCfg": 8481,

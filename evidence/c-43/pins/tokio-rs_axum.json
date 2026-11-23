@@ -19,20 +19,20 @@
  },
  "route": {
   "links": 41067,
-  "level2": 18746,
+  "level2": 19273,
   "assumed": 1144,
   "proven": 15439,
-  "toolchainDecided": 2163,
+  "toolchainDecided": 2690,
   "libraryModuleLinks": 0,
-  "level2Percent": 45.65,
-  "withModuleLinksPercent": 45.65,
-  "toolchainDecidedPercent": 5.27
+  "level2Percent": 46.93,
+  "withModuleLinksPercent": 46.93,
+  "toolchainDecidedPercent": 6.55
  },
  "decided": {
-  "definite:definite": 2413,
-  "definite:unresolved": 2163,
-  "withheld:conditional-candidates": 476,
-  "withheld:cfg-variant": 1815,
+  "definite:definite": 2720,
+  "definite:unresolved": 2690,
+  "withheld:conditional-candidates": 1002,
+  "withheld:cfg-variant": 455,
   "withheld:cfg-link": 334
  },
  "join": {
@@ -54,7 +54,7 @@
   "filter:kind-incompatible": 3
  },
  "agreement": {
-  "confirmed": 2413,
+  "confirmed": 2720,
   "differs": 0,
   "percent": 100
  },
@@ -66,18 +66,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 44.5,
-  "cpuS": 98.6,
-  "peakMiB": 1961
+  "wallS": 69.2,
+  "cpuS": 137.1,
+  "peakMiB": 1945
  },
  "index": {
   "sourceOnly": {
-   "wallS": 50.6,
-   "cpuS": 66.2
+   "wallS": 58.8,
+   "cpuS": 74.9
   },
   "route": {
-   "wallS": 157.2,
-   "cpuS": 65.3
+   "wallS": 225,
+   "cpuS": 81.4
   }
  },
  "errors": {
@@ -90,17 +90,19 @@
    "no identity: library item": 6748,
    "no identity: local binding": 1325,
    "gate: trait-method declaration": 459,
-   "credited": 2163,
+   "credited": 2690,
    "no identity: declaration without a graph symbol": 611,
-   "other": 1550,
+   "gate: cfg on an enclosing module": 995,
    "no identity: generated item": 197,
    "no answer: no-name-site": 81,
    "no answer: no-occurrence-at-site": 178,
    "gate: cfg-variant guard": 331,
    "gate: known error classes": 44,
    "no answer: file-not-indexed": 10376,
+   "gate: conditional candidates": 16,
    "gate: cfg condition other than test": 111,
-   "gate: kind/namespace": 34
+   "gate: kind/namespace": 34,
+   "other": 12
   },
   "libraryPassingCfg": 6514,
   "notIndexed": {

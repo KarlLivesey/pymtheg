@@ -29,9 +29,9 @@
   "toolchainDecidedPercent": 2.97
  },
  "decided": {
-  "withheld:cfg-variant": 127,
+  "withheld:cfg-variant": 76,
   "definite:unresolved": 164,
-  "definite:definite": 501,
+  "definite:definite": 552,
   "withheld:cfg-link": 192,
   "withheld:conditional-candidates": 10
  },
@@ -50,7 +50,7 @@
   "none:file-not-indexed": 837
  },
  "agreement": {
-  "confirmed": 501,
+  "confirmed": 552,
   "differs": 0,
   "percent": 100
  },
@@ -62,18 +62,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 14.7,
-  "cpuS": 34.8,
-  "peakMiB": 929
+  "wallS": 16.4,
+  "cpuS": 37.3,
+  "peakMiB": 921
  },
  "index": {
   "sourceOnly": {
-   "wallS": 7.4,
-   "cpuS": 10.5
+   "wallS": 8.3,
+   "cpuS": 11.6
   },
   "route": {
-   "wallS": 38.2,
-   "cpuS": 13.6
+   "wallS": 38.6,
+   "cpuS": 12.2
   }
  },
  "errors": {
@@ -87,7 +87,7 @@
    "gate: kind/namespace": 6,
    "gate: trait-method declaration": 37,
    "gate: known error classes": 51,
-   "other": 48,
+   "gate: cfg on an enclosing module": 48,
    "credited": 164,
    "no answer: no-occurrence-at-site": 294,
    "no answer: no-name-site": 5,

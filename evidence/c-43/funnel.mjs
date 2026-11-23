@@ -140,7 +140,7 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
       if (variant(target)) return add("gate: cfg-variant guard");
       // C-43 review: what the source-only answer recorded as conditional, and
       // targets in a module under cfg (or declared only inside a macro).
-      if (link.data.uncertainty === "conditional-name-may-be-absent") return add("gate: conditional candidates");
+      if (String(link.data.uncertainty ?? "").split("; ").includes("conditional-name-may-be-absent")) return add("gate: conditional candidates");
       if (now?.data?.toolchain === undefined && target && link.resolution !== "library") return add("gate: cfg on an enclosing module");
       if (link.resolution === "library") return add("gate: source-only library target kept");
       if (link.resolution === "ambiguous" && !(before.candidates.get(parsed.id) ?? []).includes(target)) return add("gate: answer outside the candidate set");
