@@ -3163,21 +3163,42 @@ split out to C-51. Here, a program with an unread file withholds library
 targets as before (C-13).
 [C-39](changes/C-39.md)
 
-### C-47 The structural judgement is bounded by counts
+### C-47 The structural judgement is memoised per program and bounded by counts
 
 The structural judgement (C-13) recursed without end on oclif/core's
 recursive generic types beside a failed file. Its error handlers swallowed
 each stack overflow and went on, so the run's length depended on where
-V8's stack ran out: it could take more than 85 minutes, or never end. One
-judgement is now bounded by counts: 100 nested judgements and 200,000 steps
-actually computed. A stack overflow inside it counts as the depth bound,
-and every handler in the judge lets a bound through. A link whose
-judgement reaches a bound is `invalid-code`, caused by the failed file,
-with one reason, `judge-budget-exhausted`, whichever bound fired. **Rules
-out:** a wall-clock watchdog; treating a stack overflow as an answer
-(clean, or "no symbol"). An index run that ignores SIGTERM during a
-synchronous analysis is recorded as further work: module analysis would
-have to run in a worker that the coordinator terminates, as `check` does.
+V8's stack ran out: it could take more than 85 minutes, or never end.
+
+**Decided.** Every judgement in progress has an index on one stack: bound
+values, expressions, type parameter constraints, keys and taint checks.
+
+- **An answer is memoised for the program only if everything it consulted
+  began after it.** A cycle is settled at the root of its group, as in
+  Tarjan's algorithm. No memoised answer depends on the order of
+  evaluation, and the work is proportional to the distinct judgements
+  reached.
+- **What is memoised:** taint checks and type-level computations, by keys
+  that hold only the bindings their type nodes name; and checker types.
+- **A recursive alias reference is judged by its own type arguments.**
+- **Bounds by counts:** 100 nested judgements over every recursive path of
+  the judgement, 200,000 steps per judgement, and 8,000,000 per program.
+  A stack overflow counts as the depth bound.
+- **Overflows are unknown, never answers.** Every handler in the module
+  that can meet a stack overflow treats it as unknown: a link whose
+  judgement or dependence a bound left unknown is `invalid-code`, with one
+  reason, `judge-budget-exhausted`, whichever bound fired.
+
+**Rules out:**
+
+- a wall-clock watchdog;
+- treating a stack overflow as an answer (clean, "no symbol", or a partial
+  set of causes);
+- memoising an answer that consulted a judgement in progress.
+
+**Further work:** an index run ignores SIGTERM during a synchronous
+analysis. Module analysis would have to run in a worker that the
+coordinator terminates, as `check` does.
 [C-47](changes/C-47.md)
 
 ### C-13 TypeScript program budget and compiler exceptions

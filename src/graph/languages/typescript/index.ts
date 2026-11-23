@@ -256,7 +256,8 @@ function openSession(
   });
   /** Builds a program and its checker, or says what was thrown. */
   const attempt = ():
-    { program: ts.Program; checker: ts.TypeChecker } | Thrown => {
+    | { program: ts.Program; checker: ts.TypeChecker }
+    | Thrown => {
     try {
       return compile();
     } catch (error) {
@@ -1648,7 +1649,8 @@ export function typescriptModule(
                   ...((link.data ?? {}) as { [key: string]: Json }),
                 };
                 const outside = data.libraryFacts as unknown as
-                  LibraryTarget[] | undefined;
+                  | LibraryTarget[]
+                  | undefined;
                 if (
                   data.reason === "invalid-code" ||
                   (outside?.length &&

@@ -915,11 +915,14 @@ and never yields a version pin.
   could have a target is unresolved with `taint-budget-exhausted`, except
   links that bind a failed file directly, which stay `invalid-code`; no pin
   outside microsoft/TypeScript comes near it. The structural judgement of a receiver
-  that depends on a failed file is also bounded (C-47): at most 100 nested
-  judgements and 200,000 judgement steps, and a stack overflow inside it
-  counts as the bound. A link whose judgement reaches a bound is
-  `invalid-code` with the failed file as its cause and the reason
-  `judge-budget-exhausted`. It is never treated as clean. The program budget counts
+  that depends on a failed file is memoised per program and bounded
+  (C-47). It allows at most 100 nested judgements over all its recursive
+  paths, 200,000 steps per judgement and 8,000,000 per program. A stack
+  overflow inside it counts as the bound, and an overflow anywhere in the
+  failed-file checks is unknown, never an answer. A link whose judgement or
+  dependence a bound left unknown is `invalid-code`, with the failed files
+  as its cause and the reason `judge-budget-exhausted`. It is never treated
+  as clean. The program budget counts
   every checkout file a program loads, imported files included; a file past
   it is left out of that program only (installed declarations have their
   own budget). Invalid extracted UTF-16 ranges use the same per-file

@@ -23,3 +23,17 @@ To rebuild it, run that script with the main build until it stops at step 16.
 - `seeded-edits-oclif-{4242,3307,911}.json`: 30 seeded edits each on
   oclif/core with this branch. Every incremental store equals a cold one.
   The 4242 sequence includes the step that hung on main.
+
+## Review 2
+
+- `review-2/cold-runs.json`: cold indexes of five pins with a central file
+  broken (`const = ;` appended), by this branch merged with main
+  (`49ddae13`), by main, and on Excalidraw by the previous head
+  (`c19202a`). It also holds three clean pins against main, redux-toolkit
+  and Excalidraw at two other stack sizes, and the link-by-link outcome of
+  the 95 links the previous head bounded on Excalidraw. Row comparisons
+  normalise the module version string. Several runs went at once on the
+  dev server; the seconds are observations only.
+- `review-2/seeded-edits-oclif-{4242,3307,911}.json`: 30 seeded edits each
+  on oclif/core with this branch (the pin copied with its symlinks kept).
+  Every incremental store equals a cold one.
