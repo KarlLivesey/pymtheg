@@ -3,7 +3,7 @@
 // the same rows as main. Each build indexes the pristine pin in a fresh
 // process (scripts/reindex/cold-once.mjs, same project id); every row of
 // every table is compared. The only allowed difference is the Rust module
-// version (46 on main, 48 here), mapped before comparing.
+// version (47 on main since C-36, 48 here), mapped before comparing.
 //   node off-identical.mjs <out.json> <main dist> <branch dist> <store dir> <pin dir>...
 import { spawnSync } from "node:child_process";
 import { existsSync, rmSync, writeFileSync } from "node:fs";
@@ -11,7 +11,7 @@ import { basename, join } from "node:path";
 import { compareRows, storeRows } from "../../scripts/reindex/dump.mjs";
 
 const [out, mainDist, branchDist, storeDir, ...pins] = process.argv.slice(2);
-const MAIN = "46";
+const MAIN = "47";
 const BRANCH = "48";
 const mapVersion = (rows) =>
   Object.fromEntries(
