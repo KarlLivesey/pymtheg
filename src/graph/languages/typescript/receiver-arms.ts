@@ -43,6 +43,8 @@ interface Arm {
    * element of it can be (C-41 review 2).
    */
   readonly items?: readonly Arm[];
+  /** An object literal producer, whose properties and spreads a member read walks. */
+  readonly literal?: ts.ObjectLiteralExpression;
   /**
    * A generic call's result whose type arguments the walk could not prove
    * unreduced: `type` is its instantiated type, `generic` the same type as
@@ -121,6 +123,9 @@ function skipValue(expression: ts.Expression): ts.Expression {
 
 const NO_ARMS: readonly Arm[] = [];
 
+/** Observation counters (C-41 review 2): member calls walked, expressions computed. */
+export const receiverStatistics = { calls: 0, expressions: 0 };
+
 export type ReceiverVerdict =
   /** The checker's member stands. */
   | undefined
@@ -139,6 +144,7 @@ export function receiverArms(
   const unreducedCache = new WeakMap<ts.Node, boolean>();
   const active = new Set<ts.Node>();
   const returnLists = new WeakMap<ts.Node, readonly ts.Expression[]>();
+  const mutationCache = new WeakMap<ts.Node, ts.Expression[] | null>();
   const checking = new Set<ts.Node>();
   const fileWrites = new WeakMap<
     ts.SourceFile,
@@ -185,8 +191,11 @@ export function receiverArms(
               ? known.array === arm.array
               : arm.items
                 ? known === arm
-                : !known.array &&
+                : arm.literal
+                  ? known.literal === arm.literal
+                  : !known.array &&
                   !known.items &&
+                  !known.literal &&
                   known.type === arm.type &&
                   known.generic === arm.generic,
           )
@@ -231,8 +240,16 @@ export function receiverArms(
   }
 
   function compute(node: ts.Expression): Arms {
+    receiverStatistics.expressions++;
     const value = skipValue(node);
     if (value !== node) return arms(value);
+    // `x as const` keeps the value (`[pick ? one : two] as const`); any
+    // other assertion writes a type.
+    if (
+      (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) &&
+      ts.isConstTypeReference(node.type)
+    )
+      return arms(node.expression);
     if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node))
       return leaf(node);
     if (ts.isConditionalExpression(node))
@@ -274,8 +291,9 @@ export function receiverArms(
     }
     if (ts.isArrayLiteralExpression(node))
       return [{ type: typeAt(node), array: node }];
+    if (ts.isObjectLiteralExpression(node))
+      return [{ type: typeAt(node), literal: node }];
     if (
-      ts.isObjectLiteralExpression(node) ||
       ts.isFunctionExpression(node) ||
       ts.isArrowFunction(node) ||
       ts.isClassExpression(node) ||
@@ -1319,6 +1337,7 @@ export function receiverArms(
       !!owner &&
       !owners[0]!.array &&
       !owners[0]!.items &&
+      !owners[0]!.literal &&
       owners[0]!.type === typeAt(owner)
     );
   }
@@ -1335,6 +1354,7 @@ export function receiverArms(
     const checked = agrees(owners, owner);
     return merge(
       owners.map((arm) => {
+        if (arm.literal) return literalMember(arm.literal, name, at);
         const type = checker.getApparentType(arm.type);
         const member = checker.getPropertyOfType(type, name);
         if (arm.generic) {
@@ -1408,6 +1428,168 @@ export function receiverArms(
     );
   }
 
+  /**
+   * The value of `name` on the object literal `node`: its last own
+   * property of that name, or what the spreads after it supply
+   * (`{ ...defaultHooks, ...opts }`, `{ ...(pick ? { r: one } : { r: two }) }`).
+   * A spread that may lack the member lets an earlier one supply it too.
+   */
+  function literalMember(
+    node: ts.ObjectLiteralExpression,
+    name: string,
+    at: ts.Node,
+  ): Arms {
+    const collected: Arms[] = [];
+    for (let index = node.properties.length - 1; index >= 0; index--) {
+      const property = node.properties[index]!;
+      if (ts.isSpreadAssignment(property)) {
+        const spread = arms(property.expression);
+        if (!spread) return undefined;
+        let always = spread.length > 0;
+        for (const arm of spread) {
+          const member = arm.literal
+            ? undefined
+            : checker.getPropertyOfType(
+                checker.getApparentType(arm.type),
+                name,
+              );
+          if (arm.literal) {
+            const inner = literalMember(arm.literal, name, at);
+            if (!inner) return undefined;
+            collected.push(inner);
+            // Whether this literal always has the member: unknown, so earlier
+            // properties count too unless it is its own property.
+            always &&= arm.literal.properties.some(
+              (item) =>
+                !ts.isSpreadAssignment(item) &&
+                item.name !== undefined &&
+                staticName(item.name) === name,
+            );
+            continue;
+          }
+          if (!member) {
+            always = false;
+            continue;
+          }
+          if (member.flags & ts.SymbolFlags.Optional) always = false;
+          collected.push(property_(arm, name, at));
+        }
+        if (always) return merge(collected);
+        continue;
+      }
+      const key = property.name && staticName(property.name);
+      if (key === undefined) return undefined;
+      if (key !== name) continue;
+      let own = checker.getSymbolAtLocation(property.name!);
+      if (ts.isShorthandPropertyAssignment(property))
+        own = checker.getShorthandAssignmentValueSymbol(property) ?? own;
+      if (
+        ts.isPropertyAssignment(property) ||
+        ts.isShorthandPropertyAssignment(property) ||
+        // A getter without a written type: its returns.
+        (ts.isGetAccessorDeclaration(property) && !property.type)
+      ) {
+        const value = declarationArms(property);
+        collected.push(
+          value === WRITTEN ? [{ type: typeAt(property.name!) }] : value,
+        );
+      } else
+        collected.push([
+          {
+            type: checker.getNonNullableType(
+              own ? checker.getTypeOfSymbol(own) : typeAt(property),
+            ),
+          },
+        ]);
+      return merge(collected);
+    }
+    return merge(collected);
+  }
+
+  /** A member of one (non-literal) arm, as `property` reads it. */
+  function property_(arm: Arm, name: string, at: ts.Node): Arms {
+    return property([{ ...arm, literal: undefined }], name, at);
+  }
+
+  /**
+   * Values an array literal bound to a name gets after it is created, in its
+   * file (`plugins.push(extra)`, `plugins[0] = x`): undefined when one is
+   * not followed (C-41 review 2).
+   */
+  function arrayMutations(
+    node: ts.ArrayLiteralExpression,
+  ): ts.Expression[] | undefined {
+    const known = mutationCache.get(node);
+    if (known !== undefined) return known ?? undefined;
+    let at: ts.Node = node;
+    while (
+      ts.isParenthesizedExpression(at.parent) ||
+      ts.isSatisfiesExpression(at.parent) ||
+      (ts.isAsExpression(at.parent) && ts.isConstTypeReference(at.parent.type))
+    )
+      at = at.parent;
+    const holder = at.parent;
+    if (
+      !ts.isVariableDeclaration(holder) ||
+      holder.initializer !== at ||
+      !ts.isIdentifier(holder.name)
+    ) {
+      mutationCache.set(node, []);
+      return [];
+    }
+    const own = checker.getSymbolAtLocation(holder.name);
+    const values: ts.Expression[] = [];
+    let unknown = false;
+    const visit = (child: ts.Node): void => {
+      if (unknown) return;
+      if (
+        ts.isIdentifier(child) &&
+        child !== holder.name &&
+        child.text === (holder.name as ts.Identifier).text &&
+        checker.getSymbolAtLocation(child) === own
+      ) {
+        const parent = child.parent;
+        if (ts.isPropertyAccessExpression(parent) && parent.expression === child) {
+          const call = parent.parent;
+          const method = parent.name.text;
+          if (ts.isCallExpression(call) && call.expression === parent) {
+            const added =
+              method === "push" || method === "unshift"
+                ? call.arguments
+                : method === "splice"
+                  ? call.arguments.slice(2)
+                  : method === "fill"
+                    ? call.arguments.slice(0, 1)
+                    : method === "copyWithin"
+                      ? []
+                      : undefined;
+            if (added) {
+              if (added.some(ts.isSpreadElement)) unknown = true;
+              else values.push(...added);
+            }
+          }
+        } else if (
+          ts.isElementAccessExpression(parent) &&
+          parent.expression === child &&
+          isWrite(parent)
+        ) {
+          const assignment = parent.parent;
+          if (
+            ts.isBinaryExpression(assignment) &&
+            assignment.left === parent &&
+            assignment.operatorToken.kind === ts.SyntaxKind.EqualsToken
+          )
+            values.push(assignment.right);
+          else unknown = true;
+        }
+      }
+      ts.forEachChild(child, visit);
+    };
+    visit(holder.getSourceFile());
+    mutationCache.set(node, unknown ? null : values);
+    return unknown ? undefined : values;
+  }
+
   /** The arms of an element (index `index` if known) of each of `owners`. */
   function element(
     owners: Arms,
@@ -1424,6 +1606,19 @@ export function receiverArms(
         if (arm.items) return merge([arm.items]);
         const array = arm.array;
         if (array) {
+          const added = arrayMutations(array);
+          if (!added) return undefined;
+          if (added.length)
+            return merge([
+              ...array.elements.map((item) =>
+                ts.isSpreadElement(item)
+                  ? element(arms(item.expression), undefined, item, item.expression)
+                  : ts.isOmittedExpression(item)
+                    ? NO_ARMS
+                    : arms(item),
+              ),
+              ...added.map(arms),
+            ]);
           if (
             index !== undefined &&
             index < array.elements.length &&
@@ -1476,6 +1671,7 @@ export function receiverArms(
     symbol: ts.Symbol,
   ): ReceiverVerdict => {
     if (name.startsWith("#")) return undefined;
+    receiverStatistics.calls++;
     let found: Arms;
     try {
       found = arms(receiver);

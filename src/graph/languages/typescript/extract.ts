@@ -1222,9 +1222,20 @@ export function extractFile(
         receiverReaders.set(program, arms);
       }
       const verdict = arms(receiver, found.name, found.symbol);
-      if (verdict === "unverified")
-        return { targets: [], reason: "receiver-unverified", receiver };
-      if (verdict) {
+      // A receiver the walk cannot follow: a member declared on an
+      // interface or class (or in a library) is one declaration whatever
+      // producer supplied the value, so the checker's answer stands. Only a
+      // member of an object or type literal, where each producer has its own
+      // declaration, is unresolved (C-41 review 2).
+      if (verdict === "unverified") {
+        const declarations = found.symbol.declarations ?? [];
+        const ownDeclaration = (declaration: ts.Declaration) =>
+          ts.isObjectLiteralExpression(declaration.parent) ||
+          ts.isTypeLiteralNode(declaration.parent);
+        if (!declarations.length || declarations.some(ownDeclaration))
+          return { targets: [], reason: "receiver-unverified", receiver };
+        visit(found.symbol, 0);
+      } else if (verdict) {
         for (const member of verdict) visit(member, 0);
         if (local)
           return {
