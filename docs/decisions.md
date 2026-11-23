@@ -3489,11 +3489,14 @@ a separate index daemon for now. See [C-45](changes/C-45.md).
 **Decided (C-53):** the indexer holds the parse results of every module
 that analyses until that module's analysis and writes each file once, with
 its analysed result (or as parsed when the module returns none for it).
-A run holding any file commits its run mark at the end of the parse write,
-where its first commit used to be, so a run started after that point finds
-it unfinished and takes over. **Why:** every Go and Rust file was stored as
-parsed and then replaced whole as analysed; on four pins that was 46-57% of
-the rows a cold index changed. **Trade:** held results stay in memory until
+A run holding files that main's parse write would have written commits its
+run mark at the end of the parse write, where its first commit used to be,
+so a run started after that point finds it unfinished and takes over
+(files of a module reusing its analysis, C-27 and C-36, were held before
+and claim nothing). **Why:** every Go and Rust file was stored as parsed
+and then replaced whole as analysed, and every TypeScript file as a
+placeholder and then as analysed; on four pins that was 46-57% of the rows
+a cold index changed. **Trade:** held results stay in memory until
 their module's analysis instead of being read back (helix peak +9%; lower
 on restic, cli/cli and dioxus). A run killed between the phases leaves its
 mark and no held file; the next run trusts no record, as before.
