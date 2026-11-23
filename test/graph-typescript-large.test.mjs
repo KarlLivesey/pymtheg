@@ -1039,27 +1039,33 @@ test("an expanding generic type beside a failed file is judged, not bounded", as
 // nothing bound, where `T` is judged by its constraint `Bad`; comparing the
 // declaration alone skipped that constraint and left these links clean.
 test("the expanding-type cut does not skip the constraint of an unbound parameter", async () => {
-  const result = await indexFiles({
-    "broken.ts": "export interface Bad { x: number; n: number }\nconst = ;\n",
-    "use.ts": [
-      'import type { Bad } from "./broken";',
-      "type Builder<T extends Bad> = {",
-      "  set(v: T): this;",
-      "  get(): T;",
-      "  add(k: string): Builder<T & { k: string }>;",
-      "};",
-      "declare const b: Builder<{ x: number; n: number }>;",
-      "declare function wrap<T>(x: { v: T }): T;",
-      "wrap({ v: b }).get().n.toFixed(); // plain",
-      "wrap({ v: b.add('a') }).get().n.toFixed(); // added",
-      "",
-    ].join("\n"),
-  });
-  for (const mark of ["// plain", "// added"]) {
+  // Each line in its own project: a failure memoised for one would hide a
+  // clean answer for the other. The second is a check with no `self`
+  // inside a check of the same literal that has one.
+  const cases = [
+    "wrap({ v: b }).get().n.toFixed(); // here",
+    "wrap({ v: b.add('a') }).get().n.toFixed(); // here",
+  ];
+  for (const line of cases) {
+    const result = await indexFiles({
+      "broken.ts": "export interface Bad { x: number; n: number }\nconst = ;\n",
+      "use.ts": [
+        'import type { Bad } from "./broken";',
+        "type Builder<T extends Bad> = {",
+        "  set(v: T): this;",
+        "  get(): T;",
+        "  add(k: string): Builder<T & { k: string }>;",
+        "};",
+        "declare const b: Builder<{ x: number; n: number }>;",
+        "declare function wrap<T>(x: { v: T }): T;",
+        line,
+        "",
+      ].join("\n"),
+    });
     for (const name of ["get", "toFixed"]) {
-      const link = linkOn(result, "use.ts", mark, name);
-      assert.equal(link.reason, "invalid-code", `${name} ${mark}`);
-      assert.equal(link.cause?.file, "broken.ts", `${name} ${mark}`);
+      const link = linkOn(result, "use.ts", "// here", name);
+      assert.equal(link.reason, "invalid-code", `${name}: ${line}`);
+      assert.equal(link.cause?.file, "broken.ts", `${name}: ${line}`);
       assert.ok(
         !link.cause.via.includes("judge-budget-exhausted"),
         link.cause.via,

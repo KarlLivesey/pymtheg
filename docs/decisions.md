@@ -3208,13 +3208,16 @@ coordinator terminates, as `check` does.
 ### C-47b Expanding generic types are judged
 
 A second check of a literal or function declaration that is still being
-checked with the same type parameters bound does not judge the declaration's member types again: it checks
+checked with the same type parameters bound and the same presence of
+`self` does not judge the declaration's member types again: it checks
 only the bound values those types name, and `self`, and records a cycle on
-the first check. For one set of bound parameters a declaration's own
+the first check. For one set of bound parameters and one presence of
+`self` a declaration's own
 failures do not depend on the values bound, because the judge reads bound
 values only through the parameters a node names and taint is an "or" over
-parts (an unbound parameter is judged by its constraint, so which
-parameters are bound is part of the comparison); so the first check
+parts (an unbound parameter is judged by its constraint, and with no
+`self` `this` is the declaration with nothing bound, so both are part of
+the comparison); so the first check
 decides them, and C-47's rule keeps the second check's answer provisional
 until the first check's group finishes. An expanding type (each level binds
 a larger value, as Vitest's `TestAPI.extend` does) is therefore judged

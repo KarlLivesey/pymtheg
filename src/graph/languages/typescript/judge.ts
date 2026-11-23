@@ -716,11 +716,16 @@ export function createJudge(input: JudgeInput): Judge {
       .map(idOf)
       .sort((a, b) => a - b)
       .join(",");
+  // Whether `self` is present is part of the anchor too: with no `self`,
+  // `this` is the declaration with nothing bound, a path a check that has a
+  // `self` never takes.
+  const shapeOf = (judged: { env: Env; self?: Judged | undefined }): string =>
+    `${boundOf(judged.env)}|${judged.self ? "s" : "-"}`;
   function anchorOf(judged: Judged): string | undefined {
     if (judged.k === "literal")
-      return `L${idOf(judged.node)}|${boundOf(judged.env)}`;
+      return `L${idOf(judged.node)}|${shapeOf(judged)}`;
     if (judged.k === "function")
-      return `F${judged.decls.map(idOf).join("+")}|${boundOf(judged.env)}`;
+      return `F${judged.decls.map(idOf).join("+")}|${shapeOf(judged)}`;
     return undefined;
   }
   function expandedParts(judged: Judged, outer: number): boolean {
