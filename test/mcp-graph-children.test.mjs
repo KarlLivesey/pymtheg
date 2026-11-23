@@ -172,3 +172,49 @@ wait();`,
     await rm(root, { recursive: true, force: true });
   }
 });
+
+for (const signal of ["SIGTERM", "SIGINT"])
+  test(`C-54: a CLI graph index stopped by ${signal} kills its toolchain children`, async () => {
+    const root = await mkdtemp(join(tmpdir(), "pym-cli-children-"));
+    try {
+      const { project, ready } = await trustedProject(root);
+      const cli = spawn(
+        process.execPath,
+        [
+          fileURLToPath(new URL("../dist/cli/main.js", import.meta.url)),
+          "graph",
+          "index",
+          "--root",
+          project,
+          "--json",
+        ],
+        { stdio: ["ignore", "ignore", "inherit"], env: process.env },
+      );
+      let exited = false;
+      const exit = new Promise((resolve) =>
+        cli.once("exit", (code, sig) => {
+          exited = true;
+          resolve({ code, sig });
+        }),
+      );
+      await until(
+        () => existsSync(ready) || exited,
+        "the fake go did not start",
+      );
+      assert.ok(
+        existsSync(ready),
+        "the CLI ended before the fake go was ready",
+      );
+      const pids = JSON.parse(readFileSync(ready, "utf8"));
+      cli.kill(signal);
+      const { code } = await exit;
+      // An interrupted graph command exits 130.
+      assert.equal(code, 130);
+      await until(
+        () => !running(pids.go) && !running(pids.child),
+        "a toolchain process outlived the CLI",
+      );
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
