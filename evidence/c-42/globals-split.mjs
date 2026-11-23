@@ -24,6 +24,10 @@
 // Also split by the set of declaring units and by name, and the SW-6 group
 // "one name declared by several library typings" (same last name, several
 // units) separately.
+// Check (C-42 review round 2 ruling): no site whose library units are only
+// the DOM, @types/node and the TypeScript library is unmarked by the conflict
+// rule (`unitConflict`); `environmentOnlyConflicts` counts them and must be
+// 0, with up to ten samples.
 // HEAD.json is a run of the measurement build (README): its stores equal the
 // candidate's but for the two fields that name why a set is not marked.
 // Usage: node globals-split.mjs SCRATCH MAIN.json HEAD.json BUILD > globals-split.json
@@ -69,6 +73,8 @@ const totals = { all: table(), sw6Group: table() };
 const byUnits = table();
 const byName = table();
 const byPin = table();
+const ENVIRONMENT = new Set(["dom", "node", "typescript-lib"]);
+const environmentOnlyConflicts = { total: 0, byPin: table(), samples: [] };
 for (const [id, mainRepo] of runs[0]) {
   const headRepo = runs[1].get(id);
   if (mainRepo.outcome !== "finished" || headRepo?.outcome !== "finished") continue;
@@ -77,6 +83,22 @@ for (const [id, mainRepo] of runs[0]) {
     db.close();
     return value;
   });
+  for (const link of after.values())
+    if (
+      link.data.unitConflict === true &&
+      link.libraries.length &&
+      link.libraries.every(({ ecosystem }) => ENVIRONMENT.has(ecosystem))
+    ) {
+      environmentOnlyConflicts.total++;
+      add(environmentOnlyConflicts.byPin, id);
+      if (environmentOnlyConflicts.samples.length < 10)
+        environmentOnlyConflicts.samples.push({
+          pin: id,
+          file: link.file,
+          name: link.name,
+          units: [...new Set(link.libraries.map(({ ecosystem, unit }) => `${ecosystem}:${unit}`))],
+        });
+    }
   for (const [key, link] of before) {
     if (link.resolution !== "ambiguous" || link.checkout || !link.libraries.length) continue;
     const now = after.get(key);
@@ -107,6 +129,7 @@ for (const [id, mainRepo] of runs[0]) {
 }
 const top = (rows, n) => Object.fromEntries(Object.entries(rows).sort((a, b) => b[1] - a[1]).slice(0, n));
 console.log(JSON.stringify({
+  environmentOnlyConflicts,
   totals,
   byPin,
   byUnits: Object.fromEntries(Object.entries(byUnits).map(([kind, rows]) => [kind, top(rows, 25)])),

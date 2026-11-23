@@ -225,6 +225,7 @@ interface NodeDiagnostics {
     token: undefined,
     nodes: readonly ts.Node[],
   ): readonly ts.Diagnostic[];
+  getSymbolAtLocation(node: ts.Node): ts.Symbol | undefined;
 }
 /**
  * C-42 (review N1): a second checker of `program` that type-checks
@@ -232,6 +233,62 @@ interface NodeDiagnostics {
  * program, so the compiler itself answers TS2403 there. It shares the
  * program's parsed and bound files; only its type caches are its own.
  */
+/** The identifier inside `node` that starts at `start`. */
+function nameAt(node: ts.Node, start: number): ts.Identifier | undefined {
+  const file = node.getSourceFile();
+  if (node.getStart(file) <= start && start < node.end) {
+    if (ts.isIdentifier(node) && node.getStart(file) === start) return node;
+    for (const child of node.getChildren(file)) {
+      const found = nameAt(child, start);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+/** Whether the compiler finds two declarations' type parameters different
+ * (TS2428): names, and constraints and defaults where both have one; a
+ * declaration may omit trailing parameters that have defaults. Compared as
+ * written. */
+function typeParametersDiffer(a: ts.Node, b: ts.Node): boolean {
+  const list = (node: ts.Node) =>
+    ts.isClassLike(node) || ts.isInterfaceDeclaration(node)
+      ? ts.getEffectiveTypeParameterDeclarations(node)
+      : [];
+  const left = list(a);
+  const right = list(b);
+  const text = (node: ts.Node | undefined) =>
+    node?.getText().replace(/\s+/g, "");
+  for (let i = 0; i < Math.min(left.length, right.length); i++) {
+    const [x, y] = [left[i]!, right[i]!];
+    if (x.name.text !== y.name.text) return true;
+    for (const [p, q] of [
+      [x.constraint, y.constraint],
+      [x.default, y.default],
+    ] as const)
+      if (p && q && text(p) !== text(q)) return true;
+  }
+  const longer = left.length > right.length ? left : right;
+  const shorter = Math.min(left.length, right.length);
+  return longer.slice(shorter).some((parameter) => !parameter.default);
+}
+/** Whether the compiler finds two declarations' modifiers different
+ * (TS2687): `?`, and private, protected, async, abstract, readonly and
+ * static. */
+function modifiersDiffer(a: ts.Node, b: ts.Node): boolean {
+  const optional = (node: ts.Node) =>
+    !!(node as { questionToken?: ts.Node }).questionToken;
+  const flags = (node: ts.Node) =>
+    ts.canHaveModifiers(node) || ts.isVariableDeclaration(node)
+      ? ts.getCombinedModifierFlags(node as ts.Declaration) &
+        (ts.ModifierFlags.Private |
+          ts.ModifierFlags.Protected |
+          ts.ModifierFlags.Async |
+          ts.ModifierFlags.Abstract |
+          ts.ModifierFlags.Readonly |
+          ts.ModifierFlags.Static)
+      : 0;
+  return optional(a) !== optional(b) || flags(a) !== flags(b);
+}
 const declarationCheckers = new WeakMap<ts.Program, NodeDiagnostics>();
 /** C-42: the unit pairs in conflict, once per program (`conflictingUnitPairs`). */
 const unitConflictsByProgram = new WeakMap<ts.Program, Set<string>>();
@@ -948,18 +1005,22 @@ export function extractFile(
    * - 2428, all declarations must have identical type parameters;
    * - 2687, all declarations must have identical modifiers.
    *
-   * A diagnostic names its declaration. A comparison (2403, 2717, 2428,
-   * 2687) is made against the first declaration, so a unit found different
-   * differs from every unit with no such diagnostic on the name (they agree
-   * with the first): it is paired with each of them (A and B agree, C
-   * differs: A–C and B–C). Two units both found different (DOM and Node
-   * against a first declaration in Workers) may agree with each other, so
-   * they are paired only when no unit agrees with the first. A duplicate
-   * (2300, 2451) names the other declaration in its related information
-   * ("was also declared here"): those two units are the pair, so two
-   * units' `fetch` functions are not paired by a third unit's `var fetch`;
-   * without related information, it is paired with every other unit. A
-   * declaration's unit is the one its library candidate names (its
+   * A conflict pairs exactly the two units whose declarations disagree:
+   * the unit of the declaration a diagnostic names, and the unit of the
+   * other declaration. The other is the diagnostic's related "was also
+   * declared here" location (2403, 2717 and the duplicates 2300, 2451).
+   * 2428 and 2687 carry none; there it is each declaration of the same
+   * symbol the compiler's own comparison finds different (type parameter
+   * names, constraints and defaults; the modifiers it compares and `?`).
+   * Only where neither finds one is the unit paired with the units that
+   * declare the name and are not themselves reported for it. Two units
+   * are never paired because both were reported against a third (DOM and
+   * Node against a first declaration in Workers). A conflict whose two
+   * declarations have the same unit key (two installed versions of
+   * `@types/node`; `lib.dom` and `lib.webworker`, both the unit `dom`)
+   * creates no pair: a link's target names the key, the same for both.
+   * Nor is it attributed to another unit: a declaration that disagrees
+   * with one of its own key pairs with no unit. A declaration's unit is the one its library candidate names (its
    * `targetOf` unit: `node:url` for a `global` block inside `declare module
    * "url"`), so conflicts and link unit sets use one key, and every
    * `node:*` unit counts as the one package `@types/node`. Computed once per
@@ -968,7 +1029,6 @@ export function extractFile(
    * and `typescript.conflictChecks` the declarations checked.
    */
   const CONFLICT_CODES = new Set([2403, 2717, 2300, 2451, 2428, 2687]);
-  const COMPARED = new Set([2403, 2717, 2428, 2687]);
   // Conflicts are between typings packages: every `node:*` unit is one
   // package, `@types/node` (its modules' globals are one environment).
   const unitKey = (unit: { ecosystem: string; unit: string }) =>
@@ -1084,9 +1144,10 @@ export function extractFile(
       return found;
     };
     let checked = 0;
-    // Per name, the units a comparison with the first declaration found
-    // different (2403, 2717, 2428, 2687).
-    const differing = new Map<string, Set<string>>();
+    // The diagnostics first: whether a declaration was reported decides
+    // what its symbol's other declarations are paired with.
+    const diagnosed: { diagnostic: ts.Diagnostic; own: GlobalDeclaration }[] = [];
+    const reportedAt = new Set<string>();
     for (const [file, entries] of byFile) {
       const statements = [
         ...new Set(
@@ -1105,40 +1166,82 @@ export function extractFile(
         if (!CONFLICT_CODES.has(diagnostic.code)) continue;
         const own = at(diagnostic.file, diagnostic.start);
         if (!own) continue;
-        const related = (diagnostic.relatedInformation ?? [])
-          .map((info) => at(info.file, info.start))
-          .filter(
-            (other): other is GlobalDeclaration =>
-              !!other && other.name === own.name,
-          );
-        if (COMPARED.has(diagnostic.code)) {
-          const units = differing.get(own.name) ?? new Set<string>();
-          units.add(own.unit);
-          differing.set(own.name, units);
-          continue;
-        }
-        // A duplicate (2300, 2451) names both declarations: pair those.
-        for (const other of related.length ? related : byName.get(own.name)!)
-          if (other.unit !== own.unit)
-            unitConflicts.add(pairKey(own.unit, other.unit));
+        diagnosed.push({ diagnostic, own });
+        reportedAt.add(`${diagnostic.file!.fileName}\0${diagnostic.start}`);
       }
     }
-    // A comparison is with the first declaration: a unit found different
-    // differs from every unit that agrees with the first (no diagnostic on
-    // its declarations), not only from the first's. Two units both found
-    // different may agree with each other, so they are paired only when
-    // every unit declaring the name was found different.
-    for (const [name, found] of differing) {
-      const agreeing = new Set(
-        byName
-          .get(name)!
-          .map(({ unit }) => unit)
-          .filter((unit) => !found.has(unit)),
+    const reported = (declaration: ts.Declaration) => {
+      const name = ts.getNameOfDeclaration(declaration) ?? declaration;
+      const file = name.getSourceFile();
+      return reportedAt.has(`${file.fileName}\0${name.getStart(file)}`);
+    };
+    const enclosing = (declaration: ts.Node) =>
+      at(declaration.getSourceFile(), declaration.getStart());
+    // The declarations a diagnostic's declaration disagrees with.
+    const otherSides = ({
+      diagnostic,
+      own,
+    }: (typeof diagnosed)[number]): GlobalDeclaration[] => {
+      const name = nameAt(own.node, diagnostic.start!);
+      const declaration = name?.parent;
+      const declarations =
+        (name && declarationChecker.getSymbolAtLocation(name)?.declarations) ??
+        [];
+      const others = (diagnostic.relatedInformation ?? []).map((info) =>
+        at(info.file, info.start),
       );
-      const others = agreeing.size ? agreeing : found;
-      for (const unit of found)
-        for (const other of others)
-          if (other !== unit) unitConflicts.add(pairKey(unit, other));
+      if (declaration && (diagnostic.code === 2428 || diagnostic.code === 2687)) {
+        // Reported on declarations with no related location: the ones the
+        // compiler's comparison finds different are the other side.
+        const differs =
+          diagnostic.code === 2428 ? typeParametersDiffer : modifiersDiffer;
+        for (const other of declarations)
+          if (other !== declaration && differs(declaration, other))
+            others.push(enclosing(other));
+      } else if (diagnostic.code === 2403 || diagnostic.code === 2717)
+        // Compared with the first declaration: the declarations not
+        // reported agree with it, so they disagree with this one too.
+        for (const other of declarations)
+          if (other !== declaration && !reported(other))
+            others.push(enclosing(other));
+      return others.filter(
+        (other): other is GlobalDeclaration =>
+          !!other && other.name === own.name,
+      );
+    };
+    // Per name, the units reported, for a diagnostic with no other known.
+    const reportedUnits = new Map<string, Set<string>>();
+    for (const { own } of diagnosed) {
+      const units = reportedUnits.get(own.name) ?? new Set<string>();
+      units.add(own.unit);
+      reportedUnits.set(own.name, units);
+    }
+    for (const entry of diagnosed) {
+      const { own } = entry;
+      let others = otherSides(entry);
+      // A declaration that disagrees with one of its own unit key is a
+      // conflict inside the key: it makes no pair, with that unit or any
+      // other (see above).
+      if (others.some((other) => other.unit === own.unit)) continue;
+      if (!others.length) {
+        // No other declaration known: the disagreement is with the units not
+        // reported for the name, unless the unit itself declares the name
+        // again (the DOM and WebWorker libraries), where it may be inside
+        // the key.
+        const declaring = byName.get(own.name)!;
+        if (
+          declaring.some(
+            (other) => other.unit === own.unit && other.node !== own.node,
+          )
+        )
+          continue;
+        others = declaring.filter(
+          (other) => !reportedUnits.get(own.name)!.has(other.unit),
+        );
+      }
+      for (const other of others)
+        if (other.unit !== own.unit)
+          unitConflicts.add(pairKey(own.unit, other.unit));
     }
     count("typescript.conflictChecks", checked);
     // Cached only once complete: an exception leaves no partial answer.

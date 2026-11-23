@@ -1920,6 +1920,95 @@ test("two units that differ from the first declaration but agree with each other
   assert.equal(link.data.mergedGlobal, true);
 });
 
+// C-42 review round 2 ruling: a conflict pairs the two units whose
+// declarations disagree. Workers' Request is the first declaration; the
+// other two agree with each other and differ from it (the tRPC shape).
+test("two units reported against a third are each paired with it, not with each other", async () => {
+  const files = {
+    "tsconfig.json": config({
+      lib: ["es2022"],
+      types: ["env-workers", "env-web", "node"],
+    }),
+    ...typesPackage(
+      "env-workers",
+      "interface Request { cf: number }\ndeclare var Request: { new (): Request; workers: true };\ndeclare function cfOnly(): void;\n",
+    ),
+    ...typesPackage(
+      "env-web",
+      "interface Request { url: string }\ndeclare var Request: { new (): Request };\ndeclare function webAndNode(): void;\ndeclare function cfOnly(): void;\n",
+    ),
+    "node_modules/@types/node/package.json": manifest("@types/node", "20.0.0"),
+    "node_modules/@types/node/index.d.ts":
+      'declare module "undici" { global { var Request: { new (): Request }; function webAndNode(): void; function cfNode(): void; } }\n',
+    "src/main.ts": "webAndNode();\ncfOnly();\nexport {};\n",
+  };
+  // Web and Node agree with each other: not paired.
+  const agreeing = await globalsCase(files, "src/main.ts", "webAndNode");
+  assert.equal(agreeing.data.mergedGlobal, true);
+  // Workers and Web disagree: paired.
+  const differing = await globalsCase(files, "src/main.ts", "cfOnly");
+  assert.equal(differing.data.mergedGlobal, undefined);
+});
+
+// A conflict inside one unit key creates no pair, and is attributed to no
+// other unit: two installed versions of @types/node (Dexie), and the DOM
+// and WebWorker libraries, both the unit `dom` (vitest's web-worker
+// package).
+test("two installed versions of @types/node in conflict leave a merged global marked", async () => {
+  const nodeTypes = (version, n) => ({
+    "package.json": manifest("@types/node", version),
+    "index.d.ts": `declare module "url" { global { var dual: { n: ${n} }; function helper(): void; } }\n`,
+  });
+  const files = {
+    "tsconfig.json": config({ lib: ["es2022"], types: ["node", "env-pkg", "env-b"] }),
+    ...Object.fromEntries(
+      Object.entries(nodeTypes("20.0.0", "number")).map(([k, v]) => [
+        `node_modules/@types/node/${k}`,
+        v,
+      ]),
+    ),
+    ...typesPackage("env-pkg", '/// <reference types="node" />\nexport {};\n'),
+    ...Object.fromEntries(
+      Object.entries(nodeTypes("18.0.0", "string")).map(([k, v]) => [
+        `node_modules/env-pkg/node_modules/@types/node/${k}`,
+        v,
+      ]),
+    ),
+    // Agrees with the first @types/node, so differs from the second.
+    ...typesPackage(
+      "env-b",
+      "declare var dual: { n: number };\ndeclare function helper(): void;\n",
+    ),
+    "src/main.ts": "helper();\nexport {};\n",
+  };
+  const link = await globalsCase(files, "src/main.ts", "helper");
+  assert.equal(link.data.mergedGlobal, true);
+});
+
+test("the DOM and WebWorker libraries in conflict leave a merged global of the DOM and Node marked", async () => {
+  const link = await globalsCase(
+    {
+      "tsconfig.json": config({
+        lib: ["es2022", "dom", "webworker"],
+        types: ["node"],
+      }),
+      "node_modules/@types/node/package.json": manifest("@types/node", "20.0.0"),
+      "node_modules/@types/node/index.d.ts": [
+        "export {};",
+        "declare global {",
+        "  interface Console { log(...data: any[]): void }",
+        "  var console: Console;",
+        "}",
+        "",
+      ].join("\n"),
+      "src/main.ts": 'console.log("x");\nexport {};\n',
+    },
+    "src/main.ts",
+    "console.log",
+  );
+  assert.equal(link.data.mergedGlobal, true);
+});
+
 test("the units in conflict are computed once per program, not once per file", async () => {
   const { graphWork, resetGraphWork } = await import("../dist/graph/work.js");
   resetGraphWork();
