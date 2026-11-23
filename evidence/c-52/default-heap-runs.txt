@@ -1,0 +1,6 @@
+Command exited with non-zero status 134
+5104056 4697.43
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+Command exited with non-zero status 134
+5092168 4522.44
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory

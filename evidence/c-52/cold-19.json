@@ -1,0 +1,211 @@
+[
+ {
+  "pin": "changesets/changesets",
+  "before": {
+   "wallSeconds": 14.754,
+   "peakMiB": 936
+  },
+  "after": {
+   "wallSeconds": 14.041,
+   "peakMiB": 914
+  }
+ },
+ {
+  "pin": "colinhacks/zod",
+  "before": {
+   "wallSeconds": 69.097,
+   "peakMiB": 2567
+  },
+  "after": {
+   "wallSeconds": 77.052,
+   "peakMiB": 2183
+  }
+ },
+ {
+  "pin": "dexie/Dexie.js",
+  "before": {
+   "wallSeconds": 51.497,
+   "peakMiB": 1306
+  },
+  "after": {
+   "wallSeconds": 55.382,
+   "peakMiB": 1235
+  }
+ },
+ {
+  "pin": "excalidraw/excalidraw",
+  "before": {
+   "wallSeconds": 155.108,
+   "peakMiB": 2867
+  },
+  "after": {
+   "wallSeconds": 154.725,
+   "peakMiB": 3195
+  }
+ },
+ {
+  "pin": "honojs/hono",
+  "before": {
+   "wallSeconds": 62.801,
+   "peakMiB": 1715
+  },
+  "after": {
+   "wallSeconds": 56.309,
+   "peakMiB": 1702
+  }
+ },
+ {
+  "pin": "mermaid-js/mermaid",
+  "before": {
+   "wallSeconds": 130.83,
+   "peakMiB": 2965
+  },
+  "after": {
+   "wallSeconds": 148.484,
+   "peakMiB": 2949
+  }
+ },
+ {
+  "pin": "nestjs/nest",
+  "before": {
+   "wallSeconds": 414.403,
+   "peakMiB": 2697
+  },
+  "after": {
+   "wallSeconds": 445.881,
+   "peakMiB": 2848
+  }
+ },
+ {
+  "pin": "oclif/core",
+  "before": {
+   "wallSeconds": 19.392,
+   "peakMiB": 1029
+  },
+  "after": {
+   "wallSeconds": 23.678,
+   "peakMiB": 1064
+  }
+ },
+ {
+  "pin": "pingdotgg/t3code",
+  "before": {
+   "wallSeconds": 160.663,
+   "peakMiB": 3514
+  },
+  "after": {
+   "wallSeconds": 203.251,
+   "peakMiB": 3237
+  }
+ },
+ {
+  "pin": "pmndrs/zustand",
+  "before": {
+   "wallSeconds": 9.246,
+   "peakMiB": 653
+  },
+  "after": {
+   "wallSeconds": 19.099,
+   "peakMiB": 652
+  }
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "before": {
+   "wallSeconds": 45.253,
+   "peakMiB": 1318
+  },
+  "after": {
+   "wallSeconds": 52.229,
+   "peakMiB": 1608
+  }
+ },
+ {
+  "pin": "react-hook-form/react-hook-form",
+  "before": {
+   "wallSeconds": 34.197,
+   "peakMiB": 1289
+  },
+  "after": {
+   "wallSeconds": 30.667,
+   "peakMiB": 1303
+  }
+ },
+ {
+  "pin": "reduxjs/redux-toolkit",
+  "before": {
+   "wallSeconds": 74.908,
+   "peakMiB": 1740
+  },
+  "after": {
+   "wallSeconds": 74.612,
+   "peakMiB": 1896
+  }
+ },
+ {
+  "pin": "trpc/trpc",
+  "before": {
+   "wallSeconds": 214.744,
+   "peakMiB": 2882
+  },
+  "after": {
+   "wallSeconds": 253.869,
+   "peakMiB": 2898
+  }
+ },
+ {
+  "pin": "vercel/turborepo",
+  "before": {
+   "wallSeconds": 898.399,
+   "peakMiB": 5305
+  },
+  "after": {
+   "wallSeconds": 1314.059,
+   "peakMiB": 5350
+  }
+ },
+ {
+  "pin": "vitejs/vite",
+  "before": {
+   "wallSeconds": 66.587,
+   "peakMiB": 1879
+  },
+  "after": {
+   "wallSeconds": 70.233,
+   "peakMiB": 1816
+  }
+ },
+ {
+  "pin": "vitest-dev/vitest",
+  "before": {
+   "wallSeconds": 160.934,
+   "peakMiB": 3078
+  },
+  "after": {
+   "wallSeconds": 194.012,
+   "peakMiB": 3106
+  }
+ },
+ {
+  "pin": "withastro/astro",
+  "before": {
+   "wallSeconds": 532.167,
+   "peakMiB": 3366
+  },
+  "after": {
+   "wallSeconds": 566.744,
+   "peakMiB": 3386
+  }
+ },
+ {
+  "pin": "yargs/yargs",
+  "before": {
+   "wallSeconds": 8.516,
+   "peakMiB": 540
+  },
+  "after": {
+   "wallSeconds": 15.425,
+   "peakMiB": 530
+  }
+ }
+]
