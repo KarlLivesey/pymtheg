@@ -1218,7 +1218,7 @@ export function extractFile(
     ) {
       let arms = receiverReaders.get(program);
       if (!arms) {
-        arms = receiverArms(checker, syntax.getAssignmentTargetKind);
+        arms = receiverArms(checker, syntax.getAssignmentTargetKind, program);
         receiverReaders.set(program, arms);
       }
       const verdict = arms(receiver, found.name, found.symbol);

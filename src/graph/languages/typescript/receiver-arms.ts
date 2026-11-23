@@ -38,6 +38,12 @@ interface Arm {
   /** An array literal producer, whose elements an element access walks. */
   readonly array?: ts.ArrayLiteralExpression;
   /**
+   * An array derived from another whose elements have several producers
+   * (`list.filter(…)`, `list.slice(1)`): those producers' arms, which any
+   * element of it can be (C-41 review 2).
+   */
+  readonly items?: readonly Arm[];
+  /**
    * A generic call's result whose type arguments the walk could not prove
    * unreduced: `type` is its instantiated type, `generic` the same type as
    * declared, type parameters left open. A member is taken from such an arm
@@ -72,6 +78,18 @@ const ELEMENT_CALLBACKS = new Set([
   "some",
   "every",
   "flatMap",
+]);
+
+/** Array methods that return one of the array's elements. */
+const ELEMENT_RESULTS = new Set(["find", "findLast", "at", "pop", "shift"]);
+/** Array methods that return an array of (some of) its elements. */
+const ARRAY_RESULTS = new Set([
+  "filter",
+  "slice",
+  "sort",
+  "reverse",
+  "toSorted",
+  "toReversed",
 ]);
 
 type Callable =
@@ -114,6 +132,7 @@ export type ReceiverVerdict =
 export function receiverArms(
   checker: ts.TypeChecker,
   isWrite: (node: ts.Node) => number,
+  program?: ts.Program,
 ) {
   const values = new WeakMap<ts.Node, Arms | null>();
   const declared = new WeakMap<ts.Node, DeclarationArms | null>();
@@ -126,6 +145,16 @@ export function receiverArms(
     Map<ts.Symbol, (ts.Expression | undefined)[]>
   >();
   let depth = 0;
+  /**
+   * Failures caused by the depth limit or a cycle: a result computed while
+   * one happened depends on where the walk started, so it is not cached
+   * (C-41 review 2).
+   */
+  let cuts = 0;
+  /** Every property write in the program, by property name (lazily). */
+  let propertyWrites:
+    | Map<string, { target: ts.Node; value: ts.Expression | undefined }[]>
+    | undefined;
 
   const typeAt = (node: ts.Node) =>
     checker.getNonNullableType(checker.getTypeAtLocation(node));
@@ -144,17 +173,22 @@ export function receiverArms(
     for (const list of lists) {
       if (!list) return undefined;
       for (const found of list) {
-        if (!found.array && nullish(found.type)) continue;
+        if (!found.array && !found.items && nullish(found.type)) continue;
         // A primitive literal is its primitive: no member differs.
         const arm =
-          !found.array && found.type.flags & ts.TypeFlags.Literal
+          !found.array && !found.items && found.type.flags & ts.TypeFlags.Literal
             ? { type: checker.getBaseTypeOfLiteralType(found.type) }
             : found;
         if (
           arms.some((known) =>
             arm.array
               ? known.array === arm.array
-              : known.type === arm.type && known.generic === arm.generic,
+              : arm.items
+                ? known === arm
+                : !known.array &&
+                  !known.items &&
+                  known.type === arm.type &&
+                  known.generic === arm.generic,
           )
         )
           continue;
@@ -173,12 +207,17 @@ export function receiverArms(
   ): T | undefined {
     const known = cache.get(node);
     if (known !== undefined) return known === null ? undefined : known;
-    if (active.has(node) || depth >= MAX_DEPTH) return undefined;
+    if (active.has(node) || depth >= MAX_DEPTH) {
+      cuts++;
+      return undefined;
+    }
     active.add(node);
     depth++;
+    const before = cuts;
     try {
       const result = compute();
-      cache.set(node, result === undefined ? null : result);
+      if (result !== undefined || cuts === before)
+        cache.set(node, result === undefined ? null : result);
       return result;
     } finally {
       depth--;
@@ -271,7 +310,15 @@ export function receiverArms(
     if (ts.isYieldExpression(node)) return leaf(node);
     if (ts.isAwaitExpression(node)) {
       const inner = arms(node.expression);
-      return inner && inner.length <= 1 ? leaf(node) : undefined;
+      if (!inner || inner.length > 1) return undefined;
+      // A generic result stays one (`await load(pick ? a : b)`).
+      const generic = inner[0]?.generic;
+      if (generic) {
+        const awaited = checker.getAwaitedType(generic);
+        return awaited ? [{ type: typeAt(node), generic: awaited }] : undefined;
+      }
+      if (inner[0] && (inner[0].array || inner[0].items)) return inner;
+      return leaf(node);
     }
     if (ts.isIdentifier(node)) return identifier(node);
     if (ts.isPropertyAccessExpression(node))
@@ -439,11 +486,22 @@ export function receiverArms(
     if (ts.isGetAccessorDeclaration(declaration))
       return declaration.type ? WRITTEN : returned(declaration);
     if (ts.isPropertyDeclaration(declaration)) {
-      if (declaration.type || !declaration.initializer) return WRITTEN;
-      return arms(declaration.initializer);
+      if (declaration.type) return WRITTEN;
+      // Its initializer and every write to it anywhere in the program
+      // (`this.h = b` in another method, a constructor's branches).
+      const writes = memberWrites(declaration);
+      if (!writes) return undefined;
+      const values = declaration.initializer
+        ? [declaration.initializer, ...writes]
+        : writes;
+      if (!values.length) return WRITTEN;
+      return merge(values.map(arms));
     }
-    if (ts.isPropertyAssignment(declaration))
-      return arms(declaration.initializer);
+    if (ts.isPropertyAssignment(declaration)) {
+      const writes = memberWrites(declaration);
+      if (!writes) return undefined;
+      return merge([declaration.initializer, ...writes].map(arms));
+    }
     if (ts.isShorthandPropertyAssignment(declaration)) {
       let value = checker.getShorthandAssignmentValueSymbol(declaration);
       if (value && value.flags & ts.SymbolFlags.Alias)
@@ -461,6 +519,87 @@ export function receiverArms(
     if (ts.isParameter(declaration)) return parameter(declaration);
     if (ts.isBindingElement(declaration)) return binding(declaration);
     return undefined;
+  }
+
+  /**
+   * The values written to the member `declaration` declares, anywhere in
+   * the program (`state.h = b`, `this.h = b`): undefined when one is not a
+   * plain assignment, or the program is not known.
+   */
+  function memberWrites(
+    declaration: ts.PropertyDeclaration | ts.PropertyAssignment,
+  ): ts.Expression[] | undefined {
+    const name = staticName(declaration.name);
+    if (name === undefined || !program) return undefined;
+    const own = checker.getSymbolAtLocation(declaration.name);
+    if (!own) return undefined;
+    if (!propertyWrites) {
+      const found = new Map<
+        string,
+        { target: ts.Node; value: ts.Expression | undefined }[]
+      >();
+      const scan = (node: ts.Node): void => {
+        if (
+          (ts.isPropertyAccessExpression(node) ||
+            ts.isElementAccessExpression(node)) &&
+          isWrite(node)
+        ) {
+          const key = ts.isPropertyAccessExpression(node)
+            ? node.name.text
+            : ts.isStringLiteralLike(node.argumentExpression) ||
+                ts.isNumericLiteral(node.argumentExpression)
+              ? node.argumentExpression.text
+              : undefined;
+          const parent = node.parent;
+          const value =
+            ts.isBinaryExpression(parent) &&
+            parent.left === node &&
+            (parent.operatorToken.kind === ts.SyntaxKind.EqualsToken ||
+              parent.operatorToken.kind ===
+                ts.SyntaxKind.QuestionQuestionEqualsToken ||
+              parent.operatorToken.kind === ts.SyntaxKind.BarBarEqualsToken ||
+              parent.operatorToken.kind ===
+                ts.SyntaxKind.AmpersandAmpersandEqualsToken)
+              ? parent.right
+              : undefined;
+          // A computed key: kept with its receiver, which decides below
+          // whether the member could be the one written.
+          const list = found.get(key ?? "\0") ?? [];
+          list.push({
+            target:
+              key === undefined
+                ? node.expression
+                : ts.isPropertyAccessExpression(node)
+                  ? node.name
+                  : node.argumentExpression,
+            value,
+          });
+          found.set(key ?? "\0", list);
+        }
+        ts.forEachChild(node, scan);
+      };
+      for (const file of program.getSourceFiles())
+        if (!file.isDeclarationFile) scan(file);
+      propertyWrites = found;
+    }
+    // A write through a computed key to an object that has this member.
+    for (const { target } of propertyWrites.get("\0") ?? []) {
+      const member = checker.getPropertyOfType(
+        checker.getApparentType(checker.getTypeAtLocation(target)),
+        name,
+      );
+      if (member === own) return undefined;
+    }
+    const values: ts.Expression[] = [];
+    for (const { target, value } of propertyWrites.get(name) ?? []) {
+      let written = checker.getSymbolAtLocation(target);
+      if (written && written.flags & ts.SymbolFlags.Alias)
+        written = checker.getAliasedSymbol(written);
+      if (written !== own) continue;
+      if (!value) return undefined;
+      values.push(value);
+    }
+    return values;
   }
 
   function variable(declaration: ts.VariableDeclaration): DeclarationArms {
@@ -564,8 +703,11 @@ export function receiverArms(
       ts.isFunctionExpression(fn) ||
       ts.isArrowFunction(fn) ||
       (ts.isMethodDeclaration(fn) && ts.isObjectLiteralExpression(fn.parent));
-    if (!contextual)
-      return declaration.initializer ? arms(declaration.initializer) : WRITTEN;
+    if (!contextual) {
+      if (!declaration.initializer) return WRITTEN;
+      // A default is one producer; every call site's argument is another.
+      return callSiteArms(declaration);
+    }
     const own = callbackElement(declaration);
     if (own !== null) return own;
     if (contextOf(fn)) return WRITTEN;
@@ -575,6 +717,58 @@ export function receiverArms(
     return declared
       ? [{ type: typeAt(declaration.name), generic: declared }]
       : undefined;
+  }
+
+  /**
+   * The values a defaulted parameter of a plain, unexported function can
+   * hold: its default where a call omits it, and each call's argument. A
+   * method, a constructor, an exported function or one used other than by
+   * direct calls in its file has call sites the walk cannot enumerate:
+   * unresolved (C-41 review 2).
+   */
+  function callSiteArms(declaration: ts.ParameterDeclaration): Arms {
+    const fn = declaration.parent;
+    if (
+      !ts.isFunctionDeclaration(fn) ||
+      !fn.name ||
+      ts.getCombinedModifierFlags(fn) & ts.ModifierFlags.Export
+    )
+      return undefined;
+    const index = fn.parameters.indexOf(declaration);
+    const own = checker.getSymbolAtLocation(fn.name);
+    if (!own) return undefined;
+    const file = fn.getSourceFile();
+    const values: ts.Expression[] = [];
+    let omitted = false;
+    let escapes = false;
+    const visit = (node: ts.Node): void => {
+      if (escapes) return;
+      if (
+        ts.isIdentifier(node) &&
+        node !== fn.name &&
+        node.text === fn.name!.text &&
+        checker.getSymbolAtLocation(node) === own
+      ) {
+        const call = node.parent;
+        if (
+          !ts.isCallExpression(call) ||
+          call.expression !== node ||
+          call.arguments.some(ts.isSpreadElement)
+        ) {
+          escapes = true;
+          return;
+        }
+        const argument = call.arguments[index];
+        if (argument) values.push(argument);
+        else omitted = true;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    // `export { f }` or `export default f` are references too.
+    if (escapes) return undefined;
+    if (omitted || !values.length) values.push(declaration.initializer!);
+    return merge(values.map(arms));
   }
 
   /**
@@ -748,6 +942,18 @@ export function receiverArms(
   function callAccepted(call: ts.CallExpression | ts.NewExpression): boolean {
     const callee = arms(call.expression);
     if (!callee || callee.length > 1) return false;
+    // A method of a generic result (`load(…).then(v => …)`) or of an array
+    // whose elements have several producers: its callback's parameters
+    // are typed from the reduced type argument (C-41 review 2).
+    if (callee[0]?.generic) return false;
+    if (ts.isPropertyAccessExpression(call.expression)) {
+      const owners = arms(call.expression.expression);
+      if (!owners) return false;
+      if (owners.some((arm) => arm.generic)) return false;
+      const elements = elementsOf(owners);
+      if (elements === undefined) return false;
+      if (elements.length > 1 && reducible(elements)) return false;
+    }
     if (call.typeArguments?.length) return true;
     const declaration = checker.getResolvedSignature(call)?.declaration;
     if (!declaration || ts.isJSDocSignature(declaration)) return true;
@@ -777,26 +983,38 @@ export function receiverArms(
     call: ts.CallExpression | ts.NewExpression,
     skipFunctions = false,
   ): boolean {
+    // Inference unions what several arguments give one type parameter
+    // (`either(a, b)`): their arms together must not be reducible.
+    const together: Arms[] = [];
     for (const argument of call.arguments ?? []) {
       const value = skipValue(argument);
-      if (
-        skipFunctions &&
-        (ts.isFunctionExpression(value) || ts.isArrowFunction(value))
-      )
-        continue;
-      if (!unreduced(ts.isSpreadElement(value) ? value.expression : value))
-        return false;
+      const fn = ts.isFunctionExpression(value) || ts.isArrowFunction(value);
+      if (skipFunctions && fn) continue;
+      const inner = ts.isSpreadElement(value) ? value.expression : value;
+      if (!unreduced(inner)) return false;
+      if (fn) {
+        if (!value.type) together.push(returned(value));
+      } else if (ts.isSpreadElement(value)) {
+        const spread = arms(inner);
+        together.push(spread && elementsOf(spread));
+      } else if (!ts.isObjectLiteralExpression(inner))
+        together.push(expandArrays(arms(inner)));
     }
-    return true;
+    const all = merge(together);
+    return !!all && !reducible(all);
   }
 
   /** Whether the value of `expression` (and what a generic infers from it) is one arm. */
   function unreduced(expression: ts.Expression): boolean {
     const known = unreducedCache.get(expression);
     if (known !== undefined) return known;
-    if (checking.has(expression) || depth >= MAX_DEPTH) return false;
+    if (checking.has(expression) || depth >= MAX_DEPTH) {
+      cuts++;
+      return false;
+    }
     checking.add(expression);
     depth++;
+    const before = cuts;
     let result: boolean;
     try {
       const value = skipValue(expression);
@@ -826,14 +1044,15 @@ export function receiverArms(
           result = !!out && !reducible(out);
         }
       } else {
-        const out = arms(value);
+        // An array value counts by its elements (`head(list)`).
+        const out = expandArrays(arms(value));
         result = !!out && !reducible(out);
       }
     } finally {
       depth--;
       checking.delete(expression);
     }
-    unreducedCache.set(expression, result);
+    if (result || cuts === before) unreducedCache.set(expression, result);
     return result;
   }
 
@@ -900,6 +1119,28 @@ export function receiverArms(
       ]);
     }
     return result;
+  }
+
+  /** The element producers' arms of array arms; undefined if any is not one. */
+  function elementsOf(owners: readonly Arm[]): Arms {
+    if (!owners.some((arm) => arm.array || arm.items)) return [];
+    return merge(
+      owners.map((arm): Arms => {
+        if (arm.items) return arm.items;
+        if (arm.array) return element([arm], undefined, arm.array);
+        return undefined;
+      }),
+    );
+  }
+
+  /** Arms with every array arm replaced by its elements' arms. */
+  function expandArrays(found: Arms): Arms {
+    if (!found) return undefined;
+    return merge(
+      found.map((arm): Arms =>
+        arm.array || arm.items ? elementsOf([arm]) : [arm],
+      ),
+    );
   }
 
   /** The value returned by calling the body `fn`, as arms. */
@@ -979,6 +1220,22 @@ export function receiverArms(
         ts.isStringLiteralLike(node.arguments[0]!))
     )
       return leaf(node);
+    // A method of an array whose elements have several producers: an
+    // element-returning method gives those producers, an array-returning one
+    // an array of them, any other is not followed (C-41 review 2).
+    if (ts.isPropertyAccessExpression(callee)) {
+      const owners = arms(callee.expression);
+      if (!owners) return undefined;
+      const elements = elementsOf(owners);
+      if (elements === undefined) return undefined;
+      if (elements.length > 1 && reducible(elements)) {
+        const method = callee.name.text;
+        if (ELEMENT_RESULTS.has(method)) return elements;
+        if (ARRAY_RESULTS.has(method))
+          return [{ type: typeAt(node), items: elements }];
+        return undefined;
+      }
+    }
     const callees = arms(callee);
     if (!callees) return undefined;
     if (callees.length > 1)
@@ -1061,6 +1318,7 @@ export function receiverArms(
       owners.length === 1 &&
       !!owner &&
       !owners[0]!.array &&
+      !owners[0]!.items &&
       owners[0]!.type === typeAt(owner)
     );
   }
@@ -1163,6 +1421,7 @@ export function receiverArms(
     return merge(
       owners.map((arm): Arms => {
         if (arm.generic) return undefined;
+        if (arm.items) return merge([arm.items]);
         const array = arm.array;
         if (array) {
           if (
@@ -1237,7 +1496,7 @@ export function receiverArms(
     const parts = (type: ts.Type) => (type.isUnion() ? type.types : [type]);
     const own = new Set(parts(at));
     const split: Arm[] = found.flatMap((arm) =>
-      arm.generic || arm.array
+      arm.generic || arm.array || arm.items
         ? [arm]
         : parts(arm.type)
             .filter((part) => !nullish(part))
@@ -1252,7 +1511,7 @@ export function receiverArms(
       ts.TypeFlags.BooleanLike |
       ts.TypeFlags.ESSymbolLike;
     const held = split.filter((arm) => {
-      if (arm.generic || arm.array) return true;
+      if (arm.generic || arm.array || arm.items) return true;
       const primitive = arm.type.flags & PRIMITIVE;
       if (primitive) return [...own].some((part) => part.flags & primitive);
       return checker.isTypeAssignableTo(arm.type, at);
@@ -1265,7 +1524,9 @@ export function receiverArms(
     // The checker's own type, part for part: its answer stands.
     if (
       kept.length === own.size &&
-      kept.every((arm) => !arm.generic && !arm.array && own.has(arm.type))
+      kept.every(
+        (arm) => !arm.generic && !arm.array && !arm.items && own.has(arm.type),
+      )
     )
       return undefined;
     const members: ts.Symbol[] = [];
