@@ -429,3 +429,65 @@ test("each change of trust drops what the session kept: source-only, trusted, re
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+// C-55: Go's decoded inputs are kept by the session between runs; the
+// store's record of written paths says what to read again.
+test("Go's kept inputs are reused for an edit, and dropped when another process indexes in between", async () => {
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go": "package a\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() }\n',
+    "c/c.go": "package c\n\nfunc C() int { return 3 }\n",
+  });
+  try {
+    const registry = await discoverLanguages();
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    // The cold run wrote every file after reading its inputs, and a run
+    // with no scope reads no projection: the first edit reads them again.
+    write("c/c.go", "package c\n\nfunc C() int { return 6 }\n");
+    assert.equal((await index(root, session)).sync.complete, true);
+    // A body edit: everything but the edited file comes from what was kept.
+    write("c/c.go", "package c\n\nfunc C() int { return 4 }\n");
+    resetGraphWork();
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.ok(
+      (graphWork.counts["kept.input.recordsReused"] ?? 0) >= 2,
+      JSON.stringify(graphWork.counts),
+    );
+    assert.ok((graphWork.counts["kept.input.symbolsReused"] ?? 0) > 0);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+    // Another process renames a's function and indexes; then the session
+    // indexes an edit of c alone.
+    write("a/a.go", "package a\n\nfunc Hello2() int { return 1 }\n");
+    write(
+      "b/b.go",
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello2() }\n',
+    );
+    const other = spawnSync(
+      process.execPath,
+      [
+        new URL("./fixtures/graph-session/go-index-child.mjs", import.meta.url)
+          .pathname,
+        root,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(other.status, 0, other.stderr);
+    // The session's edit of c calls the renamed function: with a stale
+    // a.go record or stale symbols the call would not resolve as cold.
+    write(
+      "c/c.go",
+      'package c\n\nimport "example.com/m/a"\n\nfunc C() int { return a.Hello2() }\n',
+    );
+    resetGraphWork();
+    const dropped = session.counts.dropped;
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.equal(session.counts.dropped, dropped + 1, "the session dropped");
+    assert.equal(graphWork.counts["kept.input.recordsReused"] ?? 0, 0);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
