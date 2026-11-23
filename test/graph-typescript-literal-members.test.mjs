@@ -710,3 +710,80 @@ test("a call that is not on a declared member of a literal stays unlinked", asyn
     `mapped type member: ${got["mapped.a();"]}`,
   );
 });
+
+/**
+ * C-41 review 2: for every step kind the walk follows, a value with two
+ * producers never gives a definite link to one producer's member. Each case
+ * is one file; `pick`, `k`, `one`, `two`, `a`, `b` as the reviewer's fixture.
+ */
+const TWO_PRODUCERS = {
+  // B1: array methods and iterators.
+  "find on a literal": "[a, b].find((x) => !!k)!.run();",
+  "find on a const array": "const list = [a, b];\nlist.find((x) => !!k)!.run();",
+  "at": "const list = [a, b];\nlist.at(-1)!.run();",
+  "filter then index": "const list = [a, b];\nlist.filter((x) => !!k)[0]!.run();",
+  "pop": "const list = [a, b];\nlist.pop()!.run();",
+  "slice then index": "const list = [a, b];\nlist.slice(1)[0]!.run();",
+  "values iterator": "const list = [a, b];\nlist.values().next().value!.run();",
+  "entries": "const list = [a, b];\nfor (const [, f] of list.entries()) f.run();",
+  "reduce": "const list = [a, b];\nlist.reduce((x, y) => y).run();",
+  "spread then sort": "const list = [a, b];\n[...list].sort()[0]!.run();",
+  "Array.from": "const list = [a, b];\nArray.from(list)[0]!.run();",
+  "object literals in an array": "const formats = [one, two];\nformats.find((f) => !!k)!.run();",
+  // B2: parameter defaults.
+  "a default and a call": "function use(x = a) { x.run(); }\nuse(b);",
+  "a destructured default": "function opts({ h = a } = {}) { h.run(); }\nopts({ h: b });",
+  "a constructor parameter property":
+    "class P { constructor(private h = one) {} go() { this.h.run(); } }\nnew P(two);",
+  // B3: fields and properties.
+  "a field written elsewhere":
+    "class S { h = a; swap() { this.h = b; } go() { this.h.run(); } }",
+  "a property written elsewhere": "const state = { h: a };\nstate.h = b;\nstate.h.run();",
+  "a field set in constructor branches":
+    "class S { h; constructor() { if (pick) this.h = one; else this.h = two; } go() { this.h.run(); } }",
+  // B4: generic calls.
+  "two arguments to one type parameter":
+    "declare function either<T>(x: T, y: T): T;\neither(a, b).run();",
+  "two object literals to one type parameter":
+    "declare function either<T>(x: T, y: T): T;\neither(one, two).run();",
+  "an optional first argument":
+    "declare function orElse<T>(x: T | undefined, y: T): T;\norElse(pick ? one : undefined, two).run();",
+  "a rest parameter": "declare function firstOf<T>(...xs: T[]): T;\nfirstOf(one, two).run();",
+  "an array argument": "declare function head<T>(xs: T[]): T;\nconst list = [a, b];\nhead(list).run();",
+  "a Set of the elements": "const list = [a, b];\nnew Set(list).values().next().value!.run();",
+  // B5: await and promise callbacks.
+  "await of a generic result":
+    "declare function load<T>(v: T): Promise<T>;\nasync function go() { (await load(pick ? a : b)).run(); }",
+  "a promise callback":
+    "declare function load<T>(v: T): Promise<T>;\nload(pick ? a : b).then((v) => v.run());",
+  // Kinds the first round already covered, kept as a guard.
+  "a conditional": "(pick ? a : b).run();",
+  "nullish coalescing": "declare const maybe: typeof a | undefined;\n(maybe ?? b).run();",
+  "an element by computed index": "const list = [a, b];\nlist[k.length]!.run();",
+  "for-of": "const list = [a, b];\nfor (const x of list) x.run();",
+  "forEach": "const list = [a, b];\nlist.forEach((x) => x.run());",
+  "a reassigned let": "let x = a;\nif (pick) x = b;\nx.run();",
+  "an inferred return": "function choose() { if (pick) return a; return b; }\nchoose().run();",
+};
+
+test("no step kind gives a definite link to one of two producers", async () => {
+  const header = [
+    "declare const pick: boolean;",
+    "declare const k: string;",
+    "const one = { run() {} };",
+    "const two = { run() {} };",
+    "declare const a: { run(): void };",
+    "declare const b: { run(): void };",
+    "",
+  ].join("\n");
+  const failures = [];
+  for (const [kind, body] of Object.entries(TWO_PRODUCERS)) {
+    const got = await outcomes({ "src/use.ts": header + body + "\n" }, "src/use.ts", true);
+    for (const [key, outcome] of Object.entries(got)) {
+      if (!/@.*\brun$/.test(key)) continue;
+      if (typeof outcome === "string" && outcome.startsWith("src/"))
+        failures.push(`${kind}: ${key} -> ${outcome}`);
+    }
+  }
+  assert.deepEqual(failures, []);
+});
