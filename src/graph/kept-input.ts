@@ -167,7 +167,7 @@ export class KeptInputs {
           rows.set(path, oldProjection.get(path)!);
           this.bytes.set(
             `p:${path}`,
-            this.previousBytes(`p:${path}`, oldProjection.get(path)),
+            this.previousBytes(`p:${path}`, oldProjection.get(path)!),
           );
         }
       }
