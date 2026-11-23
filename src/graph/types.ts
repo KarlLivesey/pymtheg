@@ -192,6 +192,13 @@ export interface ResolutionContext {
   links: readonly GraphLink[];
   /** If present, return decisions and derived links only for these files. */
   resolutionFiles?: ReadonlySet<string>;
+  /**
+   * C-45: state this module kept from the session's last completed run,
+   * present when the index runs in a session. A value is returned only
+   * under the validity key it was kept with; the module's key must cover
+   * every input the value was computed from.
+   */
+  kept?: import("./session.js").KeptState;
 }
 /**
  * The opt-in toolchain route for one module (`graph.toolchain.<module id>` in
@@ -229,6 +236,8 @@ export interface ProjectAnalysisContext {
   previousFiles?: ReadonlyMap<string, GraphFile>;
   /** Includes deleted context paths. Analysis runs even when this list is empty. */
   changedContextFiles: readonly string[];
+  /** C-45: kept state, as for ResolutionContext.kept. */
+  kept?: import("./session.js").KeptState;
 }
 export interface AnalyzedFile {
   path: string;

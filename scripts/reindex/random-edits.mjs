@@ -4,6 +4,7 @@
 // a cold index of the same tree into a new store with the same project id;
 // the two stores must be identical row for row (dump.mjs).
 //   node scripts/reindex/random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json>
+import "../isolated-home.mjs";
 import { execFileSync } from "node:child_process";
 import {
   copyFileSync,
@@ -17,13 +18,14 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import ts from "typescript";
 import { compareRows, setPageCache, storeRows } from "./dump.mjs";
 
 const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
   process.argv.slice(2);
 if (!outArg)
   throw Error(
-    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command]",
+    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--scoped-mix]",
   );
 const dist = resolve(distArg);
 const expectedSteps = Number(countArg);
@@ -49,6 +51,13 @@ const temporary = storeDir && join(storeDir, `${name}.${seedArg}.sqlite`);
 // unchanged `graph index` that must verify without an index run and leave
 // the store's bytes as they were.
 const command = flags.includes("--command");
+// C-49: TypeScript edits also copy, remove and swap whole declarations,
+// members and object properties (same-named siblings) and insert a callback
+// holding a local (an anonymous-scoped symbol; a repeated insert is its
+// same-named sibling). A separate flag, so earlier seeds replay as they did.
+const siblings = flags.includes("--siblings");
+// C-36: --scoped-mix weights Rust edits to those that can keep the surface.
+const scopedMix = flags.includes("--scoped-mix");
 if (command && !temporary) throw Error("--command requires --store-dir");
 const cacheAt = flags.indexOf("--cache-pages");
 const cachePages = cacheAt < 0 ? undefined : Number(flags[cacheAt + 1]);
@@ -63,7 +72,12 @@ if (
 if (existsSync(base) && !resume) throw Error(`exists: ${base}`);
 mkdirSync(base, { recursive: true });
 if (!existsSync(root))
-  cpSync(join(scratch, "pins", name), root, { recursive: true });
+  // verbatimSymlinks: a pnpm install links packages by relative symlinks,
+  // which must point into the copy, not back into the pin.
+  cpSync(join(scratch, "pins", name), root, {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
 
 // Deterministic PRNG (mulberry32).
 let state = Number(seedArg) >>> 0;
@@ -133,7 +147,7 @@ const projectId =
 // initial graph. Keep that list for deterministic replay after an interruption.
 const signatureTargetPath = join(base, "signature-targets.json");
 let signatureTargets = [];
-if (repo.language === "go") {
+if (repo.language === "go" || repo.language === "rust") {
   if (!existsSync(signatureTargetPath)) {
     const db = new DatabaseSync(graph, { readOnly: true });
     try {
@@ -141,10 +155,10 @@ if (repo.language === "go") {
         .prepare(
           `SELECT DISTINCT s.file,s.name FROM graph_links l
         JOIN graph_symbols s ON s.id=l.target
-        WHERE l.module='go' AND l.kind='calls' AND s.kind='function' AND s.file!=l.file
+        WHERE l.module=? AND l.kind='calls' AND s.kind='function' AND s.file!=l.file
         ORDER BY s.file,s.name`,
         )
-        .all();
+        .all(repo.language);
       writeFileSync(signatureTargetPath, JSON.stringify(targets));
     } finally {
       db.close();
@@ -155,6 +169,82 @@ if (repo.language === "go") {
 // Edits that keep, move or break code: a comment line, a blank line, a
 // duplicated line, a deleted line, a no-op statement after an opening brace.
 const kinds = ["comment", "blank", "duplicate", "delete", "statement"];
+if (siblings) kinds.push("copy", "remove", "swap", "anonymous");
+
+/** A sibling edit of one statement, member or property list, or undefined. */
+function siblingEdit(kind, file, source) {
+  const syntax = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const lists = [];
+  const walk = (node) => {
+    const statements =
+      ts.isSourceFile(node) || ts.isBlock(node) || ts.isModuleBlock(node);
+    const list = statements
+      ? node.statements
+      : ts.isClassLike(node) ||
+          ts.isInterfaceDeclaration(node) ||
+          ts.isTypeLiteralNode(node)
+        ? node.members
+        : ts.isObjectLiteralExpression(node)
+          ? node.properties
+          : undefined;
+    if (list?.length)
+      lists.push({
+        list,
+        statements,
+        block: ts.isBlock(node),
+        comma: ts.isObjectLiteralExpression(node),
+      });
+    ts.forEachChild(node, walk);
+  };
+  walk(syntax);
+  // An anonymous-scoped local is a symbol only inside a declaration's
+  // body, so the callback goes into a block.
+  const usable = lists.filter((item) =>
+    kind === "swap"
+      ? item.list.length >= 2
+      : kind === "anonymous"
+        ? item.statements && item.block
+        : true,
+  );
+  if (!usable.length) return undefined;
+  const { list, comma } = pick(usable);
+  const at = Math.floor(random() * list.length);
+  const span = (node) => [node.getStart(syntax), node.end];
+  const [start, end] = span(list[at]);
+  const separator = comma ? ", " : "\n";
+  if (kind === "copy")
+    return (
+      source.slice(0, start) +
+      source.slice(start, end) +
+      separator +
+      source.slice(start)
+    );
+  if (kind === "remove") {
+    const stop = comma && source[end] === "," ? end + 1 : end;
+    return source.slice(0, start) + source.slice(stop);
+  }
+  if (kind === "anonymous")
+    return (
+      source.slice(0, start) +
+      "[0].forEach(() => { const c49 = () => 0; });\n" +
+      source.slice(start)
+    );
+  const first = Math.min(at, list.length - 2);
+  const [aStart, aEnd] = span(list[first]);
+  const [bStart, bEnd] = span(list[first + 1]);
+  return (
+    source.slice(0, aStart) +
+    source.slice(bStart, bEnd) +
+    source.slice(aEnd, bStart) +
+    source.slice(aStart, aEnd) +
+    source.slice(bEnd)
+  );
+}
 const statement = { go: "_ = 0", rust: "let _ = 0;", typescript: "void 0;" }[
   repo.language
 ];
@@ -325,6 +415,184 @@ function goEdit(step, file, source) {
   return { file, kind: "comment", text: source + "\n// Random edit.\n" };
 }
 
+// C-36: Rust edits weighted to what other files read: signatures, imports,
+// macros, module structure, attributes and file membership.
+const rustKinds = [
+  "body",
+  "comment",
+  "export",
+  "signature",
+  "signature",
+  "import",
+  "import",
+  "macro",
+  "macro",
+  "mod-add",
+  "mod-add",
+  "file-delete",
+  "cfg",
+  "derive",
+];
+const rustScopedKinds = [
+  ...Array(6).fill("body"),
+  ...Array(6).fill("call"),
+  ...Array(4).fill("comment"),
+  // Each other kind once.
+  ...new Set(rustKinds.filter((kind) => !["body", "comment"].includes(kind))),
+];
+const rustCreated = [];
+function rustEdit(step, file, source) {
+  const kind = pick(scopedMix ? rustScopedKinds : rustKinds);
+  const insert = (at, text) => source.slice(0, at) + text + source.slice(at);
+  // After any inner attributes, doc comments and blank lines at the top.
+  const head = /^(?:\s*(?:#!\[[^\n]*\]|\/\/[^\n]*)\n)*/.exec(source)[0].length;
+  const name = `c36_random_${step}`;
+  switch (kind) {
+    case "body": {
+      const functions = [
+        ...source.matchAll(/^\s*(?:pub[^\n]*?)?fn [^\n;]*\{$/gm),
+      ];
+      if (functions.length) {
+        const match = pick(functions);
+        return {
+          file,
+          kind,
+          text: insert(match.index + match[0].length, "\n    let _ = 0;"),
+        };
+      }
+      break;
+    }
+    case "call": {
+      // A statement that adds call links in an existing function body.
+      const functions = [
+        ...source.matchAll(/^\s*(?:pub[^\n]*?)?fn [^\n;]*\{$/gm),
+      ];
+      if (functions.length) {
+        const match = pick(functions);
+        return {
+          file,
+          kind,
+          text: insert(
+            match.index + match[0].length,
+            "\n    let _ = std::mem::size_of::<u8>();",
+          ),
+        };
+      }
+      break;
+    }
+    case "export":
+      return {
+        file,
+        kind,
+        text: source + `\npub fn ${name}() -> u32 {\n    1\n}\n`,
+      };
+    case "signature": {
+      const start = Math.floor(random() * signatureTargets.length);
+      for (const { file: targetFile, name: targetName } of [
+        ...signatureTargets.slice(start),
+        ...signatureTargets.slice(0, start),
+      ]) {
+        const text = sourceOf(targetFile);
+        const header = new RegExp(`(\\bfn\\s+)${targetName}(?=\\s*[<(])`, "u");
+        if (header.test(text))
+          return {
+            file: targetFile,
+            kind,
+            text: text.replace(header, `$1${name}`),
+          };
+      }
+      break;
+    }
+    case "import": {
+      const uses = [...source.matchAll(/^use [^\n]*;\n/gm)];
+      if (uses.length && random() < 0.5) {
+        const match = pick(uses);
+        return {
+          file,
+          kind: "remove-import",
+          text:
+            source.slice(0, match.index) +
+            source.slice(match.index + match[0].length),
+        };
+      }
+      return {
+        file,
+        kind: "add-import",
+        text: insert(
+          head,
+          `use std::${pick(["collections::*", "fmt::Write as _", "io::{self, Read}", "sync::Arc"])};\n`,
+        ),
+      };
+    }
+    case "macro": {
+      const macros = [...source.matchAll(/macro_rules!\s*\w+\s*\{/g)];
+      if (macros.length && random() < 0.5) {
+        const match = pick(macros);
+        return {
+          file,
+          kind: "change-macro",
+          text: insert(match.index + match[0].length, `\n    (${name}) => {};`),
+        };
+      }
+      return {
+        file,
+        kind: "add-macro",
+        text: insert(head, `macro_rules! ${name} {\n    () => {};\n}\n`),
+      };
+    }
+    case "mod-add": {
+      // A module file's children sit beside mod.rs, lib.rs and main.rs, and
+      // in a directory named after any other file.
+      const owner = file.split("/").pop();
+      const added = ["mod.rs", "lib.rs", "main.rs"].includes(owner)
+        ? join(dirname(file), `${name}.rs`)
+        : join(dirname(file), owner.slice(0, -3), `${name}.rs`);
+      rustCreated.push({ added, parent: file });
+      sourceByFile.set(added, `pub fn ${name}() -> u32 {\n    1\n}\n`);
+      return {
+        file,
+        kind,
+        text: insert(head, `pub mod ${name};\n`),
+        also: added,
+      };
+    }
+    case "file-delete":
+      if (rustCreated.length) {
+        const { added } = rustCreated.splice(
+          Math.floor(random() * rustCreated.length),
+          1,
+        )[0];
+        return { file: added, kind };
+      }
+      break;
+    case "cfg":
+    case "derive": {
+      const items = [
+        ...source.matchAll(
+          kind === "cfg"
+            ? /^(?:pub(?:\([^)]*\))? )?(?:fn|struct|enum|mod|const|static|trait|type) /gm
+            : /^(?:pub(?:\([^)]*\))? )?(?:struct|enum) /gm,
+        ),
+      ];
+      if (items.length) {
+        const match = pick(items);
+        return {
+          file,
+          kind,
+          text: insert(
+            match.index,
+            kind === "cfg"
+              ? `#[cfg(feature = "${name}")]\n`
+              : "#[derive(Debug)]\n",
+          ),
+        };
+      }
+      break;
+    }
+  }
+  return { file, kind: "comment", text: source + "\n// c36 random edit\n" };
+}
+
 // Replay the seed from pristine source when resuming so no PRNG state or
 // generated source needs to be kept in the evidence.
 const sourceByFile = new Map();
@@ -337,6 +605,7 @@ for (let step = 0; step < expectedSteps; step++) {
   let edit;
   let at = 0;
   if (repo.language === "go") edit = goEdit(step, file, original);
+  else if (repo.language === "rust") edit = rustEdit(step, file, original);
   else {
     const lines = original.split("\n");
     let kind = pick(kinds);
@@ -348,11 +617,16 @@ for (let step = 0; step < expectedSteps; step++) {
       if (braces.length) lines.splice(pick(braces) + 1, 0, statement);
       else kind = "comment";
     }
+    let text;
+    if (["copy", "remove", "swap", "anonymous"].includes(kind)) {
+      text = siblingEdit(kind, file, original);
+      if (text === undefined) kind = "comment";
+    }
     if (kind === "comment") lines.splice(at, 0, "// c22 random edit");
     if (kind === "blank") lines.splice(at, 0, "");
     if (kind === "duplicate") lines.splice(at, 0, lines[at] ?? "");
     if (kind === "delete") lines.splice(at, 1);
-    edit = { file, kind, text: lines.join("\n") };
+    edit = { file, kind, text: text ?? lines.join("\n") };
   }
   file = edit.file;
   const { kind, text } = edit;
@@ -362,6 +636,10 @@ for (let step = 0; step < expectedSteps; step++) {
   const path = join(root, file);
   if (text !== undefined) writeFileSync(path, text);
   else if (existsSync(path)) rmSync(path);
+  if (edit.also) {
+    mkdirSync(dirname(join(root, edit.also)), { recursive: true });
+    writeFileSync(join(root, edit.also), sourceByFile.get(edit.also));
+  }
   incremental(join(base, `step-${step}.json`));
   const cold = temporary ?? join(base, `cold-${step}.sqlite`);
   clearStore(cold);
@@ -401,7 +679,16 @@ for (let step = 0; step < expectedSteps; step++) {
     differences,
     wallMs: measured.wallMs,
     failed: measured.report?.failedCount,
-    resolvedFiles: measured.counts?.["resolve.go.decisionFiles"] ?? 0,
+    resolvedFiles:
+      measured.counts?.[`resolve.${repo.language}.decisionFiles`] ?? 0,
+    ...(repo.language === "rust"
+      ? {
+          scoped: measured.counts?.["analyze.rust.scopedFiles"] ?? 0,
+          fullPass: Object.keys(measured.counts ?? {})
+            .filter((key) => key.startsWith("analyze.rust.fullPass."))
+            .map((key) => key.slice("analyze.rust.fullPass.".length)),
+        }
+      : {}),
     ...(noEdit ? { noEdit } : {}),
   });
   console.log(

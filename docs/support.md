@@ -249,8 +249,8 @@ empty `graph.sqlite-turnstile` beside it (created only where the store uses the 
 unchanged) and read as having no library targets when opened read-only. Any
 other graph database is refused with a rebuild message; 0.1.0 refuses a
 schema-4 graph the same way. Nothing runs project code.
-Nothing runs a language toolchain unless the project opts in to the Go
-toolchain route (below); nothing reads or writes `.codegraph/`. Language
+Nothing runs a language toolchain unless the project is trusted at init
+(D22) or opts in to the Go toolchain route (below); nothing reads or writes `.codegraph/`. Language
 modules are discovered from `src/graph/languages/*/`;
 production discovery offers `go`, `rust` and `typescript` (the `toy` fixture is
 test-only). Each module's current version, and the versions the index was built
@@ -776,7 +776,12 @@ reference, package script or test runner config (Vitest `typecheck.tsconfig`,
 ts-jest `tsconfig`) names. A call on a member merged from several
 declarations of one receiver type links the declaration of the signature
 the checker selects, when no declaration from another body could also
-accept the arguments.
+accept the arguments. A const assertion (`as const`, `<const>x`) stores no link.
+A package-name `extends` whose base is reached through an installed
+workspace link is read (C-39). A base whose JSON has a syntax error keeps
+the missing-settings marker. A manifest range that the compiler's semver
+parser throws on is an unknown range: it identifies the registry dependency
+and never yields a version pin.
 
 - **Definite:** module imports; import and export bindings to the original
   declaration through barrels, `export *`, renames and default exports; CommonJS
@@ -909,7 +914,15 @@ accept the arguments.
   of 8,000,000 steps. When it is reached, every link of that program that
   could have a target is unresolved with `taint-budget-exhausted`, except
   links that bind a failed file directly, which stay `invalid-code`; no pin
-  outside microsoft/TypeScript comes near it. The program budget counts
+  outside microsoft/TypeScript comes near it. The structural judgement of a receiver
+  that depends on a failed file is memoised per program and bounded
+  (C-47). It allows at most 100 nested judgements over all its recursive
+  paths, 200,000 steps per judgement and 8,000,000 per program. A stack
+  overflow inside it counts as the bound, and an overflow anywhere in the
+  failed-file checks is unknown, never an answer. A link whose judgement or
+  dependence a bound left unknown is `invalid-code`, with the failed files
+  as its cause and the reason `judge-budget-exhausted`. It is never treated
+  as clean. The program budget counts
   every checkout file a program loads, imported files included; a file past
   it is left out of that program only (installed declarations have their
   own budget). Invalid extracted UTF-16 ranges use the same per-file
@@ -976,20 +989,62 @@ An unfinished run or a direct graph write requires recovery. The opt-in
 toolchain route uses a full pass. The same file tree produces the same
 graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
-**Go toolchain route (opt-in, decision D17).** With the key
-`"graph": {"toolchain": {"go": true}}` added to the existing
-`.pymtheg/settings.json` (which must keep its `version: 1` and `scenarios`; a
-file holding only the `graph` key is unreadable and the route stays off with a
-`settings-unreadable` warning; full example in the
-[code guide](code-guide.md#the-go-toolchain-route)), or an absolute path to the
-`go` to trust instead of `true`, indexing also runs that `go` (`go list` and a `go/types` helper) in a
+Rust can reuse the stored link decisions outside the edited files. A comment,
+whitespace or body edit that leaves every fact another file reads unchanged
+re-decides only the edited file. This includes a body edit that adds calls.
+It does not apply when deciding the file's links meets a lookup cycle, a
+depth limit or a re-entry guard, as in modules that glob each other.
+
+Any other change uses the full Rust pass. This covers changes to symbols,
+imports, macros, modules, attributes or cfg conditions; a Cargo manifest,
+lockfile or configuration change; an added, removed or unreadable file; and
+an unfinished previous run. No answer the resolver caches depends on its
+caller, and the scoped path is used only when the edited file's decisions
+meet no cut. The same file tree therefore produces the same graph after a
+fresh or incremental index. [C-36](changes/C-36.md)
+
+**Toolchain processes (C-54).** Every child process the graph starts runs
+in its own process group, recorded in memory the server owns. Cancelling a
+`code_graph` or `requirement_links` job ends the processes it started; a
+server that exits ends them too, and the CLI (and `pymtheg mcp`) turns
+SIGINT, SIGTERM, SIGHUP and SIGQUIT into an orderly end that does the same;
+a cancel kills the job's children at once, whatever its worker does. Only a
+death the process cannot observe (SIGKILL, a crash of the runtime) leaves
+children running. On Windows the recorded
+process is killed, not its children. [C-54](changes/C-54.md)
+
+**Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted
+on this machine (below; [code guide](code-guide.md#the-go-toolchain-route)),
+indexing also runs `go` from `PATH`, or the absolute path named in your own
+trust answer file, (`go list` and a `go/types` helper) in a
 closed environment with network, cgo and telemetry off, and merges its facts:
 it can upgrade unresolved or candidate links to definite, confirm source-only
 links or verify candidate sets; such links carry `decidedBy: "toolchain"`.
 Every answer reports `toolchain.go.state` (`used` with counts, `unavailable` with
 the reason, such as no `go.mod` at the project root, `go.work`, no `go`, or Go
 older than 1.22; `not-indexed`). Turning it on or off makes the next query sync.
-No MCP tool changes this setting; edit the file. Sources:
+An unreadable `.pymtheg/settings.json` keeps every route off with a
+`settings-unreadable` warning.
+
+**Trust at init (decision D22, C-44).** `init` asks once whether the
+repository is trusted and records the answer for this checkout on this
+machine in the user's own configuration (`$PYMTHEG_CONFIG_HOME` or the
+platform's config folder, `trust.json`, user-only), never under a checkout;
+`pymtheg trust` lists and `--revoke` removes answers. A trusted checkout runs
+the Go route above with its default policy. A source-only checkout, or one
+with no answer on this machine (`unanswered`: a clone, a copy, a moved
+checkout), runs nothing. Nothing committed can grant trust: a committed
+`graph.trust: "source-only"` binds on every machine, a committed
+`"trusted"` is only init's preselected answer, a committed
+`graph.toolchain.go: false` turns Go off, and a committed tool path is never
+run (warning `committed-tool-path-ignored`). Graph answers of an initialised
+project report `trust` (`trusted`, `source-only` or `unanswered`, then with
+`trustAnswer`). **Behaviour change (C-44):** a committed
+`graph.toolchain.go: true` no longer turns the Go route on for whoever checks the
+repository out; each user answers the trust question once per checkout. A
+tool path that resolves inside the checkout is never run, even from the
+user's own file (warning `tool-path-inside-checkout`). The question and how each path answers it are described in
+[project initialization](project-init.md#trusting-the-repository). Sources:
 [W3-L](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L.md), [W3-L2](https://github.com/KarlLivesey/pymtheg/blob/main/docs/changes/W3-L2.md).
 
 #### Not built yet

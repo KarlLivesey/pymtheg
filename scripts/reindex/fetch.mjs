@@ -2,6 +2,7 @@
 // Fetches pinned sweep repositories (sweep/repos.json) into <scratch>/pins/<name>
 // as clean detached checkouts, for the C-22 re-index measurements.
 //   node scripts/reindex/fetch.mjs <scratch> <repo id>...
+import "../isolated-home.mjs";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

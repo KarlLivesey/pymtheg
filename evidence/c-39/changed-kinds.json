@@ -1,0 +1,30 @@
+{
+ "counts": {
+  "library: same package, declaration name instead of binding spelling": 181,
+  "library: declaring package named instead of the importing package": 6,
+  "site removed": 18,
+  "now unresolved (external-package)": 46
+ },
+ "examples": {
+  "library: same package, declaration name instead of binding spelling": [
+   "vercel/turborepo packages/turbo-gen/__tests__/cli.test.ts:278 path.resolve: node:path:resolve => node:path:path.PlatformPath.prototype.resolve",
+   "vercel/turborepo packages/turbo-gen/__tests__/cli.test.ts:896 path.join: node:path:join => node:path:path.PlatformPath.prototype.join",
+   "vercel/turborepo packages/turbo-gen/__tests__/cli.test.ts:1115 path.join: node:path:join => node:path:path.PlatformPath.prototype.join"
+  ],
+  "library: declaring package named instead of the importing package": [
+   "vercel/turborepo packages/turbo-releaser/src/native.test.ts:5370 assert.rejects: node:assert/strict:rejects => node:assert:assert.rejects",
+   "vercel/turborepo packages/turbo-releaser/src/native.test.ts:5733 assert.rejects: node:assert/strict:rejects => node:assert:assert.rejects",
+   "vercel/turborepo packages/turbo-releaser/src/npm.test.ts:3033 assert.rejects: node:assert/strict:rejects => node:assert:assert.rejects"
+  ],
+  "site removed": [
+   "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:23 @repo/eslint-config: null => undefined",
+   "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:9 config: null => undefined",
+   "vercel/turborepo examples/with-svelte/apps/docs/eslint.config.js:62 default: null => undefined"
+  ],
+  "now unresolved (external-package)": [
+   "withastro/astro examples/blog/src/pages/rss.xml.js:9 getCollection: null => ",
+   "withastro/astro examples/blog/src/pages/rss.xml.js:196 getCollection: null => ",
+   "withastro/astro packages/astro/e2e/fixtures/cloudflare/src/pages/collections.json.js:9 getCollection: null => "
+  ]
+ }
+}

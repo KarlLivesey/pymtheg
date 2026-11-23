@@ -257,15 +257,20 @@ capped at 64 KiB, so pages may hold fewer items than `limit`; always follow
 later tells you when that symbol changed. The first planning write in a project
 that was never initialised initialises it exactly as `pymtheg init` would
 (`.pymtheg/project.json`, `.pymtheg/settings.json` and `.pymtheg/.gitignore`;
-the planning database itself is ignored by Git).
+the planning database itself is ignored by Git). That write needs the answer
+to init's question, whether the repository is trusted (decision D22):
+`trust: "trusted"` lets the languages' official tools run on it, as building
+it would, and `trust: "source-only"` means Pymtheg starts no program on its behalf, neither a build tool nor Git. Without it, the
+call returns the question and initialises nothing; ask your user or follow
+your standing instructions, then call again with `trust`.
 
 Arguments by action (anything else is refused, naming what the action
 accepts; `wait`, `section`, `limit` and `noSync` apply to all):
 
 | Action             | Arguments                                         |
 | ------------------ | ------------------------------------------------- |
-| `requirement`      | `id`, `title` (both required), `text`, `owner`     |
-| `add`              | `record`, `selector` (both required), `note`       |
+| `requirement`      | `id`, `title` (both required), `text`, `owner`, `trust` |
+| `add`              | `record`, `selector` (both required), `note`, `trust` |
 | `remove`           | `link` (required)                                  |
 | `refresh`          | `link` (required)                                  |
 | `list`             | `record`, `symbol`, `file`                         |
@@ -282,7 +287,10 @@ async function links_(action, args = {}) {
     ? call("link_result", { jobId: first.jobId, wait: true, section: args.section ?? "items" })
     : first;
 }
-const record = await links_("requirement", { id: "R1", title: "Restocking records the amount" });
+const asked = await call("requirement_links", { action: "requirement", id: "R1", title: "Restocking records the amount" }).catch((e) => String(e));
+expect(asked.includes("Do you trust this repository?"));
+// => the question comes back; nothing is initialised until it is answered.
+const record = await links_("requirement", { id: "R1", title: "Restocking records the amount", trust: "source-only" });
 expect(record.items[0].id === "plan:R1");
 const after = await call("project_info", {});
 expect(after.initialised === true && after.workspace.name.length > 0);
@@ -345,31 +353,32 @@ document `architecture/plan.json`; that is not a file on disk.
 
 ## The Go toolchain route
 
-By default nothing runs `go`: Go links come from the source alone. A project can
-opt in to links checked with the Go toolchain (`go list` and `go/types`), which
-runs the project's `go` build configuration and is as trusted as building it.
-**No MCP tool turns it on.** Edit `.pymtheg/settings.json` (it exists once the
-project is initialised) and add a `graph` setting:
+By default nothing runs `go`: Go links come from the source alone. A checkout
+that is **trusted on this machine** (decision D22) has its Go links checked with
+the Go toolchain (`go list` and `go/types`), which runs the project's `go`
+build configuration and is as trusted as building it. The answer is yours,
+kept in your own Pymtheg configuration and never in a repository, so a cloned
+repository is asked again. Nothing committed can turn the route on: a committed
+`"graph": {"trust": "source-only"}` forbids it on every machine, and a committed
+`"graph": {"toolchain": {"go": false}}` turns Go off; a tool path is honoured
+only from your own answer file (`"toolchain": {"go": "/usr/local/go/bin/go"}`).
 
-```json
-{ "version": 1, "scenarios": {}, "graph": { "toolchain": { "go": true } } }
-```
-
-`true` uses `go` from the server process's `PATH`; an absolute path such as
-`"/usr/local/go/bin/go"` names the `go` to trust. The next `code_graph` query
-re-indexes, and `summary.toolchain` reports the route: `go.state` is `used`
-(with counts of links it upgraded, confirmed or disagreed with), `unavailable`
-(with the reason, for example no `go.mod` at the project root, a `go.work`
-workspace, or no `go` found) or `not-indexed`. Go 1.22 or newer is required.
+Over MCP, `summary.trust` says which applies: `trusted`, `source-only` or
+`unanswered` (with `summary.trustAnswer` saying how to answer). On an
+initialised checkout with no answer here, ask your user "Do you trust this
+repository?" and pass `trust: "trusted"` or `"source-only"` to `code_graph`; an
+existing answer is never changed. With the route on, `summary.toolchain`
+reports it: `go.state` is `used` (with counts of links it upgraded, confirmed
+or disagreed with), `unavailable` (with the reason, for example no `go.mod` at
+the project root, a `go.work` workspace, or no `go` found) or `not-indexed`.
+Go 1.22 or newer is required.
 
 ```js
 // verified-mcp
-await write(".pymtheg/settings.json", JSON.stringify({ version: 1, scenarios: {}, graph: { toolchain: { go: true } } }) + "\n");
 const routed = await graph({ action: "symbol", query: "(*Store).Put" });
-expect(routed.summary.toolchain.setting.go === true);
-expect(["used", "unavailable"].includes(routed.summary.toolchain.go.state));
-// => with go 1.27.4 on PATH: summary.toolchain: { setting: { go: true }, go: { state: "used", version: "go1.27.4", packages: { total: 1, clean: 1 }, confirmedLinks: 8, upgradedLinks: 0, disagreements: 0, … } };
-// => otherwise go: { state: "unavailable", reason: "go was not found on PATH" }.
+expect(routed.summary.trust === "source-only");
+expect(routed.summary.toolchain === null);
+// => this checkout was answered "source-only" by the first planning write above, so nothing runs.
 ```
 
-Set `"go": false` or remove `graph` to turn it off again.
+`pymtheg trust` lists your answers and `pymtheg trust --revoke` removes one.

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { readdir, readFile } from "node:fs/promises";
+import { toolchainWorkDirectory } from "../project/local-trust.js";
 import { join, resolve } from "node:path";
 import { compare, contentHash, validateResult } from "./identity.js";
 import { resolutionFacts } from "./analysis.js";
@@ -9,6 +10,7 @@ import {
 } from "./dependency-inputs.js";
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import { count, stage } from "./work.js";
+import type { KeptState } from "./session.js";
 import type {
   AnalyzedFile,
   ContextFile,
@@ -65,6 +67,8 @@ export interface IndexOptions {
   signal?: AbortSignal;
   /** Progress through the captured files when comparing them with storage. */
   onFileCompared?: (path: string) => void;
+  /** C-45: each module's kept state, when the index runs in a session. */
+  kept?: (module: LanguageModule) => KeptState | undefined;
 }
 const message = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -97,6 +101,12 @@ export async function indexProject(
   store: GraphStorage,
   options: IndexOptions = {},
 ): Promise<IndexReport> {
+  const keptFor = new Map<string, KeptState | undefined>();
+  const kept = (module: LanguageModule): KeptState | undefined => {
+    if (!options.kept) return undefined;
+    if (!keptFor.has(module.id)) keptFor.set(module.id, options.kept(module));
+    return keptFor.get(module.id);
+  };
   const report: IndexReport = {
     discovered: 0,
     claimed: 0,
@@ -417,8 +427,7 @@ export async function indexProject(
               root,
               setting,
               workDir:
-                options.toolchainDirectory ??
-                resolve(root, ".pymtheg", "rebuildable", "toolchain"),
+                options.toolchainDirectory ?? toolchainWorkDirectory(root),
               environment: options.environment ?? process.env,
               ...(options.signal ? { signal: options.signal } : {}),
               note: (note) =>
@@ -428,6 +437,7 @@ export async function indexProject(
         module.analyze!({
           projectId: store.projectId,
           ...(options.signal ? { signal: options.signal } : {}),
+          ...(kept(module) ? { kept: kept(module)! } : {}),
           ...(toolchain ? { toolchain } : {}),
           ...(inputs && { dependencyInputs: inputs }),
           files,
@@ -605,7 +615,14 @@ export async function indexProject(
       const owns = modules.has(module.id);
       if (scope?.size === 0) return;
       const output = owns
-        ? await runResolve(module, store, ownContexts, options.signal, scope)
+        ? await runResolve(
+            module,
+            store,
+            ownContexts,
+            options.signal,
+            scope,
+            kept(module),
+          )
         : [];
       count(
         `resolve.${module.id}.resolutions`,
@@ -815,6 +832,7 @@ async function runResolve(
   contexts: readonly ContextFile[],
   signal?: AbortSignal,
   resolutionFiles?: ReadonlySet<string>,
+  kept?: KeptState,
 ): Promise<readonly LinkResolution[] | ResolutionResult> {
   if (!module.resolve) return [];
   // Only a store that declares independent reads is trusted not to share
@@ -834,6 +852,7 @@ async function runResolve(
       module.resolve!({
         projectId: store.projectId,
         ...(signal ? { signal } : {}),
+        ...(kept ? { kept } : {}),
         ...(resolutionFiles
           ? { resolutionFiles: new Set(resolutionFiles) }
           : {}),

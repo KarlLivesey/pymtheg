@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import { lstat, realpath } from "node:fs/promises";
+import { lstat, realpath, stat } from "node:fs/promises";
 import {
   checkpointSchema,
   checkpointFrom,
@@ -17,6 +17,8 @@ import {
 } from "./registry.js";
 import { SqliteGraphStore } from "./store.js";
 import { indexProject, type IndexReport } from "./indexer.js";
+import type { IndexSession, SessionRun } from "./session.js";
+import type { LanguageModule } from "./types.js";
 import { stage, stageSync } from "./work.js";
 import {
   captureInventory,
@@ -31,7 +33,20 @@ import {
   type ToolchainState,
 } from "./command-toolchain.js";
 import { loadConfig } from "../project/config.js";
-import { graphToolchains } from "../shared/config.js";
+import {
+  committedToolPaths,
+  graphToolchains,
+  trustState,
+  type TrustState,
+} from "../shared/config.js";
+import {
+  cacheInsideCheckout,
+  readLocalTrust,
+  toolchainWorkDirectory,
+  toolInsideCheckout,
+} from "../project/local-trust.js";
+import { readWorkspace } from "../project/workspace.js";
+import { trustAnswerHow } from "../project/trust.js";
 import { dirname, join } from "node:path";
 
 export type GraphCommand = "index" | "status" | QueryCommand;
@@ -105,12 +120,25 @@ export interface GraphResponse {
    * absent when the project has not opted in (off).
    */
   toolchain?: ToolchainState;
+  /**
+   * D22: the trust that applies on this machine, for an initialised project:
+   * its local answer, "source-only" when the committed settings bind it, or
+   * "unanswered" (nothing runs) with trustAnswer saying how to answer.
+   */
+  trust?: TrustState;
+  trustAnswer?: string;
 }
 export interface GraphExecutionOptions {
   signal?: AbortSignal;
   progress?: ((progress: GraphProgress) => void) | undefined;
   /** Tests/embedders may supply a registry; the CLI always discovers production modules. */
   registry?: LanguageRegistry;
+  /**
+   * C-45: a process that indexes more than once passes the same session: its
+   * modules are loaded once, and each module may keep proved state between
+   * runs (see IndexSession).
+   */
+  session?: IndexSession;
 }
 const arity: Record<GraphCommand, number> = {
   index: 0,
@@ -156,12 +184,16 @@ export async function executeGraph(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
-  const registry =
-    options.registry ?? (await stage("command.modules", discoverLanguages));
+  const registry = options.session
+    ? await stage("command.modules", () => options.session!.registry())
+    : (options.registry ?? (await stage("command.modules", discoverLanguages)));
   // An explicit index first verifies on a read-only connection, which
   // writes nothing to the file (C-33). It opens the writable store only if
   // it has to index.
-  const verifyFirst = request.command === "index" && !options.registry;
+  const verifyFirst =
+    request.command === "index" &&
+    !options.registry &&
+    !options.session?.injectedRegistry;
   let store: SqliteGraphStore | null = null;
   if (exists)
     try {
@@ -179,6 +211,7 @@ export async function executeGraph(
       // The writable store reports it, or prepares the file, when indexing.
       if (!verifyFirst) throw error;
     }
+  let sessionRun: SessionRun | undefined;
   try {
     const listing: InventoryListing = {
       discovered: 0,
@@ -221,8 +254,38 @@ export async function executeGraph(
     // unreadable one is off too, with a warning.
     let toolchains: Record<string, boolean | string> = {};
     let settingsError: string | null = null;
+    // D22: the trust that applies on this machine, reported for an
+    // initialised project. Only the local answer can turn routes on.
+    let trust: TrustState | undefined;
+    let ignoredPaths: string[] = [];
+    const insidePaths: string[] = [];
+    const hardLinked: string[] = [];
+    let cacheInside = false;
     try {
-      toolchains = graphToolchains((await loadConfig(root)).config);
+      const { config } = await loadConfig(root);
+      const local = await readLocalTrust(root);
+      toolchains = graphToolchains(config, local);
+      ignoredPaths = committedToolPaths(config);
+      // Defence in depth (D22): a tool path that resolves inside the
+      // checkout is the repository's code; it is never run, even when the
+      // user's own configuration names it. The route stays off.
+      // The cache folder holds the routes' helpers and facts: one inside the
+      // checkout would let the repository supply them, so no route runs.
+      if (Object.keys(toolchains).length && (await cacheInsideCheckout(root))) {
+        toolchains = {};
+        cacheInside = true;
+      }
+      for (const [key, setting] of Object.entries(toolchains)) {
+        if (typeof setting !== "string") continue;
+        if (await toolInsideCheckout(setting, root)) {
+          delete toolchains[key];
+          insidePaths.push(key);
+        } else if (((await stat(setting).catch(() => null))?.nlink ?? 1) > 1)
+          // A second name for the same file could live in the checkout.
+          hardLinked.push(key);
+      }
+      if (await readWorkspace(root).catch(() => null))
+        trust = trustState(config, local);
     } catch (error) {
       settingsError = error instanceof Error ? error.message : String(error);
     }
@@ -248,10 +311,8 @@ export async function executeGraph(
         metadata,
       );
     const complete = previousState?.fingerprint === currentFingerprint();
-    const toolchainDirectory = join(
-      dirname(storagePath(root, "graph")),
-      "toolchain",
-    );
+    // D22: outside the checkout (the user's cache folder), never in it.
+    const toolchainDirectory = toolchainOn ? toolchainWorkDirectory(root) : "";
     // The completion and the analysis completion are read again in one
     // snapshot, which supplies the answer. The analysis completion names
     // each incremental module that owns a stored file, as an index run
@@ -429,14 +490,45 @@ export async function executeGraph(
           if (typeof value !== "function") return value;
           return (...args: unknown[]) => {
             signal.throwIfAborted();
-            return value.apply(target, args);
+            const result = value.apply(target, args);
+            // C-45: kept state is confirmed against the completion record
+            // the run's ownership baseline read, in the same snapshot; the
+            // record read before the run began can be stale.
+            if (key === "beginIndexRun")
+              sessionRun?.confirm(
+                checkpointFrom(
+                  currentStore.baselineCommandState(),
+                  currentStore.projectId,
+                )?.fingerprint ?? null,
+              );
+            return result;
           };
         },
       });
       const started = performance.now();
       options.progress?.({ phase: "inventory", done: 0, total });
+      // C-45: what a session kept is used only if the store is as its last
+      // completed run left it (the completion record), for this project,
+      // store and configuration.
+      sessionRun = options.session?.beginRun(
+        {
+          root,
+          store: path,
+          projectId: currentStore.projectId,
+          configuration,
+          settings,
+        },
+        previousState?.fingerprint ?? null,
+      );
+      const run = sessionRun;
       const indexed = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
+        ...(run
+          ? {
+              kept: (module: LanguageModule) =>
+                run.kept(module.id, module.version),
+            }
+          : {}),
         onFileCompared: (path) => {
           signal.throwIfAborted();
           options.progress?.({
@@ -475,8 +567,8 @@ export async function executeGraph(
         !report.analysisErrors.length &&
         !report.resolutionErrors.length
       )
-        stageSync("command.checkpointWrite", () =>
-          currentStore.completeGraphCommandState(
+        stageSync("command.checkpointWrite", () => {
+          const written = currentStore.completeGraphCommandState(
             {
               schema: checkpointSchema,
               projectId: currentStore.projectId,
@@ -490,9 +582,13 @@ export async function executeGraph(
                 : {}),
             },
             dataVersion,
-          ),
-        );
+          );
+          if (written) sessionRun?.complete(currentFingerprint());
+          return written;
+        });
       else store.invalidateGraphCommandState();
+      // A run that wrote no completion keeps nothing (see IndexSession).
+      sessionRun?.abandon();
       options.progress?.({ phase: "complete", done: total, total });
     }
     const finish = (): GraphResponse => {
@@ -617,6 +713,10 @@ export async function executeGraph(
         },
         data: null,
       };
+      if (trust) {
+        response.trust = trust;
+        if (trust === "unanswered") response.trustAnswer = trustAnswerHow;
+      }
       if (toolchainOn)
         response.toolchain = report
           ? toolchainState(toolchains, report.toolchains)
@@ -633,6 +733,31 @@ export async function executeGraph(
           code: "toolchain-inputs-not-rechecked",
           message:
             "Toolchain-backed facts are as recorded at the last sync; the toolchain's inputs (Go version, go.mod/go.sum, local replace targets, Go files outside the index) were not re-checked. Sync (a query without --no-sync, or graph index) to re-check them.",
+          files: [],
+        });
+      if (cacheInside)
+        response.warnings.push({
+          code: "cache-home-inside-checkout",
+          message:
+            "The Pymtheg cache folder lies inside this checkout, so no toolchain route runs. Set PYMTHEG_CACHE_HOME to a folder outside it.",
+          files: [],
+        });
+      if (hardLinked.length)
+        response.warnings.push({
+          code: "tool-file-hard-linked",
+          message: `The tool file for ${hardLinked.join(", ")} in your trust answer has more than one hard link; another name for it could be inside a repository. Check it is the tool you mean.`,
+          files: [],
+        });
+      if (insidePaths.length)
+        response.warnings.push({
+          code: "tool-path-inside-checkout",
+          message: `The tool path for ${insidePaths.join(", ")} in your trust answer resolves inside this checkout, so it is never run and that route stays off. Name a tool outside the repository.`,
+          files: [],
+        });
+      if (ignoredPaths.length)
+        response.warnings.push({
+          code: "committed-tool-path-ignored",
+          message: `.pymtheg/settings.json names a tool path for ${ignoredPaths.join(", ")}; a committed path is never run (it could point into the repository). Tool paths go in your own trust answer file (pymtheg trust).`,
           files: [],
         });
       if (settingsError)
@@ -760,6 +885,8 @@ export async function executeGraph(
     }
     return response;
   } finally {
+    // A run that failed or was aborted keeps nothing (no-op once complete).
+    sessionRun?.abandon();
     stageSync("command.sqliteClose", () => store?.close());
   }
 }

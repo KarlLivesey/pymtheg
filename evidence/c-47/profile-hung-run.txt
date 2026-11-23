@@ -1,0 +1,56 @@
+Statistical profiling result from p2.log, (564029 ticks, 311410 unaccounted, 0 excluded).
+
+ [Shared libraries]:
+   ticks  total  nonlib   name
+   1014    0.2%          /usr/lib64/libstdc++.so.6.0.36
+      9    0.0%          [vdso]
+      1    0.0%          /usr/lib64/libc.so.6
+
+ [JavaScript]:
+   ticks  total  nonlib   name
+  56851   10.1%   10.1%  Builtin: LoadIC
+  30988    5.5%    5.5%  Builtin: LoadIC_Megamorphic
+  19106    3.4%    3.4%  JS: *fromType dist/graph/languages/typescript/judge.js:754:22
+  10654    1.9%    1.9%  Builtin: CallFunction_ReceiverIsAny
+   6247    1.1%    1.1%  Builtin: LoadICTrampoline_Megamorphic
+   6221    1.1%    1.1%  JS: *resolveNameHelper typescript/lib/typescript.js:23574:29
+   4935    0.9%    0.9%  JS: *referenceType dist/graph/languages/typescript/judge.js:665:27
+   4478    0.8%    0.8%  Builtin: FindOrderedHashMapEntry
+   4311    0.8%    0.8%  JS: *getSymbolOfNameOrPropertyAccessExpression typescript/lib/typescript.js:91659:53
+   3276    0.6%    0.6%  Builtin: CallFunction_ReceiverIsNullOrUndefined
+   3143    0.6%    0.6%  JS: *getSymbolAtLocation typescript/lib/typescript.js:91873:31
+   2992    0.5%    0.5%  JS: *UnionType dist/graph/languages/typescript/judge.js:549:20
+   2909    0.5%    0.5%  Builtin: FindOrderedHashSetEntry
+   2758    0.5%    0.5%  JS: *<anonymous> dist/graph/languages/typescript/judge.js:233:72
+   2559    0.5%    0.5%  JS: *<anonymous> dist/graph/languages/typescript/judge.js:215:49
+ [Bottom up (heavy) profile]:
+  Note: percentage shows a share of a particular caller in the total
+  amount of its parent calls.
+  Callers occupying less than 1.0% are not shown.
+
+   ticks parent  name
+  311410   55.2%  UNKNOWN
+  225982   72.6%    JS: *resolveNameHelper typescript/lib/typescript.js:23574:29
+  225980  100.0%      JS: *resolveEntityName typescript/lib/typescript.js:53835:29
+  225980  100.0%        JS: *getSymbolOfNameOrPropertyAccessExpression typescript/lib/typescript.js:91659:53
+  225979  100.0%          JS: *getSymbolAtLocation typescript/lib/typescript.js:91873:31
+  225979  100.0%            JS: *getSymbolAtLocation typescript/lib/typescript.js:51166:26
+  38732   12.4%    JS: *getSymbolOfNameOrPropertyAccessExpression typescript/lib/typescript.js:91659:53
+  38732  100.0%      JS: *getSymbolAtLocation typescript/lib/typescript.js:91873:31
+  38732  100.0%        JS: *getSymbolAtLocation typescript/lib/typescript.js:51166:26
+  32814   84.7%          JS: *symbolAt dist/graph/languages/typescript/judge.js:63:22
+  32813  100.0%            JS: *referenceType dist/graph/languages/typescript/judge.js:665:27
+   5917   15.3%          JS: *referenceType dist/graph/languages/typescript/judge.js:665:27
+   5917  100.0%            JS: *TypeReference dist/graph/languages/typescript/judge.js:497:24
+  29665    9.5%    JS: *resolveEntityName typescript/lib/typescript.js:53835:29
+  29664  100.0%      JS: *getSymbolOfNameOrPropertyAccessExpression typescript/lib/typescript.js:91659:53
+  29662  100.0%        JS: *getSymbolAtLocation typescript/lib/typescript.js:91873:31
+  29662  100.0%          JS: *getSymbolAtLocation typescript/lib/typescript.js:51166:26
+  29651  100.0%            JS: *referenceType dist/graph/languages/typescript/judge.js:665:27
+
+  56851   10.1%  Builtin: LoadIC
+  38210   67.2%    JS: *fromType dist/graph/languages/typescript/judge.js:754:22
+  37144   97.2%      JS: *<anonymous> dist/graph/languages/typescript/judge.js:773:42
+  37144  100.0%        JS: *fromType dist/graph/languages/typescript/judge.js:754:22
+  37075   99.8%          JS: *computationHandler dist/graph/languages/typescript/judge.js:578:32
+  37075  100.0%            JS: *referenceType dist/graph/languages/typescript/judge.js:665:27

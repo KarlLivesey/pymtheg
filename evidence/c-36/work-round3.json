@@ -1,0 +1,18 @@
+{
+ "comment": "C-36 round 3: resolver work counters on a cold index, main (the code of origin/main, 60d4f2b) against the round-2 head (44b978e) and the round-3 head. Counters were inserted the same way in each tree by an experiment-only patch: lookups = calls of find(), lookupComputes = calls of lookupPath() (memo misses), lazyComputes = lazy-cache computations (main: answers stored, the heads: every computation), cuts = cycle cuts and helper re-entries. One process each, in-thread, in parallel; counts do not depend on load. cpuS are observations on a shared server.",
+ "dioxus": {
+  "main": { "lookups": 25742334, "lookupComputes": 6295164, "lazyComputes": 156118, "cuts": 4885481, "cpuS": 678.3 },
+  "round2": { "lookups": 27500859, "lookupComputes": 6433100, "lazyComputes": 215409, "cuts": 4948127, "cpuS": 749.1 },
+  "round3": { "lookups": 27506987, "lookupComputes": 6434838, "lazyComputes": 215298, "cuts": 4948477, "cpuS": 704.3 }
+ },
+ "helix": {
+  "main": { "lookups": 1015835, "lookupComputes": 394920, "lazyComputes": 73966, "cuts": 175695, "cpuS": 133.3 },
+  "round3": { "lookups": 1040383, "lookupComputes": 403622, "lazyComputes": 90998, "cuts": 175630, "cpuS": 134.8 }
+ },
+ "cpuObservations": {
+  "comment": "cold-cost.mjs, alternating, separate processes, shared server (load average 25-47); not cost evidence",
+  "dioxusFirstRound3Rule": [{ "main": 579.1, "head": 660.8 }, { "main": 686.7, "head": 753.5 }],
+  "dioxusFreshState": [{ "main": 641.4, "head": 686.4 }, { "main": 616.4, "head": 680.1 }],
+  "parallelPair": { "dioxus": { "main": 606.8, "head": 641.5 }, "helix": { "main": 119.2, "head": 126.6 } }
+ }
+}

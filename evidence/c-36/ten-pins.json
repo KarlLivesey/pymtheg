@@ -1,0 +1,306 @@
+{
+  "pins": [
+    {
+      "id": "BurntSushi/ripgrep",
+      "before": {
+        "links": 39819,
+        "level2": 26307,
+        "assumed": 1,
+        "blank": 0
+      },
+      "after": {
+        "links": 39819,
+        "level2": 26307,
+        "assumed": 1,
+        "blank": 0
+      },
+      "common": {
+        "links": 39819,
+        "before": 26307,
+        "after": 26307,
+        "beforeAssumed": 1,
+        "afterAssumed": 1
+      },
+      "compared": 26311,
+      "lost": 0,
+      "symbolsBefore": 4392,
+      "symbolsAfter": 4392,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "actix/actix-web",
+      "before": {
+        "links": 86640,
+        "level2": 36227,
+        "assumed": 3111,
+        "blank": 0
+      },
+      "after": {
+        "links": 86640,
+        "level2": 36227,
+        "assumed": 3111,
+        "blank": 0
+      },
+      "common": {
+        "links": 86640,
+        "before": 36227,
+        "after": 36227,
+        "beforeAssumed": 3111,
+        "afterAssumed": 3111
+      },
+      "compared": 36240,
+      "lost": 0,
+      "symbolsBefore": 7702,
+      "symbolsAfter": 7702,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "cberner/redb",
+      "before": {
+        "links": 73731,
+        "level2": 35223,
+        "assumed": 110,
+        "blank": 0
+      },
+      "after": {
+        "links": 73731,
+        "level2": 35223,
+        "assumed": 110,
+        "blank": 0
+      },
+      "common": {
+        "links": 73731,
+        "before": 35223,
+        "after": 35223,
+        "beforeAssumed": 110,
+        "afterAssumed": 110
+      },
+      "compared": 35224,
+      "lost": 0,
+      "symbolsBefore": 5523,
+      "symbolsAfter": 5523,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "crossbeam-rs/crossbeam",
+      "before": {
+        "links": 34081,
+        "level2": 19138,
+        "assumed": 0,
+        "blank": 0
+      },
+      "after": {
+        "links": 34081,
+        "level2": 19138,
+        "assumed": 0,
+        "blank": 0
+      },
+      "common": {
+        "links": 34081,
+        "before": 19138,
+        "after": 19138,
+        "beforeAssumed": 0,
+        "afterAssumed": 0
+      },
+      "compared": 19160,
+      "lost": 0,
+      "symbolsBefore": 3367,
+      "symbolsAfter": 3367,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "fjall-rs/fjall",
+      "before": {
+        "links": 13361,
+        "level2": 6072,
+        "assumed": 97,
+        "blank": 0
+      },
+      "after": {
+        "links": 13361,
+        "level2": 6072,
+        "assumed": 97,
+        "blank": 0
+      },
+      "common": {
+        "links": 13361,
+        "before": 6072,
+        "after": 6072,
+        "beforeAssumed": 97,
+        "afterAssumed": 97
+      },
+      "compared": 6072,
+      "lost": 0,
+      "symbolsBefore": 1177,
+      "symbolsAfter": 1177,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "helix-editor/helix",
+      "before": {
+        "links": 90583,
+        "level2": 40673,
+        "assumed": 2491,
+        "blank": 0
+      },
+      "after": {
+        "links": 90583,
+        "level2": 40673,
+        "assumed": 2491,
+        "blank": 0
+      },
+      "common": {
+        "links": 90583,
+        "before": 40673,
+        "after": 40673,
+        "beforeAssumed": 2491,
+        "afterAssumed": 2491
+      },
+      "compared": 40686,
+      "lost": 0,
+      "symbolsBefore": 8351,
+      "symbolsAfter": 8351,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "rust-embedded/cortex-m",
+      "before": {
+        "links": 5531,
+        "level2": 3347,
+        "assumed": 7,
+        "blank": 0
+      },
+      "after": {
+        "links": 5531,
+        "level2": 3347,
+        "assumed": 7,
+        "blank": 0
+      },
+      "common": {
+        "links": 5531,
+        "before": 3347,
+        "after": 3347,
+        "beforeAssumed": 7,
+        "afterAssumed": 7
+      },
+      "compared": 3375,
+      "lost": 0,
+      "symbolsBefore": 1361,
+      "symbolsAfter": 1361,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "rustls/rustls",
+      "before": {
+        "links": 70802,
+        "level2": 23060,
+        "assumed": 299,
+        "blank": 0
+      },
+      "after": {
+        "links": 70802,
+        "level2": 23060,
+        "assumed": 299,
+        "blank": 0
+      },
+      "common": {
+        "links": 70802,
+        "before": 23060,
+        "after": 23060,
+        "beforeAssumed": 299,
+        "afterAssumed": 299
+      },
+      "compared": 23078,
+      "lost": 0,
+      "symbolsBefore": 7269,
+      "symbolsAfter": 7269,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "serde-rs/serde",
+      "before": {
+        "links": 30714,
+        "level2": 8297,
+        "assumed": 0,
+        "blank": 0
+      },
+      "after": {
+        "links": 30714,
+        "level2": 8297,
+        "assumed": 0,
+        "blank": 0
+      },
+      "common": {
+        "links": 30714,
+        "before": 8297,
+        "after": 8297,
+        "beforeAssumed": 0,
+        "afterAssumed": 0
+      },
+      "compared": 8306,
+      "lost": 0,
+      "symbolsBefore": 4246,
+      "symbolsAfter": 4246,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    },
+    {
+      "id": "tokio-rs/axum",
+      "before": {
+        "links": 41067,
+        "level2": 16583,
+        "assumed": 1144,
+        "blank": 0
+      },
+      "after": {
+        "links": 41067,
+        "level2": 16583,
+        "assumed": 1144,
+        "blank": 0
+      },
+      "common": {
+        "links": 41067,
+        "before": 16583,
+        "after": 16583,
+        "beforeAssumed": 1144,
+        "afterAssumed": 1144
+      },
+      "compared": 16588,
+      "lost": 0,
+      "symbolsBefore": 4552,
+      "symbolsAfter": 4552,
+      "symbolLoss": 0,
+      "symbolGain": 0
+    }
+  ],
+  "totals": {
+    "before": {
+      "links": 486329,
+      "level2": 214927,
+      "assumed": 7260,
+      "blank": 0
+    },
+    "after": {
+      "links": 486329,
+      "level2": 214927,
+      "assumed": 7260,
+      "blank": 0
+    },
+    "common": {
+      "links": 486329,
+      "before": 214927,
+      "after": 214927,
+      "beforeAssumed": 7260,
+      "afterAssumed": 7260
+    }
+  },
+  "changes": []
+}

@@ -64,6 +64,38 @@
       "anchor": "pub fn tab_width_at(visual_x: usize, tab_width: u16) -> usize {",
       "body": "\n    let _ = 0;",
       "export": "\npub fn c22_probe() -> u32 {\n    1\n}\n"
+    },
+    {
+      "id": "cberner/redb",
+      "file": "src/types.rs",
+      "comment": "\n// c36: comment-only edit\n",
+      "anchor": "    pub fn new(name: &str) -> Self {",
+      "body": "\n        let _ = 0;",
+      "export": "\npub fn c36_probe() -> u32 {\n    1\n}\n"
+    },
+    {
+      "id": "DioxusLabs/dioxus",
+      "file": "packages/hooks/src/use_signal.rs",
+      "comment": "\n// c36: comment-only edit\n",
+      "anchor": "pub fn use_signal<T: 'static>(f: impl FnOnce() -> T) -> Signal<T, UnsyncStorage> {",
+      "body": "\n    let _ = 0;",
+      "export": "\npub fn c36_probe() -> u32 {\n    1\n}\n"
+    },
+    {
+      "id": "fjall-rs/fjall",
+      "file": "src/path.rs",
+      "comment": "\n// c36: comment-only edit\n",
+      "anchor": "pub fn absolute_path(path: &Path) -> PathBuf {",
+      "body": "\n    let _ = 0;",
+      "export": "\npub fn c36_probe() -> u32 {\n    1\n}\n"
+    },
+    {
+      "id": "vitest-dev/vitest",
+      "file": "packages/vitest/src/utils/base.ts",
+      "comment": "\n// c22: comment-only edit\n",
+      "anchor": "export function escapeRegExp(s: string): string {",
+      "body": "\n  void 0",
+      "export": "\nexport function c22Probe(): number {\n  return 1\n}\n"
     }
   ]
 }

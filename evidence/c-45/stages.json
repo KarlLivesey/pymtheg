@@ -1,0 +1,1010 @@
+[
+ {
+  "pin": "honojs_hono",
+  "step": "cold",
+  "wallMs": 58511,
+  "totalCpuMs": 62314,
+  "groups": {
+   "process start and module load": 758,
+   "tree hash and snapshot": 592,
+   "stored inputs read": 2579,
+   "parse": 0,
+   "analysis (language)": 43179,
+   "resolution (language)": 956,
+   "store writes and completion": 13773,
+   "other": 477
+  },
+  "counters": {
+   "filesHashed": 1518,
+   "filesParsed": 0,
+   "analysisInputFiles": 460,
+   "tsPrograms": 24,
+   "tsFilesExtracted": 650,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 72340,
+   "recordsDecoded": 460,
+   "filesWritten": 920,
+   "sqlStatements": 203068
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "step": "warm",
+  "wallMs": 721,
+  "totalCpuMs": 938,
+  "groups": {
+   "process start and module load": 624,
+   "tree hash and snapshot": 273,
+   "stored inputs read": 9,
+   "parse": 0,
+   "analysis (language)": 0,
+   "resolution (language)": 0,
+   "store writes and completion": 3,
+   "other": 29
+  },
+  "counters": {
+   "filesHashed": 506,
+   "filesParsed": 0,
+   "analysisInputFiles": 0,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 0,
+   "recordsDecoded": 0,
+   "filesWritten": 0,
+   "sqlStatements": 14
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "step": "body",
+  "wallMs": 31689,
+  "totalCpuMs": 50866,
+  "groups": {
+   "process start and module load": 626,
+   "tree hash and snapshot": 604,
+   "stored inputs read": 3206,
+   "parse": 0,
+   "analysis (language)": 42455,
+   "resolution (language)": 1189,
+   "store writes and completion": 2396,
+   "other": 390
+  },
+  "counters": {
+   "filesHashed": 1518,
+   "filesParsed": 0,
+   "analysisInputFiles": 460,
+   "tsPrograms": 24,
+   "tsFilesExtracted": 650,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 72340,
+   "recordsDecoded": 461,
+   "filesWritten": 18,
+   "sqlStatements": 17659
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "step": "body-revert",
+  "wallMs": 31078,
+  "totalCpuMs": 46684,
+  "groups": {
+   "process start and module load": 629,
+   "tree hash and snapshot": 598,
+   "stored inputs read": 3054,
+   "parse": 0,
+   "analysis (language)": 38303,
+   "resolution (language)": 1070,
+   "store writes and completion": 2631,
+   "other": 399
+  },
+  "counters": {
+   "filesHashed": 1518,
+   "filesParsed": 0,
+   "analysisInputFiles": 460,
+   "tsPrograms": 24,
+   "tsFilesExtracted": 650,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 72340,
+   "recordsDecoded": 461,
+   "filesWritten": 18,
+   "sqlStatements": 17659
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "step": "export",
+  "wallMs": 27275,
+  "totalCpuMs": 46234,
+  "groups": {
+   "process start and module load": 594,
+   "tree hash and snapshot": 541,
+   "stored inputs read": 3154,
+   "parse": 0,
+   "analysis (language)": 39574,
+   "resolution (language)": 965,
+   "store writes and completion": 1006,
+   "other": 400
+  },
+  "counters": {
+   "filesHashed": 1518,
+   "filesParsed": 0,
+   "analysisInputFiles": 460,
+   "tsPrograms": 24,
+   "tsFilesExtracted": 650,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 72341,
+   "recordsDecoded": 461,
+   "filesWritten": 2,
+   "sqlStatements": 1425
+  }
+ },
+ {
+  "pin": "honojs_hono",
+  "step": "export-revert",
+  "wallMs": 25583,
+  "totalCpuMs": 46563,
+  "groups": {
+   "process start and module load": 543,
+   "tree hash and snapshot": 546,
+   "stored inputs read": 3308,
+   "parse": 0,
+   "analysis (language)": 39756,
+   "resolution (language)": 1123,
+   "store writes and completion": 917,
+   "other": 370
+  },
+  "counters": {
+   "filesHashed": 1518,
+   "filesParsed": 0,
+   "analysisInputFiles": 460,
+   "tsPrograms": 24,
+   "tsFilesExtracted": 650,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 72340,
+   "recordsDecoded": 461,
+   "filesWritten": 2,
+   "sqlStatements": 1422
+  }
+ },
+ {
+  "pin": "vitest-dev_vitest",
+  "step": "cold",
+  "wallMs": 215383,
+  "totalCpuMs": 169757,
+  "groups": {
+   "process start and module load": 680,
+   "tree hash and snapshot": 2816,
+   "stored inputs read": 5074,
+   "parse": 0,
+   "analysis (language)": 109596,
+   "resolution (language)": 1276,
+   "store writes and completion": 49374,
+   "other": 941
+  },
+  "counters": {
+   "filesHashed": 7926,
+   "filesParsed": 0,
+   "analysisInputFiles": 2490,
+   "tsPrograms": 50,
+   "tsFilesExtracted": 3815,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 116220,
+   "recordsDecoded": 2490,
+   "filesWritten": 4980,
+   "sqlStatements": 362657
+  }
+ },
+ {
+  "pin": "vitest-dev_vitest",
+  "step": "warm",
+  "wallMs": 1376,
+  "totalCpuMs": 1706,
+  "groups": {
+   "process start and module load": 623,
+   "tree hash and snapshot": 915,
+   "stored inputs read": 40,
+   "parse": 0,
+   "analysis (language)": 0,
+   "resolution (language)": 0,
+   "store writes and completion": 2,
+   "other": 126
+  },
+  "counters": {
+   "filesHashed": 2642,
+   "filesParsed": 0,
+   "analysisInputFiles": 0,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 0,
+   "recordsDecoded": 0,
+   "filesWritten": 0,
+   "sqlStatements": 14
+  }
+ },
+ {
+  "pin": "vitest-dev_vitest",
+  "step": "body",
+  "wallMs": 85621,
+  "totalCpuMs": 122562,
+  "groups": {
+   "process start and module load": 639,
+   "tree hash and snapshot": 2599,
+   "stored inputs read": 5688,
+   "parse": 0,
+   "analysis (language)": 109023,
+   "resolution (language)": 1281,
+   "store writes and completion": 2406,
+   "other": 926
+  },
+  "counters": {
+   "filesHashed": 7926,
+   "filesParsed": 0,
+   "analysisInputFiles": 2490,
+   "tsPrograms": 50,
+   "tsFilesExtracted": 3815,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 116220,
+   "recordsDecoded": 2494,
+   "filesWritten": 7,
+   "sqlStatements": 6975
+  }
+ },
+ {
+  "pin": "vitest-dev_vitest",
+  "step": "body-revert",
+  "wallMs": 84531,
+  "totalCpuMs": 126601,
+  "groups": {
+   "process start and module load": 615,
+   "tree hash and snapshot": 2465,
+   "stored inputs read": 5735,
+   "parse": 0,
+   "analysis (language)": 113132,
+   "resolution (language)": 1255,
+   "store writes and completion": 2442,
+   "other": 957
+  },
+  "counters": {
+   "filesHashed": 7926,
+   "filesParsed": 0,
+   "analysisInputFiles": 2490,
+   "tsPrograms": 50,
+   "tsFilesExtracted": 3815,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 116220,
+   "recordsDecoded": 2494,
+   "filesWritten": 7,
+   "sqlStatements": 6975
+  }
+ },
+ {
+  "pin": "vitest-dev_vitest",
+  "step": "export",
+  "wallMs": 82284,
+  "totalCpuMs": 128283,
+  "groups": {
+   "process start and module load": 604,
+   "tree hash and snapshot": 2720,
+   "stored inputs read": 6018,
+   "parse": 0,
+   "analysis (language)": 114279,
+   "resolution (language)": 1492,
+   "store writes and completion": 2186,
+   "other": 984
+  },
+  "counters": {
+   "filesHashed": 7926,
+   "filesParsed": 0,
+   "analysisInputFiles": 2490,
+   "tsPrograms": 50,
+   "tsFilesExtracted": 3815,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 116221,
+   "recordsDecoded": 2494,
+   "filesWritten": 2,
+   "sqlStatements": 2790
+  }
+ },
+ {
+  "pin": "vitest-dev_vitest",
+  "step": "export-revert",
+  "wallMs": 80511,
+  "totalCpuMs": 124308,
+  "groups": {
+   "process start and module load": 636,
+   "tree hash and snapshot": 2551,
+   "stored inputs read": 5571,
+   "parse": 0,
+   "analysis (language)": 112230,
+   "resolution (language)": 1272,
+   "store writes and completion": 1141,
+   "other": 907
+  },
+  "counters": {
+   "filesHashed": 7926,
+   "filesParsed": 0,
+   "analysisInputFiles": 2490,
+   "tsPrograms": 50,
+   "tsFilesExtracted": 3815,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 116220,
+   "recordsDecoded": 2494,
+   "filesWritten": 2,
+   "sqlStatements": 2787
+  }
+ },
+ {
+  "pin": "restic_restic",
+  "step": "cold",
+  "wallMs": 74212,
+  "totalCpuMs": 45882,
+  "groups": {
+   "process start and module load": 706,
+   "tree hash and snapshot": 668,
+   "stored inputs read": 3170,
+   "parse": 4646,
+   "analysis (language)": 4537,
+   "resolution (language)": 3143,
+   "store writes and completion": 28077,
+   "other": 935
+  },
+  "counters": {
+   "filesHashed": 1680,
+   "filesParsed": 559,
+   "analysisInputFiles": 559,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 559,
+   "resolverInputLinks": 63330,
+   "recordsDecoded": 1279,
+   "filesWritten": 953,
+   "sqlStatements": 263546
+  }
+ },
+ {
+  "pin": "restic_restic",
+  "step": "warm",
+  "wallMs": 678,
+  "totalCpuMs": 927,
+  "groups": {
+   "process start and module load": 603,
+   "tree hash and snapshot": 296,
+   "stored inputs read": 8,
+   "parse": 0,
+   "analysis (language)": 0,
+   "resolution (language)": 0,
+   "store writes and completion": 2,
+   "other": 18
+  },
+  "counters": {
+   "filesHashed": 560,
+   "filesParsed": 0,
+   "analysisInputFiles": 0,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 0,
+   "recordsDecoded": 0,
+   "filesWritten": 0,
+   "sqlStatements": 14
+  }
+ },
+ {
+  "pin": "restic_restic",
+  "step": "body",
+  "wallMs": 3569,
+  "totalCpuMs": 5229,
+  "groups": {
+   "process start and module load": 545,
+   "tree hash and snapshot": 661,
+   "stored inputs read": 1174,
+   "parse": 95,
+   "analysis (language)": 1321,
+   "resolution (language)": 923,
+   "store writes and completion": 178,
+   "other": 332
+  },
+  "counters": {
+   "filesHashed": 1680,
+   "filesParsed": 1,
+   "analysisInputFiles": 559,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 1,
+   "resolverInputLinks": 20,
+   "recordsDecoded": 560,
+   "filesWritten": 1,
+   "sqlStatements": 725
+  }
+ },
+ {
+  "pin": "restic_restic",
+  "step": "body-revert",
+  "wallMs": 3537,
+  "totalCpuMs": 4841,
+  "groups": {
+   "process start and module load": 627,
+   "tree hash and snapshot": 626,
+   "stored inputs read": 1054,
+   "parse": 128,
+   "analysis (language)": 1261,
+   "resolution (language)": 749,
+   "store writes and completion": 98,
+   "other": 298
+  },
+  "counters": {
+   "filesHashed": 1680,
+   "filesParsed": 1,
+   "analysisInputFiles": 559,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 1,
+   "resolverInputLinks": 20,
+   "recordsDecoded": 560,
+   "filesWritten": 1,
+   "sqlStatements": 725
+  }
+ },
+ {
+  "pin": "restic_restic",
+  "step": "export",
+  "wallMs": 9217,
+  "totalCpuMs": 13765,
+  "groups": {
+   "process start and module load": 636,
+   "tree hash and snapshot": 702,
+   "stored inputs read": 3594,
+   "parse": 114,
+   "analysis (language)": 4391,
+   "resolution (language)": 3353,
+   "store writes and completion": 602,
+   "other": 373
+  },
+  "counters": {
+   "filesHashed": 1680,
+   "filesParsed": 1,
+   "analysisInputFiles": 559,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 545,
+   "resolverInputLinks": 62346,
+   "recordsDecoded": 714,
+   "filesWritten": 1,
+   "sqlStatements": 883
+  }
+ },
+ {
+  "pin": "restic_restic",
+  "step": "export-revert",
+  "wallMs": 10455,
+  "totalCpuMs": 14619,
+  "groups": {
+   "process start and module load": 648,
+   "tree hash and snapshot": 747,
+   "stored inputs read": 3744,
+   "parse": 117,
+   "analysis (language)": 4730,
+   "resolution (language)": 3580,
+   "store writes and completion": 652,
+   "other": 401
+  },
+  "counters": {
+   "filesHashed": 1680,
+   "filesParsed": 1,
+   "analysisInputFiles": 559,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 545,
+   "resolverInputLinks": 62345,
+   "recordsDecoded": 714,
+   "filesWritten": 1,
+   "sqlStatements": 880
+  }
+ },
+ {
+  "pin": "cli_cli",
+  "step": "cold",
+  "wallMs": 269504,
+  "totalCpuMs": 167530,
+  "groups": {
+   "process start and module load": 706,
+   "tree hash and snapshot": 1526,
+   "stored inputs read": 13311,
+   "parse": 13358,
+   "analysis (language)": 18993,
+   "resolution (language)": 8968,
+   "store writes and completion": 107845,
+   "other": 2823
+  },
+  "counters": {
+   "filesHashed": 3597,
+   "filesParsed": 1127,
+   "analysisInputFiles": 1191,
+   "tsPrograms": 2,
+   "tsFilesExtracted": 64,
+   "goDecisionFiles": 1127,
+   "resolverInputLinks": 216644,
+   "recordsDecoded": 2862,
+   "filesWritten": 2156,
+   "sqlStatements": 843529
+  }
+ },
+ {
+  "pin": "cli_cli",
+  "step": "warm",
+  "wallMs": 876,
+  "totalCpuMs": 1184,
+  "groups": {
+   "process start and module load": 614,
+   "tree hash and snapshot": 513,
+   "stored inputs read": 15,
+   "parse": 0,
+   "analysis (language)": 0,
+   "resolution (language)": 0,
+   "store writes and completion": 3,
+   "other": 39
+  },
+  "counters": {
+   "filesHashed": 1199,
+   "filesParsed": 0,
+   "analysisInputFiles": 0,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 0,
+   "recordsDecoded": 0,
+   "filesWritten": 0,
+   "sqlStatements": 14
+  }
+ },
+ {
+  "pin": "cli_cli",
+  "step": "body",
+  "wallMs": 9410,
+  "totalCpuMs": 13034,
+  "groups": {
+   "process start and module load": 619,
+   "tree hash and snapshot": 1354,
+   "stored inputs read": 4807,
+   "parse": 203,
+   "analysis (language)": 2767,
+   "resolution (language)": 2190,
+   "store writes and completion": 231,
+   "other": 863
+  },
+  "counters": {
+   "filesHashed": 3597,
+   "filesParsed": 1,
+   "analysisInputFiles": 1191,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 1,
+   "resolverInputLinks": 9331,
+   "recordsDecoded": 1192,
+   "filesWritten": 1,
+   "sqlStatements": 1420
+  }
+ },
+ {
+  "pin": "cli_cli",
+  "step": "body-revert",
+  "wallMs": 9539,
+  "totalCpuMs": 13076,
+  "groups": {
+   "process start and module load": 611,
+   "tree hash and snapshot": 1414,
+   "stored inputs read": 4815,
+   "parse": 237,
+   "analysis (language)": 2727,
+   "resolution (language)": 2182,
+   "store writes and completion": 205,
+   "other": 885
+  },
+  "counters": {
+   "filesHashed": 3597,
+   "filesParsed": 1,
+   "analysisInputFiles": 1191,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 1,
+   "resolverInputLinks": 9331,
+   "recordsDecoded": 1192,
+   "filesWritten": 1,
+   "sqlStatements": 1420
+  }
+ },
+ {
+  "pin": "cli_cli",
+  "step": "export",
+  "wallMs": 24806,
+  "totalCpuMs": 33839,
+  "groups": {
+   "process start and module load": 621,
+   "tree hash and snapshot": 1373,
+   "stored inputs read": 12372,
+   "parse": 209,
+   "analysis (language)": 9367,
+   "resolution (language)": 7367,
+   "store writes and completion": 1230,
+   "other": 1300
+  },
+  "counters": {
+   "filesHashed": 3597,
+   "filesParsed": 1,
+   "analysisInputFiles": 1191,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 724,
+   "resolverInputLinks": 148113,
+   "recordsDecoded": 1524,
+   "filesWritten": 1,
+   "sqlStatements": 1756
+  }
+ },
+ {
+  "pin": "cli_cli",
+  "step": "export-revert",
+  "wallMs": 24936,
+  "totalCpuMs": 32783,
+  "groups": {
+   "process start and module load": 634,
+   "tree hash and snapshot": 1329,
+   "stored inputs read": 11768,
+   "parse": 225,
+   "analysis (language)": 9598,
+   "resolution (language)": 7034,
+   "store writes and completion": 942,
+   "other": 1253
+  },
+  "counters": {
+   "filesHashed": 3597,
+   "filesParsed": 1,
+   "analysisInputFiles": 1191,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 724,
+   "resolverInputLinks": 148112,
+   "recordsDecoded": 1524,
+   "filesWritten": 1,
+   "sqlStatements": 1753
+  }
+ },
+ {
+  "pin": "helix-editor_helix",
+  "step": "cold",
+  "wallMs": 154439,
+  "totalCpuMs": 131765,
+  "groups": {
+   "process start and module load": 665,
+   "tree hash and snapshot": 857,
+   "stored inputs read": 7620,
+   "parse": 42260,
+   "analysis (language)": 25815,
+   "resolution (language)": 21068,
+   "store writes and completion": 32172,
+   "other": 1308
+  },
+  "counters": {
+   "filesHashed": 858,
+   "filesParsed": 255,
+   "analysisInputFiles": 269,
+   "tsPrograms": 1,
+   "tsFilesExtracted": 14,
+   "goDecisionFiles": 4,
+   "resolverInputLinks": 90504,
+   "recordsDecoded": 824,
+   "filesWritten": 536,
+   "sqlStatements": 276108
+  }
+ },
+ {
+  "pin": "helix-editor_helix",
+  "step": "warm",
+  "wallMs": 585,
+  "totalCpuMs": 841,
+  "groups": {
+   "process start and module load": 558,
+   "tree hash and snapshot": 260,
+   "stored inputs read": 6,
+   "parse": 0,
+   "analysis (language)": 0,
+   "resolution (language)": 0,
+   "store writes and completion": 3,
+   "other": 14
+  },
+  "counters": {
+   "filesHashed": 286,
+   "filesParsed": 0,
+   "analysisInputFiles": 0,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 0,
+   "recordsDecoded": 0,
+   "filesWritten": 0,
+   "sqlStatements": 14
+  }
+ },
+ {
+  "pin": "helix-editor_helix",
+  "step": "body",
+  "wallMs": 37841,
+  "totalCpuMs": 54609,
+  "groups": {
+   "process start and module load": 610,
+   "tree hash and snapshot": 591,
+   "stored inputs read": 5877,
+   "parse": 620,
+   "analysis (language)": 22899,
+   "resolution (language)": 21868,
+   "store writes and completion": 1302,
+   "other": 842
+  },
+  "counters": {
+   "filesHashed": 858,
+   "filesParsed": 1,
+   "analysisInputFiles": 269,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 90458,
+   "recordsDecoded": 554,
+   "filesWritten": 2,
+   "sqlStatements": 1420
+  }
+ },
+ {
+  "pin": "helix-editor_helix",
+  "step": "body-revert",
+  "wallMs": 34018,
+  "totalCpuMs": 50541,
+  "groups": {
+   "process start and module load": 586,
+   "tree hash and snapshot": 541,
+   "stored inputs read": 5951,
+   "parse": 568,
+   "analysis (language)": 21123,
+   "resolution (language)": 19790,
+   "store writes and completion": 1157,
+   "other": 825
+  },
+  "counters": {
+   "filesHashed": 858,
+   "filesParsed": 1,
+   "analysisInputFiles": 269,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 90458,
+   "recordsDecoded": 554,
+   "filesWritten": 2,
+   "sqlStatements": 1420
+  }
+ },
+ {
+  "pin": "helix-editor_helix",
+  "step": "export",
+  "wallMs": 34850,
+  "totalCpuMs": 51828,
+  "groups": {
+   "process start and module load": 609,
+   "tree hash and snapshot": 590,
+   "stored inputs read": 5865,
+   "parse": 573,
+   "analysis (language)": 21229,
+   "resolution (language)": 21001,
+   "store writes and completion": 1141,
+   "other": 820
+  },
+  "counters": {
+   "filesHashed": 858,
+   "filesParsed": 1,
+   "analysisInputFiles": 269,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 90459,
+   "recordsDecoded": 554,
+   "filesWritten": 2,
+   "sqlStatements": 1426
+  }
+ },
+ {
+  "pin": "helix-editor_helix",
+  "step": "export-revert",
+  "wallMs": 36000,
+  "totalCpuMs": 53926,
+  "groups": {
+   "process start and module load": 593,
+   "tree hash and snapshot": 571,
+   "stored inputs read": 6286,
+   "parse": 676,
+   "analysis (language)": 22632,
+   "resolution (language)": 21172,
+   "store writes and completion": 1138,
+   "other": 858
+  },
+  "counters": {
+   "filesHashed": 858,
+   "filesParsed": 1,
+   "analysisInputFiles": 269,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 90458,
+   "recordsDecoded": 554,
+   "filesWritten": 2,
+   "sqlStatements": 1421
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "step": "cold",
+  "wallMs": 611701,
+  "totalCpuMs": 567172,
+  "groups": {
+   "process start and module load": 655,
+   "tree hash and snapshot": 1382,
+   "stored inputs read": 10335,
+   "parse": 59012,
+   "analysis (language)": 210555,
+   "resolution (language)": 206685,
+   "store writes and completion": 76486,
+   "other": 2062
+  },
+  "counters": {
+   "filesHashed": 3261,
+   "filesParsed": 884,
+   "analysisInputFiles": 954,
+   "tsPrograms": 6,
+   "tsFilesExtracted": 128,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 154438,
+   "recordsDecoded": 1924,
+   "filesWritten": 1908,
+   "sqlStatements": 495081
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "step": "warm",
+  "wallMs": 915,
+  "totalCpuMs": 1171,
+  "groups": {
+   "process start and module load": 614,
+   "tree hash and snapshot": 506,
+   "stored inputs read": 14,
+   "parse": 0,
+   "analysis (language)": 0,
+   "resolution (language)": 0,
+   "store writes and completion": 2,
+   "other": 35
+  },
+  "counters": {
+   "filesHashed": 1087,
+   "filesParsed": 0,
+   "analysisInputFiles": 0,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 0,
+   "recordsDecoded": 0,
+   "filesWritten": 0,
+   "sqlStatements": 14
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "step": "body",
+  "wallMs": 364101,
+  "totalCpuMs": 429103,
+  "groups": {
+   "process start and module load": 597,
+   "tree hash and snapshot": 1411,
+   "stored inputs read": 10883,
+   "parse": 246,
+   "analysis (language)": 208931,
+   "resolution (language)": 203874,
+   "store writes and completion": 1831,
+   "other": 1330
+  },
+  "counters": {
+   "filesHashed": 3261,
+   "filesParsed": 1,
+   "analysisInputFiles": 954,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 154438,
+   "recordsDecoded": 1925,
+   "filesWritten": 2,
+   "sqlStatements": 1157
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "step": "body-revert",
+  "wallMs": 389321,
+  "totalCpuMs": 459357,
+  "groups": {
+   "process start and module load": 641,
+   "tree hash and snapshot": 1249,
+   "stored inputs read": 10820,
+   "parse": 306,
+   "analysis (language)": 228558,
+   "resolution (language)": 214495,
+   "store writes and completion": 1807,
+   "other": 1481
+  },
+  "counters": {
+   "filesHashed": 3261,
+   "filesParsed": 1,
+   "analysisInputFiles": 954,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 154438,
+   "recordsDecoded": 1925,
+   "filesWritten": 2,
+   "sqlStatements": 1157
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "step": "export",
+  "wallMs": 380268,
+  "totalCpuMs": 446420,
+  "groups": {
+   "process start and module load": 610,
+   "tree hash and snapshot": 1191,
+   "stored inputs read": 11605,
+   "parse": 283,
+   "analysis (language)": 205475,
+   "resolution (language)": 224080,
+   "store writes and completion": 1648,
+   "other": 1528
+  },
+  "counters": {
+   "filesHashed": 3261,
+   "filesParsed": 1,
+   "analysisInputFiles": 954,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 154439,
+   "recordsDecoded": 1925,
+   "filesWritten": 2,
+   "sqlStatements": 1163
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "step": "export-revert",
+  "wallMs": 413568,
+  "totalCpuMs": 479706,
+  "groups": {
+   "process start and module load": 631,
+   "tree hash and snapshot": 1390,
+   "stored inputs read": 11510,
+   "parse": 400,
+   "analysis (language)": 222790,
+   "resolution (language)": 239628,
+   "store writes and completion": 1710,
+   "other": 1647
+  },
+  "counters": {
+   "filesHashed": 3261,
+   "filesParsed": 1,
+   "analysisInputFiles": 954,
+   "tsPrograms": 0,
+   "tsFilesExtracted": 0,
+   "goDecisionFiles": 0,
+   "resolverInputLinks": 154438,
+   "recordsDecoded": 1925,
+   "filesWritten": 2,
+   "sqlStatements": 1158
+  }
+ }
+]

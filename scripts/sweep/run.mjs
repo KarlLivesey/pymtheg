@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "../isolated-home.mjs";
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, openSync } from "node:fs";
