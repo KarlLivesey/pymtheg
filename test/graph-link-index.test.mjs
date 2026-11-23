@@ -86,17 +86,19 @@ test("with one-row batches, after every file write another connection can read s
       store.close();
       SqliteGraphStore.writeBatchRows = previous;
     }
-    // Four parse writes, then four analysis writes; each one already committed.
+    // Four file writes, at analysis (C-53: each file is written once);
+    // each one already committed.
     assert.deepEqual(
       probes,
-      [1, 2, 3, 4, 4, 4, 4, 4].map((files) => [files, true]),
+      [1, 2, 3, 4].map((files) => [files, true]),
     );
   });
 });
 
 // C-37: under the write-ahead log a batch holds the write lock across its
 // writes, so another writer waits for the batch (here each phase is one
-// batch); readers are never blocked and read the last commit.
+// batch, and the files are written in the analysis batch, C-53); readers
+// are never blocked and read the last commit.
 test("within a write batch readers read the last commit; another writer gets the lock after it", async () => {
   await project(async ({ root, database }) => {
     const batched = writeAheadLogSafe(dirname(database));
@@ -111,8 +113,8 @@ test("within a write batch readers read the last commit; another writer gets the
     assert.deepEqual(
       probes,
       batched
-        ? [0, 0, 0, 0, 4, 4, 4, 4].map((files) => [files, false])
-        : [1, 2, 3, 4, 4, 4, 4, 4].map((files) => [files, true]),
+        ? [0, 0, 0, 0].map((files) => [files, false])
+        : [1, 2, 3, 4].map((files) => [files, true]),
     );
     const raw = new DatabaseSync(database, { timeout: 0 });
     raw.exec("BEGIN IMMEDIATE");

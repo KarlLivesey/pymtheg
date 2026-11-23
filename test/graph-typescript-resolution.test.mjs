@@ -5385,7 +5385,7 @@ test("direct eval and with make require uncertain; indirect eval does not", asyn
       assert.equal(imported.resolution, "unresolved");
       assert.equal(imported.data.reason, "dynamic-scope");
       assert.deepEqual(imported.data.targets, [
-        { file: "dep.ts", key: "module@0" },
+        { file: "dep.ts", key: "module" },
       ]);
       const member = graph.store
         .links()
