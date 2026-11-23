@@ -1,0 +1,881 @@
+{
+ "id": "excalidraw/excalidraw",
+ "label": "excalidraw_excalidraw.mainD",
+ "steps": [
+  {
+   "step": 0,
+   "commit": "609f0f2fff1998e5008da17f0b4d6cf731c10289",
+   "file": "packages/element/src/renderElement.ts",
+   "filesWritten": 5,
+   "otherFilesWritten": 4,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 172,
+   "rowsChangedInMeaning": 156,
+   "rows": {
+    "graph_files": 5,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 6,
+    "graph_links": 159,
+    "graph_candidates": 0,
+    "graph_library_targets": 2,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 6,
+    "graph_links": 147,
+    "graph_candidates": 0,
+    "graph_library_targets": 2,
+    "project": 0
+   },
+   "examples": [
+    "packages/excalidraw/eraser/index.ts",
+    "packages/excalidraw/renderer/interactiveScene.ts",
+    "packages/excalidraw/renderer/renderNewElementScene.ts",
+    "packages/excalidraw/renderer/staticScene.ts"
+   ],
+   "wallMs": 127386,
+   "cpuMs": 187723,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 1,
+   "commit": "6f0a4d19b577e781ee5491d6cb89799b3fba7ee8",
+   "file": "excalidraw-app/data/LocalData.ts",
+   "filesWritten": 4,
+   "otherFilesWritten": 3,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 121,
+   "rowsChangedInMeaning": 105,
+   "rows": {
+    "graph_files": 4,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 23,
+    "graph_links": 94,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 23,
+    "graph_links": 81,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/App.tsx",
+    "excalidraw-app/ExcalidrawPlusIframeExport.tsx",
+    "excalidraw-app/collab/Collab.tsx"
+   ],
+   "wallMs": 149065,
+   "cpuMs": 210563,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 2,
+   "commit": "c12a8cd037f562d07c96d1df8a6b74bd06d3069b",
+   "file": "packages/excalidraw/components/CursorHint.tsx",
+   "filesWritten": 2,
+   "otherFilesWritten": 1,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 86,
+   "rowsChangedInMeaning": 79,
+   "rows": {
+    "graph_files": 2,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 16,
+    "graph_links": 67,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 16,
+    "graph_links": 61,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [
+    "packages/excalidraw/components/App.tsx"
+   ],
+   "wallMs": 140002,
+   "cpuMs": 199452,
+   "redoEqualsFirst": false,
+   "redoDifferences": [
+    {
+     "table": "graph_contexts",
+     "onlyIncremental": 1,
+     "onlyCold": 1,
+     "examples": {
+      "incremental": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components\\\\u000052\\\\u0000197070191\\\\u000016877\\\\u00005586\\\\u00001795362965469272534\\\\u00001795362965469272534\\\"}}\"}"
+      ],
+      "cold": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components\\\\u000052\\\\u0000197070191\\\\u000016877\\\\u00005586\\\\u00001795362022579198931\\\\u00001795362022579198931\\\"}}\"}"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "step": 3,
+   "commit": "ea74787447db38be580ceb11f53928b1a291f88f",
+   "file": "excalidraw-app/App.tsx",
+   "filesWritten": 3,
+   "otherFilesWritten": 2,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 720,
+   "rowsChangedInMeaning": 713,
+   "rows": {
+    "graph_files": 3,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 62,
+    "graph_links": 513,
+    "graph_candidates": 0,
+    "graph_library_targets": 141,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 62,
+    "graph_links": 508,
+    "graph_candidates": 0,
+    "graph_library_targets": 141,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/index.tsx",
+    "excalidraw-app/tests/collab.test.tsx"
+   ],
+   "wallMs": 132871,
+   "cpuMs": 193604,
+   "redoEqualsFirst": false,
+   "redoDifferences": [
+    {
+     "table": "graph_contexts",
+     "onlyIncremental": 1,
+     "onlyCold": 1,
+     "examples": {
+      "incremental": [
+       "{\"path\":\"node_modules/excalidraw-app\",\"body\":\"{\\\"path\\\":\\\"node_modules/excalidraw-app\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"excalidraw-app\\\\u000052\\\\u0000197068675\\\\u000016877\\\\u0000596\\\\u00001795363260542930859\\\\u00001795363260542930859\\\"}}\"}"
+      ],
+      "cold": [
+       "{\"path\":\"node_modules/excalidraw-app\",\"body\":\"{\\\"path\\\":\\\"node_modules/excalidraw-app\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"excalidraw-app\\\\u000052\\\\u0000197068675\\\\u000016877\\\\u0000596\\\\u00001795362022482198018\\\\u00001795362022482198018\\\"}}\"}"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "step": 4,
+   "commit": "46c42a6cb0bfc8c096ac4f232d427e10c2d943d1",
+   "file": "packages/excalidraw/components/App.tsx",
+   "filesWritten": 44,
+   "otherFilesWritten": 43,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 2617,
+   "rowsChangedInMeaning": 2384,
+   "rows": {
+    "graph_files": 44,
+    "graph_contexts": 2,
+    "graph_parse_failures": 0,
+    "graph_symbols": 193,
+    "graph_links": 1913,
+    "graph_candidates": 3,
+    "graph_library_targets": 462,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 2,
+    "graph_parse_failures": 0,
+    "graph_symbols": 193,
+    "graph_links": 1723,
+    "graph_candidates": 3,
+    "graph_library_targets": 462,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/collab/Collab.tsx",
+    "excalidraw-app/tests/collab.test.tsx",
+    "packages/common/src/utils.test.ts",
+    "packages/common/src/utils.ts",
+    "packages/element/tests/frame.test.tsx"
+   ],
+   "wallMs": 166942,
+   "cpuMs": 211712,
+   "redoEqualsFirst": false,
+   "redoDifferences": [
+    {
+     "table": "graph_contexts",
+     "onlyIncremental": 2,
+     "onlyCold": 2,
+     "examples": {
+      "incremental": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components\\\\u000052\\\\u0000197070191\\\\u000016877\\\\u00005586\\\\u00001795363601020517947\\\\u00001795363601020517947\\\"}}\"}",
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components/App.tsx\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components/App.tsx\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components/App.tsx\\\\u000052\\\\u0000199769213\\\\u000033188\\\\u0000371973\\\\u00001795363601020517947\\\\u00001795363601020517947\\\"}}\"}"
+      ],
+      "cold": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components\\\\u000052\\\\u0000197070191\\\\u000016877\\\\u00005586\\\\u00001795362965469272534\\\\u00001795362965469272534\\\"}}\"}",
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components/App.tsx\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components/App.tsx\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components/App.tsx\\\\u000052\\\\u0000197070278\\\\u000033188\\\\u0000371973\\\\u00001795362022531198479\\\\u00001795362022531198479\\\"}}\"}"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "step": 5,
+   "commit": "7c0b3295760d3492a980f2f6416a36c9ef592103",
+   "file": "packages/excalidraw/textAutoResizeHandle.ts",
+   "filesWritten": 2,
+   "otherFilesWritten": 1,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 34,
+   "rowsChangedInMeaning": 31,
+   "rows": {
+    "graph_files": 2,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 8,
+    "graph_links": 23,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 8,
+    "graph_links": 21,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [
+    "packages/excalidraw/components/App.text.ts"
+   ],
+   "wallMs": 170100,
+   "cpuMs": 228326,
+   "redoEqualsFirst": false,
+   "redoDifferences": [
+    {
+     "table": "graph_contexts",
+     "onlyIncremental": 1,
+     "onlyCold": 1,
+     "examples": {
+      "incremental": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw\\\\u000052\\\\u0000197069882\\\\u000016877\\\\u00001194\\\\u00001795363982240854845\\\\u00001795363982240854845\\\"}}\"}"
+      ],
+      "cold": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw\\\\u000052\\\\u0000197069882\\\\u000016877\\\\u00001194\\\\u00001795362022675199834\\\\u00001795362022675199834\\\"}}\"}"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "step": 6,
+   "commit": "5776e1cc66842ca229c79fbbf3d2ccf208c24ab0",
+   "file": "packages/element/src/selection.ts",
+   "filesWritten": 14,
+   "otherFilesWritten": 13,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 115,
+   "rowsChangedInMeaning": 49,
+   "rows": {
+    "graph_files": 14,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5,
+    "graph_links": 85,
+    "graph_candidates": 0,
+    "graph_library_targets": 11,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5,
+    "graph_links": 32,
+    "graph_candidates": 0,
+    "graph_library_targets": 11,
+    "project": 0
+   },
+   "examples": [
+    "packages/element/tests/selection.test.ts",
+    "packages/excalidraw/actions/actionDeselect.ts",
+    "packages/excalidraw/actions/actionProperties.tsx",
+    "packages/excalidraw/components/Actions.tsx",
+    "packages/excalidraw/components/App.clipboard.ts"
+   ],
+   "wallMs": 150708,
+   "cpuMs": 202531,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 7,
+   "commit": "0cf56b19c79a28dda52f0dcb1c5392ed19cb5fcd",
+   "file": "packages/common/tests/binary-heap.test.ts",
+   "filesWritten": 0,
+   "otherFilesWritten": 0,
+   "filesChangedInMeaning": 0,
+   "rowsWritten": 0,
+   "rowsChangedInMeaning": 0,
+   "rows": {
+    "graph_files": 0,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 0,
+    "graph_links": 0,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 0,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 0,
+    "graph_links": 0,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [],
+   "wallMs": 138263,
+   "cpuMs": 198956,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 8,
+   "commit": "d992c10bc1c3ad87eff4e0a45091810242f01ce7",
+   "file": "excalidraw-app/data/LocalData.ts",
+   "filesWritten": 4,
+   "otherFilesWritten": 3,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 189,
+   "rowsChangedInMeaning": 171,
+   "rows": {
+    "graph_files": 4,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 28,
+    "graph_links": 156,
+    "graph_candidates": 0,
+    "graph_library_targets": 1,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 28,
+    "graph_links": 141,
+    "graph_candidates": 0,
+    "graph_library_targets": 1,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/App.tsx",
+    "excalidraw-app/ExcalidrawPlusIframeExport.tsx",
+    "excalidraw-app/collab/Collab.tsx"
+   ],
+   "wallMs": 121738,
+   "cpuMs": 178965,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 9,
+   "commit": "091b9053a3db8ef702c0b65bc8d351290f685362",
+   "file": "packages/excalidraw/actions/actionHistory.tsx",
+   "filesWritten": 4,
+   "otherFilesWritten": 3,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 126,
+   "rowsChangedInMeaning": 106,
+   "rows": {
+    "graph_files": 4,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 28,
+    "graph_links": 91,
+    "graph_candidates": 0,
+    "graph_library_targets": 3,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 28,
+    "graph_links": 74,
+    "graph_candidates": 0,
+    "graph_library_targets": 3,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/tests/collab.test.tsx",
+    "packages/excalidraw/components/App.tsx",
+    "packages/excalidraw/tests/history.test.tsx"
+   ],
+   "wallMs": 130495,
+   "cpuMs": 191269,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 10,
+   "commit": "1caec99b290c75cda05385e637138998807a65ae",
+   "file": "dev-docs/docusaurus.config.js",
+   "filesWritten": 1,
+   "otherFilesWritten": 0,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 23,
+   "rowsChangedInMeaning": 23,
+   "rows": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 20,
+    "graph_links": 2,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 20,
+    "graph_links": 2,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [],
+   "wallMs": 131268,
+   "cpuMs": 189798,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 11,
+   "commit": "2b0e4c9623e44b3f2f7d02d532f23128e988cb5d",
+   "file": "packages/excalidraw/data/resave.ts",
+   "filesWritten": 1,
+   "otherFilesWritten": 0,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 14,
+   "rowsChangedInMeaning": 14,
+   "rows": {
+    "graph_files": 1,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 3,
+    "graph_links": 7,
+    "graph_candidates": 0,
+    "graph_library_targets": 2,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 3,
+    "graph_links": 7,
+    "graph_candidates": 0,
+    "graph_library_targets": 2,
+    "project": 0
+   },
+   "examples": [],
+   "wallMs": 127735,
+   "cpuMs": 185705,
+   "redoEqualsFirst": false,
+   "redoDifferences": [
+    {
+     "table": "graph_contexts",
+     "onlyIncremental": 1,
+     "onlyCold": 1,
+     "examples": {
+      "incremental": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/data\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/data\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/data\\\\u000052\\\\u0000197071654\\\\u000016877\\\\u0000304\\\\u00001795365718355344912\\\\u00001795365718355344912\\\"}}\"}"
+      ],
+      "cold": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/data\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/data\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/data\\\\u000052\\\\u0000197071654\\\\u000016877\\\\u0000304\\\\u00001795362022584198978\\\\u00001795362022584198978\\\"}}\"}"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "step": 12,
+   "commit": "3d8c12fba475bad8ebee4c238466c59f08a5458c",
+   "file": "packages/excalidraw/components/main-menu/DefaultItems.tsx",
+   "filesWritten": 2,
+   "otherFilesWritten": 1,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 90,
+   "rowsChangedInMeaning": 88,
+   "rows": {
+    "graph_files": 2,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 9,
+    "graph_links": 79,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 9,
+    "graph_links": 78,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/components/AppMainMenu.tsx"
+   ],
+   "wallMs": 141595,
+   "cpuMs": 199875,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 13,
+   "commit": "cae9d2bcbd3e6c70c579a52574d91ea8898a80bb",
+   "file": "packages/excalidraw/components/App.tsx",
+   "filesWritten": 40,
+   "otherFilesWritten": 39,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 1923,
+   "rowsChangedInMeaning": 1720,
+   "rows": {
+    "graph_files": 40,
+    "graph_contexts": 2,
+    "graph_parse_failures": 0,
+    "graph_symbols": 172,
+    "graph_links": 1709,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 2,
+    "graph_parse_failures": 0,
+    "graph_symbols": 172,
+    "graph_links": 1545,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/collab/Collab.tsx",
+    "packages/common/src/utils.test.ts",
+    "packages/common/src/utils.ts",
+    "packages/element/tests/frame.test.tsx",
+    "packages/excalidraw/components/App.arrowText.ts"
+   ],
+   "wallMs": 150684,
+   "cpuMs": 201350,
+   "redoEqualsFirst": false,
+   "redoDifferences": [
+    {
+     "table": "graph_contexts",
+     "onlyIncremental": 2,
+     "onlyCold": 2,
+     "examples": {
+      "incremental": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components\\\\u000052\\\\u0000197070191\\\\u000016877\\\\u00005586\\\\u00001795366316140432646\\\\u00001795366316140432646\\\"}}\"}",
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components/App.tsx\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components/App.tsx\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components/App.tsx\\\\u000052\\\\u0000201461311\\\\u000033188\\\\u0000371973\\\\u00001795366316140432646\\\\u00001795366316140432646\\\"}}\"}"
+      ],
+      "cold": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components\\\\u000052\\\\u0000197070191\\\\u000016877\\\\u00005586\\\\u00001795363601020517947\\\\u00001795363601020517947\\\"}}\"}",
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components/App.tsx\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components/App.tsx\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components/App.tsx\\\\u000052\\\\u0000199769213\\\\u000033188\\\\u0000371973\\\\u00001795363601020517947\\\\u00001795363601020517947\\\"}}\"}"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "step": 14,
+   "commit": "0b3a5e7cc4d6ba5bcc5105f694a59f721ee06fc5",
+   "file": "packages/element/src/binding.ts",
+   "filesWritten": 20,
+   "otherFilesWritten": 19,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 499,
+   "rowsChangedInMeaning": 392,
+   "rows": {
+    "graph_files": 20,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 48,
+    "graph_links": 431,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 48,
+    "graph_links": 343,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/components/DebugCanvas.tsx",
+    "packages/element/src/arrowEndpointText.ts",
+    "packages/element/src/arrows/focus.ts",
+    "packages/element/src/delta.ts",
+    "packages/element/src/duplicate.ts"
+   ],
+   "wallMs": 136068,
+   "cpuMs": 191375,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 15,
+   "commit": "f39ac4a653335efaaaf9834bf28e9ffc1452cb59",
+   "file": "packages/element/src/arrows/focus.ts",
+   "filesWritten": 4,
+   "otherFilesWritten": 3,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 127,
+   "rowsChangedInMeaning": 114,
+   "rows": {
+    "graph_files": 4,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 27,
+    "graph_links": 96,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 27,
+    "graph_links": 86,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [
+    "packages/element/src/arrows/helpers.ts",
+    "packages/excalidraw/components/App.selectionTool.ts",
+    "packages/excalidraw/components/App.tsx"
+   ],
+   "wallMs": 131922,
+   "cpuMs": 191055,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 16,
+   "commit": "6135548534fcfacc0ffa7bd1d1f7d32ce05f137d",
+   "file": "packages/excalidraw/components/TTDDialog/hooks/useMermaidRenderer.ts",
+   "filesWritten": 1,
+   "otherFilesWritten": 0,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 16,
+   "rowsChangedInMeaning": 16,
+   "rows": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 3,
+    "graph_links": 11,
+    "graph_candidates": 0,
+    "graph_library_targets": 1,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 3,
+    "graph_links": 11,
+    "graph_candidates": 0,
+    "graph_library_targets": 1,
+    "project": 0
+   },
+   "examples": [],
+   "wallMs": 140557,
+   "cpuMs": 200788,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 17,
+   "commit": "7cc31ac64a9ec3f9ce5bc3a09cd3716c2eb07370",
+   "file": "packages/excalidraw/clipboard.ts",
+   "filesWritten": 15,
+   "otherFilesWritten": 14,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 483,
+   "rowsChangedInMeaning": 388,
+   "rows": {
+    "graph_files": 15,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 40,
+    "graph_links": 298,
+    "graph_candidates": 4,
+    "graph_library_targets": 125,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 1,
+    "graph_parse_failures": 0,
+    "graph_symbols": 40,
+    "graph_links": 217,
+    "graph_candidates": 4,
+    "graph_library_targets": 125,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/CustomStats.tsx",
+    "excalidraw-app/share/ShareDialog.tsx",
+    "packages/excalidraw/actions/actionClipboard.tsx",
+    "packages/excalidraw/actions/actionElementLink.ts",
+    "packages/excalidraw/clipboard.test.ts"
+   ],
+   "wallMs": 134898,
+   "cpuMs": 186342,
+   "redoEqualsFirst": false,
+   "redoDifferences": [
+    {
+     "table": "graph_contexts",
+     "onlyIncremental": 1,
+     "onlyCold": 1,
+     "examples": {
+      "incremental": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw\\\\u000052\\\\u0000197069882\\\\u000016877\\\\u00001194\\\\u00001795367494712646166\\\\u00001795367494712646166\\\"}}\"}"
+      ],
+      "cold": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw\\\\u000052\\\\u0000197069882\\\\u000016877\\\\u00001194\\\\u00001795363982240854845\\\\u00001795363982240854845\\\"}}\"}"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "step": 18,
+   "commit": "7c4194485647fcd3a1aaa75612c0193208d65bae",
+   "file": "packages/common/src/binary-heap.ts",
+   "filesWritten": 3,
+   "otherFilesWritten": 2,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 74,
+   "rowsChangedInMeaning": 39,
+   "rows": {
+    "graph_files": 3,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 9,
+    "graph_links": 62,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 0,
+    "graph_parse_failures": 0,
+    "graph_symbols": 9,
+    "graph_links": 29,
+    "graph_candidates": 0,
+    "graph_library_targets": 0,
+    "project": 0
+   },
+   "examples": [
+    "packages/common/tests/binary-heap.test.ts",
+    "packages/element/src/elbowArrow.ts"
+   ],
+   "wallMs": 124096,
+   "cpuMs": 184059,
+   "redoEqualsFirst": true
+  },
+  {
+   "step": 19,
+   "commit": "91c7748c3d58a54444193695d3b7d3ced34434ad",
+   "file": "packages/excalidraw/components/App.tsx",
+   "filesWritten": 19,
+   "otherFilesWritten": 18,
+   "filesChangedInMeaning": 1,
+   "rowsWritten": 383,
+   "rowsChangedInMeaning": 304,
+   "rows": {
+    "graph_files": 19,
+    "graph_contexts": 2,
+    "graph_parse_failures": 0,
+    "graph_symbols": 37,
+    "graph_links": 261,
+    "graph_candidates": 3,
+    "graph_library_targets": 61,
+    "project": 0
+   },
+   "meaning": {
+    "graph_files": 1,
+    "graph_contexts": 2,
+    "graph_parse_failures": 0,
+    "graph_symbols": 37,
+    "graph_links": 200,
+    "graph_candidates": 3,
+    "graph_library_targets": 61,
+    "project": 0
+   },
+   "examples": [
+    "excalidraw-app/collab/Collab.tsx",
+    "packages/common/src/utils.test.ts",
+    "packages/common/src/utils.ts",
+    "packages/excalidraw/components/App.pan.ts",
+    "packages/excalidraw/components/App.textTool.ts"
+   ],
+   "wallMs": 141239,
+   "cpuMs": 193086,
+   "redoEqualsFirst": false,
+   "redoDifferences": [
+    {
+     "table": "graph_contexts",
+     "onlyIncremental": 2,
+     "onlyCold": 2,
+     "examples": {
+      "incremental": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components\\\\u000052\\\\u0000197070191\\\\u000016877\\\\u00005586\\\\u00001795368067873384631\\\\u00001795368067873384631\\\"}}\"}",
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components/App.tsx\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components/App.tsx\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components/App.tsx\\\\u000052\\\\u0000203452776\\\\u000033188\\\\u0000371973\\\\u00001795368067873384631\\\\u00001795368067873384631\\\"}}\"}"
+      ],
+      "cold": [
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components\\\\u000052\\\\u0000197070191\\\\u000016877\\\\u00005586\\\\u00001795366316140432646\\\\u00001795366316140432646\\\"}}\"}",
+       "{\"path\":\"node_modules/@excalidraw/excalidraw/components/App.tsx\",\"body\":\"{\\\"path\\\":\\\"node_modules/@excalidraw/excalidraw/components/App.tsx\\\",\\\"text\\\":\\\"\\\",\\\"hash\\\":\\\"\\\",\\\"status\\\":\\\"clean\\\",\\\"diagnostics\\\":[],\\\"dependency\\\":{\\\"module\\\":\\\"typescript\\\",\\\"stamp\\\":\\\"packages/excalidraw/components/App.tsx\\\\u000052\\\\u0000201461311\\\\u000033188\\\\u0000371973\\\\u00001795366316140432646\\\\u00001795366316140432646\\\"}}\"}"
+      ]
+     }
+    }
+   ]
+  }
+ ]
+}
