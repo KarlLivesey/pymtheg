@@ -3205,6 +3205,21 @@ analysis. Module analysis would have to run in a worker that the
 coordinator terminates, as `check` does.
 [C-47](changes/C-47.md)
 
+### C-47b An expanding generic type ends at the judge's bound
+
+**Decided (C-47b):** a generic type that binds a larger value at every
+level (Vitest's `TestAPI.extend`) is not given a special rule in the
+structural judgement; it reaches the depth bound and its link is
+`invalid-code` with `judge-budget-exhausted`. **Why:** a cut that judged
+only the bound values at a repeated declaration was built and reviewed
+three times; each round found an input the declaration's own judgement
+reads beside its nodes (an unbound parameter's constraint, whether `self`
+is present, the kind of value a tuple rest spreads), and each gap gave a
+clean link through a failed file. The cut would change one link on the
+measured trees. **Rules out:** treating a repeated declaration as already
+judged, unless what a judgement reads is first made explicit in the code
+rather than argued in a note. [C-47](changes/C-47.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000
@@ -3523,3 +3538,25 @@ on restic, cli/cli and dioxus). A run killed between the phases leaves its
 mark and no held file; the next run trusts no record, as before.
 **Unchanged:** the stored rows, row for row; module versions; C-33's
 no-edit run; C-37's batches. See [C-53](changes/C-53.md).
+
+### C-48 The MCP server keeps one graph worker
+
+**Decided (C-48):** the MCP server runs every graph job, one at a time, in
+one worker that lives between jobs and keeps an `IndexSession` (C-45).
+Cancellation is cooperative: through memory shared with the worker, at the
+worker's next checkpoint (every abort check of the graph command). A cancel
+that finds the worker inside a language module's own call, with no
+toolchain process live, terminates it at once, as before, and its session
+ends. While a module's returned promise is awaited, or a toolchain process
+of the job is live, the server kills the job's processes and asks the
+worker to abort; a worker that answers within 30 s (by an injectable
+clock) keeps running, and one that does not is terminated then. A worker idle for 10 minutes (by an
+injectable clock) is ended. **Why:** an unchanged index costs 0.2 to 0.4 s
+instead of 0.7 to 1.3 s, and module state kept by a session can only be
+reused by a process that lives. **Trade:** a worker keeps its memory
+high-water mark between jobs unless it collects: after every job it runs a
+full collection and reports its live heap (77 to 132 MiB on four pins),
+and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall-clock wait that decides a
+result; the 30 s grace only bounds how long an unanswering worker is
+given. See [C-48](changes/C-48.md).
+
