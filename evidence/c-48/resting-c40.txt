@@ -1,0 +1,7 @@
+honojs/hono cold: complete, wall 33899 ms, cpu 54937 ms, rss 1191 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 61 MiB
+honojs/hono warm: complete, wall 233 ms, cpu 372 ms, rss 1191 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 58 MiB
+honojs/hono body: complete, wall 26638 ms, cpu 42274 ms, rss 1322 MiB, worker 1, session {"loads":1,"runs":2,"dropped":0}, live heap 59 MiB
+honojs/hono body-revert: complete, wall 28483 ms, cpu 44358 ms, rss 1326 MiB, worker 1, session {"loads":1,"runs":3,"dropped":0}, live heap 58 MiB
+honojs/hono export: complete, wall 29814 ms, cpu 44564 ms, rss 1345 MiB, worker 1, session {"loads":1,"runs":4,"dropped":0}, live heap 58 MiB
+honojs/hono export-revert: complete, wall 28702 ms, cpu 44052 ms, rss 1349 MiB, worker 1, session {"loads":1,"runs":5,"dropped":0}, live heap 59 MiB
+honojs/hono last revert equals cold: yes

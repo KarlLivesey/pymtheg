@@ -160,7 +160,10 @@ export function aliasChain(
       let module: ts.Symbol | undefined;
       try {
         module = checker.getSymbolAtLocation(specifier);
-      } catch {
+      } catch (error) {
+        // C-47: a stack overflow is not "no module": the caller's own
+        // overflow rule decides (a shorter chain could miss a seed).
+        if (error instanceof RangeError) throw error;
         module = undefined;
       }
       const equals = module?.exports?.get("export=" as ts.__String);
@@ -171,7 +174,8 @@ export function aliasChain(
     let next: ts.Symbol | undefined;
     try {
       next = checker.getImmediateAliasedSymbol(current);
-    } catch {
+    } catch (error) {
+      if (error instanceof RangeError) throw error;
       next = undefined;
     }
     if (!next || next === current || chain.includes(next)) break;
@@ -289,7 +293,9 @@ export const DEPENDENCIES: Record<
     let contextual: ts.Type | undefined;
     try {
       contextual = checker.getContextualType(fn);
-    } catch {
+    } catch (error) {
+      // C-47: a stack overflow is not "no contextual type".
+      if (error instanceof RangeError) throw error;
       contextual = undefined;
     }
     for (const type of contextual?.isUnion()
