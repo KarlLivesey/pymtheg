@@ -26,6 +26,7 @@ import { libraryKey, libraryReader } from "./library.js";
 import type { ProjectGroup } from "./project.js";
 import type { Renamed } from "./rename.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
+import { setJudgeBudget, setJudgeProgramBudget } from "./judge.js";
 import { neutralizeAssumed } from "./untrusted.js";
 import { entryProvenance } from "./workspace-entries.js";
 import { unbuiltEntryAssumption } from "./entry-build.js";
@@ -59,6 +60,10 @@ const exhaustedSessions = new WeakSet<object>();
 export interface TypeScriptModuleOptions {
   /** The taint walk's step budget (taint.ts; TAINT_BUDGET otherwise). */
   taintSteps?: number;
+  /** C-47: the structural judgement's step budget (judge.ts JUDGE_BUDGET). */
+  judgeSteps?: number;
+  /** C-47: the judge's step budget for a whole program (JUDGE_PROGRAM_BUDGET). */
+  judgeProgramSteps?: number;
   /** The program budget in characters (project.ts; MAX_PROGRAM_SOURCE otherwise). */
   programCharacters?: number;
   /** Called before every checker call the module makes; may throw. */
@@ -121,7 +126,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `45+typescript-${ts.version}`;
+const MODULE_VERSION = `49+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -230,6 +235,10 @@ function openSession(
       const checker = attributed(program.getTypeChecker(), hooks.checkerFault);
       if (hooks.taintSteps !== undefined)
         setTaintBudget(checker, hooks.taintSteps);
+      if (hooks.judgeSteps !== undefined)
+        setJudgeBudget(checker, hooks.judgeSteps);
+      if (hooks.judgeProgramSteps !== undefined)
+        setJudgeProgramBudget(checker, hooks.judgeProgramSteps);
       return { program, checker };
     } catch (error) {
       lastProgram = program;
@@ -696,6 +705,20 @@ const operationalFailure = (message: string): ParseResult => {
  */
 export const injectedExtractionFaults = new Set<string>();
 /** The diagnostic for an unexpected exception while extracting one file. */
+/** Why a result's symbol keys would be refused by the core, if they would. */
+export function invalidKeys(result: ParseResult): string | undefined {
+  const keys = new Set<string>();
+  for (const symbol of result.symbols) {
+    if (!symbol.key) return "An extracted symbol has no key";
+    if (keys.has(symbol.key))
+      return `Two extracted symbols share the key ${JSON.stringify(symbol.key)}`;
+    keys.add(symbol.key);
+  }
+  for (const link of result.links)
+    if (link.sourceKey !== null && !keys.has(link.sourceKey))
+      return `An extracted link names the missing source key ${JSON.stringify(link.sourceKey)}`;
+  return undefined;
+}
 export function internalErrorMessage(path: string, error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
   return `Internal error in the TypeScript module while reading ${path} (a defect in pymtheg, not a problem in this file; it is retried on the next index): ${detail}`;
@@ -1384,6 +1407,17 @@ export function typescriptModule(
               return {
                 drop: `${COMPILER_FAILURE}: Invalid UTF-16 range in the extracted facts for ${path}`,
                 blame: path,
+              };
+            // Keys the core would refuse (empty, duplicated, or a link
+            // source that is no symbol) fail this file alone, as this
+            // module's own fault: the core refuses a module's whole output
+            // for one invalid file.
+            const keyFault = invalidKeys(result);
+            if (keyFault)
+              return {
+                result: operationalFailure(
+                  `${internalErrorMessage(path, Error(keyFault))} (only this file is affected)`,
+                ),
               };
             statistics.extracted++;
             if (taintExhausted(session.checker)) {

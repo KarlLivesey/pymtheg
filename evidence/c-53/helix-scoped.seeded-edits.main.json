@@ -1,0 +1,416 @@
+{
+ "id": "helix-editor/helix",
+ "seed": 5303,
+ "expectedSteps": 30,
+ "steps": [
+  {
+   "step": 0,
+   "file": "helix-core/src/snippets/parser.rs",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 54430,
+   "failed": 0,
+   "resolvedFiles": 251,
+   "scoped": 0,
+   "fullPass": [
+    "lookup-cut"
+   ]
+  },
+  {
+   "step": 1,
+   "file": "helix-lsp-types/src/window.rs",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13517,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 2,
+   "file": "helix-core/src/match_brackets.rs",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15456,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 3,
+   "file": "helix-stdx/src/range.rs",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15924,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 4,
+   "file": "helix-view/src/action.rs",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15841,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 5,
+   "file": "helix-vcs/src/git/test.rs",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13867,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 6,
+   "file": "helix-term/src/ui/mod.rs",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 59107,
+   "failed": 0,
+   "resolvedFiles": 251,
+   "scoped": 0,
+   "fullPass": [
+    "surface"
+   ]
+  },
+  {
+   "step": 7,
+   "file": "helix-term/src/handlers/signature_help.rs",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 16114,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 8,
+   "file": "helix-term/tests/test/movement.rs",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 55474,
+   "failed": 0,
+   "resolvedFiles": 251,
+   "scoped": 0,
+   "fullPass": [
+    "lookup-cut"
+   ]
+  },
+  {
+   "step": 9,
+   "file": "helix-term/src/handlers/completion/request.rs",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13236,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 10,
+   "file": "helix-term/src/handlers/code_action_hint.rs",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11298,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 11,
+   "file": "tests/query/highlights/rust/edge.rs",
+   "kind": "call",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15344,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 12,
+   "file": "tests/indent/rust.rs",
+   "kind": "call",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14289,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 13,
+   "file": "helix-term/tests/test/command_line.rs",
+   "kind": "add-import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 38381,
+   "failed": 0,
+   "resolvedFiles": 251,
+   "scoped": 0,
+   "fullPass": [
+    "surface"
+   ]
+  },
+  {
+   "step": 14,
+   "file": "helix-term/src/ui/statusline.rs",
+   "kind": "call",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 64481,
+   "failed": 0,
+   "resolvedFiles": 251,
+   "scoped": 0,
+   "fullPass": [
+    "lookup-cut"
+   ]
+  },
+  {
+   "step": 15,
+   "file": "helix-dap/src/registry.rs",
+   "kind": "remove-import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 42100,
+   "failed": 0,
+   "resolvedFiles": 251,
+   "scoped": 0,
+   "fullPass": [
+    "surface"
+   ]
+  },
+  {
+   "step": 16,
+   "file": "helix-loader/build.rs",
+   "kind": "call",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13702,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 17,
+   "file": "helix-core/src/diff.rs",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 44067,
+   "failed": 0,
+   "resolvedFiles": 251,
+   "scoped": 0,
+   "fullPass": [
+    "surface"
+   ]
+  },
+  {
+   "step": 18,
+   "file": "helix-lsp-types/src/document_highlight.rs",
+   "kind": "mod-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 45086,
+   "failed": 0,
+   "resolvedFiles": 252,
+   "scoped": 0,
+   "fullPass": []
+  },
+  {
+   "step": 19,
+   "file": "helix-lsp-types/src/moniker.rs",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 12041,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 20,
+   "file": "helix-core/src/test.rs",
+   "kind": "call",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13906,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 21,
+   "file": "helix-term/src/handlers/code_action_hint.rs",
+   "kind": "call",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13257,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 22,
+   "file": "helix-tui/src/widgets/paragraph.rs",
+   "kind": "call",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 13149,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 23,
+   "file": "helix-lsp-types/src/workspace_folders.rs",
+   "kind": "add-macro",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 39433,
+   "failed": 0,
+   "resolvedFiles": 252,
+   "scoped": 0,
+   "fullPass": [
+    "surface"
+   ]
+  },
+  {
+   "step": 24,
+   "file": "helix-term/src/main.rs",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10185,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 25,
+   "file": "helix-core/src/search.rs",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10094,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 26,
+   "file": "helix-view/src/handlers/diagnostics.rs",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 14064,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 27,
+   "file": "helix-core/src/wrap.rs",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10039,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 28,
+   "file": "helix-lsp-types/src/rename.rs",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9407,
+   "failed": 0,
+   "resolvedFiles": 1,
+   "scoped": 1,
+   "fullPass": []
+  },
+  {
+   "step": 29,
+   "file": "helix-core/src/increment/mod.rs",
+   "kind": "cfg",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 33188,
+   "failed": 0,
+   "resolvedFiles": 252,
+   "scoped": 0,
+   "fullPass": [
+    "surface"
+   ]
+  }
+ ],
+ "equal": true
+}

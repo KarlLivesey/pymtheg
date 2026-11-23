@@ -17,6 +17,8 @@ import {
 } from "./registry.js";
 import { SqliteGraphStore } from "./store.js";
 import { indexProject, type IndexReport } from "./indexer.js";
+import type { IndexSession, SessionRun } from "./session.js";
+import type { LanguageModule } from "./types.js";
 import { stage, stageSync } from "./work.js";
 import {
   captureInventory,
@@ -131,6 +133,28 @@ export interface GraphExecutionOptions {
   progress?: ((progress: GraphProgress) => void) | undefined;
   /** Tests/embedders may supply a registry; the CLI always discovers production modules. */
   registry?: LanguageRegistry;
+  /**
+   * C-45: a process that indexes more than once passes the same session: its
+   * modules are loaded once, and each module may keep proved state between
+   * runs (see IndexSession).
+   */
+  session?: IndexSession;
+  /**
+   * C-48: told when a call into a language module (or a toolchain) begins
+   * (true), when the call has returned a promise that is being awaited
+   * ("awaiting"), and when it has settled (false). During the call itself
+   * the module may run for long without passing a cancellation checkpoint,
+   * so a caller that must cancel promptly ends the work another way. While
+   * its promise is awaited, a module that honours the abort signal (Rust's
+   * phase worker, a toolchain's child process) is cancelled through it at
+   * its next await. The module may still run synchronous code between its
+   * awaits during that time (Go's analysis with the toolchain route runs
+   * its notes pass and decision loops after awaiting the facts), so the
+   * abort can take effect only at its next await or when it settles. The
+   * abort signal is checked after the call is announced, so a cancellation
+   * set before it is never missed.
+   */
+  onModuleCall?: (inside: boolean | "awaiting") => void;
 }
 const arity: Record<GraphCommand, number> = {
   index: 0,
@@ -176,12 +200,16 @@ export async function executeGraph(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
-  const registry =
-    options.registry ?? (await stage("command.modules", discoverLanguages));
+  const registry = options.session
+    ? await stage("command.modules", () => options.session!.registry())
+    : (options.registry ?? (await stage("command.modules", discoverLanguages)));
   // An explicit index first verifies on a read-only connection, which
   // writes nothing to the file (C-33). It opens the writable store only if
   // it has to index.
-  const verifyFirst = request.command === "index" && !options.registry;
+  const verifyFirst =
+    request.command === "index" &&
+    !options.registry &&
+    !options.session?.injectedRegistry;
   let store: SqliteGraphStore | null = null;
   if (exists)
     try {
@@ -199,6 +227,7 @@ export async function executeGraph(
       // The writable store reports it, or prepares the file, when indexing.
       if (!verifyFirst) throw error;
     }
+  let sessionRun: SessionRun | undefined;
   try {
     const listing: InventoryListing = {
       discovered: 0,
@@ -298,6 +327,28 @@ export async function executeGraph(
         metadata,
       );
     const complete = previousState?.fingerprint === currentFingerprint();
+    // A module's or a toolchain's call (C-48): "inside" while the call
+    // itself runs, "awaiting" while the promise it returned is awaited.
+    const moduleCall = async <T>(call: () => T | Promise<T>): Promise<T> => {
+      options.onModuleCall?.(true);
+      let pending: T | Promise<T>;
+      try {
+        signal.throwIfAborted();
+        pending = call();
+      } catch (error) {
+        options.onModuleCall?.(false);
+        throw error;
+      }
+      options.onModuleCall?.("awaiting");
+      try {
+        return await pending;
+      } finally {
+        options.onModuleCall?.(false);
+      }
+    };
+    // A toolchain runs outside this process, between checkpoints.
+    const toolchainCall = <T>(call: () => Promise<T>): Promise<T> =>
+      moduleCall(call);
     // D22: outside the checkout (the user's cache folder), never in it.
     const toolchainDirectory = toolchainOn ? toolchainWorkDirectory(root) : "";
     // The completion and the analysis completion are read again in one
@@ -358,12 +409,14 @@ export async function executeGraph(
       request.noSync
         ? true
         : recordedKey !== undefined &&
-          (await goToolchainKey(
-            root,
-            toolchains.go!,
-            inventory,
-            toolchainDirectory,
-            signal,
+          (await toolchainCall(() =>
+            goToolchainKey(
+              root,
+              toolchains.go!,
+              inventory,
+              toolchainDirectory,
+              signal,
+            ),
           )) === recordedKey;
     const shouldIndex = wouldIndex || !toolchainCurrent;
     let report: IndexReport | null = null;
@@ -400,6 +453,8 @@ export async function executeGraph(
           (dirty.has(file.path) || retry.has(file.path)) &&
           registry.modules.find((m) => m.id === file.module)?.parse,
       ).length;
+      const inModule = <T>(call: () => T | Promise<T>): Promise<T> =>
+        moduleCall(call);
       const tracked = new LanguageRegistry(
         registry.modules.map((module) => ({
           ...module,
@@ -410,7 +465,7 @@ export async function executeGraph(
                 ) => {
                   signal.throwIfAborted();
                   try {
-                    return await module.parse!(source);
+                    return await inModule(() => module.parse!(source));
                   } finally {
                     options.progress?.({
                       phase: "parse",
@@ -435,7 +490,7 @@ export async function executeGraph(
                     total: context.files.length,
                     module: module.id,
                   });
-                  const result = await module.analyze!(context);
+                  const result = await inModule(() => module.analyze!(context));
                   options.progress?.({
                     phase: "analyze",
                     done: context.files.length,
@@ -458,7 +513,7 @@ export async function executeGraph(
                     total: context.files.length,
                     module: module.id,
                   });
-                  const result = await module.resolve!(context);
+                  const result = await inModule(() => module.resolve!(context));
                   options.progress?.({
                     phase: "resolve",
                     done: context.files.length,
@@ -477,14 +532,45 @@ export async function executeGraph(
           if (typeof value !== "function") return value;
           return (...args: unknown[]) => {
             signal.throwIfAborted();
-            return value.apply(target, args);
+            const result = value.apply(target, args);
+            // C-45: kept state is confirmed against the completion record
+            // the run's ownership baseline read, in the same snapshot; the
+            // record read before the run began can be stale.
+            if (key === "beginIndexRun")
+              sessionRun?.confirm(
+                checkpointFrom(
+                  currentStore.baselineCommandState(),
+                  currentStore.projectId,
+                )?.fingerprint ?? null,
+              );
+            return result;
           };
         },
       });
       const started = performance.now();
       options.progress?.({ phase: "inventory", done: 0, total });
+      // C-45: what a session kept is used only if the store is as its last
+      // completed run left it (the completion record), for this project,
+      // store and configuration.
+      sessionRun = options.session?.beginRun(
+        {
+          root,
+          store: path,
+          projectId: currentStore.projectId,
+          configuration,
+          settings,
+        },
+        previousState?.fingerprint ?? null,
+      );
+      const run = sessionRun;
       const indexed = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
+        ...(run
+          ? {
+              kept: (module: LanguageModule) =>
+                run.kept(module.id, module.version),
+            }
+          : {}),
         onFileCompared: (path) => {
           signal.throwIfAborted();
           options.progress?.({
@@ -523,8 +609,8 @@ export async function executeGraph(
         !report.analysisErrors.length &&
         !report.resolutionErrors.length
       )
-        stageSync("command.checkpointWrite", () =>
-          currentStore.completeGraphCommandState(
+        stageSync("command.checkpointWrite", () => {
+          const written = currentStore.completeGraphCommandState(
             {
               schema: checkpointSchema,
               projectId: currentStore.projectId,
@@ -538,9 +624,13 @@ export async function executeGraph(
                 : {}),
             },
             dataVersion,
-          ),
-        );
+          );
+          if (written) sessionRun?.complete(currentFingerprint());
+          return written;
+        });
       else store.invalidateGraphCommandState();
+      // A run that wrote no completion keeps nothing (see IndexSession).
+      sessionRun?.abandon();
       options.progress?.({ phase: "complete", done: total, total });
     }
     const finish = (): GraphResponse => {
@@ -768,8 +858,21 @@ export async function executeGraph(
             .map((f) => f.path),
         };
       else if (request.command !== "index" && store) {
+        // C-48 review: every store read of a query is a checkpoint, so a
+        // cancel during query evaluation is acted on at the next read.
+        const reading = store;
+        const checkpointed = new Proxy(reading, {
+          get(target, key) {
+            const value = Reflect.get(target, key);
+            if (typeof value !== "function") return value;
+            return (...args: unknown[]) => {
+              signal.throwIfAborted();
+              return value.apply(target, args);
+            };
+          },
+        });
         const query = queryGraph(
-          store,
+          checkpointed,
           request.command,
           request.args ?? [],
           depth,
@@ -837,6 +940,8 @@ export async function executeGraph(
     }
     return response;
   } finally {
+    // A run that failed or was aborted keeps nothing (no-op once complete).
+    sessionRun?.abandon();
     stageSync("command.sqliteClose", () => store?.close());
   }
 }

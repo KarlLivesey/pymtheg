@@ -381,6 +381,8 @@ export class SqliteGraphStore implements GraphStorage {
         completed: ReadonlyMap<string, string>;
         /** Another connection committed between two of its commits. */
         interleaved: boolean;
+        /** The completion record in the run's baseline snapshot (C-45). */
+        commandState: unknown;
       } = {
     state: "idle",
   };
@@ -1370,11 +1372,13 @@ export class SqliteGraphStore implements GraphStorage {
     let version: number;
     let takeOver: boolean;
     let completed: ReadonlyMap<string, string>;
+    let commandState: unknown;
     this.db.exec("BEGIN");
     try {
       version = this.commandDataVersion();
       takeOver = this.unfinishedIndexRun();
       completed = takeOver ? new Map() : this.readCompletedAnalysis();
+      commandState = this.graphCommandState();
     } finally {
       this.db.exec("COMMIT");
     }
@@ -1385,20 +1389,25 @@ export class SqliteGraphStore implements GraphStorage {
       takeOver,
       completed,
       interleaved: false,
+      commandState,
     };
     if (!takeOver) return false;
     this.transaction(() => {});
     return true;
   }
-  /**
-   * Writes this run's mark now, if it has not written yet (C-38A). A run that
-   * holds back its parsed writes until analysis (C-27) claims the store
-   * before analysing, as a run that writes its parse results first does: a
-   * run that begins meanwhile then takes over, and this one writes nothing
-   * more.
-   */
   claimIndexRun(): void {
     if (this.indexRun.state === "pending") this.transaction(() => {});
+  }
+  /**
+   * C-45: the completion record as the current run's baseline snapshot read
+   * it, in the same read as its data version and mark: every later write by
+   * another connection is caught by the run's own ownership checks.
+   * Undefined outside a run.
+   */
+  baselineCommandState(): unknown {
+    return this.indexRun.state === "idle"
+      ? undefined
+      : this.indexRun.commandState;
   }
   private readCompletedAnalysis(): ReadonlyMap<string, string> {
     const row = this.db
