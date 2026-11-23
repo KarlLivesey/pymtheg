@@ -18,6 +18,7 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import ts from "typescript";
 import { compareRows, setPageCache, storeRows } from "./dump.mjs";
 
 const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
@@ -50,6 +51,11 @@ const temporary = storeDir && join(storeDir, `${name}.${seedArg}.sqlite`);
 // unchanged `graph index` that must verify without an index run and leave
 // the store's bytes as they were.
 const command = flags.includes("--command");
+// C-49: TypeScript edits also copy, remove and swap whole declarations,
+// members and object properties (same-named siblings) and insert a callback
+// holding a local (an anonymous-scoped symbol; a repeated insert is its
+// same-named sibling). A separate flag, so earlier seeds replay as they did.
+const siblings = flags.includes("--siblings");
 // C-36: --scoped-mix weights Rust edits to those that can keep the surface.
 const scopedMix = flags.includes("--scoped-mix");
 if (command && !temporary) throw Error("--command requires --store-dir");
@@ -163,6 +169,82 @@ if (repo.language === "go" || repo.language === "rust") {
 // Edits that keep, move or break code: a comment line, a blank line, a
 // duplicated line, a deleted line, a no-op statement after an opening brace.
 const kinds = ["comment", "blank", "duplicate", "delete", "statement"];
+if (siblings) kinds.push("copy", "remove", "swap", "anonymous");
+
+/** A sibling edit of one statement, member or property list, or undefined. */
+function siblingEdit(kind, file, source) {
+  const syntax = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const lists = [];
+  const walk = (node) => {
+    const statements =
+      ts.isSourceFile(node) || ts.isBlock(node) || ts.isModuleBlock(node);
+    const list = statements
+      ? node.statements
+      : ts.isClassLike(node) ||
+          ts.isInterfaceDeclaration(node) ||
+          ts.isTypeLiteralNode(node)
+        ? node.members
+        : ts.isObjectLiteralExpression(node)
+          ? node.properties
+          : undefined;
+    if (list?.length)
+      lists.push({
+        list,
+        statements,
+        block: ts.isBlock(node),
+        comma: ts.isObjectLiteralExpression(node),
+      });
+    ts.forEachChild(node, walk);
+  };
+  walk(syntax);
+  // An anonymous-scoped local is a symbol only inside a declaration's
+  // body, so the callback goes into a block.
+  const usable = lists.filter((item) =>
+    kind === "swap"
+      ? item.list.length >= 2
+      : kind === "anonymous"
+        ? item.statements && item.block
+        : true,
+  );
+  if (!usable.length) return undefined;
+  const { list, comma } = pick(usable);
+  const at = Math.floor(random() * list.length);
+  const span = (node) => [node.getStart(syntax), node.end];
+  const [start, end] = span(list[at]);
+  const separator = comma ? ", " : "\n";
+  if (kind === "copy")
+    return (
+      source.slice(0, start) +
+      source.slice(start, end) +
+      separator +
+      source.slice(start)
+    );
+  if (kind === "remove") {
+    const stop = comma && source[end] === "," ? end + 1 : end;
+    return source.slice(0, start) + source.slice(stop);
+  }
+  if (kind === "anonymous")
+    return (
+      source.slice(0, start) +
+      "[0].forEach(() => { const c49 = () => 0; });\n" +
+      source.slice(start)
+    );
+  const first = Math.min(at, list.length - 2);
+  const [aStart, aEnd] = span(list[first]);
+  const [bStart, bEnd] = span(list[first + 1]);
+  return (
+    source.slice(0, aStart) +
+    source.slice(bStart, bEnd) +
+    source.slice(aEnd, bStart) +
+    source.slice(aStart, aEnd) +
+    source.slice(bEnd)
+  );
+}
 const statement = { go: "_ = 0", rust: "let _ = 0;", typescript: "void 0;" }[
   repo.language
 ];
@@ -535,11 +617,16 @@ for (let step = 0; step < expectedSteps; step++) {
       if (braces.length) lines.splice(pick(braces) + 1, 0, statement);
       else kind = "comment";
     }
+    let text;
+    if (["copy", "remove", "swap", "anonymous"].includes(kind)) {
+      text = siblingEdit(kind, file, original);
+      if (text === undefined) kind = "comment";
+    }
     if (kind === "comment") lines.splice(at, 0, "// c22 random edit");
     if (kind === "blank") lines.splice(at, 0, "");
     if (kind === "duplicate") lines.splice(at, 0, lines[at] ?? "");
     if (kind === "delete") lines.splice(at, 1);
-    edit = { file, kind, text: lines.join("\n") };
+    edit = { file, kind, text: text ?? lines.join("\n") };
   }
   file = edit.file;
   const { kind, text } = edit;

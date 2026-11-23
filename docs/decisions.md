@@ -3457,3 +3457,82 @@ command, as before; once per sync in a long-lived process). **Rules out
 for now:** streaming a module's results to the store. The results were
 small (298 MiB as JSON on microsoft/TypeScript); the retained program was
 the cost. See [C-40](changes/C-40.md).
+
+### TypeScript symbol keys are name paths, not offsets (C-49)
+
+**Decided (C-49):** a TypeScript symbol's key is its kind and identity
+(`function:splitPath`, `method:Box.open`), with `~n` for the n-th later
+declaration of the same kind and identity in the file, in source order (the
+same order the core numbers ordinals by), and `module` for the file. Keys
+are computed from the file's syntax alone and are unique only within the
+file; in a JavaScript file the compiler saw with renamed module-system
+names, keys report the original names, like identities. **Why:** keys were
+`kind@offset`, and links store their targets by key, so a body edit
+rewrote the stored rows of every file linking into a later declaration of
+the edited file without changing any fact. **Unchanged:** symbol ids,
+ordinals and requirement links (which store identity and ordinal, never a
+key); no migration is needed. **Trade:** inserting or removing a same-named
+sibling still renumbers the later ones, as their ordinals already did.
+See [C-49](changes/C-49.md).
+
+### C-45 Kept module state between index runs needs three proofs
+
+**Decided (C-45):** a process that indexes more than once may pass an
+`IndexSession`. The session loads the modules once and keeps per-module
+values between runs, returned only under the validity key the module kept
+them with. Everything is dropped unless the store's completion record, as
+the run's own ownership baseline reads it (the same snapshot as its data
+version and mark), is the one the session's last completed run wrote, and
+the project, store, module versions and index settings are unchanged.
+A run takes what was kept; only values it sets again are kept after it,
+and only if it writes its completion record. Modules treat kept values as
+immutable. Kept state is bounded by count; the embedder bounds memory. The session holds no
+connection or lock between runs; each run is an ordinary index run.
+**Why:** a one-file edit rebuilds per-process and per-language state that
+did not change (C-45 measurements). The completion record already proves
+what the store holds, so it is the proof for kept state too. **Rules out:**
+a file watcher as the source of truth for what changed (only a hint), and
+a separate index daemon for now. See [C-45](changes/C-45.md).
+
+
+
+### An analysing module's files are written once per run (C-53)
+
+**Decided (C-53):** the indexer holds the parse results of every module
+that analyses until that module's analysis and writes each file once, with
+its analysed result (or as parsed when the module returns none for it).
+A run holding files that main's parse write would have written commits its
+run mark at the end of the parse write, where its first commit used to be,
+so a run started after that point finds it unfinished and takes over
+(files of a module reusing its analysis, C-27 and C-36, were held before
+and claim nothing). **Why:** every Go and Rust file was stored as parsed
+and then replaced whole as analysed, and every TypeScript file as a
+placeholder and then as analysed; on four pins that was 46-57% of the rows
+a cold index changed. **Trade:** held results stay in memory until
+their module's analysis instead of being read back (helix peak +9%; lower
+on restic, cli/cli and dioxus). A run killed between the phases leaves its
+mark and no held file; the next run trusts no record, as before.
+**Unchanged:** the stored rows, row for row; module versions; C-33's
+no-edit run; C-37's batches. See [C-53](changes/C-53.md).
+
+### C-48 The MCP server keeps one graph worker
+
+**Decided (C-48):** the MCP server runs every graph job, one at a time, in
+one worker that lives between jobs and keeps an `IndexSession` (C-45).
+Cancellation is cooperative: through memory shared with the worker, at the
+worker's next checkpoint (every abort check of the graph command). A cancel
+that finds the worker inside a language module's own call, with no
+toolchain process live, terminates it at once, as before, and its session
+ends. While a module's returned promise is awaited, or a toolchain process
+of the job is live, the server kills the job's processes and asks the
+worker to abort; a worker that answers within 30 s (by an injectable
+clock) keeps running, and one that does not is terminated then. A worker idle for 10 minutes (by an
+injectable clock) is ended. **Why:** an unchanged index costs 0.2 to 0.4 s
+instead of 0.7 to 1.3 s, and module state kept by a session can only be
+reused by a process that lives. **Trade:** a worker keeps its memory
+high-water mark between jobs unless it collects: after every job it runs a
+full collection and reports its live heap (77 to 132 MiB on four pins),
+and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall-clock wait that decides a
+result; the 30 s grace only bounds how long an unanswering worker is
+given. See [C-48](changes/C-48.md).
+

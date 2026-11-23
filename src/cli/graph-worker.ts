@@ -65,13 +65,17 @@ export async function serveGraphRequest(
       ...options,
       signal: cancel.signal,
       progress: (progress) => post({ kind: "progress", progress }),
+      // Only a module's synchronous call is the module section: while its
+      // promise is awaited ("awaiting"), the abort signal reaches the module
+      // (Rust's phase worker, a toolchain's processes), so a cancel there is
+      // cooperative.
       onModuleCall: (inside) => {
         Atomics.store(
           shared,
           CONTROL.section,
-          inside ? SECTION.module : SECTION.core,
+          inside === true ? SECTION.module : SECTION.core,
         );
-        if (inside && Atomics.load(shared, CONTROL.cancel) === 1) {
+        if (inside === true && Atomics.load(shared, CONTROL.cancel) === 1) {
           cancel.abort();
           cancel.signal.throwIfAborted();
         }
