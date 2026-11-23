@@ -20,6 +20,7 @@ import { GraphJobs } from "../dist/mcp/graph-jobs.js";
 import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 import { module as synthetic } from "./fixtures/graph-core/synthetic.mjs";
 import { keepingModule } from "./fixtures/mcp-graph/keeping-module.mjs";
+import { tableModule } from "./fixtures/graph-session/table-module.mjs";
 
 const production = await discoverLanguages();
 const worker = new URL(
@@ -53,7 +54,7 @@ function jobsFor(root, mode, options = {}) {
   const jobs = new GraphJobs(root, {
     launch: (control) =>
       new Worker(worker, {
-        workerData: { control, gate: gate.buffer, mode },
+        workerData: { control, gate: gate.buffer, mode, root },
         stdout: true,
         stderr: true,
       }),
@@ -226,7 +227,12 @@ test("an idle worker is ended with its session, by a test clock", async () => {
   }
 });
 
-test("a worker terminated after any committed write leaves a store the next job repairs to cold", async (t) => {
+// The worker stops after its nth store write call (as the C-22 kill child
+// counts them). Under C-37's write batches a write call does not always
+// commit: some of these points fall inside an open batch, where the
+// termination discards the batch's uncommitted writes; the others fall
+// after a commit. Either way the next job must repair the store to cold.
+test("a worker terminated after any store write call (committed, or inside an open batch) leaves a store the next job repairs to cold", async (t) => {
   const { base, root, write } = tree(goFiles);
   try {
     // A completed index, then an edit whose re-index is cut short.
@@ -293,6 +299,94 @@ test("after each job the worker reports what it keeps; over its bound it is ende
   } finally {
     await kept.jobs.close();
     await bounded.jobs.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+/** The stored name of every `.k` file (the table module), by path. */
+function storedNames(root) {
+  const store = new SqliteGraphStore(graphAt(root), undefined, {
+    readOnly: true,
+  });
+  try {
+    return Object.fromEntries(
+      store
+        .files()
+        .filter((file) => file.path.endsWith(".k"))
+        .map((file) => [file.path, file.result.data?.name ?? null]),
+    );
+  } finally {
+    store.close();
+  }
+}
+
+test("through the worker, another process's complete index just before a run's baseline drops what the session kept", async () => {
+  const { base, root, write } = tree({ "a.k": "k=alpha", "b.k": "k=beta" });
+  const { jobs, gate } = jobsFor(root, "table-race");
+  try {
+    assert.equal((await run(jobs)).state, "complete");
+    write("a.k", "k=ALPHA2");
+    // Armed: the worker's next baseline is preceded by the other process.
+    Atomics.store(gate, 2, 1);
+    assert.equal((await run(jobs)).state, "complete");
+    assert.equal(Atomics.load(gate, 2), 0, "the other process ran");
+    write("b.k", "k=beta2");
+    const last = await run(jobs);
+    assert.equal(last.state, "complete");
+    assert.equal(jobs.generation, 1);
+    assert.ok(last.session.dropped >= 1, JSON.stringify(last.session));
+    assert.deepEqual(storedNames(root), { "a.k": "ALPHA2", "b.k": "beta2" });
+    assert.deepEqual(
+      await differencesFromCold(
+        base,
+        root,
+        new LanguageRegistry([tableModule]),
+      ),
+      [],
+    );
+  } finally {
+    await jobs.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a worker started under other code is ended before the next job", async () => {
+  const { base, root, write } = tree(synFiles);
+  let code = "1.0.0";
+  const { jobs } = jobsFor(root, "keeping", { codeVersion: () => code });
+  try {
+    await run(jobs);
+    write("1.syn", "edit a");
+    await run(jobs);
+    assert.equal(jobs.generation, 1, "the same code keeps the worker");
+    code = "1.0.1";
+    write("1.syn", "edit b");
+    const job = await run(jobs);
+    assert.equal(job.state, "complete");
+    assert.equal(jobs.generation, 2, "an upgrade starts a new worker");
+    assert.deepEqual(job.session, { runs: 1, dropped: 0 });
+  } finally {
+    await jobs.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a cancel during query evaluation is acted on at the query's next store read; the worker lives", async () => {
+  const { base, root } = tree(synFiles);
+  const { jobs, stopped, release } = jobsFor(root, "pause-query");
+  try {
+    assert.equal((await run(jobs)).state, "complete");
+    const job = jobs.start({ command: "callers", args: ["0.syn:0"] });
+    await stopped();
+    const cancelling = jobs.cancel(job.id);
+    release();
+    await cancelling;
+    assert.equal(job.state, "cancelled");
+    assert.equal(jobs.generation, 1, "acknowledged at a checkpoint");
+    assert.equal((await run(jobs)).state, "complete");
+    assert.equal(jobs.generation, 1);
+  } finally {
+    await jobs.close();
     rmSync(base, { recursive: true, force: true });
   }
 });

@@ -845,8 +845,21 @@ export async function executeGraph(
             .map((f) => f.path),
         };
       else if (request.command !== "index" && store) {
+        // C-48 review: every store read of a query is a checkpoint, so a
+        // cancel during query evaluation is acted on at the next read.
+        const reading = store;
+        const checkpointed = new Proxy(reading, {
+          get(target, key) {
+            const value = Reflect.get(target, key);
+            if (typeof value !== "function") return value;
+            return (...args: unknown[]) => {
+              signal.throwIfAborted();
+              return value.apply(target, args);
+            };
+          },
+        });
         const query = queryGraph(
-          store,
+          checkpointed,
           request.command,
           request.args ?? [],
           depth,

@@ -11,6 +11,11 @@
 //         "keeping"      the synthetic module, keeping a name map (C-45)
 //         "write-limit"  production modules; stops for good at its
 //                        `writes`th committed write (gate[2])
+//         "pause-query"  the keeping module; a query stops inside its first
+//                        call-link read until released
+//         "table-race"   the table module (C-45 review); while gate[2] is 1,
+//                        the next run's baseline is preceded by another
+//                        process's complete `graph index` (once)
 // A stopped worker sets gate[0] to 1 and waits for gate[1].
 import { workerData } from "node:worker_threads";
 import { serveGraphRequests } from "../../../dist/mcp/graph-worker.js";
@@ -20,6 +25,8 @@ import {
 } from "../../../dist/graph/index.js";
 import { module as synthetic } from "../graph-core/synthetic.mjs";
 import { keepingModule } from "./keeping-module.mjs";
+import { tableModule } from "../graph-session/table-module.mjs";
+import { spawnSync } from "node:child_process";
 
 const gate = new Int32Array(workerData.gate);
 const stop = () => {
@@ -79,6 +86,35 @@ if (workerData.mode === "pause-module" || workerData.mode === "crash-module") {
       },
     },
   ]);
+}
+if (workerData.mode === "pause-query") {
+  // The keeping module; a query stops inside its first call-link read.
+  registry = new LanguageRegistry([keepingModule]);
+  const callLinks = proto.callLinks;
+  let stopped = false;
+  proto.callLinks = function (...args) {
+    if (!stopped) {
+      stopped = true;
+      stop();
+    }
+    return callLinks.apply(this, args);
+  };
+}
+if (workerData.mode === "table-race") {
+  registry = new LanguageRegistry([tableModule]);
+  const beginIndexRun = proto.beginIndexRun;
+  const child = new URL("../graph-session/index-child.mjs", import.meta.url)
+    .pathname;
+  proto.beginIndexRun = function (...args) {
+    if (Atomics.load(gate, 2) === 1) {
+      Atomics.store(gate, 2, 0);
+      const other = spawnSync(process.execPath, [child, workerData.root], {
+        encoding: "utf8",
+      });
+      if (other.status !== 0) throw Error(other.stderr);
+    }
+    return beginIndexRun.apply(this, args);
+  };
 }
 if (workerData.mode === "keeping")
   registry = new LanguageRegistry([keepingModule]);

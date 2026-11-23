@@ -2,6 +2,8 @@
 import type { operationError } from "./operation-errors.js";
 import { findProjectRoot } from "../storage/local.js";
 import { Worker } from "node:worker_threads";
+import { readFileSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import type { GraphRequest, GraphProgress } from "../graph/commands.js";
 import { GraphView } from "./graph-view.js";
@@ -39,6 +41,40 @@ export interface GraphJobsOptions {
    * when the job finishes, with its session: the next job starts a new one.
    */
   restingBytes?: number;
+  /**
+   * The code a new worker would run (the package version and build). A
+   * worker started under another value is ended before the next job, so an
+   * upgrade on disk is never served by old module code. Tests supply one.
+   */
+  codeVersion?: () => string;
+}
+/**
+ * The package version and a build id: the size and modification time of
+ * the worker's own compiled entry. An upgrade or a rebuild changes it.
+ */
+export function installedCodeVersion(): string {
+  const entry = fileURLToPath(new URL("./graph-worker.js", import.meta.url));
+  const manifest = fileURLToPath(
+    new URL("../../package.json", import.meta.url),
+  );
+  const read = (path: string) => {
+    try {
+      const info = statSync(path);
+      return `${info.size}:${info.mtimeMs}`;
+    } catch {
+      return "missing";
+    }
+  };
+  let version = "unknown";
+  try {
+    version = String(
+      (JSON.parse(readFileSync(manifest, "utf8")) as { version?: unknown })
+        .version,
+    );
+  } catch {
+    // No manifest: the build id alone.
+  }
+  return `${version}\u0000${read(entry)}`;
 }
 type WorkerMessage = {
   kind: string;
@@ -82,6 +118,9 @@ export class GraphJobs {
   private readonly clock: () => number;
   private readonly idleMs: number;
   private readonly restingBytes: number;
+  private readonly codeVersion: () => string;
+  /** The code version the current worker was started under. */
+  private workerCode: string | undefined;
   private worker: Worker | undefined;
   private control: Int32Array | undefined;
   private current: GraphJob | undefined;
@@ -104,6 +143,7 @@ export class GraphJobs {
     this.clock = options.clock ?? Date.now;
     this.idleMs = options.idleMs ?? 10 * 60_000;
     this.restingBytes = options.restingBytes ?? defaultRestingBytes;
+    this.codeVersion = options.codeVersion ?? installedCodeVersion;
   }
   activeId() {
     return this.current && !this.current.exited ? this.current.id : null;
@@ -119,7 +159,11 @@ export class GraphJobs {
         "A graph job is running. Read or cancel its jobId with graph_result before starting another.",
       );
     this.releaseIfIdle();
-    const worker = this.worker ?? this.startWorker();
+    // A worker started under other code (an upgrade or rebuild on disk) is
+    // ended; the job starts one with the code installed now.
+    const code = this.codeVersion();
+    if (this.worker && this.workerCode !== code) void this.retire();
+    const worker = this.worker ?? this.startWorker(code);
     Atomics.store(this.control!, CONTROL.cancel, 0);
     let settle!: () => void;
     const job: GraphJob = {
@@ -158,13 +202,14 @@ export class GraphJobs {
       this.timer.unref?.();
     }
   }
-  private startWorker(): Worker {
+  private startWorker(code: string): Worker {
     const control = new Int32Array(
       new SharedArrayBuffer(controlLength * Int32Array.BYTES_PER_ELEMENT),
     );
     const worker = this.launch(control.buffer as SharedArrayBuffer);
     this.generation++;
     this.worker = worker;
+    this.workerCode = code;
     this.control = control;
     // Only parentPort messages enter the protocol; module logging must not corrupt stdio.
     worker.stdout?.resume();
