@@ -79,9 +79,7 @@ interface ConfigData {
 
 /** The literal `file` paths of an `output` value (an object or a list of them). */
 function outputFiles(value: ts.Expression): string[] {
-  const objects = ts.isArrayLiteralExpression(value)
-    ? value.elements
-    : [value];
+  const objects = ts.isArrayLiteralExpression(value) ? value.elements : [value];
   const files: string[] = [];
   for (const item of objects)
     if (ts.isObjectLiteralExpression(item))
@@ -282,7 +280,8 @@ export function entryConventions(
     if (bundlerConfig.test(name)) {
       const list = bundlers.get(owner) ?? [];
       const data = readBundlerConfig(path, text);
-      if (name.startsWith("rollup.") && !data.lists) unreadableRollup.add(owner);
+      if (name.startsWith("rollup.") && !data.lists)
+        unreadableRollup.add(owner);
       list.push(data);
       bundlers.set(owner, list);
     } else if (extractorConfig.test(name)) {
@@ -395,8 +394,7 @@ export function entryConventions(
       // A token other than <projectFolder> (`<unscopedPackageName>`) or a
       // value that is not a string: the roll-up cannot be read.
       const readable = (value: unknown) =>
-        typeof value === "string" &&
-        !/<(?!projectFolder>)[^>]*>/.test(value);
+        typeof value === "string" && !/<(?!projectFolder>)[^>]*>/.test(value);
       if (
         !readable(main) ||
         [
@@ -404,7 +402,9 @@ export function entryConventions(
           "alphaTrimmedFilePath",
           "betaTrimmedFilePath",
           "publicTrimmedFilePath",
-        ].some((field) => rollup[field] !== undefined && !readable(rollup[field]))
+        ].some(
+          (field) => rollup[field] !== undefined && !readable(rollup[field]),
+        )
       ) {
         unreadableRollup.add(root);
         return "conflicting";
