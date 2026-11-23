@@ -394,6 +394,12 @@ export interface GraphStorage {
    * the store, or throws without writing.
    */
   beginIndexRun?(): StorageResult<boolean>;
+  /**
+   * C-53: commits the run's mark now if the run has not written yet, so a
+   * run that holds results before writing them is seen as unfinished by
+   * any later run from that point on. Proves ownership like any write.
+   */
+  claimIndexRun?(): StorageResult<void>;
   /** Module versions whose completed decisions this run found in its opening snapshot. */
   completedAnalysis?(): StorageResult<ReadonlyMap<string, string>>;
   /** An incomplete run retains its mark. A successful owned run records reusable module decisions. */

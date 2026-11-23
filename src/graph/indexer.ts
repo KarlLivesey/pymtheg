@@ -314,7 +314,18 @@ export async function indexProject(
   // After an unfinished run every claimed file counts as changed, so no
   // module reuses an earlier analysis.
   if (unfinished) for (const path of claims.keys()) changed.add(path);
-  const deferred = new Map<string, GraphFile[]>();
+  // C-53: the parse results of a module that analyses are held until its
+  // analysis and written once, with the analysed result, instead of being
+  // written here and replaced there. A run stopped in between leaves its
+  // unfinished mark, so the next run trusts no record and parses again.
+  // Each held file is kept as the record the store would hold, so what a
+  // module does to its analysis input never reaches a stored record.
+  const deferred = new Map<string, string[]>();
+  for (const module of registry.modules)
+    if (module.analyze) deferred.set(module.id, []);
+  // Modules that may reuse their earlier analysis are handed the previous
+  // records of the files they are given again (C-27).
+  const reusing = new Set<string>();
   if (canReuse)
     for (const module of registry.modules)
       if (
@@ -323,7 +334,7 @@ export async function indexProject(
         completed?.get(module.id) === module.version &&
         !incompatible.has(module.id)
       )
-        deferred.set(module.id, []);
+        reusing.add(module.id);
   const writeParsed = async (file: GraphFile) => {
     await store.replaceFile(file, cacheableFailures.has(file.path));
     report.indexed++;
@@ -339,12 +350,25 @@ export async function indexProject(
       ]);
       for (const file of updates) {
         const pending = deferred.get(file.module);
-        if (pending) pending.push(file);
+        if (pending) pending.push(JSON.stringify(file));
         else {
           previousFiles.delete(file.path);
           await writeParsed(file);
         }
       }
+      // A run holding files that its parse write used to write marks the
+      // store here, as that write did: from now on any other run finds it
+      // unfinished and takes over, so this run cannot later write analysis
+      // of a tree that another run has already found current. Files of a
+      // module reusing its analysis were held before C-53 too (C-27, C-36):
+      // they claim nothing, so a run stopped in that analysis still leaves
+      // the previous complete graph.
+      if (
+        [...deferred].some(
+          ([module, files]) => files.length && !reusing.has(module),
+        )
+      )
+        await store.claimIndexRun?.();
     }),
   );
   // Written: release every captured text and parse result (C-2). Only the
@@ -378,12 +402,25 @@ export async function indexProject(
         : (await store.files()).filter((file) => file.module === module.id),
     );
     count(`analyze.${module.id}.inputFiles`, files.length);
-    const pending = deferred.get(module.id);
+    const heldRecords = deferred.get(module.id);
+    const pending = heldRecords?.map((text) => JSON.parse(text) as GraphFile);
+    const heldRecord = new Map(
+      pending?.map((file, index) => [file.path, heldRecords![index]!]),
+    );
     if (pending?.length) {
+      // A held file replaces its stored record; a new one joins in path
+      // order, the order the store lists records in.
       const updatesByPath = new Map(pending.map((file) => [file.path, file]));
-      for (const [index, file] of files.entries())
+      for (const [index, file] of files.entries()) {
         files[index] = updatesByPath.get(file.path) ?? file;
+        updatesByPath.delete(file.path);
+      }
+      if (updatesByPath.size) {
+        files.push(...updatesByPath.values());
+        files.sort((a, b) => compare(a.path, b.path));
+      }
     }
+    const reuse = reusing.has(module.id);
     const filesByPath = new Map(files.map((file) => [file.path, file]));
     const oldPaths = new Set(
       oldFiles
@@ -432,7 +469,7 @@ export async function indexProject(
           changedFiles: [...changed]
             .filter((path) => filesByPath.has(path) || oldPaths.has(path))
             .sort(compare),
-          ...(pending && !toolchain
+          ...(reuse && pending && !toolchain
             ? {
                 previousFiles: new Map(
                   pending.map((file) => [
@@ -452,6 +489,7 @@ export async function indexProject(
         results = output.files;
         scope = new Set(output.resolutionFiles);
         if (
+          !reuse ||
           !pending ||
           toolchain ||
           scope.size !== output.resolutionFiles.length ||
@@ -500,26 +538,33 @@ export async function indexProject(
     const pendingPaths = new Set(pending?.map((file) => file.path));
     await stage(`analyze.${module.id}.write`, () =>
       batched(async () => {
-        // A scoped write must never remove a still-valid derived symbol from an
-        // edited file between parse and analysis. SQLite would clear incoming
-        // links that the resolver has proved can be left alone.
-        if (pending && !scope)
-          for (const file of pending) await writeParsed(file);
-        else if (pending) {
-          const analyzedPaths = new Set(results.map((file) => file.path));
-          for (const file of pending)
-            if (!analyzedPaths.has(file.path)) await writeParsed(file);
-          report.indexed += pending.filter((file) =>
-            analyzedPaths.has(file.path),
-          ).length;
-        }
+        // Each held file is written once: with its analysed result when the
+        // module returned one, else as parsed. A scoped write therefore never
+        // removes a still-valid derived symbol from an edited file between
+        // parse and analysis (SQLite would clear incoming links that the
+        // resolver has proved can be left alone).
+        const analyzedPaths = new Set(results.map((file) => file.path));
+        for (const file of pending ?? [])
+          if (!analyzedPaths.has(file.path))
+            await writeParsed(
+              JSON.parse(heldRecord.get(file.path)!) as GraphFile,
+            );
+        report.indexed += pending
+          ? pending.filter((file) => analyzedPaths.has(file.path)).length
+          : 0;
         for (const item of results) {
           const file = filesByPath.get(item.path)!;
-          if (
-            (scope && pendingPaths.has(file.path)) ||
-            JSON.stringify(file.result) !== JSON.stringify(item.result)
-          ) {
-            count(`analyze.${module.id}.filesChanged`);
+          const held = pendingPaths.has(file.path);
+          const differs =
+            JSON.stringify(file.result) !== JSON.stringify(item.result);
+          if (held || differs) {
+            if ((scope && held) || differs)
+              count(`analyze.${module.id}.filesChanged`);
+            // A held file's parse failure is cacheable exactly when its
+            // parse write would have recorded it.
+            const parseFailure = held
+              ? cacheableFailures.has(file.path)
+              : (await store.isParseFailure?.(file.path)) === true;
             await store.replaceFile(
               { ...file, result: item.result },
               !analysisFailed &&
@@ -528,8 +573,7 @@ export async function indexProject(
                 // Analyze-only modules may explicitly certify a file-local content
                 // failure. Unclassified analysis failures are never cached.
                 (item.result.failureKind === "content" ||
-                  (file.result.status === "failed" &&
-                    (await store.isParseFailure?.(file.path)) === true)),
+                  (file.result.status === "failed" && parseFailure)),
             );
           }
           report.analyzed++;

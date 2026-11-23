@@ -1,0 +1,34 @@
+{
+ "steps": 30,
+ "totals": {
+  "store.filesWritten": [
+   452,
+   427
+  ],
+  "store.symbolRowsWritten": [
+   16731,
+   15998
+  ],
+  "store.linkRowsInserted": [
+   205011,
+   196603
+  ],
+  "store.linkRowsDeleted": [
+   205618,
+   197210
+  ],
+  "store.linkTargetsRewritten": [
+   62693,
+   62693
+  ],
+  "store.sqlStatements": [
+   381864,
+   373020
+  ]
+ },
+ "stepsWritingMore": [],
+ "peakRssKiB": [
+  1362392,
+  1360396
+ ]
+}
