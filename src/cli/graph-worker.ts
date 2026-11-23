@@ -13,6 +13,7 @@
 // `cancel` message, which aborts the command at its next checkpoint, as a
 // signal on the main thread did before.
 import { parentPort } from "node:worker_threads";
+import { adoptChildGroupTable } from "../backends/child-groups.js";
 import {
   executeGraph,
   type GraphExecutionOptions,
@@ -46,7 +47,10 @@ export async function serveGraphRequest(
     GraphExecutionOptions,
     "progress" | "signal" | "onModuleCall"
   > = {},
+  children?: SharedArrayBuffer,
 ): Promise<void> {
+  // Child process groups are recorded for the coordinator (child-groups.ts).
+  adoptChildGroupTable(children);
   const shared = new Int32Array(control);
   const cancel = new AbortController();
   const post = (message: GraphWorkerMessage) =>

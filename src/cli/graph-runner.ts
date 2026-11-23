@@ -12,7 +12,13 @@
 // else it sends `cancel`, and the command stops at its next checkpoint as a
 // cancelled run did before (an asynchronous module call, such as the Rust
 // module's phase worker, receives the abort signal).
+//
+// Child processes the worker starts (a toolchain, a helper) are recorded in
+// a table this thread owns (child-groups.ts). A terminated worker cannot end
+// them, so this thread kills every group still recorded once the worker has
+// stopped, when it exits for any reason, and when this process exits.
 import { Worker } from "node:worker_threads";
+import { childGroupTable, killChildGroups } from "../backends/child-groups.js";
 import type {
   GraphProgress,
   GraphRequest,
@@ -53,12 +59,16 @@ export function runGraphInWorker(
     controlLength * Int32Array.BYTES_PER_ELEMENT,
   );
   const shared = new Int32Array(control);
+  const children = childGroupTable();
+  const onProcessExit = () => killChildGroups(children);
+  process.on("exit", onProcessExit);
   return new Promise<GraphResponse>((resolve, reject) => {
     const worker = new Worker(
       options.workerURL ?? new URL("./graph-worker-main.js", import.meta.url),
-      { workerData: { ...options.workerData, request, control } },
+      { workerData: { ...options.workerData, request, control, children } },
     );
     let settled = false;
+    let terminated = false;
     const finish = (outcome: () => void) => {
       if (settled) return;
       settled = true;
@@ -68,7 +78,9 @@ export function runGraphInWorker(
     const onAbort = () => {
       Atomics.store(shared, CONTROL.cancel, 1);
       if (Atomics.load(shared, CONTROL.section) === SECTION.module) {
-        finish(() => reject(abortError(signal)));
+        // The run is answered on the worker's exit, after its child
+        // processes are killed, so nothing it started outlives the answer.
+        terminated = true;
         void worker.terminate();
       } else worker.postMessage({ kind: "cancel" });
     };
@@ -85,10 +97,16 @@ export function runGraphInWorker(
         );
     });
     worker.on("error", (error) => finish(() => reject(error)));
-    worker.on("exit", (code) =>
+    worker.on("exit", (code) => {
+      killChildGroups(children);
+      process.off("exit", onProcessExit);
       finish(() =>
-        reject(new Error(`The graph worker exited (${code}) before answering`)),
-      ),
-    );
+        reject(
+          terminated
+            ? abortError(signal)
+            : new Error(`The graph worker exited (${code}) before answering`),
+        ),
+      );
+    });
   });
 }

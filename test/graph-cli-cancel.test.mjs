@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runGraphInWorker } from "../dist/cli/graph-runner.js";
@@ -57,6 +58,57 @@ test("an abort ends a graph run stuck inside a module call, and the next index r
     );
     assert.deepEqual(after.counts, fresh.counts);
   } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+// C-50 review: a child process the worker started (as a toolchain is) is
+// killed with its whole process group when the coordinator terminates the
+// worker; a terminated worker could not kill it itself. The child and a
+// grandchild each hold a connection to the test's socket, which closes only
+// when that process has died.
+test("an abort inside a module call kills the child processes the worker started", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-cli-child-"));
+  const root = join(scratch, "project");
+  const socket = join(scratch, "child.sock");
+  const connections = [];
+  let connected;
+  const both = new Promise((resolve) => (connected = resolve));
+  const server = createServer((connection) => {
+    connections.push(
+      new Promise((resolve) => connection.on("close", resolve)),
+    );
+    connection.resume();
+    if (connections.length === 2) connected();
+  });
+  await new Promise((resolve) => server.listen(socket, resolve));
+  try {
+    await mkdir(root);
+    for (const [path, text] of Object.entries(fixtureFiles(2)))
+      await writeFile(join(root, path), text);
+    await writeFile(join(root, "z.x"), "def stuck\n");
+    const flag = new SharedArrayBuffer(4);
+    const controller = new AbortController();
+    const run = runGraphInWorker(
+      { command: "index", root },
+      {
+        signal: controller.signal,
+        workerURL: new URL("./graph-cli-stuck-worker.mjs", import.meta.url),
+        workerData: { flag, socket },
+      },
+    );
+    // Readiness: the module is inside its synchronous call, and the child
+    // and the grandchild are both running.
+    const waited = Atomics.waitAsync(new Int32Array(flag), 0, 0);
+    if (waited.async) await waited.value;
+    await both;
+    controller.abort();
+    await assert.rejects(run, (error) => error.name === "AbortError");
+    // Both processes die: each connection closes.
+    await Promise.all(connections);
+    assert.equal(connections.length, 2);
+  } finally {
+    server.close();
     await rm(scratch, { recursive: true, force: true });
   }
 });
