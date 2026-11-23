@@ -1,0 +1,37 @@
+{
+ "steps": 30,
+ "totals": {
+  "store.filesWritten": [
+   46,
+   35
+  ],
+  "store.symbolRowsWritten": [
+   1096,
+   872
+  ],
+  "store.linkRowsInserted": [
+   14271,
+   11330
+  ],
+  "store.linkRowsDeleted": [
+   14259,
+   11318
+  ],
+  "store.linkTargetsRewritten": [
+   3315,
+   3315
+  ],
+  "store.sqlStatements": [
+   34703,
+   31498
+  ]
+ },
+ "stepsWritingMore": [],
+ "peakRssKiB": [
+  1421272,
+  1422016
+ ]
+}
+
+helix-editor_helix same-rows
+DioxusLabs_dioxus same-rows
