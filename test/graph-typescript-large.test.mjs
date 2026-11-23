@@ -1034,6 +1034,40 @@ test("an expanding generic type beside a failed file is judged, not bounded", as
   );
 });
 
+// C-47b review: the cut compares the declaration together with which type
+// parameters are bound. `this` in a type literal is the same literal with
+// nothing bound, where `T` is judged by its constraint `Bad`; comparing the
+// declaration alone skipped that constraint and left these links clean.
+test("the expanding-type cut does not skip the constraint of an unbound parameter", async () => {
+  const result = await indexFiles({
+    "broken.ts": "export interface Bad { x: number; n: number }\nconst = ;\n",
+    "use.ts": [
+      'import type { Bad } from "./broken";',
+      "type Builder<T extends Bad> = {",
+      "  set(v: T): this;",
+      "  get(): T;",
+      "  add(k: string): Builder<T & { k: string }>;",
+      "};",
+      "declare const b: Builder<{ x: number; n: number }>;",
+      "declare function wrap<T>(x: { v: T }): T;",
+      "wrap({ v: b }).get().n.toFixed(); // plain",
+      "wrap({ v: b.add('a') }).get().n.toFixed(); // added",
+      "",
+    ].join("\n"),
+  });
+  for (const mark of ["// plain", "// added"]) {
+    for (const name of ["get", "toFixed"]) {
+      const link = linkOn(result, "use.ts", mark, name);
+      assert.equal(link.reason, "invalid-code", `${name} ${mark}`);
+      assert.equal(link.cause?.file, "broken.ts", `${name} ${mark}`);
+      assert.ok(
+        !link.cause.via.includes("judge-budget-exhausted"),
+        link.cause.via,
+      );
+    }
+  }
+});
+
 // C-47 review F1: a taint check that met a check in progress is provisional;
 // memoising it made `x.a.v.go` depend on `r1.v.go` being judged first.
 test("a taint answer that met a check in progress is not kept for later links", async () => {

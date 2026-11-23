@@ -699,17 +699,28 @@ export function createJudge(input: JudgeInput): Judge {
   }
   // C-47: an expanding type (each level binds a larger value, as
   // `TestAPI<AddBuilderWorker<ExtraContext, K, T>>` does) never repeats a
-  // key. A literal's or function's own failures are its declaration's
-  // (seed bindings, failed modules, unhandled kinds), whatever its
-  // environment; the environment only decides which bound values are
-  // reached. So a second check of the same declaration, while the first is
-  // in progress, adds only what its bound values reach: it checks the
-  // values it names and `self`, and leaves the declaration's own parts to
-  // the first check (a cycle on it).
+  // key. For one set of bound type parameters, a literal's or function's
+  // own failures are its declaration's (seed bindings, failed modules,
+  // unhandled kinds), whatever values are bound; the values only decide
+  // what is reached through them. So a second check of the same
+  // declaration with the same parameters bound, while the first is in
+  // progress, adds only what its bound values reach: it checks the values
+  // it names and `self`, and leaves the declaration's own parts to the
+  // first check (a cycle on it). Which parameters are bound is part of the
+  // anchor: an unbound parameter is judged by its constraint, which is not
+  // one of the declaration's own parts (`this` in a type literal with no
+  // `self` is the same literal with nothing bound).
   const anchors = new Map<string, number>();
+  const boundOf = (env: Env): string =>
+    [...env.keys()]
+      .map(idOf)
+      .sort((a, b) => a - b)
+      .join(",");
   function anchorOf(judged: Judged): string | undefined {
-    if (judged.k === "literal") return `L${idOf(judged.node)}`;
-    if (judged.k === "function") return `F${judged.decls.map(idOf).join("+")}`;
+    if (judged.k === "literal")
+      return `L${idOf(judged.node)}|${boundOf(judged.env)}`;
+    if (judged.k === "function")
+      return `F${judged.decls.map(idOf).join("+")}|${boundOf(judged.env)}`;
     return undefined;
   }
   function expandedParts(judged: Judged, outer: number): boolean {
@@ -2293,9 +2304,7 @@ export function createJudge(input: JudgeInput): Judge {
     return invoke(expression(node.expression), node, true);
   }
   type Call =
-    | ts.CallExpression
-    | ts.NewExpression
-    | ts.TaggedTemplateExpression;
+    ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression;
   const argumentsOf = (call: Call): readonly ts.Expression[] =>
     ts.isTaggedTemplateExpression(call) ? [] : (call.arguments ?? []);
   function invoke(callee: Judged, call: Call, construct: boolean): Judged {
