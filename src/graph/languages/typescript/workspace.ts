@@ -24,12 +24,43 @@ const semver = ts as typeof ts & {
     tryParse(value: string): { test(version: Version): boolean } | undefined;
   };
 };
-function matchesVersion(range: string, value: unknown): boolean {
-  const version = typeof value === "string" && semver.Version.tryParse(value);
-  return !!(version && semver.VersionRange.tryParse(range)?.test(version));
+/**
+ * The compiler's parsers throw on some valid manifest ranges (for example
+ * `^1.0.0-beta.9-8d6992`, a published prerelease form); a throw is reported
+ * here as `"unparseable"`, never as a compiler failure of the importing file.
+ */
+function tryParse<T>(parse: (value: string) => T, value: string) {
+  try {
+    return parse(value);
+  } catch {
+    return "unparseable" as const;
+  }
 }
-export const registryRange = (value: string): boolean =>
-  /^[a-z][\w.-]*$/i.test(value) || !!semver.VersionRange.tryParse(value);
+function matchesVersion(range: string, value: unknown): boolean {
+  if (typeof value !== "string") return false;
+  const version = tryParse((v) => semver.Version.tryParse(v), value);
+  const parsed = tryParse((v) => semver.VersionRange.tryParse(v), range);
+  // An unparseable version or range proves no match.
+  return (
+    !!version &&
+    version !== "unparseable" &&
+    !!parsed &&
+    parsed !== "unparseable" &&
+    parsed.test(version)
+  );
+}
+/**
+ * Whether a manifest value names a registry range: `"known"` when it parses
+ * (or is a dist-tag), `"unknown"` when the compiler's parser throws on a value
+ * with no protocol or path (a registry range it cannot read), otherwise
+ * false.
+ */
+export const registryRange = (value: string): "known" | "unknown" | false => {
+  if (/^[a-z][\w.-]*$/i.test(value)) return "known";
+  const parsed = tryParse((v) => semver.VersionRange.tryParse(v), value);
+  if (parsed === "unparseable") return /[:/\\]/.test(value) ? false : "unknown";
+  return parsed ? "known" : false;
+};
 
 type Catalog = ReadonlyMap<string, ReadonlyMap<string, string>>;
 interface WorkspaceCatalog {

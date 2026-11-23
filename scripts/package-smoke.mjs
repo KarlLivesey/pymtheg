@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "./isolated-home.mjs";
 import {spawnSync} from 'node:child_process';import {pathToFileURL} from 'node:url';import {resolve} from 'node:path';import assert from 'node:assert/strict';
 const root=resolve(process.argv[2]??'/tmp/pym-production-1/node_modules/pymtheg');
 const child=spawnSync(process.execPath,[resolve(root,'dist/cli/main.js'),'check',resolve(root,'examples/mvp/library.pym'),'--format','json'],{encoding:'utf8'});

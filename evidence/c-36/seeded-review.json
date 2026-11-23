@@ -1,0 +1,1471 @@
+{
+ "note": "C-36 review fixes: seeded Rust edits (scripts/reindex/random-edits.mjs --command --scoped-mix) on the build after the review fixes. Each step: the incremental store after graph index equals a fresh cold index row for row, then an unchanged graph index verifies without an index run and leaves the store byte-identical.",
+ "runs": [
+  {
+   "id": "BurntSushi/ripgrep",
+   "seed": 36301,
+   "expectedSteps": 30,
+   "equal": true,
+   "steps": [
+    {
+     "step": 0,
+     "file": "crates/cli/src/hostname.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 532
+     }
+    },
+    {
+     "step": 1,
+     "file": "tests/tests.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 543
+     }
+    },
+    {
+     "step": 2,
+     "file": "crates/regex/src/ast.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 547
+     }
+    },
+    {
+     "step": 3,
+     "file": "crates/searcher/src/line_buffer.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 533
+     }
+    },
+    {
+     "step": 4,
+     "file": "crates/printer/src/jsont.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 586
+     }
+    },
+    {
+     "step": 5,
+     "file": "crates/regex/src/matcher.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 550
+     }
+    },
+    {
+     "step": 6,
+     "file": "crates/core/messages.rs",
+     "kind": "export",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 643
+     }
+    },
+    {
+     "step": 7,
+     "file": "crates/pcre2/src/lib.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 618
+     }
+    },
+    {
+     "step": 8,
+     "file": "crates/cli/src/hostname/c36_random_0.rs",
+     "kind": "file-delete",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 541
+     }
+    },
+    {
+     "step": 9,
+     "file": "crates/cli/src/lib.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 549
+     }
+    },
+    {
+     "step": 10,
+     "file": "crates/ignore/tests/gitignore_matched_path_or_any_parents_tests.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 514
+     }
+    },
+    {
+     "step": 11,
+     "file": "fuzz/fuzz_targets/fuzz_glob.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 537
+     }
+    },
+    {
+     "step": 12,
+     "file": "crates/core/flags/doc/help.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 533
+     }
+    },
+    {
+     "step": 13,
+     "file": "crates/searcher/src/searcher/core.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 574
+     }
+    },
+    {
+     "step": 14,
+     "file": "crates/globset/src/glob.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 535
+     }
+    },
+    {
+     "step": 15,
+     "file": "crates/cli/src/c36_random_9.rs",
+     "kind": "file-delete",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 652
+     }
+    },
+    {
+     "step": 16,
+     "file": "crates/ignore/src/gitignore.rs",
+     "kind": "change-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 551
+     }
+    },
+    {
+     "step": 17,
+     "file": "crates/printer/src/color.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 677
+     }
+    },
+    {
+     "step": 18,
+     "file": "crates/regex/src/ban.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 709
+     }
+    },
+    {
+     "step": 19,
+     "file": "crates/ignore/src/walk.rs",
+     "kind": "export",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 599
+     }
+    },
+    {
+     "step": 20,
+     "file": "crates/pcre2/src/error.rs",
+     "kind": "add-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 618
+     }
+    },
+    {
+     "step": 21,
+     "file": "crates/printer/src/util.rs",
+     "kind": "derive",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 643
+     }
+    },
+    {
+     "step": 22,
+     "file": "crates/globset/src/pathutil.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 668
+     }
+    },
+    {
+     "step": 23,
+     "file": "crates/ignore/src/pathutil.rs",
+     "kind": "add-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 592
+     }
+    },
+    {
+     "step": 24,
+     "file": "crates/regex/src/error.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 102,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 624
+     }
+    },
+    {
+     "step": 25,
+     "file": "crates/searcher/src/testutil.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 628
+     }
+    },
+    {
+     "step": 26,
+     "file": "crates/searcher/src/sink.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 650
+     }
+    },
+    {
+     "step": 27,
+     "file": "crates/regex/src/matcher.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 702
+     }
+    },
+    {
+     "step": 28,
+     "file": "crates/core/flags/complete/fish.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 661
+     }
+    },
+    {
+     "step": 29,
+     "file": "crates/matcher/tests/util.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 613
+     }
+    }
+   ]
+  },
+  {
+   "id": "BurntSushi/ripgrep",
+   "seed": 36302,
+   "expectedSteps": 30,
+   "equal": true,
+   "steps": [
+    {
+     "step": 0,
+     "file": "crates/printer/src/hyperlink/mod.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 103,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 540
+     }
+    },
+    {
+     "step": 1,
+     "file": "crates/printer/src/json.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 540
+     }
+    },
+    {
+     "step": 2,
+     "file": "crates/cli/src/human.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 538
+     }
+    },
+    {
+     "step": 3,
+     "file": "crates/printer/src/hyperlink/mod.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 541
+     }
+    },
+    {
+     "step": 4,
+     "file": "crates/globset/src/pathutil.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 547
+     }
+    },
+    {
+     "step": 5,
+     "file": "crates/globset/src/serde_impl.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 542
+     }
+    },
+    {
+     "step": 6,
+     "file": "crates/globset/benches/bench.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 678
+     }
+    },
+    {
+     "step": 7,
+     "file": "crates/printer/src/hyperlink/mod.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 588
+     }
+    },
+    {
+     "step": 8,
+     "file": "crates/ignore/src/pathutil.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 571
+     }
+    },
+    {
+     "step": 9,
+     "file": "crates/globset/src/fnv.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 546
+     }
+    },
+    {
+     "step": 10,
+     "file": "crates/cli/src/process.rs",
+     "kind": "add-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 580
+     }
+    },
+    {
+     "step": 11,
+     "file": "crates/searcher/src/sink.rs",
+     "kind": "derive",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 561
+     }
+    },
+    {
+     "step": 12,
+     "file": "crates/searcher/src/searcher/glue.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 546
+     }
+    },
+    {
+     "step": 13,
+     "file": "crates/regex/src/strip.rs",
+     "kind": "cfg",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 104,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 561
+     }
+    },
+    {
+     "step": 14,
+     "file": "crates/globset/src/glob.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 105,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 531
+     }
+    },
+    {
+     "step": 15,
+     "file": "crates/core/flags/complete/powershell.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 105,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 551
+     }
+    },
+    {
+     "step": 16,
+     "file": "crates/globset/benches/bench.rs",
+     "kind": "remove-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 105,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 646
+     }
+    },
+    {
+     "step": 17,
+     "file": "crates/core/search.rs",
+     "kind": "cfg",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 105,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 699
+     }
+    },
+    {
+     "step": 18,
+     "file": "crates/globset/src/pathutil.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 106,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 654
+     }
+    },
+    {
+     "step": 19,
+     "file": "tests/regression.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 107,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 577
+     }
+    },
+    {
+     "step": 20,
+     "file": "crates/cli/src/pattern.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 107,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 695
+     }
+    },
+    {
+     "step": 21,
+     "file": "crates/cli/src/lib.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 108,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 604
+     }
+    },
+    {
+     "step": 22,
+     "file": "crates/core/search.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 746
+     }
+    },
+    {
+     "step": 23,
+     "file": "crates/core/flags/parse.rs",
+     "kind": "add-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 108,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 682
+     }
+    },
+    {
+     "step": 24,
+     "file": "crates/pcre2/src/matcher.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 708
+     }
+    },
+    {
+     "step": 25,
+     "file": "crates/regex/src/error.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 674
+     }
+    },
+    {
+     "step": 26,
+     "file": "crates/ignore/tests/gitignore_matched_path_or_any_parents_tests.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 108,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 653
+     }
+    },
+    {
+     "step": 27,
+     "file": "crates/cli/src/process.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 108,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 648
+     }
+    },
+    {
+     "step": 28,
+     "file": "crates/core/flags/doc/version.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 109,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 630
+     }
+    },
+    {
+     "step": 29,
+     "file": "tests/misc.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 556
+     }
+    }
+   ]
+  },
+  {
+   "id": "helix-editor/helix",
+   "seed": 36303,
+   "expectedSteps": 10,
+   "equal": true,
+   "steps": [
+    {
+     "step": 0,
+     "file": "helix-term/tests/test/commands.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 251,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 717
+     }
+    },
+    {
+     "step": 1,
+     "file": "helix-lsp/src/file_event.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 752
+     }
+    },
+    {
+     "step": 2,
+     "file": "helix-term/src/ui/select.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 252,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 760
+     }
+    },
+    {
+     "step": 3,
+     "file": "helix-stdx/src/uri.rs",
+     "kind": "body",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 702
+     }
+    },
+    {
+     "step": 4,
+     "file": "helix-core/src/case_conversion.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 253,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 743
+     }
+    },
+    {
+     "step": 5,
+     "file": "helix-core/src/selection.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 254,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 837
+     }
+    },
+    {
+     "step": 6,
+     "file": "helix-core/src/match_brackets.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 887
+     }
+    },
+    {
+     "step": 7,
+     "file": "helix-term/src/ui/info.rs",
+     "kind": "add-macro",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 254,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 878
+     }
+    },
+    {
+     "step": 8,
+     "file": "helix-core/src/snippets.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 840
+     }
+    },
+    {
+     "step": 9,
+     "file": "helix-lsp-types/src/file_operations.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 255,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 831
+     }
+    }
+   ]
+  },
+  {
+   "id": "helix-editor/helix",
+   "seed": 36304,
+   "expectedSteps": 10,
+   "equal": true,
+   "steps": [
+    {
+     "step": 0,
+     "file": "helix-view/src/handlers/word_index.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 251,
+     "scoped": 0,
+     "fullPass": [
+      "lookup-cut"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 675
+     }
+    },
+    {
+     "step": 1,
+     "file": "helix-core/src/config.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 691
+     }
+    },
+    {
+     "step": 2,
+     "file": "helix-term/src/commands/typed.rs",
+     "kind": "export",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 251,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 718
+     }
+    },
+    {
+     "step": 3,
+     "file": "helix-dap/src/registry.rs",
+     "kind": "add-import",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 251,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 727
+     }
+    },
+    {
+     "step": 4,
+     "file": "helix-vcs/src/status.rs",
+     "kind": "comment",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 1,
+     "scoped": 1,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 741
+     }
+    },
+    {
+     "step": 5,
+     "file": "tests/indent/rust.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 252,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 897
+     }
+    },
+    {
+     "step": 6,
+     "file": "helix-lsp-types/src/formatting.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 253,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 858
+     }
+    },
+    {
+     "step": 7,
+     "file": "helix-stdx/tests/path.rs",
+     "kind": "call",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 253,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 811
+     }
+    },
+    {
+     "step": 8,
+     "file": "helix-core/src/case_conversion.rs",
+     "kind": "signature",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 253,
+     "scoped": 0,
+     "fullPass": [
+      "surface"
+     ],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 819
+     }
+    },
+    {
+     "step": 9,
+     "file": "helix-term/src/handlers/signature_help.rs",
+     "kind": "mod-add",
+     "line": 1,
+     "equal": true,
+     "failed": 0,
+     "resolvedFiles": 254,
+     "scoped": 0,
+     "fullPass": [],
+     "noEdit": {
+      "complete": true,
+      "verified": true,
+      "identical": true,
+      "cpuMs": 843
+     }
+    }
+   ]
+  }
+ ]
+}

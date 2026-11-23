@@ -8,6 +8,7 @@
 // and any error ("database is locked"). The waits are observations; with
 // measure.mjs's commit times they give the number of batches each spanned.
 //   node scripts/store-cost/waiter.mjs <graph.sqlite> <pid> <out.json> [--turnstile]
+import "../isolated-home.mjs";
 import { existsSync, writeFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 

@@ -5,6 +5,10 @@
 # /usr/bin/time. The store goes in <store dir> and is removed afterwards.
 #   scripts/memory/peak.sh <dist> <pin dir> <store dir> <out prefix>
 set -u
+# The user's Pymtheg configuration and cache go to fresh folders in the
+# scratch, never the account's real ones (scripts/isolated-home.mjs).
+export PYMTHEG_CONFIG_HOME="${PYMTHEG_CONFIG_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-config-XXXXXX")}"
+export PYMTHEG_CACHE_HOME="${PYMTHEG_CACHE_HOME:-$(mkdir -p "${PYM_SCRATCH:-${TMPDIR:-/tmp}}" && mktemp -d "${PYM_SCRATCH:-${TMPDIR:-/tmp}}/pym-cache-XXXXXX")}"
 dist=$1 pin=$2 stores=$3 out=$4
 here=$(cd "$(dirname "$0")/.." && pwd)
 mkdir -p "$stores" "$(dirname "$out")"

@@ -12,6 +12,7 @@
 //   at-begin-savepoint  the same, with each file's writes in a savepoint
 // Prints microseconds per row. Timings are observations.
 //   node scripts/store-cost/micro.mjs <dist> <dir> [files] [per]
+import "../isolated-home.mjs";
 import { existsSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";

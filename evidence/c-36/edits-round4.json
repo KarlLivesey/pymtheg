@@ -1,0 +1,275 @@
+{
+ "note": "C-36 round 4: scripts/reindex/measure.mjs per pin, main = origin/main 635e90c, head = the round-4 head. cpuS is process CPU of one `graph index` (index-once.mjs, a fresh process); files = Rust files whose links were decided (main decides every Rust file); scoped = Rust files re-decided alone. After each revert the store equalled that build's cold store row for row (equality lists empty for every pin and build). Main and head ran side by side on a shared server: CPU seconds are observations.",
+ "rows": [
+  {
+   "pin": "BurntSushi_ripgrep",
+   "step": "comment",
+   "build": "main",
+   "cpuS": 24.3,
+   "files": 102,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "step": "comment",
+   "build": "head",
+   "cpuS": 11.1,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "step": "body",
+   "build": "main",
+   "cpuS": 23.4,
+   "files": 102,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "step": "body",
+   "build": "head",
+   "cpuS": 10.3,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "step": "export",
+   "build": "main",
+   "cpuS": 25.8,
+   "files": 102,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "step": "export",
+   "build": "head",
+   "cpuS": 26.4,
+   "files": 102,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "cberner_redb",
+   "step": "comment",
+   "build": "main",
+   "cpuS": 47.5,
+   "files": 98,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "cberner_redb",
+   "step": "comment",
+   "build": "head",
+   "cpuS": 19,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "cberner_redb",
+   "step": "body",
+   "build": "main",
+   "cpuS": 43.3,
+   "files": 98,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "cberner_redb",
+   "step": "body",
+   "build": "head",
+   "cpuS": 19.2,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "cberner_redb",
+   "step": "export",
+   "build": "main",
+   "cpuS": 46,
+   "files": 98,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "cberner_redb",
+   "step": "export",
+   "build": "head",
+   "cpuS": 45,
+   "files": 98,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "step": "comment",
+   "build": "main",
+   "cpuS": 10.6,
+   "files": 119,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "step": "comment",
+   "build": "head",
+   "cpuS": 5.3,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "step": "body",
+   "build": "main",
+   "cpuS": 10.9,
+   "files": 119,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "step": "body",
+   "build": "head",
+   "cpuS": 5.3,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "step": "export",
+   "build": "main",
+   "cpuS": 9.7,
+   "files": 119,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "step": "export",
+   "build": "head",
+   "cpuS": 11.3,
+   "files": 119,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "helix-editor_helix",
+   "step": "comment",
+   "build": "main",
+   "cpuS": 68.8,
+   "files": 251,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "helix-editor_helix",
+   "step": "comment",
+   "build": "head",
+   "cpuS": 23.3,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "helix-editor_helix",
+   "step": "body",
+   "build": "main",
+   "cpuS": 63.8,
+   "files": 251,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "helix-editor_helix",
+   "step": "body",
+   "build": "head",
+   "cpuS": 20,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "helix-editor_helix",
+   "step": "export",
+   "build": "main",
+   "cpuS": 59.1,
+   "files": 251,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "helix-editor_helix",
+   "step": "export",
+   "build": "head",
+   "cpuS": 70.7,
+   "files": 251,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "DioxusLabs_dioxus",
+   "step": "comment",
+   "build": "main",
+   "cpuS": 506.6,
+   "files": 884,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "DioxusLabs_dioxus",
+   "step": "comment",
+   "build": "head",
+   "cpuS": 332.9,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "DioxusLabs_dioxus",
+   "step": "body",
+   "build": "main",
+   "cpuS": 512.2,
+   "files": 884,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "DioxusLabs_dioxus",
+   "step": "body",
+   "build": "head",
+   "cpuS": 318,
+   "files": 1,
+   "revertEqual": true,
+   "scoped": 1
+  },
+  {
+   "pin": "DioxusLabs_dioxus",
+   "step": "export",
+   "build": "main",
+   "cpuS": 548.6,
+   "files": 884,
+   "revertEqual": true,
+   "scoped": 0
+  },
+  {
+   "pin": "DioxusLabs_dioxus",
+   "step": "export",
+   "build": "head",
+   "cpuS": 617.1,
+   "files": 884,
+   "revertEqual": true,
+   "scoped": 0
+  }
+ ]
+}

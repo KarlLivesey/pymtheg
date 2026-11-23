@@ -3,6 +3,7 @@
 // totals, the 15 costliest statements, every table and index size, the
 // stages above 0.5 s and the row digests. Prints one JSON document.
 //   node scripts/store-cost/compact.mjs <label>=<result.json>...
+import "../isolated-home.mjs";
 import { existsSync, readFileSync } from "node:fs";
 
 const out = {};
