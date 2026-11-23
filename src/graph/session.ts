@@ -73,8 +73,8 @@ export class IndexSession {
   private completion: string | undefined;
   private readonly kept = new Map<string, Map<string, Kept>>();
   private readonly maxValues: number;
-  /** Runs begun, and times something kept or recorded was dropped. */
-  readonly counts = { runs: 0, dropped: 0 };
+  /** Module discoveries, runs begun, and times something kept was dropped. */
+  readonly counts = { loads: 0, runs: 0, dropped: 0 };
 
   constructor(
     options: { registry?: LanguageRegistry; maxValuesPerModule?: number } = {},
@@ -85,7 +85,11 @@ export class IndexSession {
   }
   /** The language modules, discovered once per session. */
   registry(): Promise<LanguageRegistry> {
-    return (this.loaded ??= discoverLanguages());
+    if (!this.loaded) {
+      this.counts.loads++;
+      this.loaded = discoverLanguages();
+    }
+    return this.loaded;
   }
   /** Releases everything kept. */
   drop(): void {

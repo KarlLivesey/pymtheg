@@ -1,0 +1,113 @@
+{
+ "wallMs": 601930,
+ "phases": {
+  "analysis DELETE graph_links": {
+   "statements": 884,
+   "rows": 150189,
+   "bytes": 32517
+  },
+  "analysis DELETE graph_parse_failures": {
+   "statements": 884,
+   "rows": 0,
+   "bytes": 32517
+  },
+  "analysis INSERT graph_files": {
+   "statements": 884,
+   "rows": 884,
+   "bytes": 80739275
+  },
+  "analysis INSERT graph_links": {
+   "statements": 150189,
+   "rows": 150189,
+   "bytes": 144710561
+  },
+  "analysis INSERT graph_symbols": {
+   "statements": 16802,
+   "rows": 16802,
+   "bytes": 11897646
+  },
+  "parse DELETE graph_links": {
+   "statements": 884,
+   "rows": 0,
+   "bytes": 32517
+  },
+  "parse DELETE graph_meta": {
+   "statements": 1,
+   "rows": 0,
+   "bytes": 0
+  },
+  "parse DELETE graph_parse_failures": {
+   "statements": 884,
+   "rows": 0,
+   "bytes": 32517
+  },
+  "parse INSERT graph_files": {
+   "statements": 884,
+   "rows": 884,
+   "bytes": 67632672
+  },
+  "parse INSERT graph_links": {
+   "statements": 150189,
+   "rows": 150189,
+   "bytes": 131761688
+  },
+  "parse INSERT graph_meta": {
+   "statements": 1,
+   "rows": 1,
+   "bytes": 36
+  },
+  "parse INSERT graph_symbols": {
+   "statements": 16802,
+   "rows": 16802,
+   "bytes": 11739916
+  },
+  "resolution DELETE graph_candidates": {
+   "statements": 54267,
+   "rows": 0,
+   "bytes": 3744423
+  },
+  "resolution DELETE graph_meta": {
+   "statements": 1,
+   "rows": 1,
+   "bytes": 0
+  },
+  "resolution INSERT graph_candidates": {
+   "statements": 42,
+   "rows": 42,
+   "bytes": 6100
+  },
+  "resolution INSERT graph_library_targets": {
+   "statements": 19092,
+   "rows": 19092,
+   "bytes": 3736845
+  },
+  "resolution INSERT graph_links": {
+   "statements": 215,
+   "rows": 215,
+   "bytes": 202449
+  },
+  "resolution UPDATE graph_links": {
+   "statements": 54267,
+   "rows": 54267,
+   "bytes": 7595889
+  }
+ },
+ "links": {
+  "rust": {
+   "links": 150404,
+   "writes": {
+    "1": 215,
+    "2": 150189
+   },
+   "pattern": {
+    "parse:insert → analysis:insert": 150189,
+    "resolution:insert": 215
+   },
+   "steps": {
+    "parse→analysis other: data": 84655,
+    "parse→analysis identical": 65534
+   },
+   "bodyBytes": 216929031
+  }
+ }
+}

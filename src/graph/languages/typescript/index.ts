@@ -125,7 +125,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `51+typescript-${ts.version}`;
+const MODULE_VERSION = `50+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -704,6 +704,20 @@ const operationalFailure = (message: string): ParseResult => {
  */
 export const injectedExtractionFaults = new Set<string>();
 /** The diagnostic for an unexpected exception while extracting one file. */
+/** Why a result's symbol keys would be refused by the core, if they would. */
+export function invalidKeys(result: ParseResult): string | undefined {
+  const keys = new Set<string>();
+  for (const symbol of result.symbols) {
+    if (!symbol.key) return "An extracted symbol has no key";
+    if (keys.has(symbol.key))
+      return `Two extracted symbols share the key ${JSON.stringify(symbol.key)}`;
+    keys.add(symbol.key);
+  }
+  for (const link of result.links)
+    if (link.sourceKey !== null && !keys.has(link.sourceKey))
+      return `An extracted link names the missing source key ${JSON.stringify(link.sourceKey)}`;
+  return undefined;
+}
 export function internalErrorMessage(path: string, error: unknown): string {
   const detail = error instanceof Error ? error.message : String(error);
   return `Internal error in the TypeScript module while reading ${path} (a defect in pymtheg, not a problem in this file; it is retried on the next index): ${detail}`;
@@ -1377,6 +1391,17 @@ export function typescriptModule(
               return {
                 drop: `${COMPILER_FAILURE}: Invalid UTF-16 range in the extracted facts for ${path}`,
                 blame: path,
+              };
+            // Keys the core would refuse (empty, duplicated, or a link
+            // source that is no symbol) fail this file alone, as this
+            // module's own fault: the core refuses a module's whole output
+            // for one invalid file.
+            const keyFault = invalidKeys(result);
+            if (keyFault)
+              return {
+                result: operationalFailure(
+                  `${internalErrorMessage(path, Error(keyFault))} (only this file is affected)`,
+                ),
               };
             statistics.extracted++;
             if (taintExhausted(session.checker)) {

@@ -1395,6 +1395,9 @@ export class SqliteGraphStore implements GraphStorage {
     this.transaction(() => {});
     return true;
   }
+  claimIndexRun(): void {
+    if (this.indexRun.state === "pending") this.transaction(() => {});
+  }
   /**
    * C-45: the completion record as the current run's baseline snapshot read
    * it, in the same read as its data version and mark: every later write by

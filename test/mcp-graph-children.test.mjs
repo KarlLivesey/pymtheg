@@ -282,18 +282,25 @@ test("C-54: a worker that never answers the abort is terminated when the cancel'
     mkdirSync(project);
     await initializeWorkspace(project, undefined, { trust: "source-only" });
     const clock = controlledClock();
-    const jobs = new GraphJobs(
-      realpathSync(project),
-      (request) =>
+    const jobs = new GraphJobs(realpathSync(project), {
+      launch: (control, childGroups) =>
         new Worker(
           new URL(
             "./fixtures/mcp-graph/silent-child-worker.mjs",
             import.meta.url,
           ),
-          { workerData: { ...request, ready } },
+          {
+            workerData: {
+              control,
+              childGroups,
+              root: realpathSync(project),
+              ready,
+            },
+          },
         ),
-      { clock, graceMs: 30_000 },
-    );
+      cancelClock: clock,
+      graceMs: 30_000,
+    });
     const job = jobs.start({ command: "index" });
     await until(() => existsSync(ready), "the child did not start");
     const pid = Number(readFileSync(ready, "utf8"));

@@ -1,0 +1,28 @@
+cli/cli cold: complete, wall 173278 ms, cpu 157040 ms, rss 1643 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 132 MiB
+cli/cli warm: complete, wall 486 ms, cpu 664 ms, rss 1643 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 130 MiB
+cli/cli body: complete, wall 8465 ms, cpu 11064 ms, rss 1646 MiB, worker 1, session {"loads":1,"runs":2,"dropped":0}, live heap 130 MiB
+cli/cli body-revert: complete, wall 8498 ms, cpu 11334 ms, rss 1644 MiB, worker 1, session {"loads":1,"runs":3,"dropped":0}, live heap 130 MiB
+cli/cli export: complete, wall 22144 ms, cpu 29010 ms, rss 1643 MiB, worker 1, session {"loads":1,"runs":4,"dropped":0}, live heap 131 MiB
+cli/cli export-revert: complete, wall 21463 ms, cpu 27952 ms, rss 1644 MiB, worker 1, session {"loads":1,"runs":5,"dropped":0}, live heap 130 MiB
+cli/cli last revert equals cold: yes
+helix-editor/helix cold: complete, wall 117207 ms, cpu 126815 ms, rss 1397 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 125 MiB
+helix-editor/helix warm: complete, wall 282 ms, cpu 515 ms, rss 1397 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 125 MiB
+helix-editor/helix body: complete, wall 35914 ms, cpu 52471 ms, rss 1362 MiB, worker 1, session {"loads":1,"runs":2,"dropped":0}, live heap 124 MiB
+helix-editor/helix body-revert: complete, wall 32843 ms, cpu 49837 ms, rss 1390 MiB, worker 1, session {"loads":1,"runs":3,"dropped":0}, live heap 125 MiB
+helix-editor/helix export: complete, wall 32423 ms, cpu 48841 ms, rss 1377 MiB, worker 1, session {"loads":1,"runs":4,"dropped":0}, live heap 125 MiB
+helix-editor/helix export-revert: complete, wall 32567 ms, cpu 49066 ms, rss 1377 MiB, worker 1, session {"loads":1,"runs":5,"dropped":0}, live heap 125 MiB
+helix-editor/helix last revert equals cold: yes
+honojs/hono cold: complete, wall 43813 ms, cpu 58069 ms, rss 1368 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 99 MiB
+honojs/hono warm: complete, wall 232 ms, cpu 413 ms, rss 1369 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 98 MiB
+honojs/hono body: complete, wall 28040 ms, cpu 39874 ms, rss 1382 MiB, worker 1, session {"loads":1,"runs":2,"dropped":0}, live heap 98 MiB
+honojs/hono body-revert: complete, wall 29197 ms, cpu 39397 ms, rss 1385 MiB, worker 1, session {"loads":1,"runs":3,"dropped":0}, live heap 98 MiB
+honojs/hono export: complete, wall 25220 ms, cpu 37245 ms, rss 1372 MiB, worker 1, session {"loads":1,"runs":4,"dropped":0}, live heap 98 MiB
+honojs/hono export-revert: complete, wall 24502 ms, cpu 35558 ms, rss 1375 MiB, worker 1, session {"loads":1,"runs":5,"dropped":0}, live heap 98 MiB
+honojs/hono last revert equals cold: yes
+restic/restic cold: complete, wall 44007 ms, cpu 42898 ms, rss 842 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 80 MiB
+restic/restic warm: complete, wall 212 ms, cpu 275 ms, rss 842 MiB, worker 1, session {"loads":1,"runs":1,"dropped":0}, live heap 79 MiB
+restic/restic body: complete, wall 2678 ms, cpu 3517 ms, rss 842 MiB, worker 1, session {"loads":1,"runs":2,"dropped":0}, live heap 77 MiB
+restic/restic body-revert: complete, wall 2563 ms, cpu 3388 ms, rss 843 MiB, worker 1, session {"loads":1,"runs":3,"dropped":0}, live heap 76 MiB
+restic/restic export: complete, wall 9686 ms, cpu 12639 ms, rss 846 MiB, worker 1, session {"loads":1,"runs":4,"dropped":0}, live heap 77 MiB
+restic/restic export-revert: complete, wall 10059 ms, cpu 12690 ms, rss 846 MiB, worker 1, session {"loads":1,"runs":5,"dropped":0}, live heap 77 MiB
+restic/restic last revert equals cold: yes
