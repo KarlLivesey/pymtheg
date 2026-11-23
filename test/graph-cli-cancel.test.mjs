@@ -72,11 +72,18 @@ test("an abort inside a module call kills the child processes the worker started
   const root = join(scratch, "project");
   const socket = join(scratch, "child.sock");
   const connections = [];
+  const sockets = [];
+  const pids = [];
   let connected;
   const both = new Promise((resolve) => (connected = resolve));
   const server = createServer((connection) => {
+    sockets.push(connection);
     connections.push(new Promise((resolve) => connection.on("close", resolve)));
-    connection.resume();
+    connection.setEncoding("utf8");
+    connection.on("data", (text) => {
+      const pid = Number.parseInt(text, 10);
+      if (pid > 0) pids.push(pid);
+    });
     if (connections.length === 2) connected();
   });
   await new Promise((resolve) => server.listen(socket, resolve));
@@ -102,10 +109,27 @@ test("an abort inside a module call kills the child processes the worker started
     await both;
     controller.abort();
     await assert.rejects(run, (error) => error.name === "AbortError");
-    // Both processes die: each connection closes.
-    await Promise.all(connections);
+    // Both processes die: each connection closes. The coordinator has
+    // already sent SIGKILL when the run rejects; the guard only turns a
+    // regression (processes left running) into a failure instead of a hang.
+    // It decides nothing when the test passes.
+    let guard;
+    const closed = await Promise.race([
+      Promise.all(connections).then(() => true),
+      new Promise((resolve) => (guard = setTimeout(resolve, 60_000, false))),
+    ]);
+    clearTimeout(guard);
+    assert.equal(closed, true, "a child process survived the cancelled run");
     assert.equal(connections.length, 2);
   } finally {
+    // Whatever survived a failure is ended, so the test process can exit.
+    for (const pid of pids)
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        /* already gone */
+      }
+    for (const socket of sockets) socket.destroy();
     server.close();
     await rm(scratch, { recursive: true, force: true });
   }

@@ -19,7 +19,8 @@ const CHILD = `
 const net = require("node:net");
 const { spawn } = require("node:child_process");
 const [path, script, grand] = process.argv.slice(1);
-net.connect(path);
+// Each says its pid, so the test can clean up whatever survives.
+net.connect(path, function () { this.write(process.pid + "\\n"); });
 if (!grand)
   spawn(process.execPath, ["-e", script, path, script, "grand"], { stdio: "ignore" });
 setInterval(() => {}, 1 << 30);
