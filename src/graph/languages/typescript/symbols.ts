@@ -724,7 +724,9 @@ export function objectMember(node: ts.Node): SymbolDraft | undefined {
     name: names.at(-1)!,
     identity: `${identityOf(owner)}.${slot}[${literal ? "object" : "type"}].${names.join(".")}`,
     range,
-    data: { scoped: true },
+    // A type literal's members are listed after a file's other symbols
+    // (C-41), by position: they do not displace symbols listed before.
+    data: literal ? { scoped: true } : { scoped: true, typeMember: true },
   };
 }
 

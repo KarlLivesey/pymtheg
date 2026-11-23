@@ -474,6 +474,50 @@ test("nested type positions have their places; a type literal's overloads are on
   }
 });
 
+test("a file's listing shows type-literal members after its other symbols, by position", async () => {
+  // C-41 review: a generated schema of type literals added thousands of
+  // symbols to one file; at a listing limit they displaced symbols shown
+  // before.
+  const scratch = await mkdtemp(join(tmpdir(), "c41-listing-"));
+  const root = join(scratch, "project");
+  const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "c41");
+  try {
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), tsconfig);
+    await writeFile(
+      join(root, "src/schema.ts"),
+      [
+        "export type Schema = {",
+        ...Array.from({ length: 20 }, (_, i) => `  t${i}: { m${i}(): void };`),
+        "};",
+        "export const config = { load() {} };",
+        "export class Service { start() {} stop() {} }",
+        "export function helper() {}",
+        "",
+      ].join("\n"),
+    );
+    await indexProject(root, new LanguageRegistry([typescript]), store);
+    const all = store.symbolsForFile("src/schema.ts", 1000);
+    const members = all.filter((symbol) => symbol.data?.typeMember);
+    assert.equal(members.length, 40);
+    const others = all.filter((symbol) => !symbol.data?.typeMember);
+    // Every other symbol comes first, so a limit shows them before members.
+    assert.deepEqual(
+      store
+        .symbolsForFile("src/schema.ts", others.length)
+        .map((symbol) => symbol.identity),
+      others.map((symbol) => symbol.identity),
+    );
+    assert.ok(others.some((symbol) => symbol.identity === "config.load"));
+    // Members in source order.
+    const starts = members.map((symbol) => symbol.range.start);
+    assert.deepEqual(starts, [...starts].sort((a, b) => a - b));
+  } finally {
+    store.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
 test("a call that is not on a declared member of a literal stays unlinked", async () => {
   const got = await outcomes(
     {
