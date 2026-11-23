@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { spawn } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
-import { registerChildGroup } from "./child-groups.js";
 export interface ProcessClock {
   schedule(callback: () => void, milliseconds: number): unknown;
   cancel(handle: unknown): void;
@@ -43,8 +42,7 @@ export async function runProcess(
       bytes = 0,
       done = false,
       killTimer: unknown = null,
-      finishTimer: unknown = null,
-      release: (() => void) | undefined;
+      finishTimer: unknown = null;
     const outDecoder = new StringDecoder("utf8"),
       errDecoder = new StringDecoder("utf8");
     const max = options.maxBytes ?? 1024 * 1024;
@@ -69,7 +67,6 @@ export async function runProcess(
       if (finishTimer) clock.cancel(finishTimer);
       options.signal?.removeEventListener("abort", abort);
       kill("SIGKILL");
-      release?.();
       child.stdout?.destroy();
       child.stderr?.destroy();
       stdout += outDecoder.end();
@@ -110,24 +107,6 @@ export async function runProcess(
         cleanup: "not spawned",
       });
       return;
-    }
-    // C-50: recorded where the thread that owns this worker can kill it.
-    if (child.pid !== undefined) {
-      release = registerChildGroup(child.pid);
-      if (!release) {
-        kill("SIGKILL");
-        clock.cancel(timer);
-        resolve({
-          kind: "spawn_failed",
-          code: null,
-          signal: null,
-          stdout: "",
-          stderr: "Too many child processes running at once",
-          elapsedMs: performance.now() - start,
-          cleanup: "Owned process group sent SIGKILL",
-        });
-        return;
-      }
     }
     if (options.input !== undefined && child.stdin) {
       child.stdin.on("error", () => {

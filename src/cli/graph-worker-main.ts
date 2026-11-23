@@ -4,9 +4,8 @@ import { workerData } from "node:worker_threads";
 import type { GraphRequest } from "../graph/commands.js";
 import { serveGraphRequest } from "./graph-worker.js";
 
-const { request, control, children } = workerData as {
+const { request, control } = workerData as {
   request: GraphRequest;
   control: SharedArrayBuffer;
-  children: SharedArrayBuffer;
 };
-await serveGraphRequest(request, control, {}, children);
+await serveGraphRequest(request, control);

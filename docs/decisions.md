@@ -3213,13 +3213,9 @@ inside a language module's synchronous code terminates it; the store is
 left as a killed run leaves it, and the next index repairs it. Anywhere
 else, the cancel is acknowledged at the command's next checkpoint, as
 before. The worker and the coordinator use a cancel flag and a section in
-shared memory (the shape of C-48), so no clock decides which. Every child
-process group a worker starts through `runProcess` is recorded in a table
-its owner holds (`src/backends/child-groups.ts`); the owner kills what is
-still recorded when the worker exits and when its own process exits.
-**Rules out:** an index run that only SIGKILL can stop; a wall-clock
-deadline in place of deterministic bounds; a toolchain process that
-outlives a cancelled run. [C-50](changes/C-50.md)
+shared memory (the shape of C-48), so no clock decides which. **Rules
+out:** an index run that only SIGKILL can stop; a wall-clock deadline in
+place of deterministic bounds. [C-50](changes/C-50.md)
 
 ### C-13 TypeScript program budget and compiler exceptions
 
