@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 // C-45 review: a module that keeps a table of each file's declared name
 // (`k=<name>`) and re-derives only the changed files, so a kept table that
 // is not proved current shows in the stored results.

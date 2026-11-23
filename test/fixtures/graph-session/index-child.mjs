@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 // C-45 review: another process's complete `graph index` of <root> with the
 // table module, run inside a session run's window before its baseline.
 import { executeGraph } from "../../../dist/graph/commands.js";
