@@ -258,6 +258,17 @@ export function receiverArms(
     )
       return leaf(node);
     if (ts.isVoidExpression(node)) return NO_ARMS;
+    // A tagged template is a call; `yield` takes the generator's next value,
+    // a type its signature writes.
+    if (ts.isTaggedTemplateExpression(node)) {
+      const declaration = checker.getResolvedSignature(node)?.declaration;
+      return !declaration ||
+        ts.isJSDocSignature(declaration) ||
+        declaration.type
+        ? leaf(node)
+        : undefined;
+    }
+    if (ts.isYieldExpression(node)) return leaf(node);
     if (ts.isAwaitExpression(node)) {
       const inner = arms(node.expression);
       return inner && inner.length <= 1 ? leaf(node) : undefined;
@@ -887,15 +898,29 @@ export function receiverArms(
     const generic = !node.typeArguments && !!declaration.typeParameters?.length;
     // Through a generic container, or with type arguments the walk cannot
     // prove unreduced: the result keeps its declared type beside it.
-    if (callees[0]?.generic || (generic && !argumentsUnreduced(node)))
-      return declaration.type
+    if (callees[0]?.generic || (generic && !argumentsUnreduced(node))) {
+      if (declaration.type)
+        return [
+          {
+            type: typeAt(node),
+            generic: checker.getTypeFromTypeNode(declaration.type),
+          },
+        ];
+      // An inferred return: its declared form is the signature's, if the
+      // body's returns are not themselves a reduced union.
+      if (!hasBody(declaration)) return undefined;
+      const out = returned(declaration);
+      if (!out || reducible(out)) return undefined;
+      const signature = checker.getSignatureFromDeclaration(declaration);
+      return signature
         ? [
             {
               type: typeAt(node),
-              generic: checker.getTypeFromTypeNode(declaration.type),
+              generic: checker.getReturnTypeOfSignature(signature),
             },
           ]
         : undefined;
+    }
     if (declaration.type) return leaf(node);
     if (!hasBody(declaration)) return undefined;
     const out = returned(declaration);
