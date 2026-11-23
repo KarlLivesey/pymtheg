@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "../shared/quiet-warnings.js";
 import { operationError } from "./operation-errors.js";
 import { agentLimits } from "./limits.js";
 import { parentPort, workerData } from "node:worker_threads";
