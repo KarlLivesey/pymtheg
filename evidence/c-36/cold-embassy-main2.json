@@ -1,0 +1,10 @@
+[
+ {
+  "pin": "embassy-rs_embassy",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 1439.81,
+  "cpuS": 1487.1,
+  "peakMiB": 4631
+ }
+]

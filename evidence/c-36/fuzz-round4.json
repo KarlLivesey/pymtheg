@@ -1,0 +1,302 @@
+{
+ "comment": "C-36 round 4: scripts/reindex/fuzz-order.mjs runs. head = the round-4 head; old = d96a8ba, the head before the review fixes (no order hook, incremental against cold only); mutations = the head with one piece of the lazy-cache rule removed (private experiment patch, named below).",
+ "head": {
+  "36401": {
+   "seed": 36401,
+   "edits": 1000,
+   "cases": 50,
+   "coldOrderChecks": 100,
+   "comparisons": 1000,
+   "scopedEdits": 251,
+   "cutEdits": 633,
+   "kinds": {
+    "leading-comment": 72,
+    "chain-other": 28,
+    "rename-fn": 62,
+    "body-call": 100,
+    "add-macro": 52,
+    "trailing-comment": 71,
+    "remove-call": 49,
+    "add-fn": 59,
+    "add-glob": 69,
+    "remove-macro": 57,
+    "whitespace": 52,
+    "chain-doc": 62,
+    "chain-trait": 29,
+    "remove-use": 56,
+    "chain-call": 38,
+    "add-util-macro": 58,
+    "toggle-macro-use": 58,
+    "cfg-variant": 28
+   },
+   "shapes": {
+    "glob-cycle": 33,
+    "mutual-pub-use": 31,
+    "macro-shadowed-glob": 28,
+    "macro-use-extern-crate": 39,
+    "serde-helper-alias": 33,
+    "cfg-siblings": 26,
+    "glob-chain-method": 32
+   },
+   "orders": {
+    "forward": 717,
+    "reversed": 717,
+    "shuffled": 716
+   },
+   "permutedLoops": 3269,
+   "mismatches": 0
+  },
+  "36402": {
+   "seed": 36402,
+   "edits": 1000,
+   "cases": 50,
+   "coldOrderChecks": 100,
+   "comparisons": 1000,
+   "scopedEdits": 279,
+   "cutEdits": 529,
+   "kinds": {
+    "remove-macro": 66,
+    "add-glob": 60,
+    "chain-trait": 34,
+    "add-macro": 74,
+    "chain-other": 24,
+    "body-call": 104,
+    "toggle-macro-use": 41,
+    "chain-doc": 62,
+    "remove-call": 50,
+    "remove-use": 72,
+    "add-fn": 47,
+    "leading-comment": 59,
+    "whitespace": 55,
+    "trailing-comment": 75,
+    "add-util-macro": 50,
+    "chain-call": 29,
+    "rename-fn": 71,
+    "cfg-variant": 27
+   },
+   "shapes": {
+    "glob-cycle": 30,
+    "mutual-pub-use": 29,
+    "macro-shadowed-glob": 25,
+    "macro-use-extern-crate": 28,
+    "serde-helper-alias": 34,
+    "cfg-siblings": 27,
+    "glob-chain-method": 32
+   },
+   "orders": {
+    "forward": 717,
+    "reversed": 717,
+    "shuffled": 716
+   },
+   "permutedLoops": 3281,
+   "mismatches": 0
+  },
+  "36403": {
+   "seed": 36403,
+   "edits": 1000,
+   "cases": 50,
+   "coldOrderChecks": 100,
+   "comparisons": 1000,
+   "scopedEdits": 282,
+   "cutEdits": 562,
+   "kinds": {
+    "chain-doc": 73,
+    "toggle-macro-use": 53,
+    "body-call": 100,
+    "leading-comment": 54,
+    "chain-trait": 42,
+    "remove-use": 58,
+    "whitespace": 52,
+    "chain-other": 31,
+    "chain-call": 32,
+    "remove-call": 61,
+    "add-fn": 81,
+    "add-glob": 49,
+    "remove-macro": 61,
+    "rename-fn": 59,
+    "add-macro": 46,
+    "add-util-macro": 71,
+    "trailing-comment": 49,
+    "cfg-variant": 28
+   },
+   "shapes": {
+    "glob-cycle": 32,
+    "mutual-pub-use": 31,
+    "macro-shadowed-glob": 29,
+    "macro-use-extern-crate": 27,
+    "serde-helper-alias": 29,
+    "cfg-siblings": 29,
+    "glob-chain-method": 32
+   },
+   "orders": {
+    "forward": 717,
+    "reversed": 717,
+    "shuffled": 716
+   },
+   "permutedLoops": 3263,
+   "mismatches": 0
+  },
+  "36404": {
+   "seed": 36404,
+   "edits": 1000,
+   "cases": 50,
+   "coldOrderChecks": 100,
+   "comparisons": 1000,
+   "scopedEdits": 319,
+   "cutEdits": 469,
+   "kinds": {
+    "chain-call": 41,
+    "remove-macro": 58,
+    "chain-other": 26,
+    "leading-comment": 52,
+    "add-fn": 65,
+    "add-util-macro": 63,
+    "trailing-comment": 66,
+    "remove-call": 51,
+    "add-glob": 66,
+    "body-call": 108,
+    "chain-doc": 59,
+    "whitespace": 65,
+    "remove-use": 52,
+    "toggle-macro-use": 58,
+    "add-macro": 60,
+    "rename-fn": 53,
+    "cfg-variant": 32,
+    "chain-trait": 25
+   },
+   "shapes": {
+    "glob-cycle": 29,
+    "mutual-pub-use": 23,
+    "macro-shadowed-glob": 28,
+    "macro-use-extern-crate": 32,
+    "serde-helper-alias": 31,
+    "cfg-siblings": 31,
+    "glob-chain-method": 29
+   },
+   "orders": {
+    "forward": 717,
+    "reversed": 717,
+    "shuffled": 716
+   },
+   "permutedLoops": 3316,
+   "mismatches": 0
+  },
+  "36405": {
+   "seed": 36405,
+   "edits": 1000,
+   "cases": 50,
+   "coldOrderChecks": 100,
+   "comparisons": 1000,
+   "scopedEdits": 285,
+   "cutEdits": 524,
+   "kinds": {
+    "remove-use": 61,
+    "add-fn": 46,
+    "whitespace": 54,
+    "chain-doc": 50,
+    "chain-trait": 29,
+    "chain-other": 28,
+    "cfg-variant": 34,
+    "leading-comment": 63,
+    "body-call": 119,
+    "chain-call": 28,
+    "remove-call": 71,
+    "remove-macro": 59,
+    "trailing-comment": 55,
+    "add-glob": 56,
+    "add-util-macro": 57,
+    "rename-fn": 58,
+    "add-macro": 71,
+    "toggle-macro-use": 61
+   },
+   "shapes": {
+    "glob-cycle": 31,
+    "mutual-pub-use": 29,
+    "macro-shadowed-glob": 30,
+    "macro-use-extern-crate": 31,
+    "serde-helper-alias": 25,
+    "cfg-siblings": 30,
+    "glob-chain-method": 30
+   },
+   "orders": {
+    "forward": 717,
+    "reversed": 717,
+    "shuffled": 716
+   },
+   "permutedLoops": 3305,
+   "mismatches": 0
+  }
+ },
+ "old": {
+  "7": {
+   "edits": 300,
+   "scopedEdits": 73,
+   "mismatches": 22,
+   "byEdit": {
+    "chain-doc": 15,
+    "body-call": 2,
+    "chain-call": 2,
+    "leading-comment": 1,
+    "whitespace": 2
+   }
+  },
+  "8": {
+   "edits": 300,
+   "scopedEdits": 69,
+   "mismatches": 2,
+   "byEdit": {
+    "chain-doc": 2
+   }
+  },
+  "9": {
+   "edits": 300,
+   "scopedEdits": 77,
+   "mismatches": 13,
+   "byEdit": {
+    "chain-doc": 6,
+    "body-call": 2,
+    "whitespace": 2,
+    "chain-call": 2,
+    "trailing-comment": 1
+   }
+  }
+ },
+ "mutations": {
+  "store-unclean": {
+   "seed": 7,
+   "edits": 300,
+   "scopedEdits": 101,
+   "mismatches": 0
+  },
+  "no-trace-replay": {
+   "seed": 7,
+   "edits": 300,
+   "scopedEdits": 101,
+   "mismatches": 0
+  },
+  "keep-expansions": {
+   "seed": 7,
+   "edits": 300,
+   "scopedEdits": 101,
+   "mismatches": 0
+  },
+  "no-mode-key": {
+   "seed": 7,
+   "edits": 300,
+   "scopedEdits": 101,
+   "mismatches": 0
+  },
+  "no-mode-key-attr": {
+   "seed": 7,
+   "edits": 300,
+   "scopedEdits": 101,
+   "mismatches": 0
+  },
+  "stackfree-off": {
+   "seed": 7,
+   "edits": 300,
+   "scopedEdits": 101,
+   "mismatches": 0
+  }
+ }
+}

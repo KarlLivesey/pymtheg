@@ -3224,7 +3224,8 @@ export function extractFile(
           { jsx: true },
         );
       }
-    } else if (ts.isTypeReferenceNode(node)) {
+    } else if (ts.isTypeReferenceNode(node) && !ts.isConstTypeReference(node)) {
+      // `x as const` and `<const>x` are const assertions, not references.
       const name = node.typeName;
       const at = ts.isQualifiedName(name) ? name.right : name;
       const lookupResult = lookup(at);

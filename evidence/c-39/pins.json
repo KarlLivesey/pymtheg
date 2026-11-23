@@ -1,0 +1,154 @@
+[
+ {
+  "id": "pingdotgg/t3code",
+  "language": "typescript",
+  "url": "https://github.com/pingdotgg/t3code.git",
+  "commit": "ea20e800216417c8d3b5dfc54a863bbd9e0b3e20",
+  "category": "UI / app monorepo",
+  "why": "Agent orchestration app with React TSX and multiple apps and packages in a Turbo monorepo."
+ },
+ {
+  "id": "withastro/astro",
+  "language": "typescript",
+  "url": "https://github.com/withastro/astro.git",
+  "commit": "3ac5ad3ae05ddc461bcc7748f0c55fd6da056652",
+  "category": "web / server framework",
+  "why": "Site framework with pnpm workspaces, package aliases and integrations."
+ },
+ {
+  "id": "nestjs/nest",
+  "language": "typescript",
+  "url": "https://github.com/nestjs/nest.git",
+  "commit": "085f83a168e9edbedfe9560428dcfd270073ae00",
+  "category": "web / server framework",
+  "why": "Decorator-heavy server framework with dependency injection and cross-package path aliases."
+ },
+ {
+  "id": "excalidraw/excalidraw",
+  "language": "typescript",
+  "url": "https://github.com/excalidraw/excalidraw.git",
+  "commit": "680f58ccfdaa1ae5b7f606ad4568f6df46acacb5",
+  "category": "UI / app",
+  "why": "React drawing app with TSX, workspace packages and cross-package imports."
+ },
+ {
+  "id": "vitest-dev/vitest",
+  "language": "typescript",
+  "url": "https://github.com/vitest-dev/vitest.git",
+  "commit": "161e25f663a838f6a30890f8a6827ff83ff1b3c7",
+  "category": "monorepo / dev tool",
+  "why": "Test runner with pnpm workspace packages and TypeScript and JavaScript fixtures."
+ },
+ {
+  "id": "mermaid-js/mermaid",
+  "language": "typescript",
+  "url": "https://github.com/mermaid-js/mermaid.git",
+  "commit": "e5fdf81d222d9e011ca75d9e4363f3bd7bf99616",
+  "category": "compiler / dev tool",
+  "why": "Diagram parsing and rendering with generated parser inputs and workspace packages."
+ },
+ {
+  "id": "trpc/trpc",
+  "language": "typescript",
+  "url": "https://github.com/trpc/trpc.git",
+  "commit": "1abda6cc6cd9ac149e474936f5dfcb679a983fb3",
+  "category": "web / server framework",
+  "why": "Inference-heavy RPC client/server library with cross-workspace examples."
+ },
+ {
+  "id": "puppeteer/puppeteer",
+  "language": "typescript",
+  "url": "https://github.com/puppeteer/puppeteer.git",
+  "commit": "e82d656004488cc2f635f878da7cede1b4631235",
+  "category": "library / dev tool",
+  "why": "Browser automation API with protocol packages and multiple tsconfig files."
+ },
+ {
+  "id": "colinhacks/zod",
+  "language": "typescript",
+  "url": "https://github.com/colinhacks/zod.git",
+  "commit": "90bf57b8e96a3729d766fff3185d39b2ab3ba016",
+  "category": "library",
+  "why": "Schema validation with heavily generic types and type-level tests."
+ },
+ {
+  "id": "vitejs/vite",
+  "language": "typescript",
+  "url": "https://github.com/vitejs/vite.git",
+  "commit": "60c260dea1fa9f628c22e32b14dddf6ca3088f2b",
+  "category": "compiler / dev tool",
+  "why": "Dev server and bundler with a large fixture tree mixing JavaScript, TS and TSX."
+ },
+ {
+  "id": "reduxjs/redux-toolkit",
+  "language": "typescript",
+  "url": "https://github.com/reduxjs/redux-toolkit.git",
+  "commit": "1a7d3b5251ceda61b77928e357a22086b45aaab1",
+  "category": "library",
+  "why": "State management with TypeScript and React entry points across packages."
+ },
+ {
+  "id": "honojs/hono",
+  "language": "typescript",
+  "url": "https://github.com/honojs/hono.git",
+  "commit": "676c8f80fcafc49e6e74c847a8f0d9c44cc7faee",
+  "category": "web / server framework",
+  "why": "Server framework with runtime-specific adapters and routing types."
+ },
+ {
+  "id": "react-hook-form/react-hook-form",
+  "language": "typescript",
+  "url": "https://github.com/react-hook-form/react-hook-form.git",
+  "commit": "66f4d72b8c66627d5542dd13e15070227d84d4a2",
+  "category": "UI library",
+  "why": "Generic React hooks with TSX and broad form fixtures."
+ },
+ {
+  "id": "vercel/turborepo",
+  "language": "typescript",
+  "url": "https://github.com/vercel/turborepo.git",
+  "commit": "eda8172408e89671cf71c39a2ffe4e05e07624bf",
+  "category": "monorepo / dev tool",
+  "why": "Turbo and pnpm monorepo examples, TypeScript tooling, and mixed Rust and JavaScript."
+ },
+ {
+  "id": "dexie/Dexie.js",
+  "language": "typescript",
+  "url": "https://github.com/dexie/Dexie.js.git",
+  "commit": "95666bf5370a222a21d7f53130d87b42e9b7bac7",
+  "category": "database / storage",
+  "why": "IndexedDB wrapper with TypeScript library code and JavaScript tests and examples."
+ },
+ {
+  "id": "changesets/changesets",
+  "language": "typescript",
+  "url": "https://github.com/changesets/changesets.git",
+  "commit": "9a035ec36045aeb6141dd0bbac9ab9e3c69ac0bc",
+  "category": "CLI tool",
+  "why": "Release-management CLI with multiple published packages and fixture projects."
+ },
+ {
+  "id": "oclif/core",
+  "language": "typescript",
+  "url": "https://github.com/oclif/core.git",
+  "commit": "50a4bc0ecd123733cd974866f8db0f1cb5a6a06f",
+  "category": "CLI tool",
+  "why": "CLI framework with CommonJS and ESM plugin-loading examples."
+ },
+ {
+  "id": "pmndrs/zustand",
+  "language": "typescript",
+  "url": "https://github.com/pmndrs/zustand.git",
+  "commit": "9fed2eb2f3af672da9f7bf694b996df3831fc207",
+  "category": "library",
+  "why": "Small state library with generic middleware and React examples."
+ },
+ {
+  "id": "yargs/yargs",
+  "language": "typescript",
+  "url": "https://github.com/yargs/yargs.git",
+  "commit": "9588a764365c0fd9a6b5dd2f76f2e1be805c5426",
+  "category": "CLI library",
+  "why": "Small command-line parsing library with ESM and CommonJS entry points."
+ }
+]

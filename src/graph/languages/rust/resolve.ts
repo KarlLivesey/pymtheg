@@ -308,6 +308,27 @@ const accepts = (s: GraphSymbol, ns: Namespace) => {
     (s.kind === "struct" && data(s).constructorForm !== "named")
   );
 };
+/**
+ * C-36: the files whose links a pass decides (all when `files` is absent).
+ * The resolver reports the lookup cycle and depth cuts it met: `decisionCuts`
+ * while deciding those links, `runCuts` in the whole run. Only a cut answer
+ * can depend on which lookups ran first.
+ */
+export interface RustDecisionScope {
+  files?: ReadonlySet<string>;
+  decisionCuts?: number;
+  runCuts?: number;
+}
+/**
+ * C-36, for the differential fuzzer only (scripts/reindex/fuzz-order.mjs):
+ * the order in which the first decision loop visits the links, as a
+ * permutation of their indexes. The loop's outputs are put back in link
+ * order afterwards, so only the order in which the caches fill changes.
+ * Unset in production.
+ */
+export const rustDecisionOrder: {
+  permute?: ((count: number) => readonly number[]) | undefined;
+} = {};
 // A proc-macro declaration has one captured function identity, an exported
 // macro name, and a function-value facet available only inside its own crate.
 const acceptsAt = (
@@ -358,7 +379,10 @@ export function resolveRust(
   annotate?: (link: GraphLink, extra: Record<string, Json>) => void,
   markScopeResult?: (link: GraphLink, assumed: boolean) => void,
   scopeAudit?: MacroScopeAudit,
+  /** C-36: decide only these files' links; every fact still comes from all files. */
+  decide?: RustDecisionScope,
 ): LinkResolution[] {
+  const decided = (file: string) => !decide?.files || decide.files.has(file);
   // Library proofs use the ordinary scoped lookup with a separate cache key.
   // The analysis pass and existing checkout decisions use the original route.
   let libraryLookup = false;
@@ -377,6 +401,38 @@ export function resolveRust(
   // the key. A failed proof keeps alternatives, it never asserts a binding.
   let unprovedImports = new Map<string, ScopeTrace | null>();
   let cycleCuts = 0;
+  // Cuts met by isolated scope probes, whose counter is restored afterwards.
+  let isolatedCuts = 0;
+  // C-36: helper re-entries met so far. A re-entry answers for the caller's
+  // stack, so an answer computed under one is never cached. Other cuts met
+  // inside a lazily cached computation are its own: it starts its lookups
+  // with an empty stack, so they do not depend on who asked.
+  let reentries = 0;
+  /**
+   * C-36: the global lookup mode that `find` keys its memo by. A lazily
+   * cached answer computed under one mode is not reused under another.
+   */
+  // A free-form part of a key, length-prefixed so the key is injective.
+  const keyPart = (v: string | undefined): string =>
+    v === undefined ? "-" : `${v.length}:${v}`;
+  /**
+   * The lookup mode, as a cache key: the scope mode, the macro-identity probe
+   * and, in a library lookup, its settings. Built by concatenation (C-36
+   * round 4: it is part of every lazy cache key); equal keys mean equal
+   * modes, as with the JSON key it replaces.
+   */
+  const lookupMode = (): string => {
+    let key = `${scopeMode}|${macroIdentityProbe ? 1 : 0}|${
+      macroIdentityFlavor
+        ? `${macroIdentityFlavor}|${keyPart(macroIdentityPrelude)}`
+        : "-"
+    }`;
+    if (libraryLookup)
+      key += `|L${libraryAttributeStart ?? "-"}|${keyPart(libraryImportScope)}|${
+        libraryProbe ? 1 : 0
+      }${protectModuleImports ? 1 : 0}|${keyPart(activeMacroImports.at(-1)?.id)}`;
+    return key;
+  };
   const namespaceParents = new WeakMap<Place, number>();
   let nextNamespaceParent = 0;
   function parentIdentity(loc: Place): number {
@@ -468,32 +524,19 @@ export function resolveRust(
   let capturedMacroExports: Map<string, Set<string>> | undefined;
   let capturedHelperExports: Map<string, Set<string>> | undefined;
   let buildingHelperExports = false;
-  function readableMacroUseBinds(
-    head: string,
-    file: string,
-    scope: string,
-    imports: readonly MacroUseImport[],
-    helpersOnly = false,
-  ): boolean {
-    if (helpersOnly && buildingHelperExports) return true;
-    if (!imports.length) return false;
-    head = head.split("::")[0]!;
-    const manifests = new Set(
-      ownerPlace(file, scope).flatMap((own) =>
-        imports.flatMap((request) => {
-          if (request.names && !request.names.includes(head)) return [];
-          const manifest = own.crate.deps.get(request.crate);
-          return manifest &&
-            packages.some((c) => c.kind === "lib" && c.manifest === manifest)
-            ? [manifest]
-            : [];
-        }),
-      ),
-    );
-    if (!manifests.size) return false;
-    let captured = helpersOnly ? capturedHelperExports : capturedMacroExports;
-    if (!captured) {
-      if (helpersOnly) buildingHelperExports = true;
+  /**
+   * The captured exports of every library crate: with `helpersOnly`, the
+   * names that can bind an inferred derive helper. A pure function of the
+   * snapshot's symbols, places, imports and attribute rules, all fixed
+   * before setup's first lookup. While the helper map is being built,
+   * `readableMacroUseBinds` answers helper questions with `true` and no
+   * lazy answer is stored (`lazyCompute`). C-36: setup ends by building
+   * both maps afresh, in both passes, so no decision reads a map built
+   * part-way through setup.
+   */
+  function captureExports(helpersOnly: boolean): Map<string, Set<string>> {
+    if (helpersOnly) buildingHelperExports = true;
+    try {
       const libs = new Map(
         packages.filter((c) => c.kind === "lib").map((c) => [c.root, c]),
       );
@@ -705,7 +748,7 @@ export function resolveRust(
             }
           }
       }
-      captured = new Map(
+      return new Map(
         packages
           .filter((c) => c.kind === "lib")
           .map((c) => [
@@ -713,11 +756,36 @@ export function resolveRust(
             exports.get(key(c.manifest, "")) ?? new Set<string>(),
           ]),
       );
-      if (helpersOnly) {
-        capturedHelperExports = captured;
-        buildingHelperExports = false;
-      } else capturedMacroExports = captured;
+    } finally {
+      if (helpersOnly) buildingHelperExports = false;
     }
+  }
+  function readableMacroUseBinds(
+    head: string,
+    file: string,
+    scope: string,
+    imports: readonly MacroUseImport[],
+    helpersOnly = false,
+  ): boolean {
+    if (helpersOnly && buildingHelperExports) return true;
+    if (!imports.length) return false;
+    head = head.split("::")[0]!;
+    const manifests = new Set(
+      ownerPlace(file, scope).flatMap((own) =>
+        imports.flatMap((request) => {
+          if (request.names && !request.names.includes(head)) return [];
+          const manifest = own.crate.deps.get(request.crate);
+          return manifest &&
+            packages.some((c) => c.kind === "lib" && c.manifest === manifest)
+            ? [manifest]
+            : [];
+        }),
+      ),
+    );
+    if (!manifests.size) return false;
+    const captured = helpersOnly
+      ? (capturedHelperExports ??= captureExports(true))
+      : (capturedMacroExports ??= captureExports(false));
     for (const manifest of manifests)
       if (captured.get(manifest)?.has(head)) return true;
     return false;
@@ -729,116 +797,250 @@ export function resolveRust(
     // Stable Rust does not apply procedural attribute macros to fields/variants.
     if (origin.nested) return false;
     if (!helperReady) return true;
-    const key = JSON.stringify(origin),
-      cached = helperCache.get(key);
+    const key = JSON.stringify([origin, lookupMode()]),
+      cached = lazyHit(helperCache, "helper", key);
     if (cached !== undefined) return cached;
-    if (helperBusy.has(key)) return true;
-    helperBusy.add(key);
-    let shadow = false;
+    if (helperBusy.has(JSON.stringify(origin))) {
+      // C-36: the answer of a helper already being decided depends on the
+      // caller's stack, like a lookup cycle cut.
+      cycleCuts++;
+      reentries++;
+      if (activeLookup) activeLookup.trace.valid = false;
+      return true;
+    }
+    helperBusy.add(JSON.stringify(origin));
     try {
-      for (const own of ownerPlace(origin.file, origin.scope)) {
-        let loc: Place | null = own;
-        while (loc) {
-          let scope = loc === own ? origin.scope : loc.local;
-          while (true) {
-            const b = attributeBindings.get(loc.file + "|" + scope);
-            if (b) {
-              if (
-                readableMacroUseBinds(
-                  origin.name,
-                  loc.file,
-                  scope,
-                  b.macroUseImports ?? [],
-                  true,
-                ) ||
-                (b.macroUseImports ?? []).some((r) =>
-                  r.names?.includes(origin.name),
+      return lazyCompute(helperCache, "helper", key, () => {
+        let shadow = false;
+        for (const own of ownerPlace(origin.file, origin.scope)) {
+          let loc: Place | null = own;
+          while (loc) {
+            let scope = loc === own ? origin.scope : loc.local;
+            while (true) {
+              const b = attributeBindings.get(loc.file + "|" + scope);
+              if (b) {
+                if (
+                  readableMacroUseBinds(
+                    origin.name,
+                    loc.file,
+                    scope,
+                    b.macroUseImports ?? [],
+                    true,
+                  ) ||
+                  (b.macroUseImports ?? []).some((r) =>
+                    r.names?.includes(origin.name),
+                  )
                 )
+                  shadow = true;
+                if (
+                  !assumeUnseenHelperBindings &&
+                  (b.unknown || b.macroUse || b.helperUnknown)
+                )
+                  shadow = true; // unseen helper binding
+              }
+              const mode = libraryLookup;
+              libraryLookup = false;
+              let found: Found;
+              try {
+                found = find(origin.name, loc, scope, "macro");
+              } finally {
+                libraryLookup = mode;
+              }
+              if (
+                found.symbols.some(
+                  (s) => s.kind === "macro" || data(s).semanticKind === "macro",
+                ) ||
+                found.possibleImportNames?.includes(origin.name)
               )
                 shadow = true;
-              if (
-                !assumeUnseenHelperBindings &&
-                (b.unknown || b.macroUse || b.helperUnknown)
-              )
-                shadow = true; // unseen helper binding
-            }
-            const mode = libraryLookup;
-            libraryLookup = false;
-            let found: Found;
-            try {
-              found = find(origin.name, loc, scope, "macro");
-            } finally {
-              libraryLookup = mode;
-            }
-            if (
-              found.symbols.some(
-                (s) => s.kind === "macro" || data(s).semanticKind === "macro",
-              ) ||
-              found.possibleImportNames?.includes(origin.name)
-            )
-              shadow = true;
-            if (!assumeUnseenHelperBindings && !found.complete) shadow = true; // unseen helper lookup
-            if (!scope) break;
-            scope = scope.includes("::")
-              ? scope.slice(0, scope.lastIndexOf("::"))
-              : "";
-          }
-          loc = loc.parent;
-        }
-      }
-      helperCache.set(key, shadow);
-      clearIncompleteLookups();
-      return shadow;
-    } finally {
-      helperBusy.delete(key);
-    }
-  }
-  const attributeShadowCache = new Map<string, boolean>();
-  function shadowFromParents(origin: AttributeOrigin): boolean {
-    if (origin.helper) return helperShadowed(origin);
-    const key = JSON.stringify(origin),
-      cached = attributeShadowCache.get(key);
-    if (cached !== undefined) return cached;
-    const head = origin.name.split("::")[0]!,
-      rule = attributeRules.get(head);
-    let result = false;
-    if (rule && rule.category !== "builtin")
-      for (const own of ownerPlace(origin.file, origin.scope)) {
-        if (rule.category === "tool" && own.crate.deps.has(head)) result = true;
-        let parent: Place | null = own;
-        while (parent) {
-          {
-            let scope = parent === own ? origin.scope : parent.local;
-            while (true) {
-              const b = attributeBindings.get(parent.file + "|" + scope);
-              if (
-                b &&
-                attributeBindingShadows(
-                  head,
-                  (parent.file !== origin.file && b.names.includes(head)) ||
-                    readableMacroUseBinds(
-                      head,
-                      parent.file,
-                      scope,
-                      b.macroUseImports ?? [],
-                    ),
-                  parent.file !== origin.file &&
-                    (b.unknown ||
-                      (rule.category === "prelude" && !!b.macroUse)),
-                )
-              )
-                result = true;
+              if (!assumeUnseenHelperBindings && !found.complete) shadow = true; // unseen helper lookup
               if (!scope) break;
               scope = scope.includes("::")
                 ? scope.slice(0, scope.lastIndexOf("::"))
                 : "";
             }
+            loc = loc.parent;
           }
-          parent = parent.parent;
         }
+        return shadow;
+      });
+    } finally {
+      helperBusy.delete(JSON.stringify(origin));
+    }
+  }
+  /**
+   * C-36: the rule every lazily filled cache follows. An answer is stored
+   * only if it does not depend on the caller: no helper re-entry occurred
+   * while computing it, and it was not computed inside an import expansion
+   * or a macro import of the caller (`importExpansions`,
+   * `activeMacroImports`), whose cuts and textual-macro answers belong to
+   * the caller's stack. The scope-read trace of the computation is stored
+   * with it and replayed on a hit, as a lookup memo hit replays its own, so
+   * the retry decision is the same for a hit and a fresh computation.
+   */
+  // Lookup state the lazy caches read, declared before setup uses them.
+  /** The deepest lookup stack reached so far (see `lookupHeights`). */
+  let deepestLookup = 0;
+  let activeLookup:
+    | {
+        trace: LookupTrace;
+        seen: Set<string>;
+        expansion: ImportExpansion | undefined;
       }
-    attributeShadowCache.set(key, result);
+    | undefined;
+  const auditedLookupReads = new WeakMap<Found, ScopeRead[]>();
+  const modeBit = { proven: 1, assumed: 2 } as const;
+  let scopeChanges = 0;
+  const rootScopeReads: ScopeRead[] = [];
+  const internedScopeReads = new Map<string, Map<string, ScopeRead>>();
+  let scopeReads: ScopeRead[] | undefined;
+  const activeMacroImports: GraphLink[] = [];
+  const importExpansions = new Map<string, number[]>();
+  /** Scope-read traces of stored lazy answers, per cache, by the same key. */
+  const lazyTraces = new WeakMap<object, Map<string, ScopeTrace>>();
+  /**
+   * Heights of stored lazy answers, per cache, by the same key: how deep the
+   * lookups of the computation went. Each of its lookups starts with an empty
+   * stack, so this is the depth a fresh computation reaches whatever the
+   * caller.
+   */
+  const lazyHeights = new WeakMap<object, Map<string, number>>();
+  function lazyHit<T>(cache: Map<string, T>, name: string, key: string) {
+    const hit = cache.get(key);
+    if (hit !== undefined) {
+      recordReads(lazyTraces.get(cache)?.get(key));
+      deepestLookup = Math.max(
+        deepestLookup,
+        lazyHeights.get(cache)?.get(key) ?? 0,
+      );
+    }
+    return hit;
+  }
+  /** Lazy computations under way, by cache and key. */
+  const lazyBusy = new Set<string>();
+  /**
+   * Runs a lazy computation from nothing: the caller's import expansions and
+   * macro imports are set aside for its duration and restored after, so its
+   * cuts are met within itself. A computation of a key already under way is
+   * a re-entry: like a helper re-entry it counts as a cut, answers for the
+   * caller's stack (with the caller's state) and is not stored, and neither
+   * is the computation it re-entered.
+   */
+  function lazyFresh<T>(
+    id: string,
+    compute: () => T,
+  ): { result: T; trace?: ScopeTrace; clean: boolean; height: number } {
+    if (lazyBusy.has(id)) {
+      cycleCuts++;
+      reentries++;
+      if (activeLookup) activeLookup.trace.valid = false;
+      return { ...lookupReads(compute), clean: false, height: 0 };
+    }
+    const expansions = [...importExpansions];
+    const macroImports = activeMacroImports.splice(0);
+    // The caller's lookup is set aside as well: the computation's lookups
+    // are not its children, so they neither absorb into its trace nor
+    // invalidate it. Only an answer that depends on the caller (a re-entry)
+    // invalidates it, below.
+    const lookup = activeLookup;
+    activeLookup = undefined;
+    const outerDeepest = deepestLookup;
+    deepestLookup = 0;
+    importExpansions.clear();
+    lazyBusy.add(id);
+    const cuts = reentries;
+    let clean = false;
+    try {
+      const { result, trace } = lookupReads(compute);
+      clean = reentries === cuts;
+      return {
+        result,
+        ...(trace !== undefined ? { trace } : {}),
+        clean,
+        height: deepestLookup,
+      };
+    } finally {
+      lazyBusy.delete(id);
+      deepestLookup = Math.max(outerDeepest, deepestLookup);
+      activeLookup = lookup;
+      if (!clean && lookup) lookup.trace.valid = false;
+      importExpansions.clear();
+      for (const [k, v] of expansions) importExpansions.set(k, v);
+      activeMacroImports.splice(0, activeMacroImports.length, ...macroImports);
+    }
+  }
+  function lazyCompute<T>(
+    cache: Map<string, T>,
+    name: string,
+    key: string,
+    compute: () => T,
+  ): T {
+    const traceKey = `${name}\u0000${key}`;
+    // An answer computed while the helper exports are being built read
+    // their placeholder answer, so it is never stored.
+    const building = buildingHelperExports;
+    const { result, trace, clean, height } = lazyFresh(traceKey, compute);
+    if (clean && !building && !buildingHelperExports) {
+      cache.set(key, result);
+      let traces = lazyTraces.get(cache);
+      if (!traces) lazyTraces.set(cache, (traces = new Map()));
+      if (trace !== undefined) traces.set(key, trace);
+      else traces.delete(key);
+      let heights = lazyHeights.get(cache);
+      if (!heights) lazyHeights.set(cache, (heights = new Map()));
+      if (height) heights.set(key, height);
+      else heights.delete(key);
+    }
     return result;
+  }
+  const attributeShadowCache = new Map<string, boolean>();
+  function shadowFromParents(origin: AttributeOrigin): boolean {
+    if (origin.helper) return helperShadowed(origin);
+    const key = JSON.stringify([origin, lookupMode()]),
+      cached = lazyHit(attributeShadowCache, "attribute", key);
+    if (cached !== undefined) return cached;
+    return lazyCompute(attributeShadowCache, "attribute", key, () => {
+      const head = origin.name.split("::")[0]!,
+        rule = attributeRules.get(head);
+      let result = false;
+      if (rule && rule.category !== "builtin")
+        for (const own of ownerPlace(origin.file, origin.scope)) {
+          if (rule.category === "tool" && own.crate.deps.has(head))
+            result = true;
+          let parent: Place | null = own;
+          while (parent) {
+            {
+              let scope = parent === own ? origin.scope : parent.local;
+              while (true) {
+                const b = attributeBindings.get(parent.file + "|" + scope);
+                if (
+                  b &&
+                  attributeBindingShadows(
+                    head,
+                    (parent.file !== origin.file && b.names.includes(head)) ||
+                      readableMacroUseBinds(
+                        head,
+                        parent.file,
+                        scope,
+                        b.macroUseImports ?? [],
+                      ),
+                    parent.file !== origin.file &&
+                      (b.unknown ||
+                        (rule.category === "prelude" && !!b.macroUse)),
+                  )
+                )
+                  result = true;
+                if (!scope) break;
+                scope = scope.includes("::")
+                  ? scope.slice(0, scope.lastIndexOf("::"))
+                  : "";
+              }
+            }
+            parent = parent.parent;
+          }
+        }
+      return result;
+    });
   }
   let attributeContextReady = false;
   let helperReady = false;
@@ -847,31 +1049,32 @@ export function resolveRust(
   const deferredHelpers: AttributeOrigin[] = [];
   const itemPresenceCache = new Map<string, string[]>();
   function itemPresence(item: GraphSymbol | GraphLink): string[] {
-    const cached = itemPresenceCache.get(item.id);
+    const presenceKey = `${item.id}|${lookupMode()}`;
+    const cached = lazyHit(itemPresenceCache, "presence", presenceKey);
     if (cached) return cached;
-    const attributes = [
-      ...new Set([
-        ...((data(item).opaqueItemAttributes ?? []) as string[]),
-        ...("kind" in item && item.kind === "module" && !data(item).unit
-          ? (moduleTargets.get(item.id) ?? []).flatMap((unit) =>
-              itemPresence(unit),
-            )
-          : []),
-        ...[
-          ...origins(item),
+    return lazyCompute(itemPresenceCache, "presence", presenceKey, () =>
+      [
+        ...new Set([
+          ...((data(item).opaqueItemAttributes ?? []) as string[]),
+          ...("kind" in item && item.kind === "module" && !data(item).unit
+            ? (moduleTargets.get(item.id) ?? []).flatMap((unit) =>
+                itemPresence(unit),
+              )
+            : []),
+          ...[
+            ...origins(item),
+            ...ownerPlace(item.file, str(data(item).scope)).flatMap(
+              (p) => p.shadowableAttributes ?? [],
+            ),
+          ]
+            .filter(shadowFromParents)
+            .map((x) => x.name),
           ...ownerPlace(item.file, str(data(item).scope)).flatMap(
-            (p) => p.shadowableAttributes ?? [],
+            (p) => p.opaqueAttributes ?? [],
           ),
-        ]
-          .filter(shadowFromParents)
-          .map((x) => x.name),
-        ...ownerPlace(item.file, str(data(item).scope)).flatMap(
-          (p) => p.opaqueAttributes ?? [],
-        ),
-      ]),
-    ].sort();
-    itemPresenceCache.set(item.id, attributes);
-    return attributes;
+        ]),
+      ].sort(),
+    );
   }
   const possible = (conditions: readonly string[]): boolean => {
     const key = JSON.stringify(conditions);
@@ -1252,8 +1455,10 @@ export function resolveRust(
   }
   if (markConditions)
     for (const link of ctx.links)
-      if (contextOf(link)?.implicit.length)
-        markConditions(link, conditionsFor(link));
+      if (contextOf(link)?.implicit.length) {
+        const gates = conditionsFor(link);
+        if (decided(link.file)) markConditions(link, gates);
+      }
   const failedByScope = new Map<string, string[]>(),
     failedByCrate = new Map<string, string[]>();
   for (const loc of places)
@@ -1393,7 +1598,6 @@ export function resolveRust(
       }
     }
   }
-  const activeMacroImports: GraphLink[] = [];
   type TextMacro = {
     symbol?: GraphSymbol;
     conditions?: string[];
@@ -1739,6 +1943,11 @@ export function resolveRust(
   }
   let memo = new Map<string, Found>();
   const retryMemo = new Map<string, Found>();
+  // C-36: how much deeper than its entry each memoised lookup went. A hit
+  // that a fresh lookup could not have finished within the depth limit is not
+  // used, so whether a lookup reaches the limit never depends on what other
+  // lookups happened to memoise first.
+  const lookupHeights = new WeakMap<Found, number>();
   type ScopeRead = {
     key: string;
     name: string;
@@ -1750,12 +1959,6 @@ export function resolveRust(
   // A cached ordinary lookup is reusable as long as every macro guard it
   // visited gives the same answer. Names and origins are needed only for
   // the offline blocker census.
-  const auditedLookupReads = new WeakMap<Found, ScopeRead[]>();
-  const modeBit = { proven: 1, assumed: 2 } as const;
-  let scopeChanges = 0;
-  const rootScopeReads: ScopeRead[] = [];
-  const internedScopeReads = new Map<string, Map<string, ScopeRead>>();
-  let scopeReads: ScopeRead[] | undefined;
   function scopeTraceOf(found: Found): ScopeTrace | undefined {
     return scopeAudit ? auditedLookupReads.get(found) : found.scopeChanges;
   }
@@ -1813,7 +2016,6 @@ export function resolveRust(
     typeof trace === "number" ? trace : 0;
   const auditReads = (trace: ScopeTrace | undefined): ScopeRead[] =>
     Array.isArray(trace) ? trace : [];
-  const importExpansions = new Map<string, number[]>();
   // Incomplete results are reusable only with the same active guards and
   // expansion limits. A cycle cut here can be a real route in another search.
   let incompleteLookups = new LookupMemo<Found>();
@@ -1821,13 +2023,6 @@ export function resolveRust(
   let observedImportProofs = new Set<string>();
   let lookupRevision = 0;
   let lookupFactsFinal = false;
-  let activeLookup:
-    | {
-        trace: LookupTrace;
-        seen: Set<string>;
-        expansion: ImportExpansion | undefined;
-      }
-    | undefined;
   function clearIncompleteLookups() {
     incompleteLookups.clear();
     observedIncompleteGuards.clear();
@@ -2453,8 +2648,8 @@ export function resolveRust(
       // With no remaining member path this IS the head-namespace lookup.
       // Reuse its exact result, including uncertainty, rather than recursively
       // repeating incomplete reexport chains while proving the same binding.
-      if (!rest.length)
-        importHeads.set(l.id, { found, cycleFree: cycleCuts === before });
+      if (!rest.length && cycleCuts === before)
+        importHeads.set(l.id, { found, cycleFree: true });
       return found;
     };
     if (declared.length) {
@@ -2955,7 +3150,9 @@ export function resolveRust(
       scopeMode === "baseline" || (baseline && canReuseBaseline(baseline))
         ? baseline
         : retryMemo.get(cacheKey);
-    if (cached) {
+    const cachedHeight = cached ? (lookupHeights.get(cached) ?? 0) : 0;
+    if (cached && seen.size + cachedHeight <= lookupDepth) {
+      deepestLookup = Math.max(deepestLookup, seen.size + cachedHeight);
       recordReads(scopeTraceOf(cached));
       return cached;
     }
@@ -2968,6 +3165,7 @@ export function resolveRust(
       return empty(!accessFrom ? false : true);
     }
     if (seen.size > lookupDepth) {
+      deepestLookup = Math.max(deepestLookup, seen.size);
       if (outer) outer.trace.valid = false;
       cycleCuts++;
       return { ...empty(false), reason: "import-lookup-depth-unverified" };
@@ -3007,6 +3205,7 @@ export function resolveRust(
           ? undefined
           : incompleteLookups.get(stateKey, seen, importExpansions);
     if (reused) {
+      deepestLookup = Math.max(deepestLookup, seen.size + reused.trace.depth);
       outer?.trace.absorb(reused.trace, outer.expansion);
       if (reused.cut) cycleCuts++;
       recordReads(scopeTraceOf(reused.result));
@@ -3026,6 +3225,8 @@ export function resolveRust(
     const outerReads = scopeReads;
     if (scopeAudit && lookupFactsFinal) scopeReads ??= rootScopeReads;
     const readStart = scopeReads?.length ?? 0;
+    const outerDeepest = deepestLookup;
+    deepestLookup = seen.size;
     try {
       result = lookupPath(name, loc, scope, ns, next, allowGlobs, accessFrom);
       const scopeTrace = capturedScopeTrace(readStart);
@@ -3036,6 +3237,8 @@ export function resolveRust(
       if (!outerReads) rootScopeReads.length = 0;
       activeLookup = outer;
     }
+    const height = deepestLookup - seen.size;
+    deepestLookup = Math.max(outerDeepest, deepestLookup);
     // C-24: a cycle cut answers "nothing more here" for a lookup already on
     // the stack. A result that met such a cut at an ancestor is the answer
     // for this entry point only: memoised as context-free, whichever lookup
@@ -3058,12 +3261,9 @@ export function resolveRust(
       // A complete entry preempts a previous incomplete result or cycle cut,
       // including when another saved lookup depended on that answer.
       if (observedIncompleteGuards.has(cacheKey)) clearIncompleteLookups();
+      lookupHeights.set(result, height);
       if (scopeMode === "baseline") memo.set(guard, result);
-      else {
-        if (retryMemo.size >= 8192)
-          retryMemo.delete(retryMemo.keys().next().value!);
-        retryMemo.set(cacheKey, result);
-      }
+      else retryMemo.set(cacheKey, result);
     } else if (trace && stateKey !== undefined) {
       observedIncompleteGuards.add(cacheKey);
       // This guard is supplied by the lookup itself, and must be absent on
@@ -4569,10 +4769,19 @@ export function resolveRust(
   memo.clear();
   unprovedImports.clear();
   clearIncompleteLookups();
+  // C-36: the captured exports are built here, afresh and in both passes,
+  // after every fact they read is fixed; a map built earlier in setup is
+  // dropped.
+  capturedMacroExports = captureExports(false);
+  capturedHelperExports = captureExports(true);
+  // C-36: setup computes every symbol's presence and conditions, as a cold
+  // pass does, so the caches it fills are the same whatever the decision
+  // scope; only the callbacks are limited to the decided files.
   if (markPresence)
     for (const symbol of symbols) {
       const attributes = itemPresence(symbol);
-      markPresence(symbol, attributes, conditionsFor(symbol));
+      const gates = conditionsFor(symbol);
+      if (decided(symbol.file)) markPresence(symbol, attributes, gates);
     }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
   const unknownImpls = new Map<string, GraphSymbol[]>(),
@@ -5366,92 +5575,105 @@ export function resolveRust(
    * standard traits by name, any checkout-resolved name (whose traits are
    * known), and anything else as an unknown trait source.
    */
-  function traitRisk(scope: string, place: Place, depth = 0): TraitRisk {
-    const key = `${place.file}|${place.crate.root}|${place.local}|${scope}`;
-    const cached = riskCache.get(key);
+  function traitRisk(scope: string, place: Place): TraitRisk {
+    const mode = lookupMode();
+    const key = `${place.file}|${place.crate.root}|${place.local}|${scope}|${mode}`;
+    const cached = lazyHit(riskCache, "risk", key);
     if (cached) return cached;
-    const risk: TraitRisk = {
-      other: false,
-      standard: new Set(),
-      standardGlob: false,
-      glob: false,
-    };
-    // A glob cycle is not proved here; the provisional entry says so.
-    riskCache.set(key, { ...risk, other: true });
-    let s = scope;
-    while (true) {
-      if (opaqueScopes.has(`${place.crate.root}|${qualified(place, s)}`))
-        risk.other = true;
-      for (const l of importsInScope.get(`${place.file}|${s}`) ?? []) {
-        const d = data(l);
-        if (d.externCrate) continue;
-        const raw = compact(l.targetName).replace(/::\*$/, "");
-        if (d.glob) risk.glob = true;
-        if (standardPath(raw, place, s)) {
-          if (d.glob) risk.standardGlob = true;
-          else risk.standard.add(lastSegment(raw));
-          continue;
+    return lazyCompute(riskCache, "risk", key, () => {
+      // C-36: the risk is the union over every scope the glob imports reach.
+      // A union does not depend on where the walk entered a glob chain or
+      // cycle, so the cached answer is the same whichever caller asks first.
+      // An earlier walk stopped at three nested globs and counted a provisional
+      // answer for a scope already being walked, which depended on the caller.
+      const risk: TraitRisk = {
+        other: false,
+        standard: new Set(),
+        standardGlob: false,
+        glob: false,
+      };
+      const visited = new Set<string>();
+      const visit = (scope: string, place: Place) => {
+        const at = `${place.file}|${place.crate.root}|${place.local}|${scope}|${mode}`;
+        if (visited.has(at)) return;
+        visited.add(at);
+        const known = lazyHit(riskCache, "risk", at);
+        if (known) {
+          risk.other ||= known.other;
+          risk.standardGlob ||= known.standardGlob;
+          risk.glob ||= known.glob;
+          for (const n of known.standard) risk.standard.add(n);
+          return;
         }
-        if (d.glob) {
-          const target = find(raw, place, s, "type");
-          if (
-            depth >= 3 ||
-            !target.complete ||
-            !target.symbols.length ||
-            target.failedFiles?.length
-          ) {
+        let s = scope;
+        while (true) {
+          if (opaqueScopes.has(`${place.crate.root}|${qualified(place, s)}`))
             risk.other = true;
-            continue;
-          }
-          for (const m of target.symbols) {
-            if (m.kind === "enum") continue;
-            const bodies =
-              m.kind !== "module"
-                ? []
-                : data(m).unit
-                  ? [roots.get(m.file)!].filter(Boolean)
-                  : (modulePlaces.get(m.id) ?? []);
-            if (!bodies.length) risk.other = true;
-            for (const body of bodies) {
-              const inner = traitRisk(body.local, body, depth + 1);
-              risk.other ||= inner.other;
-              risk.standardGlob ||= inner.standardGlob;
-              risk.glob ||= inner.glob;
-              for (const n of inner.standard) risk.standard.add(n);
+          for (const l of importsInScope.get(`${place.file}|${s}`) ?? []) {
+            const d = data(l);
+            if (d.externCrate) continue;
+            const raw = compact(l.targetName).replace(/::\*$/, "");
+            if (d.glob) risk.glob = true;
+            if (standardPath(raw, place, s)) {
+              if (d.glob) risk.standardGlob = true;
+              else risk.standard.add(lastSegment(raw));
+              continue;
             }
+            if (d.glob) {
+              const target = find(raw, place, s, "type");
+              if (
+                !target.complete ||
+                !target.symbols.length ||
+                target.failedFiles?.length
+              ) {
+                risk.other = true;
+                continue;
+              }
+              for (const m of target.symbols) {
+                if (m.kind === "enum") continue;
+                const bodies =
+                  m.kind !== "module"
+                    ? []
+                    : data(m).unit
+                      ? [roots.get(m.file)!].filter(Boolean)
+                      : (modulePlaces.get(m.id) ?? []);
+                if (!bodies.length) risk.other = true;
+                for (const body of bodies) visit(body.local, body);
+              }
+              continue;
+            }
+            const name = compact(l.targetName);
+            activeMacroImports.push(l);
+            let r: Found;
+            try {
+              r = findUsePath(
+                name,
+                place,
+                s,
+                "import",
+                new Set(),
+                true,
+                false,
+                !name.includes("::") && d.alias === name,
+              );
+            } finally {
+              activeMacroImports.pop();
+            }
+            if (
+              !r.complete ||
+              !r.symbols.length ||
+              r.failedFiles?.length ||
+              r.possibleImportNames?.length
+            )
+              risk.other = true;
           }
-          continue;
+          if (!s || s === place.local || !s.startsWith(place.local)) break;
+          s = parentScope(s);
         }
-        const name = compact(l.targetName);
-        activeMacroImports.push(l);
-        let r: Found;
-        try {
-          r = findUsePath(
-            name,
-            place,
-            s,
-            "import",
-            new Set(),
-            true,
-            false,
-            !name.includes("::") && d.alias === name,
-          );
-        } finally {
-          activeMacroImports.pop();
-        }
-        if (
-          !r.complete ||
-          !r.symbols.length ||
-          r.failedFiles?.length ||
-          r.possibleImportNames?.length
-        )
-          risk.other = true;
-      }
-      if (!s || s === place.local || !s.startsWith(place.local)) break;
-      s = parentScope(s);
-    }
-    riskCache.set(key, risk);
-    return risk;
+      };
+      visit(scope, place);
+      return risk;
+    });
   }
   let checkoutTraitMethodNames: Set<string> | undefined;
   /**
@@ -5466,11 +5688,12 @@ export function resolveRust(
     names: Set<string>;
     unknown: boolean;
   } {
-    const cached = outsideCache.get(t.id);
+    const outsideKey = `${t.id}|${lookupMode()}`;
+    const cached = lazyHit(outsideCache, "outside", outsideKey);
     if (cached) return cached;
-    const answer = implementedOutsideUncached(t);
-    outsideCache.set(t.id, answer);
-    return answer;
+    return lazyCompute(outsideCache, "outside", outsideKey, () =>
+      implementedOutsideUncached(t),
+    );
   }
   function implementedOutsideUncached(t: GraphSymbol): {
     names: Set<string>;
@@ -5933,6 +6156,8 @@ export function resolveRust(
     });
   }
   const pathCallCache = new Map<string, Found>();
+  /** C-36: the height of each stored path-call answer, as for lazy answers. */
+  const pathCallHeights = new Map<string, number>();
   /** A path call's callable targets: a value name or an associated item. */
   function pathCallTargets(
     name: string,
@@ -5967,16 +6192,24 @@ export function resolveRust(
       str(d.genericBindings),
       str(d.pathArgumentSyntax),
       str(d.implArgumentSyntax),
+      lookupMode(),
     ]);
     const cached = pathCallCache.get(key);
     if (cached) {
       recordReads(scopeTraceOf(cached));
+      deepestLookup = Math.max(deepestLookup, pathCallHeights.get(key) ?? 0);
       return cached;
     }
-    const answer = lookupWithReads(() =>
+    const building = buildingHelperExports;
+    const { result, trace, clean, height } = lazyFresh(`path\u0000${key}`, () =>
       pathCallTargetsUncached(name, selfPath, scope, d, targetName, file, loc),
     );
-    pathCallCache.set(key, answer);
+    const answer = trace ? attachScopeTrace(result, trace) : result;
+    if (clean && !building && !buildingHelperExports) {
+      pathCallCache.set(key, answer);
+      if (height) pathCallHeights.set(key, height);
+      else pathCallHeights.delete(key);
+    }
     return answer;
   }
   function pathCallTargetsUncached(
@@ -6048,160 +6281,169 @@ export function resolveRust(
     r: Data,
     loc: Place,
     site: { file: string; scope: string },
-    depth = 0,
   ): Typing {
     // The call site's scope matters only to an inner method call's autoref
     // check; other recipes carry their own scopes.
     const text = JSON.stringify(r);
-    const key = `${site.file}|${text.includes(`"k":"m"`) ? site.scope : ""}|${placeId(loc)}|${text}`;
-    const cached = typingCache.get(key);
+    const key = `${site.file}|${text.includes(`"k":"m"`) ? site.scope : ""}|${placeId(loc)}|${text}|${lookupMode()}`;
+    const cached = lazyHit(typingCache, "typing", key);
     if (cached) return cached;
-    let result: Typing;
-    const inner = () =>
-      depth > 32
-        ? { gap: "receiver-too-long" }
-        : typing((r.e ?? {}) as Data, loc, site, depth + 1);
-    switch (str(r.k)) {
-      case "type": {
-        const ref = splitReference(str(r.t));
-        result = !ref
-          ? { gap: "reference-to-reference" }
-          : r.lit === true && !structLiteralType(ref.text, loc, str(r.s))
-            ? { gap: "struct-literal-owner" }
-            : {
-                text: ref.text,
-                loc,
-                scope: str(r.s),
-                generics: str(r.g),
-                borrow:
-                  ref.borrow !== "owned" ? ref.borrow : str(r.b) || "owned",
-                mutable: r.mu !== false,
-                syntax: str(r.a),
-              };
-        break;
-      }
-      case "p": {
-        let name = compact(str(r.p));
-        const selfPath = name === "Self" || name.startsWith("Self::");
-        if (selfPath && r.it) name = base(str(r.it)) + name.slice(4);
-        const d: Data = {
-          pathSyntax: str(r.p),
-          pathArgumentSyntax: str(r.pa) || "[]",
-          implType: str(r.it),
-          implKey: str(r.ik),
-          implArgumentSyntax: str(r.ia) || "[]",
-          argumentCount: Number(r.c),
-          argumentMinimum: Number(r.cm),
-          genericBindings: str(r.g),
-        };
-        const s = single(
-          pathCallTargets(
-            name,
-            selfPath,
-            selfPath ? str(r.is) : str(r.s),
-            d,
-            str(r.p),
-            site.file,
-            loc,
-          ),
-        );
-        result = s ? resultOf(s) : { gap: "callee-unresolved" };
-        break;
-      }
-      case "u": {
-        // A unit struct used as a value; its own declaration types it.
-        const f = find(str(r.p), loc, str(r.s), "value");
-        const s = single(f);
-        const place = s && declarationPlace(s);
-        result =
-          s &&
-          place &&
-          s.kind === "struct" &&
-          data(s).constructorForm === "unit" &&
-          !itemPresence(s).length
-            ? {
-                text: s.name,
-                loc: place,
-                scope: str(data(s).scope),
-                generics: "",
-                borrow: "owned",
-                mutable: true,
-                syntax: "",
-              }
-            : { gap: "non-local-value" };
-        break;
-      }
-      case "m": {
-        const t = inner();
-        if (isGap(t)) result = t;
-        else if (t.future) result = { gap: "future-receiver" };
-        else {
+    return lazyCompute(typingCache, "typing", key, () => {
+      let result: Typing;
+      // C-36: the limit is the length of this recipe's own chain, not the depth
+      // at which it is met, so a cached answer does not depend on its caller.
+      const inner = () =>
+        chainLength(r) > 33
+          ? { gap: "receiver-too-long" }
+          : typing((r.e ?? {}) as Data, loc, site);
+      switch (str(r.k)) {
+        case "type": {
+          const ref = splitReference(str(r.t));
+          result = !ref
+            ? { gap: "reference-to-reference" }
+            : r.lit === true && !structLiteralType(ref.text, loc, str(r.s))
+              ? { gap: "struct-literal-owner" }
+              : {
+                  text: ref.text,
+                  loc,
+                  scope: str(r.s),
+                  generics: str(r.g),
+                  borrow:
+                    ref.borrow !== "owned" ? ref.borrow : str(r.b) || "owned",
+                  mutable: r.mu !== false,
+                  syntax: str(r.a),
+                };
+          break;
+        }
+        case "p": {
+          let name = compact(str(r.p));
+          const selfPath = name === "Self" || name.startsWith("Self::");
+          if (selfPath && r.it) name = base(str(r.it)) + name.slice(4);
+          const d: Data = {
+            pathSyntax: str(r.p),
+            pathArgumentSyntax: str(r.pa) || "[]",
+            implType: str(r.it),
+            implKey: str(r.ik),
+            implArgumentSyntax: str(r.ia) || "[]",
+            argumentCount: Number(r.c),
+            argumentMinimum: Number(r.cm),
+            genericBindings: str(r.g),
+          };
           const s = single(
-            methods(
-              t.text,
-              str(r.n),
+            pathCallTargets(
+              name,
+              selfPath,
+              selfPath ? str(r.is) : str(r.s),
+              d,
+              str(r.p),
+              site.file,
               loc,
-              t.scope,
-              true,
-              t.borrow,
-              t.mutable,
-              Number(r.c),
-              "",
-              Number(r.cm),
-              t.generics,
-              t.syntax,
-              t.loc,
-              site,
             ),
           );
-          result = s ? resultOf(s) : { gap: "receiver-method-unresolved" };
+          result = s ? resultOf(s) : { gap: "callee-unresolved" };
+          break;
         }
-        break;
+        case "u": {
+          // A unit struct used as a value; its own declaration types it.
+          const f = find(str(r.p), loc, str(r.s), "value");
+          const s = single(f);
+          const place = s && declarationPlace(s);
+          result =
+            s &&
+            place &&
+            s.kind === "struct" &&
+            data(s).constructorForm === "unit" &&
+            !itemPresence(s).length
+              ? {
+                  text: s.name,
+                  loc: place,
+                  scope: str(data(s).scope),
+                  generics: "",
+                  borrow: "owned",
+                  mutable: true,
+                  syntax: "",
+                }
+              : { gap: "non-local-value" };
+          break;
+        }
+        case "m": {
+          const t = inner();
+          if (isGap(t)) result = t;
+          else if (t.future) result = { gap: "future-receiver" };
+          else {
+            const s = single(
+              methods(
+                t.text,
+                str(r.n),
+                loc,
+                t.scope,
+                true,
+                t.borrow,
+                t.mutable,
+                Number(r.c),
+                "",
+                Number(r.cm),
+                t.generics,
+                t.syntax,
+                t.loc,
+                site,
+              ),
+            );
+            result = s ? resultOf(s) : { gap: "receiver-method-unresolved" };
+          }
+          break;
+        }
+        case "f": {
+          const t = inner();
+          result = isGap(t) ? t : fieldOf(t, str(r.n), loc);
+          break;
+        }
+        case "ref": {
+          const t = inner();
+          result = isGap(t)
+            ? t
+            : t.borrow !== "owned" || t.future
+              ? { gap: "reference-to-reference" }
+              : { ...t, borrow: r.m === true ? "mutable" : "shared" };
+          break;
+        }
+        case "deref": {
+          const t = inner();
+          result = isGap(t)
+            ? t
+            : t.borrow === "owned" || t.future
+              ? { gap: "deref-owned" }
+              : { ...t, mutable: t.borrow === "mutable", borrow: "owned" };
+          break;
+        }
+        case "try": {
+          const t = inner();
+          result = isGap(t) ? t : unwrapTry(t);
+          break;
+        }
+        case "await": {
+          const t = inner();
+          result = isGap(t)
+            ? t
+            : t.future
+              ? { ...t, future: false }
+              : { gap: "await-non-async" };
+          break;
+        }
+        default:
+          result = { gap: str(r.w) || "syntax" };
       }
-      case "f": {
-        const t = inner();
-        result = isGap(t) ? t : fieldOf(t, str(r.n), loc);
-        break;
-      }
-      case "ref": {
-        const t = inner();
-        result = isGap(t)
-          ? t
-          : t.borrow !== "owned" || t.future
-            ? { gap: "reference-to-reference" }
-            : { ...t, borrow: r.m === true ? "mutable" : "shared" };
-        break;
-      }
-      case "deref": {
-        const t = inner();
-        result = isGap(t)
-          ? t
-          : t.borrow === "owned" || t.future
-            ? { gap: "deref-owned" }
-            : { ...t, mutable: t.borrow === "mutable", borrow: "owned" };
-        break;
-      }
-      case "try": {
-        const t = inner();
-        result = isGap(t) ? t : unwrapTry(t);
-        break;
-      }
-      case "await": {
-        const t = inner();
-        result = isGap(t)
-          ? t
-          : t.future
-            ? { ...t, future: false }
-            : { gap: "await-non-async" };
-        break;
-      }
-      default:
-        result = { gap: str(r.w) || "syntax" };
-    }
-    if (!isGap(result) && r.im === true && result.borrow === "owned")
-      result = { ...result, mutable: false };
-    typingCache.set(key, result);
-    return result;
+      if (!isGap(result) && r.im === true && result.borrow === "owned")
+        result = { ...result, mutable: false };
+      return result;
+    });
+  }
+  /** The number of receiver recipes nested inside . */
+  function chainLength(r: Data): number {
+    let length = 0;
+    for (let e = r.e as Data | undefined; e; e = e.e as Data | undefined)
+      length++;
+    return length;
   }
   /**
    * Calls read from a macro invocation's argument tokens count only when the
@@ -7249,6 +7491,7 @@ export function resolveRust(
       prepareMacroScopeEffects();
       scopeEffectsReady = true;
     } finally {
+      isolatedCuts += cycleCuts - ordinary.cycleCuts;
       ({
         memo,
         unprovedImports,
@@ -7774,7 +8017,12 @@ export function resolveRust(
     : undefined;
   if (!scopeAudit && !libraryAudit && opaqueOrigins.size)
     prepareIsolatedScopeEffects();
-  for (const l of ctx.links) {
+  const decisionCuts = cycleCuts;
+  const permutation = rustDecisionOrder.permute?.(ctx.links.length);
+  for (const l of permutation
+    ? permutation.map((i) => ctx.links[i]!)
+    : ctx.links) {
+    if (!decided(l.file)) continue;
     const original = data(l);
     const selected = scopeAudit?.includes(l);
     const adjustedBinding = selected
@@ -7931,8 +8179,21 @@ export function resolveRust(
       });
     }
   }
+  if (permutation) {
+    // Back to link order: later phases visit these in the order they were found.
+    const rank = new Map(ctx.links.map((l, i) => [l.id, i]));
+    const byLink = (id: string) => rank.get(id) ?? -1;
+    resolutions.sort((a, b) => byLink(a.linkId) - byLink(b.linkId));
+    librarySites.sort((a, b) => byLink(a.link.id) - byLink(b.link.id));
+    if (missing) {
+      const entries = [...missing].sort((a, b) => byLink(a[0]) - byLink(b[0]));
+      missing.clear();
+      for (const [k, v] of entries) missing.set(k, v);
+    }
+  }
   if (derived) macroBodyCalls(derived);
   pathCallCache.clear();
+  pathCallHeights.clear();
   typingCache.clear();
   const macroAssessments = new Map<OpaqueOrigin, BlockingMacro[]>();
   function assessMacro(origin: OpaqueOrigin): BlockingMacro[] {
@@ -8176,6 +8437,10 @@ export function resolveRust(
         );
     }
   }
+  if (decide) {
+    decide.decisionCuts = cycleCuts - decisionCuts;
+    decide.runCuts = cycleCuts + isolatedCuts;
+  }
   return resolutions;
 
   function missingReason(l: GraphLink, d: Data, refusal?: string): string {
@@ -8275,6 +8540,7 @@ export function resolveRust(
   function macroBodyCalls(emit: (link: AddedLink) => void): void {
     for (const site of ctx.links) {
       if (site.kind !== "macros" || data(site).libraryMacroFlavor) continue;
+      if (!decided(site.file)) continue;
       const d = data(site),
         scope = str(d.scope);
       const places = ownerPlace(site.file, scope);
