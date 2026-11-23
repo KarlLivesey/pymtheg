@@ -950,6 +950,134 @@ test("a stack overflow at any checker call on a receiver never changes the membe
   ]);
 });
 
+// C-47 review: the defect main had before C-47. An overloaded callee with an argument
+// from the failed file fails the link, although the checker resolves the
+// member to a clean class. An overflow in the judgement must not make the
+// link resolved (main before C-47 took it as a clean receiver).
+test("a stack overflow in the judgement never makes a link definite", async () => {
+  const files = {
+    "clean.ts":
+      "export class Clean { run() {} }\nexport class Other { run() {} }\n",
+    "broken.ts": "export const bad = 1;\nconst = ;\n",
+    "dep.ts": [
+      'import { Clean, Other } from "./clean";',
+      "export function pick(x: string): Clean;",
+      "export function pick(x: number): Other;",
+      "export function pick(x: unknown): Clean | Other {",
+      "  return new Clean();",
+      "}",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { bad } from "./broken";',
+      'import { pick } from "./dep";',
+      "pick(bad).run(); // overloaded",
+      "",
+    ].join("\n"),
+  };
+  const onBad = (node) =>
+    node?.getSourceFile?.().fileName.endsWith("use.ts") &&
+    node.getText() === "bad";
+  let calls = 0;
+  const plain = await indexFiles(files, {
+    module: typescriptModule({
+      checkerFault: (_method, node) => {
+        if (onBad(node)) calls++;
+      },
+    }),
+  });
+  const base = linkOn(plain, "use.ts", "// overloaded", "run");
+  assert.equal(base.reason, "invalid-code");
+  assert.equal(base.target, null);
+  assert.ok(calls > 0);
+  for (let k = 1; k <= calls; k++) {
+    let seen = 0;
+    const result = await indexFiles(files, {
+      module: typescriptModule({
+        checkerFault: (_method, node) => {
+          if (onBad(node) && ++seen === k)
+            throw new RangeError("Maximum call stack size exceeded");
+        },
+      }),
+    });
+    const run = linkOn(result, "use.ts", "// overloaded", "run");
+    assert.equal(run.resolution, "unresolved", `overflow at call ${k}`);
+    assert.equal(run.target, null, `overflow at call ${k}`);
+  }
+});
+
+// C-47b: an expanding type (each level binds a larger value) never repeats
+// a key, so its judgement ends at the depth bound: unknown, with the named
+// reason, never clean. A cut for it was built and withdrawn (C-47.md).
+test("an expanding generic type beside a failed file ends at the judge's bound, never clean", async () => {
+  const result = await indexFiles({
+    "broken.ts": "export interface Bad { x: number }\nconst = ;\n",
+    "use.ts": [
+      'import type { Bad } from "./broken";',
+      "type Builder<C> = {",
+      "  add<K extends string>(k: K): Builder<{ prev: C; key: K }>;",
+      "  ctx: C;",
+      "  bad: Bad;",
+      "};",
+      "declare const b: Builder<{ n: number }>;",
+      "declare function wrap<T>(x: { v: T }): T;",
+      "wrap({ v: b }).ctx.n.toFixed(); // expanding",
+      "",
+    ].join("\n"),
+  });
+  const fixed = linkOn(result, "use.ts", "// expanding", "toFixed");
+  assert.equal(fixed.reason, "invalid-code");
+  assert.equal(fixed.target, null);
+  assert.equal(fixed.cause?.file, "broken.ts");
+  assert.ok(
+    fixed.cause.via.includes("judge-budget-exhausted"),
+    fixed.cause.via,
+  );
+});
+
+// C-47b: the three shapes on which the withdrawn cut gave a clean link.
+// Each line is alone in its project, so no answer memoised for one can
+// hide the other's.
+test("builders whose own judgement reads what is bound are failed, not clean", async () => {
+  const builder = [
+    "type Builder<T extends Bad> = {",
+    "  set(v: T): this;",
+    "  get(): T;",
+    "  add(k: string): Builder<T & { k: string }>;",
+    "};",
+    "declare const b: Builder<{ x: number; n: number }>;",
+  ];
+  const seq = [
+    "type Seq<T extends Bad[]> = {",
+    "  items: [...T];",
+    "  next(): Seq<{ [K in keyof T]: T[K] }>;",
+    "  get(): T;",
+    "};",
+    "declare const s: Seq<[{ x: number; n: number }]>;",
+  ];
+  const cases = [
+    [builder, "wrap({ v: b }).get(); // here"],
+    [builder, "wrap({ v: b.add('a') }).get(); // here"],
+    [seq, "wrap({ v: s }).get(); // here"],
+  ];
+  for (const [declarations, line] of cases) {
+    const result = await indexFiles({
+      "broken.ts": "export interface Bad { x: number; n: number }\nconst = ;\n",
+      "use.ts": [
+        'import type { Bad } from "./broken";',
+        ...declarations,
+        "declare function wrap<T>(x: { v: T }): T;",
+        line,
+        "",
+      ].join("\n"),
+    });
+    const link = linkOn(result, "use.ts", "// here", "get");
+    assert.equal(link.reason, "invalid-code", line);
+    assert.equal(link.target, null, line);
+    assert.equal(link.cause?.file, "broken.ts", line);
+  }
+});
+
 // C-47 review F1: a taint check that met a check in progress is provisional;
 // memoising it made `x.a.v.go` depend on `r1.v.go` being judged first.
 test("a taint answer that met a check in progress is not kept for later links", async () => {
