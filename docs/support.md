@@ -808,25 +808,28 @@ and never yields a version pin.
   Multiple visible producers supply candidate declarations when each has a
   graph anchor. Opaque producers stay unresolved (`object-producer-unverified`).
   Several visible producers with missing anchors stay unresolved
-  (`multiple-object-producers`). A member of a literal bound to a name is
-  checked against its producers too when the receiver's value can choose
-  (a conditional, a reassigned `let`): several give candidates. When the
-  producers cannot be followed (an element access, a call's result), the
-  checker's single declaration stands. Known wrong link: with
-  `list = [a, b]` of equal literals, `list[i].setup()`, a `for…of` over
-  `list` or `[a, b]`, `list.forEach((p) => p.setup())` and
-  `given ?? impl` link only to the first
+  (`multiple-object-producers`).
+- **Reduced receivers:** every member call's receiver chain is walked to
+  its producers (conditionals, `??`, `||`, array elements, `for…of`
+  variables, array callbacks' parameters, initialisers, a `let`'s
+  assignments, object-literal properties, inferred returns), so no step is
+  a union the checker reduced to one arm. Written steps (annotations,
+  written return types, assertions) are one arm. Several arms give each
+  arm's member as candidates; one arm gives its own member, also where the
+  checker named another (`[csv, tsv][1].format()` → `tsv.format`). A
+  receiver the walk cannot follow (an expando, a `let` written by
+  destructuring, a generic call with a reduced argument) is unresolved
+  (`receiver-unverified`). Interface, class, type-literal and
+  object-literal members alike
   ([C-41](changes/C-41.md)).
 - **Type-literal members:** members of a written type literal are
   symbols, including nested union, intersection, array, tuple and
   type-argument positions, a named parameter's written type, and inside a
   function body a local variable's written type and a local function's
-  parameters; overloads are one symbol. A call links to one only when every
-  step of the receiver's path is written and its declaration writes a type
-  holding that literal; a written union gives candidates. A receiver whose
-  type or path is inferred (a computed union, a generic's result, a
-  conditional or `??`, an element access) stays unresolved (`local`).
-  Local type aliases have no member symbols. Index signatures and mapped types have no member to link
+  parameters; overloads are one symbol, listed after a file's other
+  symbols. A call links to one when no step of its receiver is reduced
+  (above); a written union gives candidates. Local type aliases have no
+  member symbols. Index signatures and mapped types have no member to link
   ([C-41](changes/C-41.md)).
   Factory fallthrough and bare returns can contribute `undefined`, including
   after `await`. Static object destructuring follows named properties,

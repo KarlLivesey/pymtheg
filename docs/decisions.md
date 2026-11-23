@@ -3414,26 +3414,24 @@ when a part is inserted before it), and a named parameter's written type
 when the function is a symbol. Inside a function body the same holds for a
 local variable's written type and a local function's parameters, under the
 body's `[local]` name path; these links are kept. A type literal's
-overloads are one symbol. A call links to such a member only when every
-step of the receiver's path is written (no conditional, `??`, element
-access, `for…of` variable or inferred return anywhere in it) and the
-receiver's own declaration writes a type that holds the literal (directly, or through aliases, parentheses, `readonly`,
-intersections and written unions). The checker can reduce a computed union
-of identical literals to one of them, which would be a wrong definite link;
-a written type is never reduced so. An inferred receiver type stays
-`local`. Members of a literal bound to a name are now checked against
-their producers too, unless the receiver's value is direct (a module, an
-object literal, a `const` bound to one, or a property of such a value).
-When the producers can be followed they decide; when they cannot, the
-checker's answer stands, as under C-7. Destructured bindings, untyped locals
-and parameters, local type aliases and interfaces, and object literals in
-call arguments get no symbols. **Trade:** about 3,740 calls whose receiver
-type comes through a generic's inference stay `local`, as do calls whose
-path the checker computed (no candidate sets yet). **Known wrong link,
-kept from main:** an anchored object-literal member reached through an
-element access, a `for…of` over an array, an array callback's parameter
-or `given ?? impl` keeps the checker's single declaration (`list[i].setup()`
-→ `a.setup` with `list = [a, b]`); a producer walk through arrays and
-returns is its own chunk. **Rules out:** a definite link from a type computed from
-expressions to one of several literal members. See
-[C-41](changes/C-41.md).
+overloads are one symbol, and a file's listing shows type-literal members
+after its other symbols. Every member call (interface, type-literal, class
+and object-literal members alike) is checked so that no step of its
+receiver is a value the checker reduced from several producers: the chain
+is walked to its producers (conditionals, `??`, `||`, array elements,
+`for…of` variables, array callbacks' parameters, `const` initialisers, a
+`let`'s assignments in its file, object-literal properties, inferred
+returns). A written step (a type annotation, a call with a written return
+type, an assertion) is one arm; a generic call's arguments and a
+contextually typed parameter's call must be one arm each. If the arms'
+members are the checker's, its answer stands; otherwise they replace it, a
+candidate set for several arms or the right single member. A receiver the
+walk cannot follow is unresolved (`receiver-unverified`), as is an arm
+member without a symbol (`reduced-receiver`). Destructured bindings,
+untyped locals and parameters, local type aliases and interfaces, and
+object literals in call arguments get no symbols. **Trade:** a walked
+choice is not narrowed (a sound but wider candidate set), and a member
+read that is not called keeps the checker's answer. **Rules out:** a
+definite link to one member of a union the checker reduced, including
+main's on interfaces (`pick ? ia : ib`) and object literals (`[csv,
+tsv][1]`). See [C-41](changes/C-41.md).
