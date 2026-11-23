@@ -4,6 +4,11 @@ import { Worker } from "node:worker_threads";
 import { randomUUID } from "node:crypto";
 import { findProjectRoot } from "../storage/local.js";
 import type { LinkView } from "./links-view.js";
+import {
+  jobChildGroups,
+  killChildGroups,
+  releaseJobChildGroups,
+} from "../backends/child-groups.js";
 export interface LinkJob {
   id: string;
   state: "running" | "complete" | "error" | "cancelled";
@@ -14,6 +19,8 @@ export interface LinkJob {
   view?: LinkView;
   error?: { code: string; message: string; action: string };
   listeners: Set<(value: unknown) => void>;
+  /** The process groups the job's worker started (C-54), owned by this server. */
+  childGroups: SharedArrayBuffer;
 }
 export class LinkJobs {
   private jobs = new Map<string, LinkJob>();
@@ -43,9 +50,13 @@ export class LinkJobs {
       throw Error(
         "Link boundary differs from the MCP launch root; launch at the project root or initialize this directory. Parent projects are never used implicitly.",
       );
+    // C-54: a link job can index (the Go route runs `go`), so its worker
+    // records its children in a registry this server kills.
+    const childGroups = jobChildGroups();
     const worker = this.launch({
       action,
       input: { ...input, root: this.root },
+      childGroups,
     });
     worker.stdout?.resume();
     worker.stderr?.resume();
@@ -60,6 +71,7 @@ export class LinkJobs {
       }),
       progress: null,
       listeners: new Set(),
+      childGroups,
     };
     worker.on("message", (m) => {
       if (job.state !== "running") return;
@@ -95,6 +107,8 @@ export class LinkJobs {
           action: "Inspect list/history, then explicitly retry if needed.",
         };
       }
+      // Whatever the worker left running, this server kills.
+      releaseJobChildGroups(childGroups);
       settle();
     });
     this.jobs.set(job.id, job);
@@ -117,9 +131,12 @@ export class LinkJobs {
     const job = this.get(id);
     if (!job.exited) {
       job.state = "cancelled";
+      // The link library takes no abort signal: the worker is terminated,
+      // and the job's process groups are killed by this server.
       await job.worker.terminate();
       await job.done;
     }
+    killChildGroups(job.childGroups);
     return job;
   }
   async close() {
