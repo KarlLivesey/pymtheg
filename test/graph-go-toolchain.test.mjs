@@ -393,14 +393,11 @@ test(
     try {
       const controller = new AbortController();
       controller.abort();
-      const dump = await index(
-        "basic",
-        { ...on, signal: controller.signal },
-        scratch,
-      );
-      assert.deepEqual(
-        dump.report.analysisErrors.map((item) => item.message),
-        ["Indexing was cancelled"],
+      // C-54: the route rethrows the signal's own reason, so the index is
+      // cancelled as a whole (it was recorded as an analysis error before).
+      await assert.rejects(
+        index("basic", { ...on, signal: controller.signal }, scratch),
+        (error) => error === controller.signal.reason,
       );
       const dir = join(scratch, "toolchain", "go");
       const left = existsSync(dir)
