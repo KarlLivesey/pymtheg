@@ -50,18 +50,18 @@
     "generated": 859
    },
    "analyzerRun": {
-    "wallS": 582.7,
-    "cpuS": 1521.1,
-    "peakMiB": 9716
+    "wallS": 518.4,
+    "cpuS": 1363.9,
+    "peakMiB": 9721
    },
    "index": {
     "sourceOnly": {
-     "wallS": 739.5,
-     "cpuS": 806.3
+     "wallS": 556.5,
+     "cpuS": 632.2
     },
     "route": {
-     "wallS": 1901.4,
-     "cpuS": 746.7
+     "wallS": 1814.3,
+     "cpuS": 788.9
     }
    },
    "decided": {},
@@ -129,10 +129,10 @@
      "gate: kind/namespace": 51,
      "no identity: local binding": 7954,
      "no identity: generated item": 505,
-     "gate: cfg on an enclosing module": 336,
+     "gate: conditional candidates": 320,
      "no identity: declaration without a graph symbol": 473,
      "gate: known error classes": 40,
-     "gate: cfg-variant guard": 50,
+     "gate: cfg-variant guard": 66,
      "no answer: no-occurrence-at-site": 843,
      "gate: cfg condition other than test": 80,
      "no answer: file-not-indexed": 3294
@@ -219,18 +219,18 @@
     "generated": 505
    },
    "analyzerRun": {
-    "wallS": 192.8,
-    "cpuS": 1269.4,
-    "peakMiB": 2446
+    "wallS": 136.5,
+    "cpuS": 1163.8,
+    "peakMiB": 2458
    },
    "index": {
     "sourceOnly": {
-     "wallS": 121,
-     "cpuS": 146.7
+     "wallS": 93.1,
+     "cpuS": 119.6
     },
     "route": {
-     "wallS": 639.8,
-     "cpuS": 202.7
+     "wallS": 382.8,
+     "cpuS": 154.5
     }
    },
    "decided": {
@@ -308,18 +308,18 @@
     "generated": 651
    },
    "analyzerRun": {
-    "wallS": 118.2,
-    "cpuS": 564.7,
-    "peakMiB": 5202
+    "wallS": 139.9,
+    "cpuS": 628.7,
+    "peakMiB": 5197
    },
    "index": {
     "sourceOnly": {
-     "wallS": 106.2,
-     "cpuS": 133.9
+     "wallS": 148.1,
+     "cpuS": 166.7
     },
     "route": {
-     "wallS": 527.5,
-     "cpuS": 129
+     "wallS": 599.6,
+     "cpuS": 147.2
     }
    },
    "decided": {},
@@ -384,15 +384,14 @@
      "no identity: declaration without a graph symbol": 1241,
      "gate: kind/namespace": 272,
      "no identity: library item": 22834,
-     "gate: cfg on an enclosing module": 2695,
+     "gate: conditional candidates": 2677,
      "no identity: generated item": 1040,
      "no identity: local binding": 3942,
      "gate: trait-method declaration": 1358,
      "no answer: no-name-site": 254,
      "gate: cfg condition other than test": 1285,
      "no answer: no-occurrence-at-site": 1856,
-     "gate: conditional candidates": 21,
-     "gate: cfg-variant guard": 30,
+     "gate: cfg-variant guard": 69,
      "gate: known error classes": 61,
      "no answer: file-not-indexed": 2397
     },
@@ -478,18 +477,18 @@
     "generated": 1040
    },
    "analyzerRun": {
-    "wallS": 168.1,
-    "cpuS": 370.5,
-    "peakMiB": 3018
+    "wallS": 118.9,
+    "cpuS": 319.8,
+    "peakMiB": 3022
    },
    "index": {
     "sourceOnly": {
-     "wallS": 110.2,
-     "cpuS": 134.5
+     "wallS": 84,
+     "cpuS": 109.9
     },
     "route": {
-     "wallS": 499.5,
-     "cpuS": 152.2
+     "wallS": 337.7,
+     "cpuS": 119.1
     }
    },
    "decided": {
@@ -568,9 +567,8 @@
      "gate: cfg condition other than test": 1627,
      "no identity: generated item": 364,
      "no answer: file-not-indexed": 2022,
-     "gate: cfg on an enclosing module": 151,
-     "no identity: declaration without a graph symbol": 10,
-     "gate: conditional candidates": 31
+     "gate: conditional candidates": 182,
+     "no identity: declaration without a graph symbol": 10
     },
     "libraryPassingCfg": 15384,
     "notIndexed": {
@@ -634,18 +632,18 @@
     "generated": 364
    },
    "analyzerRun": {
-    "wallS": 218.4,
-    "cpuS": 2127.1,
-    "peakMiB": 2055
+    "wallS": 157,
+    "cpuS": 2066.2,
+    "peakMiB": 2054
    },
    "index": {
     "sourceOnly": {
-     "wallS": 88.5,
-     "cpuS": 107.8
+     "wallS": 64.9,
+     "cpuS": 84.9
     },
     "route": {
-     "wallS": 418.5,
-     "cpuS": 121
+     "wallS": 297.5,
+     "cpuS": 99.4
     }
    },
    "decided": {
@@ -719,14 +717,13 @@
      "gate: cfg-variant guard": 6567,
      "no identity: declaration without a graph symbol": 2173,
      "no identity: generated item": 1263,
-     "gate: cfg on an enclosing module": 604,
+     "gate: conditional candidates": 771,
      "gate: trait-method declaration": 1549,
      "gate: kind/namespace": 176,
      "no identity: local binding": 5166,
      "no answer: no-occurrence-at-site": 359,
      "gate: cfg condition other than test": 4807,
      "gate: known error classes": 47,
-     "gate: conditional candidates": 167,
      "no answer: kind-not-joined": 44
     },
     "libraryPassingCfg": 13605,
@@ -791,18 +788,18 @@
     "generated": 1255
    },
    "analyzerRun": {
-    "wallS": 176.6,
-    "cpuS": 646.4,
-    "peakMiB": 2356
+    "wallS": 113.7,
+    "cpuS": 503.8,
+    "peakMiB": 2352
    },
    "index": {
     "sourceOnly": {
-     "wallS": 166.3,
-     "cpuS": 198.6
+     "wallS": 117.8,
+     "cpuS": 150.4
     },
     "route": {
-     "wallS": 428.8,
-     "cpuS": 216.5
+     "wallS": 299.3,
+     "cpuS": 175.2
     }
    },
    "decided": {
@@ -873,8 +870,8 @@
      "no identity: library item": 12185,
      "no identity: local binding": 2165,
      "gate: known error classes": 454,
-     "gate: cfg on an enclosing module": 1313,
-     "gate: cfg-variant guard": 404,
+     "gate: conditional candidates": 781,
+     "gate: cfg-variant guard": 444,
      "gate: cfg condition other than test": 3254,
      "gate: kind/namespace": 21,
      "no identity: generated item": 363,
@@ -882,7 +879,7 @@
      "no answer: no-occurrence-at-site": 2030,
      "no answer: no-name-site": 50,
      "no answer: file-not-indexed": 2898,
-     "gate: conditional candidates": 80
+     "gate: module twin, or module conditions unseen": 572
     },
     "libraryPassingCfg": 10654,
     "notIndexed": {
@@ -966,26 +963,27 @@
     "generated": 316
    },
    "analyzerRun": {
-    "wallS": 63.8,
-    "cpuS": 107.8,
-    "peakMiB": 1670
+    "wallS": 44.9,
+    "cpuS": 80.9,
+    "peakMiB": 1673
    },
    "index": {
     "sourceOnly": {
-     "wallS": 84.7,
-     "cpuS": 89.6
+     "wallS": 50,
+     "cpuS": 65.5
     },
     "route": {
-     "wallS": 182.3,
-     "cpuS": 87.6
+     "wallS": 131.8,
+     "cpuS": 69.8
     }
    },
    "decided": {
     "definite:unresolved": 13528,
     "definite:definite": 4485,
-    "withheld:cfg-variant": 1100,
+    "withheld:cfg-variant": 528,
     "withheld:conditional-candidates": 781,
-    "withheld:cfg-link": 3698
+    "withheld:cfg-link": 3698,
+    "withheld:module-twin": 572
    },
    "join": {
     "answer": 23521,
@@ -1047,10 +1045,9 @@
      "gate: kind/namespace": 69,
      "credited": 13459,
      "no identity: generated item": 1279,
-     "gate: conditional candidates": 44,
+     "gate: conditional candidates": 314,
      "gate: trait-method declaration": 1400,
      "no identity: local binding": 4104,
-     "gate: cfg on an enclosing module": 270,
      "no identity: declaration without a graph symbol": 601,
      "no answer: no-name-site": 141,
      "gate: cfg-variant guard": 9,
@@ -1122,18 +1119,18 @@
     "generated": 1285
    },
    "analyzerRun": {
-    "wallS": 74.8,
-    "cpuS": 297.9,
-    "peakMiB": 2833
+    "wallS": 75.8,
+    "cpuS": 304.2,
+    "peakMiB": 2834
    },
    "index": {
     "sourceOnly": {
-     "wallS": 79.5,
-     "cpuS": 100.7
+     "wallS": 67.8,
+     "cpuS": 89.5
     },
     "route": {
-     "wallS": 222.6,
-     "cpuS": 102.4
+     "wallS": 221.9,
+     "cpuS": 103.8
     }
    },
    "decided": {
@@ -1208,7 +1205,7 @@
      "no identity: generated item": 745,
      "gate: cfg-variant guard": 69,
      "gate: cfg condition other than test": 310,
-     "gate: cfg on an enclosing module": 93,
+     "gate: conditional candidates": 93,
      "no answer: no-name-site": 36,
      "no identity: declaration without a graph symbol": 53,
      "no answer: file-not-indexed": 1415,
@@ -1297,18 +1294,18 @@
     "generated": 745
    },
    "analyzerRun": {
-    "wallS": 79.2,
-    "cpuS": 189.1,
-    "peakMiB": 1644
+    "wallS": 70.2,
+    "cpuS": 167.4,
+    "peakMiB": 1645
    },
    "index": {
     "sourceOnly": {
-     "wallS": 86.5,
-     "cpuS": 101.5
+     "wallS": 60.5,
+     "cpuS": 81.9
     },
     "route": {
-     "wallS": 222.3,
-     "cpuS": 105.9
+     "wallS": 200.4,
+     "cpuS": 91.9
     }
    },
    "decided": {
@@ -1379,14 +1376,13 @@
      "gate: trait-method declaration": 459,
      "credited": 2690,
      "no identity: declaration without a graph symbol": 611,
-     "gate: cfg on an enclosing module": 995,
+     "gate: conditional candidates": 1002,
      "no identity: generated item": 197,
      "no answer: no-name-site": 81,
      "no answer: no-occurrence-at-site": 178,
-     "gate: cfg-variant guard": 331,
+     "gate: cfg-variant guard": 340,
      "gate: known error classes": 44,
      "no answer: file-not-indexed": 10376,
-     "gate: conditional candidates": 16,
      "gate: cfg condition other than test": 111,
      "gate: kind/namespace": 34,
      "other": 12
@@ -1474,18 +1470,18 @@
     "generated": 197
    },
    "analyzerRun": {
-    "wallS": 69.2,
-    "cpuS": 137.1,
-    "peakMiB": 1945
+    "wallS": 42.1,
+    "cpuS": 95.4,
+    "peakMiB": 1955
    },
    "index": {
     "sourceOnly": {
-     "wallS": 58.8,
-     "cpuS": 74.9
+     "wallS": 40.4,
+     "cpuS": 56.7
     },
     "route": {
-     "wallS": 225,
-     "cpuS": 81.4
+     "wallS": 145.6,
+     "cpuS": 63.2
     }
    },
    "decided": {
@@ -1563,8 +1559,7 @@
      "no answer: no-name-site": 60,
      "gate: cfg-variant guard": 19,
      "gate: cfg condition other than test": 38,
-     "gate: cfg on an enclosing module": 579,
-     "gate: conditional candidates": 1,
+     "gate: conditional candidates": 580,
      "gate: known error classes": 8,
      "no answer: file-not-indexed": 62
     },
@@ -1600,18 +1595,18 @@
     "generated": 125
    },
    "analyzerRun": {
-    "wallS": 42.6,
-    "cpuS": 72.1,
-    "peakMiB": 1200
+    "wallS": 26,
+    "cpuS": 50.8,
+    "peakMiB": 1201
    },
    "index": {
     "sourceOnly": {
-     "wallS": 54.6,
-     "cpuS": 64
+     "wallS": 38.9,
+     "cpuS": 49
     },
     "route": {
-     "wallS": 117.4,
-     "cpuS": 61.2
+     "wallS": 80.4,
+     "cpuS": 47.9
     }
    },
    "decided": {
@@ -1680,9 +1675,8 @@
      "no identity: library item": 6449,
      "credited": 2473,
      "no answer: no-name-site": 42,
-     "gate: cfg on an enclosing module": 3731,
+     "gate: conditional candidates": 4110,
      "gate: trait-method declaration": 227,
-     "gate: conditional candidates": 397,
      "no identity: local binding": 310,
      "gate: kind/namespace": 39,
      "gate: cfg condition other than test": 405,
@@ -1691,7 +1685,8 @@
      "no identity: generated item": 54,
      "no answer: no-occurrence-at-site": 456,
      "no answer: kind-not-joined": 6,
-     "no answer: file-not-indexed": 82
+     "no answer: file-not-indexed": 82,
+     "gate: module twin, or module conditions unseen": 18
     },
     "libraryPassingCfg": 6155,
     "notIndexed": {
@@ -1724,18 +1719,18 @@
     "generated": 42
    },
    "analyzerRun": {
-    "wallS": 56.7,
-    "cpuS": 71.8,
-    "peakMiB": 1253
+    "wallS": 48,
+    "cpuS": 62.3,
+    "peakMiB": 1250
    },
    "index": {
     "sourceOnly": {
-     "wallS": 35.4,
-     "cpuS": 46.5
+     "wallS": 35.7,
+     "cpuS": 44.9
     },
     "route": {
-     "wallS": 125.7,
-     "cpuS": 53.5
+     "wallS": 105.6,
+     "cpuS": 48.7
     }
    },
    "decided": {
@@ -1743,7 +1738,8 @@
     "withheld:conditional-candidates": 4110,
     "definite:definite": 3546,
     "withheld:cfg-link": 541,
-    "withheld:cfg-variant": 91
+    "withheld:cfg-variant": 73,
+    "withheld:module-twin": 18
    },
    "join": {
     "filter:extern-crate": 34,
@@ -1813,18 +1809,18 @@
     "generated": 830
    },
    "analyzerRun": {
-    "wallS": 37.1,
-    "cpuS": 91.7,
+    "wallS": 36.5,
+    "cpuS": 93.9,
     "peakMiB": 1686
    },
    "index": {
     "sourceOnly": {
-     "wallS": 27.7,
-     "cpuS": 39.4
+     "wallS": 29.2,
+     "cpuS": 40.1
     },
     "route": {
-     "wallS": 107.7,
-     "cpuS": 44.7
+     "wallS": 102.7,
+     "cpuS": 43
     }
    },
    "decided": {},
@@ -1898,7 +1894,7 @@
      "credited": 873,
      "no identity: declaration without a graph symbol": 12,
      "gate: known error classes": 75,
-     "gate: cfg on an enclosing module": 23,
+     "gate: module twin, or module conditions unseen": 23,
      "no answer: file-not-indexed": 384
     },
     "libraryPassingCfg": 8481,
@@ -1983,25 +1979,26 @@
     "generated": 777
    },
    "analyzerRun": {
-    "wallS": 38.2,
-    "cpuS": 58.8,
-    "peakMiB": 1149
+    "wallS": 26.5,
+    "cpuS": 47.1,
+    "peakMiB": 1146
    },
    "index": {
     "sourceOnly": {
-     "wallS": 55.8,
-     "cpuS": 63.5
+     "wallS": 40.1,
+     "cpuS": 54.9
     },
     "route": {
-     "wallS": 153.2,
-     "cpuS": 68.3
+     "wallS": 94.9,
+     "cpuS": 52.4
     }
    },
    "decided": {
     "definite:definite": 584,
-    "withheld:cfg-variant": 3917,
+    "withheld:cfg-variant": 3894,
     "withheld:cfg-link": 2334,
-    "definite:unresolved": 873
+    "definite:unresolved": 873,
+    "withheld:module-twin": 23
    },
    "join": {
     "filter:import-names-module": 72,
@@ -2067,7 +2064,7 @@
      "credited": 905,
      "no answer: no-name-site": 43,
      "gate: kind/namespace": 6,
-     "gate: cfg on an enclosing module": 12,
+     "gate: conditional candidates": 12,
      "gate: cfg-variant guard": 2,
      "no answer: no-occurrence-at-site": 26,
      "gate: known error classes": 3,
@@ -2156,18 +2153,18 @@
     "generated": 38
    },
    "analyzerRun": {
-    "wallS": 42.9,
-    "cpuS": 150.2,
-    "peakMiB": 1899
+    "wallS": 35.9,
+    "cpuS": 140.7,
+    "peakMiB": 1904
    },
    "index": {
     "sourceOnly": {
-     "wallS": 34.7,
-     "cpuS": 45.6
+     "wallS": 28.2,
+     "cpuS": 39.8
     },
     "route": {
-     "wallS": 131.9,
-     "cpuS": 46.3
+     "wallS": 133.1,
+     "cpuS": 47.8
     }
    },
    "decided": {
@@ -2239,7 +2236,7 @@
      "no answer: no-occurrence-at-site": 193,
      "no identity: local binding": 425,
      "gate: cfg-variant guard": 7,
-     "gate: cfg on an enclosing module": 2,
+     "gate: conditional candidates": 2,
      "gate: cfg condition other than test": 25,
      "no answer: no-name-site": 13
     },
@@ -2325,18 +2322,18 @@
     "generated": 86
    },
    "analyzerRun": {
-    "wallS": 21.6,
-    "cpuS": 37.3,
-    "peakMiB": 1096
+    "wallS": 17.3,
+    "cpuS": 30.6,
+    "peakMiB": 1097
    },
    "index": {
     "sourceOnly": {
-     "wallS": 18.6,
-     "cpuS": 25.8
+     "wallS": 13.6,
+     "cpuS": 20.4
     },
     "route": {
-     "wallS": 56.3,
-     "cpuS": 24
+     "wallS": 49.4,
+     "cpuS": 22.1
     }
    },
    "decided": {
@@ -2409,10 +2406,10 @@
      "credited": 368,
      "no identity: generated item": 20,
      "gate: kind/namespace": 5,
-     "gate: cfg on an enclosing module": 202,
+     "gate: cfg-variant guard": 4,
+     "gate: module twin, or module conditions unseen": 199,
      "no answer: file-not-indexed": 2308,
-     "no answer: kind-not-joined": 2,
-     "gate: cfg-variant guard": 1
+     "no answer: kind-not-joined": 2
     },
     "libraryPassingCfg": 2317,
     "notIndexed": {
@@ -2495,25 +2492,26 @@
     "generated": 20
    },
    "analyzerRun": {
-    "wallS": 54.3,
-    "cpuS": 60.6,
-    "peakMiB": 931
+    "wallS": 37.3,
+    "cpuS": 42.5,
+    "peakMiB": 937
    },
    "index": {
     "sourceOnly": {
-     "wallS": 16,
-     "cpuS": 20
+     "wallS": 11.7,
+     "cpuS": 16.3
     },
     "route": {
-     "wallS": 138.8,
-     "cpuS": 24
+     "wallS": 94.3,
+     "cpuS": 17.6
     }
    },
    "decided": {
     "definite:definite": 1556,
     "withheld:cfg-link": 28,
     "definite:unresolved": 368,
-    "withheld:cfg-variant": 262
+    "withheld:cfg-variant": 63,
+    "withheld:module-twin": 199
    },
    "join": {
     "filter:extern-crate": 24,
@@ -2576,14 +2574,14 @@
      "gate: kind/namespace": 6,
      "gate: trait-method declaration": 37,
      "gate: known error classes": 51,
-     "gate: cfg on an enclosing module": 48,
+     "gate: cfg-variant guard": 47,
      "credited": 164,
      "no answer: no-occurrence-at-site": 294,
      "no answer: no-name-site": 5,
      "gate: cfg condition other than test": 49,
      "no identity: local binding": 99,
      "no answer: file-not-indexed": 673,
-     "gate: cfg-variant guard": 9
+     "gate: conditional candidates": 10
     },
     "libraryPassingCfg": 635,
     "notIndexed": {
@@ -2668,18 +2666,18 @@
     "generated": 0
    },
    "analyzerRun": {
-    "wallS": 16.4,
-    "cpuS": 37.3,
-    "peakMiB": 921
+    "wallS": 19,
+    "cpuS": 41.7,
+    "peakMiB": 926
    },
    "index": {
     "sourceOnly": {
-     "wallS": 8.3,
-     "cpuS": 11.6
+     "wallS": 7.6,
+     "cpuS": 10.7
     },
     "route": {
-     "wallS": 38.6,
-     "cpuS": 12.2
+     "wallS": 44.9,
+     "cpuS": 14.1
     }
    },
    "decided": {

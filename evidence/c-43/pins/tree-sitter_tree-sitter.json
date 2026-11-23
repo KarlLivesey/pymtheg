@@ -64,18 +64,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 79.2,
-  "cpuS": 189.1,
-  "peakMiB": 1644
+  "wallS": 70.2,
+  "cpuS": 167.4,
+  "peakMiB": 1645
  },
  "index": {
   "sourceOnly": {
-   "wallS": 86.5,
-   "cpuS": 101.5
+   "wallS": 60.5,
+   "cpuS": 81.9
   },
   "route": {
-   "wallS": 222.3,
-   "cpuS": 105.9
+   "wallS": 200.4,
+   "cpuS": 91.9
   }
  },
  "errors": {
@@ -94,7 +94,7 @@
    "no identity: generated item": 745,
    "gate: cfg-variant guard": 69,
    "gate: cfg condition other than test": 310,
-   "gate: cfg on an enclosing module": 93,
+   "gate: conditional candidates": 93,
    "no answer: no-name-site": 36,
    "no identity: declaration without a graph symbol": 53,
    "no answer: file-not-indexed": 1415,

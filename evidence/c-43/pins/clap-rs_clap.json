@@ -31,9 +31,10 @@
  "decided": {
   "definite:unresolved": 13528,
   "definite:definite": 4485,
-  "withheld:cfg-variant": 1100,
+  "withheld:cfg-variant": 528,
   "withheld:conditional-candidates": 781,
-  "withheld:cfg-link": 3698
+  "withheld:cfg-link": 3698,
+  "withheld:module-twin": 572
  },
  "join": {
   "answer": 23521,
@@ -64,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 63.8,
-  "cpuS": 107.8,
-  "peakMiB": 1670
+  "wallS": 44.9,
+  "cpuS": 80.9,
+  "peakMiB": 1673
  },
  "index": {
   "sourceOnly": {
-   "wallS": 84.7,
-   "cpuS": 89.6
+   "wallS": 50,
+   "cpuS": 65.5
   },
   "route": {
-   "wallS": 182.3,
-   "cpuS": 87.6
+   "wallS": 131.8,
+   "cpuS": 69.8
   }
  },
  "errors": {
@@ -89,8 +90,8 @@
    "no identity: library item": 12185,
    "no identity: local binding": 2165,
    "gate: known error classes": 454,
-   "gate: cfg on an enclosing module": 1313,
-   "gate: cfg-variant guard": 404,
+   "gate: conditional candidates": 781,
+   "gate: cfg-variant guard": 444,
    "gate: cfg condition other than test": 3254,
    "gate: kind/namespace": 21,
    "no identity: generated item": 363,
@@ -98,7 +99,7 @@
    "no answer: no-occurrence-at-site": 2030,
    "no answer: no-name-site": 50,
    "no answer: file-not-indexed": 2898,
-   "gate: conditional candidates": 80
+   "gate: module twin, or module conditions unseen": 572
   },
   "libraryPassingCfg": 10654,
   "notIndexed": {

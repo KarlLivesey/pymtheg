@@ -41,6 +41,18 @@ export interface ToolchainDecisions {
 const DISAGREEMENT_LIMIT = 50;
 const beyondTest = (gates: readonly Json[] | undefined) =>
   (gates ?? []).some((gate) => gate !== "test");
+/**
+ * The reasons a source-only link records, one by one: the resolver joins
+ * several with "; " (`uncertainty`). Every reason test reads this list,
+ * never the joined string.
+ */
+export const uncertaintyReasons = (value: Json | undefined): string[] =>
+  typeof value === "string" && value
+    ? value
+        .split(";")
+        .map((reason) => reason.trim())
+        .filter(Boolean)
+    : [];
 /** Link data that explains an open link; dropped when the toolchain decides it. */
 const OPEN_DATA = [
   "uncertainty",
@@ -287,6 +299,8 @@ function decideToolchain(
   const bump = (key: string) => (counts[key] = (counts[key] ?? 0) + 1);
   // Final symbol conditions, and how many symbols share each identity.
   const gated = new Set<string>();
+  /** Symbols under their own cfg (the rest of `gated` is module twins). */
+  const ownGated = new Set<string>();
   const identityOf = new Map<string, string>();
   /** Identities (kind and in-file path) some gated symbol has. */
   const gatedIdentities = new Set<string>();
@@ -303,6 +317,7 @@ function decideToolchain(
       // `#[cfg(unix)] #[path = "sys/unix.rs"] mod imp;` and its twin). A
       // module merely under cfg (a default feature) has no other item at the
       // path, so an answer into it stands (second review, narrowed).
+      if (beyondTest(data.conditions as Json[] | undefined)) ownGated.add(id);
       if (
         beyondTest(data.conditions as Json[] | undefined) ||
         moduleTwin.has(id)
@@ -328,14 +343,21 @@ function decideToolchain(
       const { tc, ...rest } = data;
       const target = String(tc);
       const id = facts[i]!.links[j]!.id;
+      // Every answer not applied records why on the link
+      // (`toolchainOutcome`), so the measurement counts each guard exactly.
       const kept = (why: string) => {
         bump(why);
-        return { ...l, data: rest };
+        return { ...l, data: { ...rest, toolchainOutcome: why } };
       };
       if (beyondTest(rest.conditions as Json[] | undefined))
         return kept("withheld:cfg-link");
       if (!identityOf.has(target)) return kept("withheld:no-symbol");
-      if (variant(target)) return kept("withheld:cfg-variant");
+      if (variant(target))
+        return kept(
+          moduleTwin.has(target) && !ownGated.has(target)
+            ? "withheld:module-twin"
+            : "withheld:cfg-variant",
+        );
       const r = resolutions.get(id);
       // Review B1: a link whose source-only answer records conditional
       // candidates (a name that cfg may remove, or twins under cfg) is never
@@ -346,7 +368,7 @@ function decideToolchain(
       // narrows nothing); a set of several candidates holding a conditional
       // one or cfg twins is never narrowed.
       const candidates = (rest.targets ?? []) as string[];
-      const reasons = String(rest.uncertainty ?? "").split("; ");
+      const reasons = uncertaintyReasons(rest.uncertainty);
       const single = candidates.length === 1 && candidates[0] === target;
       const conditionalSet = (ids: readonly string[]) =>
         ids.length > 1 && (ids.some(conditional) || twins(ids));

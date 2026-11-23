@@ -62,18 +62,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 42.9,
-  "cpuS": 150.2,
-  "peakMiB": 1899
+  "wallS": 35.9,
+  "cpuS": 140.7,
+  "peakMiB": 1904
  },
  "index": {
   "sourceOnly": {
-   "wallS": 34.7,
-   "cpuS": 45.6
+   "wallS": 28.2,
+   "cpuS": 39.8
   },
   "route": {
-   "wallS": 131.9,
-   "cpuS": 46.3
+   "wallS": 133.1,
+   "cpuS": 47.8
   }
  },
  "errors": {
@@ -90,7 +90,7 @@
    "credited": 905,
    "no answer: no-name-site": 43,
    "gate: kind/namespace": 6,
-   "gate: cfg on an enclosing module": 12,
+   "gate: conditional candidates": 12,
    "gate: cfg-variant guard": 2,
    "no answer: no-occurrence-at-site": 26,
    "gate: known error classes": 3,

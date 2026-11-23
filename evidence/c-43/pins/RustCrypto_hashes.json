@@ -32,7 +32,8 @@
   "definite:definite": 1556,
   "withheld:cfg-link": 28,
   "definite:unresolved": 368,
-  "withheld:cfg-variant": 262
+  "withheld:cfg-variant": 63,
+  "withheld:module-twin": 199
  },
  "join": {
   "filter:extern-crate": 24,
@@ -64,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 54.3,
-  "cpuS": 60.6,
-  "peakMiB": 931
+  "wallS": 37.3,
+  "cpuS": 42.5,
+  "peakMiB": 937
  },
  "index": {
   "sourceOnly": {
-   "wallS": 16,
-   "cpuS": 20
+   "wallS": 11.7,
+   "cpuS": 16.3
   },
   "route": {
-   "wallS": 138.8,
-   "cpuS": 24
+   "wallS": 94.3,
+   "cpuS": 17.6
   }
  },
  "errors": {
@@ -95,10 +96,10 @@
    "credited": 368,
    "no identity: generated item": 20,
    "gate: kind/namespace": 5,
-   "gate: cfg on an enclosing module": 202,
+   "gate: cfg-variant guard": 4,
+   "gate: module twin, or module conditions unseen": 199,
    "no answer: file-not-indexed": 2308,
-   "no answer: kind-not-joined": 2,
-   "gate: cfg-variant guard": 1
+   "no answer: kind-not-joined": 2
   },
   "libraryPassingCfg": 2317,
   "notIndexed": {

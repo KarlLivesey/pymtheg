@@ -30,9 +30,10 @@
  },
  "decided": {
   "definite:definite": 584,
-  "withheld:cfg-variant": 3917,
+  "withheld:cfg-variant": 3894,
   "withheld:cfg-link": 2334,
-  "definite:unresolved": 873
+  "definite:unresolved": 873,
+  "withheld:module-twin": 23
  },
  "join": {
   "filter:import-names-module": 72,
@@ -64,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 38.2,
-  "cpuS": 58.8,
-  "peakMiB": 1149
+  "wallS": 26.5,
+  "cpuS": 47.1,
+  "peakMiB": 1146
  },
  "index": {
   "sourceOnly": {
-   "wallS": 55.8,
-   "cpuS": 63.5
+   "wallS": 40.1,
+   "cpuS": 54.9
   },
   "route": {
-   "wallS": 153.2,
-   "cpuS": 68.3
+   "wallS": 94.9,
+   "cpuS": 52.4
   }
  },
  "errors": {
@@ -98,7 +99,7 @@
    "credited": 873,
    "no identity: declaration without a graph symbol": 12,
    "gate: known error classes": 75,
-   "gate: cfg on an enclosing module": 23,
+   "gate: module twin, or module conditions unseen": 23,
    "no answer: file-not-indexed": 384
   },
   "libraryPassingCfg": 8481,

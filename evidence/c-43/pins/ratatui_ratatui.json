@@ -64,18 +64,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 74.8,
-  "cpuS": 297.9,
-  "peakMiB": 2833
+  "wallS": 75.8,
+  "cpuS": 304.2,
+  "peakMiB": 2834
  },
  "index": {
   "sourceOnly": {
-   "wallS": 79.5,
-   "cpuS": 100.7
+   "wallS": 67.8,
+   "cpuS": 89.5
   },
   "route": {
-   "wallS": 222.6,
-   "cpuS": 102.4
+   "wallS": 221.9,
+   "cpuS": 103.8
   }
  },
  "errors": {
@@ -89,10 +89,9 @@
    "gate: kind/namespace": 69,
    "credited": 13459,
    "no identity: generated item": 1279,
-   "gate: conditional candidates": 44,
+   "gate: conditional candidates": 314,
    "gate: trait-method declaration": 1400,
    "no identity: local binding": 4104,
-   "gate: cfg on an enclosing module": 270,
    "no identity: declaration without a graph symbol": 601,
    "no answer: no-name-site": 141,
    "gate: cfg-variant guard": 9,

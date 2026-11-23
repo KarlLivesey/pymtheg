@@ -1076,7 +1076,24 @@ test("cancellation: aborting the index ends a rust-analyzer that never finishes 
       dump.report.analysisErrors.map((e) => e.message),
       ["Indexing was cancelled"],
     );
-    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+    // The kill and the reaping are asynchronous: wait until the process is
+    // gone, by turns of the event loop (a count, not a clock, bounds it).
+    const alive = () => {
+      try {
+        process.kill(pid, 0);
+      } catch {
+        return false;
+      }
+      try {
+        return !/^\d+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, "utf8"));
+      } catch {
+        return false;
+      }
+    };
+    for (let i = 0; alive(); i++) {
+      assert.ok(i < 20_000, "the fake rust-analyzer is still running");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     assert.deepEqual(
       readdirSync(join(root, "toolchain", "rust")).filter((n) =>
         n.startsWith("run-"),
@@ -1645,6 +1662,36 @@ const CFG_CRATE = {
     "    s_sys::s_open()",
     "}",
     "",
+    "// Third review: one module name aliased from two cfg-gated modules",
+    "mod q2_a;",
+    "mod q2_b;",
+    "#[cfg(unix)]",
+    "use q2_a as q_sys;",
+    "#[cfg(windows)]",
+    "use q2_b as q_sys;",
+    "pub fn q2() -> u32 {",
+    "    q_sys::q_helper2()",
+    "}",
+    "",
+    "// Third review: one type re-exported from two cfg-gated modules",
+    "mod q_ta;",
+    "mod q_tb;",
+    "#[cfg(unix)]",
+    "pub use q_ta::QConn;",
+    "#[cfg(not(unix))]",
+    "pub use q_tb::QConn;",
+    "pub fn qc() -> u32 {",
+    "    let c = QConn::new();",
+    "    c.q_send()",
+    "}",
+    "",
+    "// Third review: cfg_attr(path) with the default file as the other twin",
+    '#[cfg_attr(unix, path = "s2_unix.rs")]',
+    "mod s2;",
+    "pub fn s2f() -> u32 {",
+    "    s2::s2_open()",
+    "}",
+    "",
     "// The narrowed guard: a module under cfg with no twin is answered",
     '#[cfg(not(feature = "nope"))]',
     "mod gated_ok;",
@@ -1673,6 +1720,14 @@ const CFG_CRATE = {
   "src/s_sys/unix.rs": "pub fn s_open() -> u32 {\n    1\n}\n",
   "src/s_sys/windows.rs": "pub fn s_open() -> u32 {\n    2\n}\n",
   "src/gated_ok.rs": "pub fn g_fn() -> u32 {\n    1\n}\n",
+  "src/q2_a.rs": "pub fn q_helper2() -> u32 {\n    1\n}\n",
+  "src/q2_b.rs": "pub fn q_helper2() -> u32 {\n    2\n}\n",
+  "src/q_ta.rs":
+    "pub struct QConn;\n\nimpl QConn {\n    pub fn new() -> Self {\n        QConn\n    }\n    pub fn q_send(&self) -> u32 {\n        1\n    }\n}\n",
+  "src/q_tb.rs":
+    "pub struct QConn;\n\nimpl QConn {\n    pub fn new() -> Self {\n        QConn\n    }\n    pub fn q_send(&self) -> u32 {\n        2\n    }\n}\n",
+  "src/s2.rs": "pub fn s2_open() -> u32 {\n    1\n}\n",
+  "src/s2_unix.rs": "pub fn s2_open() -> u32 {\n    2\n}\n",
   "src/c_other.rs": "pub fn c_open() -> u32 {\n    2\n}\n",
 };
 
@@ -1702,6 +1757,10 @@ test(
         "c_sys::c_open",
         "q_helper",
         "s_sys::s_open",
+        "q_sys::q_helper2",
+        "QConn::new",
+        "c.q_send",
+        "s2::s2_open",
       ]) {
         const l = link(name);
         assert.ok(l, name);
