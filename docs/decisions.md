@@ -3515,9 +3515,9 @@ local variable's written type and a local function's parameters, under the
 body's `[local]` name path; these links are kept. A type literal's
 overloads are one symbol, and a file's listing shows type-literal members
 after its other symbols. Every member call (interface, type-literal, class
-and object-literal members alike) is checked so that no step of its
-receiver is a value the checker reduced from several producers: the chain
-is walked to its producers (conditionals, `??`, `||`, array elements,
+and object-literal members alike) links definitely only when every step
+of its receiver is a kind proven to have one producer (default-deny; the
+kinds are listed in the note): the chain is walked to its producers (conditionals, `??`, `||`, array elements,
 `for…of` variables, array callbacks' parameters, `const` initialisers, a
 `let`'s assignments in its file, object-literal properties, inferred
 returns). A written step (a type annotation, a call with a written return

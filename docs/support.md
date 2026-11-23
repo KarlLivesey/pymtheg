@@ -812,8 +812,9 @@ and never yields a version pin.
 - **Reduced receivers:** every member call's receiver chain is walked to
   its producers (conditionals, `??`, `||`, array elements, `for…of`
   variables, array callbacks' parameters, initialisers, a `let`'s
-  assignments, object-literal properties, inferred returns), so no step is
-  a union the checker reduced to one arm. Written steps (annotations,
+  assignments, object-literal properties and fields with every write,
+  inferred returns, a defaulted parameter's call sites). Only listed step
+  kinds can give a definite link; any other step is unresolved. Written steps (annotations,
   written return types, assertions) are one arm. Several arms give each
   arm's member as candidates; one arm gives its own member, also where the
   checker named another (`[csv, tsv][1].format()` → `tsv.format`). A
@@ -827,8 +828,8 @@ and never yields a version pin.
   type-argument positions, a named parameter's written type, and inside a
   function body a local variable's written type and a local function's
   parameters; overloads are one symbol, listed after a file's other
-  symbols. A call links to one when no step of its receiver is reduced
-  (above); a written union gives candidates. Local type aliases have no
+  symbols. A call links to one when every step of its receiver is a
+  proven kind (above); a written union gives candidates. Local type aliases have no
   member symbols. Index signatures and mapped types have no member to link
   ([C-41](changes/C-41.md)).
   Factory fallthrough and bare returns can contribute `undefined`, including
