@@ -401,3 +401,42 @@ test("PR 67 review: the pass without assumed entries extracts only the files tha
     `neutral extractions: ${extracted}`,
   );
 });
+
+test("PR 67 review 2: a noEmit package config that strips internals withholds @internal declarations", async () => {
+  // Vitest's shape: tsconfig.base.json sets noEmit and stripInternal, the
+  // package config extends it, the bundler builds the declarations.
+  const got = await calls({
+    "packages/v/package.json": pkg("v", {
+      exports: { ".": { types: "./dist/index.d.ts" } },
+      scripts: { build: "rollup -c" },
+    }),
+    "packages/v/tsconfig.json":
+      '{"compilerOptions":{"declaration":true,"noEmit":true,"stripInternal":true},"include":["src"]}',
+    "packages/v/rollup.config.js":
+      "export default { input: { index: 'src/index.ts' } };",
+    "packages/v/src/index.ts": [
+      "export class Core {",
+      "  open() {}",
+      "  /** @internal */",
+      "  rerunFiles() {}",
+      "}",
+      "/** @internal */",
+      "export function hidden() {}",
+      "export function shown() {}",
+      "",
+    ].join("\n"),
+    "app.ts": [
+      'import { Core, hidden, shown } from "v";',
+      "const core = new Core();",
+      "core.open(); core.rerunFiles(); hidden(); shown();",
+    ].join("\n"),
+  });
+  assert.deepEqual(got.shown, [
+    "packages/v/src/index.ts#shown",
+    ["ts-unbuilt-entry-is-bundler-entry"],
+    "packages/v/src/index.ts",
+  ]);
+  assert.deepEqual(got["core.open"]?.[0], "packages/v/src/index.ts#Core.open");
+  assert.match(String(got.hidden), /^unresolved:/);
+  assert.match(String(got["core.rerunFiles"]), /^unresolved:/);
+});
