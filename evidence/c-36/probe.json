@@ -1,0 +1,414 @@
+{
+ "note": "Lookup cuts and CPU of one full pass and of passes that decide one file (sampled by sha256 of c36-probe:path), on stored graphs of the branch before the C-34 merge. cuts: whole run; decisionCuts: while deciding the selected links.",
+ "probes": {
+  "probe-helix-analyze": [
+   {
+    "mode": "analyze",
+    "files": 251,
+    "full": {
+     "cpuMs": 18670,
+     "cuts": 12209,
+     "decisionCuts": 11728
+    }
+   },
+   {
+    "path": "helix-term/src/events.rs",
+    "cpuMs": 2932,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-lsp-types/src/call_hierarchy.rs",
+    "cpuMs": 2337,
+    "cuts": 537,
+    "decisionCuts": 57
+   },
+   {
+    "path": "helix-term/tests/test/commands/rotate_selection_contents.rs",
+    "cpuMs": 2294,
+    "cuts": 486,
+    "decisionCuts": 6
+   },
+   {
+    "path": "helix-core/src/editor_config.rs",
+    "cpuMs": 1760,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-core/src/case_conversion.rs",
+    "cpuMs": 1913,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-view/src/handlers/diagnostics.rs",
+    "cpuMs": 2014,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-term/src/lib.rs",
+    "cpuMs": 1447,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-lsp-types/src/lib.rs",
+    "cpuMs": 2679,
+    "cuts": 505,
+    "decisionCuts": 25
+   },
+   {
+    "sampled": 8,
+    "runCutFree": 0
+   }
+  ],
+  "probe-helix-resolve": [
+   {
+    "mode": "resolve",
+    "files": 251,
+    "full": {
+     "cpuMs": 20852,
+     "cuts": 15302,
+     "decisionCuts": 14822
+    }
+   },
+   {
+    "path": "helix-term/src/events.rs",
+    "cpuMs": 2220,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-lsp-types/src/call_hierarchy.rs",
+    "cpuMs": 1249,
+    "cuts": 541,
+    "decisionCuts": 61
+   },
+   {
+    "path": "helix-term/tests/test/commands/rotate_selection_contents.rs",
+    "cpuMs": 1076,
+    "cuts": 490,
+    "decisionCuts": 10
+   },
+   {
+    "path": "helix-core/src/editor_config.rs",
+    "cpuMs": 1411,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-core/src/case_conversion.rs",
+    "cpuMs": 1327,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-view/src/handlers/diagnostics.rs",
+    "cpuMs": 716,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-term/src/lib.rs",
+    "cpuMs": 1024,
+    "cuts": 480,
+    "decisionCuts": 0
+   },
+   {
+    "path": "helix-lsp-types/src/lib.rs",
+    "cpuMs": 2499,
+    "cuts": 508,
+    "decisionCuts": 28
+   },
+   {
+    "sampled": 8,
+    "runCutFree": 0
+   }
+  ],
+  "probe-redb-analyze": [
+   {
+    "mode": "analyze",
+    "files": 98,
+    "full": {
+     "cpuMs": 9860,
+     "cuts": 7063,
+     "decisionCuts": 6832
+    }
+   },
+   {
+    "path": "crates/redb-bench/benches/userspace_cache_benchmark.rs",
+    "cpuMs": 1660,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "src/tree_store/page_store/region.rs",
+    "cpuMs": 1298,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "fuzz/fuzz_targets/fuzz_redb.rs",
+    "cpuMs": 1693,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "src/tree_store/page_store/base.rs",
+    "cpuMs": 1154,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/redb-bench/benches/savepoint_benchmark.rs",
+    "cpuMs": 965,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/redb-python/src/types.rs",
+    "cpuMs": 1336,
+    "cuts": 876,
+    "decisionCuts": 645
+   },
+   {
+    "path": "src/types/uuid.rs",
+    "cpuMs": 1603,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "fuzz/fuzz_targets/common.rs",
+    "cpuMs": 1226,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "sampled": 8,
+    "runCutFree": 0
+   }
+  ],
+  "probe-redb-resolve": [
+   {
+    "mode": "resolve",
+    "files": 98,
+    "full": {
+     "cpuMs": 10275,
+     "cuts": 8397,
+     "decisionCuts": 8166
+    }
+   },
+   {
+    "path": "crates/redb-bench/benches/userspace_cache_benchmark.rs",
+    "cpuMs": 1436,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "src/tree_store/page_store/region.rs",
+    "cpuMs": 737,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "fuzz/fuzz_targets/fuzz_redb.rs",
+    "cpuMs": 1062,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "src/tree_store/page_store/base.rs",
+    "cpuMs": 869,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/redb-bench/benches/savepoint_benchmark.rs",
+    "cpuMs": 783,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/redb-python/src/types.rs",
+    "cpuMs": 737,
+    "cuts": 893,
+    "decisionCuts": 662
+   },
+   {
+    "path": "src/types/uuid.rs",
+    "cpuMs": 514,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "path": "fuzz/fuzz_targets/common.rs",
+    "cpuMs": 524,
+    "cuts": 231,
+    "decisionCuts": 0
+   },
+   {
+    "sampled": 8,
+    "runCutFree": 0
+   }
+  ],
+  "probe-rg-resolve": [
+   {
+    "mode": "resolve",
+    "files": 102,
+    "full": {
+     "cpuMs": 4928,
+     "cuts": 77,
+     "decisionCuts": 75
+    }
+   },
+   {
+    "path": "crates/cli/src/decompress.rs",
+    "cpuMs": 1163,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/regex/src/config.rs",
+    "cpuMs": 557,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/printer/src/stats.rs",
+    "cpuMs": 432,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "tests/json.rs",
+    "cpuMs": 887,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/printer/src/color.rs",
+    "cpuMs": 572,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/cli/src/process.rs",
+    "cpuMs": 509,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "sampled": 6,
+    "runCutFree": 0
+   }
+  ],
+  "probe-rg-analyze": [
+   {
+    "mode": "analyze",
+    "files": 102,
+    "full": {
+     "cpuMs": 5210,
+     "cuts": 53,
+     "decisionCuts": 51
+    }
+   },
+   {
+    "path": "crates/cli/src/decompress.rs",
+    "cpuMs": 1468,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/regex/src/config.rs",
+    "cpuMs": 1073,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/printer/src/stats.rs",
+    "cpuMs": 780,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "tests/json.rs",
+    "cpuMs": 688,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/printer/src/color.rs",
+    "cpuMs": 1049,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/cli/src/process.rs",
+    "cpuMs": 736,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "tests/multiline.rs",
+    "cpuMs": 856,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/core/main.rs",
+    "cpuMs": 1043,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/core/flags/complete/bash.rs",
+    "cpuMs": 784,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/core/messages.rs",
+    "cpuMs": 757,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/core/flags/complete/fish.rs",
+    "cpuMs": 991,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "path": "crates/ignore/src/default_types.rs",
+    "cpuMs": 1326,
+    "cuts": 2,
+    "decisionCuts": 0
+   },
+   {
+    "sampled": 12,
+    "runCutFree": 0
+   }
+  ]
+ },
+ "coldIndexCuts": {
+  "note": "Lookup cuts in a cold index (analysis pass, resolution pass).",
+  "fjall-rs/fjall": [
+   549,
+   576
+  ],
+  "BurntSushi/ripgrep": [
+   53,
+   77
+  ],
+  "cberner/redb": [
+   7063,
+   8397
+  ],
+  "helix-editor/helix": [
+   12209,
+   15302
+  ]
+ }
+}

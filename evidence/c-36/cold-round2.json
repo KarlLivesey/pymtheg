@@ -1,0 +1,170 @@
+[
+ {
+  "pin": "helix-editor_helix",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 113.06,
+  "cpuS": 123.3,
+  "peakMiB": 1290,
+  "equality": {
+   "rows": {
+    "graph_files": 269,
+    "graph_contexts": 18,
+    "graph_parse_failures": 0,
+    "graph_symbols": 8461,
+    "graph_links": 90780,
+    "graph_candidates": 60,
+    "graph_library_targets": 10203,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "helix-editor_helix",
+  "round": 0,
+  "build": "after",
+  "wallS": 117.29,
+  "cpuS": 125.6,
+  "peakMiB": 1306,
+  "equality": {
+   "rows": {
+    "graph_files": 269,
+    "graph_contexts": 18,
+    "graph_parse_failures": 0,
+    "graph_symbols": 8461,
+    "graph_links": 90780,
+    "graph_candidates": 60,
+    "graph_library_targets": 10203,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "helix-editor_helix",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 136.75,
+  "cpuS": 125.2,
+  "peakMiB": 1384,
+  "equality": {
+   "rows": {
+    "graph_files": 269,
+    "graph_contexts": 18,
+    "graph_parse_failures": 0,
+    "graph_symbols": 8461,
+    "graph_links": 90780,
+    "graph_candidates": 60,
+    "graph_library_targets": 10203,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "cberner_redb",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 63.75,
+  "cpuS": 80.3,
+  "peakMiB": 1223,
+  "equality": {
+   "rows": {
+    "graph_files": 98,
+    "graph_contexts": 9,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5523,
+    "graph_links": 73731,
+    "graph_candidates": 520,
+    "graph_library_targets": 8806,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "cberner_redb",
+  "round": 0,
+  "build": "after",
+  "wallS": 91.44,
+  "cpuS": 88,
+  "peakMiB": 1218,
+  "equality": {
+   "rows": {
+    "graph_files": 98,
+    "graph_contexts": 9,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5523,
+    "graph_links": 73731,
+    "graph_candidates": 520,
+    "graph_library_targets": 8806,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "cberner_redb",
+  "round": 0,
+  "build": "main-2",
+  "wallS": 100.73,
+  "cpuS": 91,
+  "peakMiB": 1233,
+  "equality": {
+   "rows": {
+    "graph_files": 98,
+    "graph_contexts": 9,
+    "graph_parse_failures": 0,
+    "graph_symbols": 5523,
+    "graph_links": 73731,
+    "graph_candidates": 520,
+    "graph_library_targets": 8806,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "embassy-rs_embassy",
+  "round": 0,
+  "build": "main-1",
+  "wallS": 1462.45,
+  "cpuS": 1602,
+  "peakMiB": 4585,
+  "equality": {
+   "rows": {
+    "graph_files": 2514,
+    "graph_contexts": 289,
+    "graph_parse_failures": 1,
+    "graph_symbols": 63645,
+    "graph_links": 515233,
+    "graph_candidates": 5626,
+    "graph_library_targets": 21677,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "embassy-rs_embassy",
+  "round": 0,
+  "build": "after",
+  "wallS": 1423.83,
+  "cpuS": 1600.3,
+  "peakMiB": 4797,
+  "equality": {
+   "rows": {
+    "graph_files": 2514,
+    "graph_contexts": 289,
+    "graph_parse_failures": 1,
+    "graph_symbols": 63645,
+    "graph_links": 515233,
+    "graph_candidates": 5626,
+    "graph_library_targets": 21677,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]

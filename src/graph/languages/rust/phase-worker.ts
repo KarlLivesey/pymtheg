@@ -9,7 +9,9 @@ try {
   const result =
     request.phase === "analyze"
       ? rustPhases.analyze(request.context)
-      : rustPhases.resolve(request.context);
+      : request.phase === "analyzeScoped"
+        ? rustPhases.analyzeScoped(request.context)
+        : rustPhases.resolve(request.context);
   send({ kind: "done", result });
 } catch (error) {
   send({
