@@ -3446,6 +3446,23 @@ for now:** streaming a module's results to the store. The results were
 small (298 MiB as JSON on microsoft/TypeScript); the retained program was
 the cost. See [C-40](changes/C-40.md).
 
+### TypeScript symbol keys are name paths, not offsets (C-49)
+
+**Decided (C-49):** a TypeScript symbol's key is its kind and identity
+(`function:splitPath`, `method:Box.open`), with `~n` for the n-th later
+declaration of the same kind and identity in the file, in source order (the
+same order the core numbers ordinals by), and `module` for the file. Keys
+are computed from the file's syntax alone and are unique only within the
+file; in a JavaScript file the compiler saw with renamed module-system
+names, keys report the original names, like identities. **Why:** keys were
+`kind@offset`, and links store their targets by key, so a body edit
+rewrote the stored rows of every file linking into a later declaration of
+the edited file without changing any fact. **Unchanged:** symbol ids,
+ordinals and requirement links (which store identity and ordinal, never a
+key); no migration is needed. **Trade:** inserting or removing a same-named
+sibling still renumbers the later ones, as their ordinals already did.
+See [C-49](changes/C-49.md).
+
 ### C-45 Kept module state between index runs needs three proofs
 
 **Decided (C-45):** a process that indexes more than once may pass an
@@ -3464,4 +3481,3 @@ did not change (C-45 measurements). The completion record already proves
 what the store holds, so it is the proof for kept state too. **Rules out:**
 a file watcher as the source of truth for what changed (only a hint), and
 a separate index daemon for now. See [C-45](changes/C-45.md).
-
