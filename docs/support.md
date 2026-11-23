@@ -776,7 +776,12 @@ reference, package script or test runner config (Vitest `typecheck.tsconfig`,
 ts-jest `tsconfig`) names. A call on a member merged from several
 declarations of one receiver type links the declaration of the signature
 the checker selects, when no declaration from another body could also
-accept the arguments.
+accept the arguments. A const assertion (`as const`, `<const>x`) stores no link.
+A package-name `extends` whose base is reached through an installed
+workspace link is read (C-39). A base whose JSON has a syntax error keeps
+the missing-settings marker. A manifest range that the compiler's semver
+parser throws on is an unknown range: it identifies the registry dependency
+and never yields a version pin.
 
 - **Definite:** module imports; import and export bindings to the original
   declaration through barrels, `export *`, renames and default exports; CommonJS
@@ -909,7 +914,15 @@ accept the arguments.
   of 8,000,000 steps. When it is reached, every link of that program that
   could have a target is unresolved with `taint-budget-exhausted`, except
   links that bind a failed file directly, which stay `invalid-code`; no pin
-  outside microsoft/TypeScript comes near it. The program budget counts
+  outside microsoft/TypeScript comes near it. The structural judgement of a receiver
+  that depends on a failed file is memoised per program and bounded
+  (C-47). It allows at most 100 nested judgements over all its recursive
+  paths, 200,000 steps per judgement and 8,000,000 per program. A stack
+  overflow inside it counts as the bound, and an overflow anywhere in the
+  failed-file checks is unknown, never an answer. A link whose judgement or
+  dependence a bound left unknown is `invalid-code`, with the failed files
+  as its cause and the reason `judge-budget-exhausted`. It is never treated
+  as clean. The program budget counts
   every checkout file a program loads, imported files included; a file past
   it is left out of that program only (installed declarations have their
   own budget). Invalid extracted UTF-16 ranges use the same per-file
@@ -975,6 +988,20 @@ a full Go pass. Reuse requires a recorded completed Go index in the store.
 An unfinished run or a direct graph write requires recovery. The opt-in
 toolchain route uses a full pass. The same file tree produces the same
 graph after a fresh or incremental index. [C-27](changes/C-27.md)
+
+Rust can reuse the stored link decisions outside the edited files. A comment,
+whitespace or body edit that leaves every fact another file reads unchanged
+re-decides only the edited file. This includes a body edit that adds calls.
+It does not apply when deciding the file's links meets a lookup cycle, a
+depth limit or a re-entry guard, as in modules that glob each other.
+
+Any other change uses the full Rust pass. This covers changes to symbols,
+imports, macros, modules, attributes or cfg conditions; a Cargo manifest,
+lockfile or configuration change; an added, removed or unreadable file; and
+an unfinished previous run. No answer the resolver caches depends on its
+caller, and the scoped path is used only when the edited file's decisions
+meet no cut. The same file tree therefore produces the same graph after a
+fresh or incremental index. [C-36](changes/C-36.md)
 
 **Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted
 on this machine (below; [code guide](code-guide.md#the-go-toolchain-route)),

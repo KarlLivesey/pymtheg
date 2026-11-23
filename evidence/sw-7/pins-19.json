@@ -1,0 +1,328 @@
+{
+ "pins": [
+  {
+   "id": "changesets/changesets",
+   "links": 12646,
+   "level2": 11001,
+   "assumed": 0,
+   "moduleLinks": 334
+  },
+  {
+   "id": "colinhacks/zod",
+   "links": 81042,
+   "level2": 76709,
+   "assumed": 0,
+   "moduleLinks": 423
+  },
+  {
+   "id": "dexie/Dexie.js",
+   "links": 36431,
+   "level2": 20546,
+   "assumed": 0,
+   "moduleLinks": 298
+  },
+  {
+   "id": "excalidraw/excalidraw",
+   "links": 104519,
+   "level2": 98517,
+   "assumed": 80,
+   "moduleLinks": 872
+  },
+  {
+   "id": "honojs/hono",
+   "links": 72340,
+   "level2": 65991,
+   "assumed": 0,
+   "moduleLinks": 186
+  },
+  {
+   "id": "mermaid-js/mermaid",
+   "links": 125657,
+   "level2": 112136,
+   "assumed": 66,
+   "moduleLinks": 1123
+  },
+  {
+   "id": "nestjs/nest",
+   "links": 165330,
+   "level2": 155594,
+   "assumed": 0,
+   "moduleLinks": 1690
+  },
+  {
+   "id": "oclif/core",
+   "links": 14188,
+   "level2": 13489,
+   "assumed": 0,
+   "moduleLinks": 223
+  },
+  {
+   "id": "pingdotgg/t3code",
+   "links": 162711,
+   "level2": 148911,
+   "assumed": 0,
+   "moduleLinks": 6011
+  },
+  {
+   "id": "pmndrs/zustand",
+   "links": 7099,
+   "level2": 5871,
+   "assumed": 0,
+   "moduleLinks": 81
+  },
+  {
+   "id": "puppeteer/puppeteer",
+   "links": 58244,
+   "level2": 45437,
+   "assumed": 552,
+   "moduleLinks": 741
+  },
+  {
+   "id": "react-hook-form/react-hook-form",
+   "links": 49115,
+   "level2": 37254,
+   "assumed": 0,
+   "moduleLinks": 388
+  },
+  {
+   "id": "reduxjs/redux-toolkit",
+   "links": 57208,
+   "level2": 45851,
+   "assumed": 0,
+   "moduleLinks": 654
+  },
+  {
+   "id": "trpc/trpc",
+   "links": 107470,
+   "level2": 96241,
+   "assumed": 0,
+   "moduleLinks": 1927
+  },
+  {
+   "id": "vercel/turborepo",
+   "links": 53495,
+   "level2": 25134,
+   "assumed": 8757,
+   "moduleLinks": 1782
+  },
+  {
+   "id": "vitejs/vite",
+   "links": 55576,
+   "level2": 46319,
+   "assumed": 6295,
+   "moduleLinks": 1132
+  },
+  {
+   "id": "vitest-dev/vitest",
+   "links": 116220,
+   "level2": 95780,
+   "assumed": 37095,
+   "moduleLinks": 1525
+  },
+  {
+   "id": "withastro/astro",
+   "links": 152561,
+   "level2": 131627,
+   "assumed": 5929,
+   "moduleLinks": 4846
+  },
+  {
+   "id": "yargs/yargs",
+   "links": 12205,
+   "level2": 6426,
+   "assumed": 0,
+   "moduleLinks": 67
+  }
+ ],
+ "details": {
+  "honojs/hono": {
+   "files": [
+    {
+     "status": "clean",
+     "n": 460
+    }
+   ],
+   "blockers": {
+    "local": {
+     "links": 2400,
+     "areas": {
+      "adapters/ (other)": 143,
+      "benchmarks/ (other)": 10,
+      "runtime-tests/ (other)": 4,
+      "src (the compiler, services and server)": 2243
+     }
+    },
+    "(candidate set)": {
+     "links": 2146,
+     "areas": {
+      "adapters/ (other)": 185,
+      "benchmarks/ (other)": 51,
+      "perf-measures/ (other)": 4,
+      "runtime-tests/ (other)": 88,
+      "build/ (other)": 9,
+      "src (the compiler, services and server)": 1809
+     }
+    },
+    "no-symbol": {
+     "links": 711,
+     "areas": {
+      "adapters/ (other)": 195,
+      "benchmarks/ (other)": 69,
+      "fixtures": 1,
+      "runtime-tests/ (other)": 35,
+      "build/ (other)": 2,
+      "src (the compiler, services and server)": 409
+     }
+    },
+    "workspace-build-output-missing": {
+     "links": 308,
+     "areas": {
+      "adapters/ (other)": 308
+     }
+    },
+    "external": {
+     "links": 301,
+     "areas": {
+      "adapters/ (other)": 5,
+      "benchmarks/ (other)": 16,
+      "fixtures": 1,
+      "(root files)": 1,
+      "src (the compiler, services and server)": 278
+     }
+    },
+    "any-receiver": {
+     "links": 217,
+     "areas": {
+      "adapters/ (other)": 114,
+      "benchmarks/ (other)": 25,
+      "fixtures": 2,
+      "runtime-tests/ (other)": 1,
+      "src (the compiler, services and server)": 75
+     }
+    },
+    "library-member-written": {
+     "links": 17,
+     "areas": {
+      "src (the compiler, services and server)": 17
+     }
+    },
+    "(unit only)": {
+     "links": 16,
+     "areas": {
+      "adapters/ (other)": 11,
+      "benchmarks/ (other)": 2,
+      "build/ (other)": 2,
+      "src (the compiler, services and server)": 1
+     }
+    },
+    "object-producer-unverified": {
+     "links": 13,
+     "areas": {
+      "runtime-tests/ (other)": 13
+     }
+    },
+    "external-package": {
+     "links": 12,
+     "areas": {
+      "fixtures": 12
+     }
+    },
+    "missing-module": {
+     "links": 6,
+     "areas": {
+      "perf-measures/ (other)": 3,
+      "(root files)": 1,
+      "src (the compiler, services and server)": 2
+     }
+    },
+    "deno-import-unverified": {
+     "links": 6,
+     "areas": {
+      "adapters/ (other)": 6
+     }
+    },
+    "ambiguous-project": {
+     "links": 5,
+     "areas": {
+      "src (the compiler, services and server)": 5
+     }
+    },
+    "computed-specifier": {
+     "links": 3,
+     "areas": {
+      "benchmarks/ (other)": 2,
+      "src (the compiler, services and server)": 1
+     }
+    },
+    "unknown-receiver": {
+     "links": 2,
+     "areas": {
+      "adapters/ (other)": 1,
+      "src (the compiler, services and server)": 1
+     }
+    }
+   },
+   "areas": {
+    "src (the compiler, services and server)": {
+     "links": 66143,
+     "level2": 61256,
+     "assumed": 0,
+     "moduleLinks": 46
+    },
+    "adapters/ (other)": {
+     "links": 3797,
+     "level2": 2792,
+     "assumed": 0,
+     "moduleLinks": 37
+    },
+    "benchmarks/ (other)": {
+     "links": 1073,
+     "level2": 849,
+     "assumed": 0,
+     "moduleLinks": 49
+    },
+    "runtime-tests/ (other)": {
+     "links": 955,
+     "level2": 797,
+     "assumed": 0,
+     "moduleLinks": 17
+    },
+    "build/ (other)": {
+     "links": 216,
+     "level2": 184,
+     "assumed": 0,
+     "moduleLinks": 19
+    },
+    "perf-measures/ (other)": {
+     "links": 70,
+     "level2": 50,
+     "assumed": 0,
+     "moduleLinks": 13
+    },
+    "(root files)": {
+     "links": 56,
+     "level2": 49,
+     "assumed": 0,
+     "moduleLinks": 5
+    },
+    "fixtures": {
+     "links": 30,
+     "level2": 14,
+     "assumed": 0,
+     "moduleLinks": 0
+    }
+   },
+   "failed": {
+    "files": 0,
+    "areas": {},
+    "diagnostics": {},
+    "linksStored": 0
+   },
+   "unseenMarked": {
+    "links": 0,
+    "level2": 0
+   },
+   "assumedLevel2ByAssumption": {}
+  }
+ }
+}

@@ -46,7 +46,13 @@ import {
   taintOf,
   type Taint,
 } from "./taint.js";
-import { createJudge, type Judge, type Judged } from "./judge.js";
+import {
+  createJudge,
+  JUDGE_BOUND_REASON,
+  JudgeLimit,
+  type Judge,
+  type Judged,
+} from "./judge.js";
 import {
   objectProducers,
   propertyWrite,
@@ -1329,7 +1335,13 @@ export function extractFile(
       try {
         judged = judgeOf(taint).expression(receiver);
       } catch (error) {
-        if (!isLimit(error)) throw error;
+        // C-47: a judgement stopped at its bound, or by a stack overflow, is
+        // not an answer: the receiver is failed with the bound as the reason.
+        if (error instanceof JudgeLimit)
+          judged = { k: "failed", why: error.message };
+        else if (isLimit(error))
+          judged = { k: "failed", why: new JudgeLimit("depth").message };
+        else throw error;
       }
       if (judged?.k === "failed")
         return { causes: through.causes, via: `${through.via}; ${judged.why}` };
@@ -1348,7 +1360,9 @@ export function extractFile(
         }
       }
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no failed member set": it is unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(taint, "the receiver's member set");
     }
     const files = causesOf(membership);
     if (!files) return undefined;
@@ -1409,7 +1423,13 @@ export function extractFile(
     try {
       visit(receiver);
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no tainted name": it is unknown, so the
+      // receiver is judged (and fails at the bound if the judgement does).
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(
+        taint,
+        "whether a name in the receiver is tainted",
+      );
     }
     return found;
   }
@@ -1423,11 +1443,50 @@ export function extractFile(
     try {
       files = judgeOf(taint).reaches(receiver);
     } catch (error) {
-      if (!isLimit(error)) throw error;
-      return undefined;
+      // C-47: an overflow is not "does not reach": the dependence is unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      const causes = causesOf(programFailedFiles(taint));
+      return (
+        causes && {
+          causes,
+          via: `the receiver's dependence on the failed files is unknown: ${JUDGE_BOUND_REASON}`,
+        }
+      );
     }
     const causes = causesOf(files);
     return causes && { causes, via: "the receiver depends on the failed file" };
+  }
+  /** C-47: a dependence a bound left unknown: every failed file, with the bound. */
+  function unknownDependence(
+    taint: Taint,
+    what: string,
+  ): Dependence | undefined {
+    const causes = causesOf(programFailedFiles(taint));
+    return (
+      causes && { causes, via: `${what} is unknown: ${JUDGE_BOUND_REASON}` }
+    );
+  }
+  /**
+   * C-47: every failed file of this program, every failed file its bindings
+   * reach (a failed file is not itself in the program), and every file a
+   * failed name is declared in.
+   */
+  let failedInProgram: string[] | undefined;
+  function programFailedFiles(taint: Taint): string[] {
+    if (!failedInProgram) {
+      const files = new Set<string>();
+      for (const causes of taint.all.values())
+        for (const file of causes) files.add(file);
+      for (const source of program.getSourceFiles()) {
+        const path = fromVirtual(source.fileName);
+        if (path !== undefined && context.moduleKind(path) === "invalid")
+          files.add(path);
+      }
+      for (const list of context.failedNames.values())
+        for (const file of list) files.add(file);
+      failedInProgram = [...files].sort();
+    }
+    return failedInProgram;
   }
   function judgeOf(taint: Taint): Judge {
     const known = judges.get(checker);
@@ -1645,7 +1704,9 @@ export function extractFile(
         symbolCauses(part.aliasSymbol, "type");
       }
     } catch (error) {
-      if (!isLimit(error)) throw error;
+      // C-47: an overflow is not "no cause": the causes are unknown.
+      if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+      return unknownDependence(taint, "the receiver's causes");
     }
     const found = causesOf(causes);
     if (found) return { causes: found, via: via! };
@@ -2789,15 +2850,26 @@ export function extractFile(
             !(declaration as { body?: ts.Node }).body,
         );
         const judge = judgeOf(taint);
-        const files = causesOf(
-          signatures.flatMap((signature) =>
-            judge.signatureDependsOnFailed(signature),
-          ),
-        );
+        let unknown = false;
+        let files: Causes | undefined;
+        try {
+          files = causesOf(
+            signatures.flatMap((signature) =>
+              judge.signatureDependsOnFailed(signature),
+            ),
+          );
+        } catch (error) {
+          // C-47: an overflow is not "depends on none": the dependence is unknown.
+          if (!(error instanceof JudgeLimit) && !isLimit(error)) throw error;
+          files = causesOf(programFailedFiles(taint));
+          unknown = true;
+        }
         if (files)
           found = invalid(
             files,
-            "overloaded callee whose parameter types depend on the failed file",
+            unknown
+              ? `overloaded callee whose parameter types' dependence on the failed files is unknown: ${JUDGE_BOUND_REASON}`
+              : "overloaded callee whose parameter types depend on the failed file",
           );
       }
     }
@@ -3224,7 +3296,8 @@ export function extractFile(
           { jsx: true },
         );
       }
-    } else if (ts.isTypeReferenceNode(node)) {
+    } else if (ts.isTypeReferenceNode(node) && !ts.isConstTypeReference(node)) {
+      // `x as const` and `<const>x` are const assertions, not references.
       const name = node.typeName;
       const at = ts.isQualifiedName(name) ? name.right : name;
       const lookupResult = lookup(at);
