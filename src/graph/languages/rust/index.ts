@@ -370,6 +370,74 @@ function decideToolchain(
   /** Two candidates of one kind and in-file path: cfg twins. */
   const twins = (ids: readonly string[]) =>
     new Set(ids.map((c) => identityOf.get(c) ?? c)).size < ids.length;
+  // Third review B: the cfg can sit on the `use` that selects between two
+  // ungated items (`#[cfg(feature = "fast")] pub use z_fmt::ZGrayV08 as
+  // ZGray;` beside a `not` twin naming ZGrayV09). Each item a `use` under a
+  // condition other than `test` brings in, by the name it binds. Keyed by
+  // file and in-file path, so an item's members (`ZGray::zg()` reaching
+  // `ZGrayV08::zg`) count as brought in under the same name.
+  const placeOf = new Map<string, string>();
+  updated.forEach((f, i) => {
+    byPath.get(f.path)?.result.symbols.forEach((symbol, j) => {
+      placeOf.set(
+        facts[i]!.symbols[j]!.id,
+        `${f.path}\u0000${symbol.identity}`,
+      );
+    });
+  });
+  const importedUnderCfg = new Map<string, Set<string>>();
+  updated.forEach((f, i) => {
+    byPath.get(f.path)?.result.links.forEach((l, j) => {
+      if (l.kind !== "imports") return;
+      const data = (l.data ?? {}) as Record<string, Json>;
+      if (!beyondTest(data.conditions as Json[] | undefined)) return;
+      const r = resolutions.get(facts[i]!.links[j]!.id);
+      const name =
+        (typeof data.alias === "string" && data.alias) ||
+        l.targetName.split("::").at(-1)!;
+      for (const target of [
+        ...(r?.targetId ? [r.targetId] : []),
+        ...(r?.candidateIds ?? []),
+      ]) {
+        const place = placeOf.get(target);
+        if (place === undefined) continue;
+        const names = importedUnderCfg.get(place) ?? new Set<string>();
+        names.add(name);
+        importedUnderCfg.set(place, names);
+      }
+    });
+  });
+  /** The names `use` items under cfg bind an item, or an item it is in. */
+  const namesUnderCfg = (id: string): Set<string> => {
+    const names = new Set<string>();
+    const place = placeOf.get(id);
+    if (place === undefined) return names;
+    const [file, identity] = place.split("\u0000") as [string, string];
+    // A method's identity is `impl Type::m` or `impl Trait for Type<T>::m`;
+    // the item it is in is `Type`.
+    const owned = identity.startsWith("impl ")
+      ? identity.slice(5).split(" for ").at(-1)!
+      : identity;
+    const segments = owned
+      .split("::")
+      .map((segment) => segment.replace(/<.*$/, ""));
+    for (let n = 1; n <= segments.length; n++)
+      for (const name of importedUnderCfg.get(
+        `${file}\u0000${segments.slice(0, n).join("::")}`,
+      ) ?? [])
+        names.add(name);
+    return names;
+  };
+  /** Two candidates bound to one name by `use` items under cfg. */
+  const cfgSelected = (ids: readonly string[]) => {
+    const seen = new Set<string>();
+    for (const id of ids)
+      for (const name of namesUnderCfg(id)) {
+        if (seen.has(name)) return true;
+        seen.add(name);
+      }
+    return false;
+  };
   updated.forEach((f, i) => {
     const a = byPath.get(f.path);
     if (!a) return;
@@ -408,7 +476,8 @@ function decideToolchain(
       const reasons = uncertaintyReasons(rest.uncertainty);
       const single = candidates.length === 1 && candidates[0] === target;
       const conditionalSet = (ids: readonly string[]) =>
-        ids.length > 1 && (ids.some(conditional) || twins(ids));
+        ids.length > 1 &&
+        (ids.some(conditional) || twins(ids) || cfgSelected(ids));
       if (
         !r?.targetId &&
         ((reasons.includes("conditional-name-may-be-absent") && !single) ||

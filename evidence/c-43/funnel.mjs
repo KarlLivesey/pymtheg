@@ -159,6 +159,7 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
           "withheld:module-twin": "gate: module twin, or module conditions unseen",
           "withheld:conditional-candidates": "gate: conditional candidates",
           "kept:source-only-library": "gate: source-only library target kept",
+          "kept:source-only": "gate: source-only target kept in the resolve phase",
           "kept:outside-candidate-set": "gate: answer outside the candidate set",
           "kept:source-only-differs": "gate: source-only target differs",
           "withheld:no-symbol": "no identity: declaration without a graph symbol",

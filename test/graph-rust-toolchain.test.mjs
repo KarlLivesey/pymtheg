@@ -38,6 +38,7 @@ import {
 } from "../dist/graph/languages/rust/toolchain-join.js";
 import { setRunControls } from "../dist/graph/languages/rust/toolchain-route.js";
 import { toolchainState } from "../dist/graph/command-toolchain.js";
+import { decideLink } from "../dist/graph/analysis.js";
 import { executeGraph } from "../dist/graph/commands.js";
 import { graphConfig, graphToolchains } from "../dist/shared/config.js";
 import { initializeWorkspace } from "../dist/project/workspace.js";
@@ -462,6 +463,63 @@ test("settings: this machine's trusted answer runs the Rust route; committed set
 });
 
 // ---------------------------------------------------------------- reading SCIP
+
+test("a toolchain record stands only on a link stored with its target; a kept source-only answer drops it", () => {
+  const symbol = {
+    id: "s1",
+    projectId: "p",
+    module: "rust",
+    file: "src/lib.rs",
+    key: "k1",
+    kind: "function",
+    name: "f",
+    identity: "f",
+    range: { start: 0, end: 1 },
+    status: "clean",
+  };
+  const link = {
+    id: "l1",
+    projectId: "p",
+    module: "rust",
+    file: "src/lib.rs",
+    origin: "parse",
+    sourceId: null,
+    kind: "calls",
+    targetName: "f",
+    range: { start: 2, end: 3 },
+    targetId: null,
+    targetStatus: null,
+    candidates: [],
+    resolution: "unresolved",
+    data: {
+      toolchain: { origin: "toolchain", from: "unresolved", target: "s1" },
+    },
+  };
+  // The answer is stored: the record stands.
+  const taken = decideLink(structuredClone(link), { linkId: "l1", targetId: "s1" }, [symbol]);
+  assert.equal(taken.targetId, "s1");
+  assert.equal(taken.data.toolchain.target, "s1");
+  assert.equal(taken.data.toolchainOutcome, undefined);
+  // The resolve phase kept a source-only library target: the record goes.
+  const kept = decideLink(
+    structuredClone(link),
+    {
+      linkId: "l1",
+      library: { ecosystem: "rust-std", unit: "core", symbol: "fmt::Debug::fmt", evidence: "qualified-path" },
+    },
+    [symbol],
+  );
+  assert.equal(kept.resolution, "library");
+  assert.equal(kept.data.toolchain, undefined, JSON.stringify(kept.data));
+  assert.equal(kept.data.toolchainOutcome, "kept:source-only");
+  // A confirmation names no target and is left alone.
+  const confirmed = decideLink(
+    { ...structuredClone(link), data: { toolchain: { origin: "toolchain", from: "definite" } } },
+    { linkId: "l1", targetId: "s1" },
+    [symbol],
+  );
+  assert.equal(confirmed.data.toolchain.from, "definite");
+});
 
 test("the SCIP reader reads documents, ranges, roles and rust-analyzer symbols; name sites end at the written name", () => {
   const docs = readScip(
@@ -1790,6 +1848,22 @@ const CFG_CRATE = {
     "    s2::s2_open()",
     "}",
     "",
+    "// Fourth review: ungated items of different names, selected by cfg on",
+    "// the `use` (rgb's ZGray shape)",
+    "mod z_fmt;",
+    "#[cfg(unix)]",
+    "pub use z_fmt::ZGrayV08 as ZGray;",
+    "#[cfg(not(unix))]",
+    "pub use z_fmt::ZGrayV09 as ZGray;",
+    "pub fn zgray() -> u32 {",
+    "    ZGray::zg()",
+    "}",
+    "",
+    "// Fourth review: renamed function twins in another module (brotli's",
+    "// shape), called through the module from a third file",
+    "pub mod third;",
+    "mod zcall;",
+    "",
     "// The narrowed guard: a module under cfg with no twin is answered",
     '#[cfg(not(feature = "nope"))]',
     "mod gated_ok;",
@@ -1826,6 +1900,13 @@ const CFG_CRATE = {
     "pub struct QConn;\n\nimpl QConn {\n    pub fn new() -> Self {\n        QConn\n    }\n    pub fn q_send(&self) -> u32 {\n        2\n    }\n}\n",
   "src/s2.rs": "pub fn s2_open() -> u32 {\n    1\n}\n",
   "src/s2_unix.rs": "pub fn s2_open() -> u32 {\n    2\n}\n",
+  "src/z_fmt.rs":
+    "pub struct ZGrayV08;\n\nimpl ZGrayV08 {\n    pub fn zg() -> u32 {\n        8\n    }\n}\n\npub struct ZGrayV09;\n\nimpl ZGrayV09 {\n    pub fn zg() -> u32 {\n        9\n    }\n}\n",
+  "src/third.rs":
+    "mod z_multi;\nmod z_single;\n#[cfg(unix)]\npub use self::z_multi::compress_multi as z_compress;\n#[cfg(not(unix))]\npub use self::z_single::compress as z_compress;\n",
+  "src/third/z_multi.rs": "pub fn compress_multi() -> u32 {\n    1\n}\n",
+  "src/third/z_single.rs": "pub fn compress() -> u32 {\n    2\n}\n",
+  "src/zcall.rs": "pub fn zc() -> u32 {\n    crate::third::z_compress()\n}\n",
   "src/c_other.rs": "pub fn c_open() -> u32 {\n    2\n}\n",
 };
 
@@ -1859,6 +1940,7 @@ test(
         "QConn::new",
         "c.q_send",
         "s2::s2_open",
+        "ZGray::zg",
       ]) {
         const l = link(name);
         assert.ok(l, name);
@@ -1873,6 +1955,26 @@ test(
           name + " stays open as source-only left it",
         );
       }
+      // Fourth review: every link into the cfg-selected `use` twins stays as
+      // source-only left it, including the call from another file.
+      for (const l of dump.links.filter(
+        (l) =>
+          (l.file === "src/lib.rs" && /^ZGray(::|$)/.test(l.targetName)) ||
+          (l.file === "src/zcall.rs" && /z_compress$/.test(l.targetName)),
+      )) {
+        assert.equal(
+          l.data?.toolchain,
+          undefined,
+          `${l.file} ${l.targetName}: ${JSON.stringify(l.data)}`,
+        );
+        assert.notEqual(l.resolution, "resolved", `${l.file} ${l.targetName}`);
+      }
+      assert.ok(
+        dump.links.some(
+          (l) => l.file === "src/zcall.rs" && /z_compress$/.test(l.targetName),
+        ),
+        "the cross-module call is a link",
+      );
       // The narrowed guard: a module under cfg with no twin is answered.
       const g = link("gated_ok::g_fn");
       assert.equal(
