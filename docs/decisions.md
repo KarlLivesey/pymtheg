@@ -3429,9 +3429,11 @@ candidate set for several arms or the right single member. A receiver the
 walk cannot follow is unresolved (`receiver-unverified`), as is an arm
 member without a symbol (`reduced-receiver`). Destructured bindings,
 untyped locals and parameters, local type aliases and interfaces, and
-object literals in call arguments get no symbols. **Trade:** a walked
-choice is not narrowed (a sound but wider candidate set), and a member
-read that is not called keeps the checker's answer. **Rules out:** a
+object literals in call arguments get no symbols. **Trade:** a receiver the walk cannot follow loses its link (on the 19
+pins 248 definite links became `receiver-unverified`, against 5,204
+gained and 5 corrected to candidate sets), a walked choice is not
+narrowed beyond what assignability shows (a sound but wider candidate
+set), and a member read that is not called keeps the checker's answer. **Rules out:** a
 definite link to one member of a union the checker reduced, including
 main's on interfaces (`pick ? ia : ib`) and object literals (`[csv,
 tsv][1]`). See [C-41](changes/C-41.md).
