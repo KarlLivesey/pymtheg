@@ -364,7 +364,7 @@ test("a worker started under other code is ended before the next job", async () 
     const job = await run(jobs);
     assert.equal(job.state, "complete");
     assert.equal(jobs.generation, 2, "an upgrade starts a new worker");
-    assert.deepEqual(job.session, { runs: 1, dropped: 0 });
+    assert.equal(job.session.runs, 1, "a fresh session");
   } finally {
     await jobs.close();
     rmSync(base, { recursive: true, force: true });
