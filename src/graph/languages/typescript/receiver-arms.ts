@@ -317,6 +317,17 @@ export function receiverArms(
       : undefined;
   }
 
+  /** Whether `member` is an instantiation, not its declaration's own symbol. */
+  function instantiatedMember(member: ts.Symbol): boolean {
+    const declaration = member.declarations?.[0];
+    // A shorthand property's name resolves to its value, not the member.
+    if (!declaration || ts.isShorthandPropertyAssignment(declaration))
+      return false;
+    const name = (declaration as ts.NamedDeclaration).name;
+    const own = name && checker.getSymbolAtLocation(name);
+    return !!own && own !== member;
+  }
+
   function sameDeclarations(one: ts.Symbol, other: ts.Symbol): boolean {
     const a = one.declarations ?? [];
     const b = new Set(other.declarations ?? []);
@@ -924,10 +935,16 @@ export function receiverArms(
     if (declaration.type) return leaf(node);
     if (!hasBody(declaration)) return undefined;
     const out = returned(declaration);
-    // A generic body's arms are uninstantiated and an async body's are a
-    // promise's: one arm is the call's own type.
-    if (generic || isAsync(declaration))
-      return out && out.length <= 1 ? leaf(node) : undefined;
+    // A generic body's arms are uninstantiated (also a method of an
+    // instantiated generic class: its signature is not the declared one)
+    // and an async body's are a promise's: unreduced, the call's own type.
+    const signature = checker.getResolvedSignature(node);
+    if (
+      generic ||
+      isAsync(declaration) ||
+      signature !== checker.getSignatureFromDeclaration(declaration)
+    )
+      return out && !reducible(out) ? leaf(node) : undefined;
     return out;
   }
 
@@ -1010,7 +1027,13 @@ export function receiverArms(
           declarations.length === 1
             ? declarationArms(declarations[0]!)
             : symbolArms(member);
-        if (result !== WRITTEN) return result;
+        // A member of an instantiated generic type (`ZodObject<…>.shape`):
+        // its declaration's initialiser or body is in the generic's terms,
+        // so it only says whether a union forms there; the value is the
+        // instantiated member's.
+        if (result !== WRITTEN && instantiatedMember(member)) {
+          if (!result || reducible(result)) return undefined;
+        } else if (result !== WRITTEN) return result;
         return [
           {
             type: checker.getNonNullableType(
@@ -1103,8 +1126,43 @@ export function receiverArms(
     }
     if (!found) return "unverified";
     if (!found.length) return undefined;
+    // Control flow narrows the value at the receiver (`typeof r === "string"
+    // ? r : r.toString()`, `instanceof`): the arms the checker's own type
+    // there can hold. A reduction keeps both arms (each is assignable to the
+    // reduced one); narrowing drops the parts it excludes.
+    const at = checker.getNonNullableType(checker.getTypeAtLocation(receiver));
+    const parts = (type: ts.Type) => (type.isUnion() ? type.types : [type]);
+    const own = new Set(parts(at));
+    const split: Arm[] = found.flatMap((arm) =>
+      arm.generic || arm.array
+        ? [arm]
+        : parts(arm.type)
+            .filter((part) => !nullish(part))
+            .map((part) => ({ type: part })),
+    );
+    // A primitive part is held only by a primitive of its kind (`string` is
+    // structurally assignable to a class with only `toString`).
+    const PRIMITIVE =
+      ts.TypeFlags.StringLike |
+      ts.TypeFlags.NumberLike |
+      ts.TypeFlags.BigIntLike |
+      ts.TypeFlags.BooleanLike |
+      ts.TypeFlags.ESSymbolLike;
+    const held = split.filter((arm) => {
+      if (arm.generic || arm.array) return true;
+      const primitive = arm.type.flags & PRIMITIVE;
+      if (primitive) return [...own].some((part) => part.flags & primitive);
+      return checker.isTypeAssignableTo(arm.type, at);
+    });
+    const kept = held.length ? held : split;
+    // The checker's own type, part for part: its answer stands.
+    if (
+      kept.length === own.size &&
+      kept.every((arm) => !arm.generic && !arm.array && own.has(arm.type))
+    )
+      return undefined;
     const members: ts.Symbol[] = [];
-    for (const arm of found) {
+    for (const arm of kept) {
       const member = checker.getPropertyOfType(
         checker.getApparentType(arm.type),
         name,
@@ -1112,7 +1170,7 @@ export function receiverArms(
       if (!member) {
         // One arm without a named member (an index signature): the checker's
         // own lookup decides, as before.
-        if (found.length === 1) return undefined;
+        if (kept.length === 1) return undefined;
         return "unverified";
       }
       if (arm.generic) {

@@ -302,7 +302,14 @@ if (sampleSize) {
     return `${symbol.file}:${lineOf(text, symbol.start)} ${symbol.kind} ${symbol.name}`;
   };
   changes.sort((x, y) => (x.rank < y.rank ? -1 : 1));
-  const changed = changes.slice(0, Number(sampleSize)).map((c) => {
+  // The lowest-hash changes of each kind, up to SAMPLE each.
+  const perKind = new Map();
+  for (const c of changes) {
+    const list = perKind.get(c.kind) ?? [];
+    if (list.length < Number(sampleSize)) list.push(c);
+    perKind.set(c.kind, list);
+  }
+  const changed = [...perKind.values()].flat().map((c) => {
     const source = readFileSync(join(c.checkout, c.after.file), "utf8");
     const line = lineOf(source, c.after.start);
     return {

@@ -479,6 +479,58 @@ test("anchored object-literal members through elements, iteration and callbacks 
   });
 });
 
+test("the walk keeps what the checker narrows, instantiates or types by context", async () => {
+  // C-41 review, from the sweep: none of these is a reduced union, and each
+  // keeps the checker's single member.
+  const got = await outcomes(
+    {
+      "src/use.ts": [
+        "class Filter { toString(): string { return ''; } }",
+        "declare const results: (string | Filter)[];",
+        "results.map((r) => (typeof r === 'string' ? r : r.toString()));",
+        "class Base { start() {} }",
+        "class Fast extends Base { ready() {} }",
+        "declare function make(): Base;",
+        "const adapter = make();",
+        "if (adapter instanceof Fast) adapter.ready();",
+        "interface Check<T> { toBe(value: T): void }",
+        "declare function expect<T>(actual: T): Check<T>;",
+        "declare const pick: boolean;",
+        "declare const a: { n: number };",
+        "declare const b: { n: number };",
+        "expect(pick ? a : b).toBe(a);",
+        "class Opt<T> { inner!: T; unwrap() { return this.inner; } }",
+        "class NonOpt<T> { inner!: T; unwrap() { return this.inner; } }",
+        "declare const wrapped: NonOpt<Opt<number>>;",
+        "wrapped.unwrap().unwrap();",
+        "interface Action { checked?(state: number): boolean; perform(state: number): boolean }",
+        "declare function register(action: Action): Action;",
+        "register({ checked: (state) => state > 0, perform(state) { return !this.checked!(state); } });",
+        "",
+      ].join("\n"),
+    },
+    "src/use.ts",
+    true,
+  );
+  assert.deepEqual(got, {
+    "results.map((r) => (typeof r === 'string' ? r : r.toString())); @results.map":
+      "library:",
+    "results.map((r) => (typeof r === 'string' ? r : r.toString())); @r.toString":
+      "src/use.ts#Filter.toString",
+    "const adapter = make(); @make": "src/use.ts#make",
+    "if (adapter instanceof Fast) adapter.ready(); @adapter.ready":
+      "src/use.ts#Fast.ready",
+    "expect(pick ? a : b).toBe(a); @expect": "src/use.ts#expect",
+    "expect(pick ? a : b).toBe(a); @(expression).toBe": "src/use.ts#Check.toBe",
+    "wrapped.unwrap().unwrap(); @wrapped.unwrap": "src/use.ts#NonOpt.unwrap",
+    "wrapped.unwrap().unwrap(); @(expression).unwrap": "src/use.ts#Opt.unwrap",
+    "register({ checked: (state) => state > 0, perform(state) { return !this.checked!(state); } }); @register":
+      "src/use.ts#register",
+    "register({ checked: (state) => state > 0, perform(state) { return !this.checked!(state); } }); @this.checked":
+      "src/use.ts#Action.checked",
+  });
+});
+
 test("nested type positions have their places; a type literal's overloads are one symbol", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "c41-ids-"));
   const root = join(scratch, "project");
