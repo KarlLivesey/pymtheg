@@ -261,7 +261,7 @@ for (const [language, files, edit, scoped] of [
   // C-36 under C-37: a scoped Rust re-index (one file re-decided alone) in
   // write batches, killed at every boundary.
   [
-    "Rust (scoped)",
+    "Rust (scoped, leading comment)",
     {
       "Cargo.toml":
         '[package]\nname = "fixture"\nversion = "0.1.0"\nedition = "2021"\n',
@@ -273,6 +273,21 @@ for (const [language, files, edit, scoped] of [
         "use crate::a::hello;\n\npub fn c() -> u32 {\n    hello() + 1\n}\n",
     },
     { "src/a.rs": "// moved\npub fn hello() -> u32 {\n    1\n}\n" },
+    1,
+  ],
+  [
+    "Rust (scoped, trailing comment)",
+    {
+      "Cargo.toml":
+        '[package]\nname = "fixture"\nversion = "0.1.0"\nedition = "2021"\n',
+      "src/lib.rs": "pub mod a;\npub mod b;\npub mod c;\n",
+      "src/a.rs": "pub fn hello() -> u32 {\n    1\n}\n",
+      "src/b.rs":
+        "use crate::a::hello;\n\npub fn b() -> u32 {\n    hello()\n}\n",
+      "src/c.rs":
+        "use crate::a::hello;\n\npub fn c() -> u32 {\n    hello() + 1\n}\n",
+    },
+    { "src/a.rs": "pub fn hello() -> u32 {\n    1\n}\n// trailing\n" },
     1,
   ],
 ]) {
