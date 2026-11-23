@@ -12,13 +12,13 @@ import { registerGraphTools } from "../dist/mcp/graph.js";
 
 async function fixture(run) {
   const root = await mkdtemp(join(tmpdir(), "pym-inline-"));
-  const jobs = new GraphJobs(
-    root,
-    () =>
+  const jobs = new GraphJobs(root, {
+    launch: (control) =>
       new Worker(
         new URL("./fixtures/mcp-graph/controlled-worker.mjs", import.meta.url),
+        { workerData: { control } },
       ),
-  );
+  });
   const deadlines = [];
   let announce;
   const created = () =>

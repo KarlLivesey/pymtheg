@@ -3509,3 +3509,46 @@ did not change (C-45 measurements). The completion record already proves
 what the store holds, so it is the proof for kept state too. **Rules out:**
 a file watcher as the source of truth for what changed (only a hint), and
 a separate index daemon for now. See [C-45](changes/C-45.md).
+
+
+
+### An analysing module's files are written once per run (C-53)
+
+**Decided (C-53):** the indexer holds the parse results of every module
+that analyses until that module's analysis and writes each file once, with
+its analysed result (or as parsed when the module returns none for it).
+A run holding files that main's parse write would have written commits its
+run mark at the end of the parse write, where its first commit used to be,
+so a run started after that point finds it unfinished and takes over
+(files of a module reusing its analysis, C-27 and C-36, were held before
+and claim nothing). **Why:** every Go and Rust file was stored as parsed
+and then replaced whole as analysed, and every TypeScript file as a
+placeholder and then as analysed; on four pins that was 46-57% of the rows
+a cold index changed. **Trade:** held results stay in memory until
+their module's analysis instead of being read back (helix peak +9%; lower
+on restic, cli/cli and dioxus). A run killed between the phases leaves its
+mark and no held file; the next run trusts no record, as before.
+**Unchanged:** the stored rows, row for row; module versions; C-33's
+no-edit run; C-37's batches. See [C-53](changes/C-53.md).
+
+### C-48 The MCP server keeps one graph worker
+
+**Decided (C-48):** the MCP server runs every graph job, one at a time, in
+one worker that lives between jobs and keeps an `IndexSession` (C-45).
+Cancellation is cooperative: through memory shared with the worker, at the
+worker's next checkpoint (every abort check of the graph command). A cancel
+that finds the worker inside a language module's own call, with no
+toolchain process live, terminates it at once, as before, and its session
+ends. While a module's returned promise is awaited, or a toolchain process
+of the job is live, the server kills the job's processes and asks the
+worker to abort; a worker that answers within 30 s (by an injectable
+clock) keeps running, and one that does not is terminated then. A worker idle for 10 minutes (by an
+injectable clock) is ended. **Why:** an unchanged index costs 0.2 to 0.4 s
+instead of 0.7 to 1.3 s, and module state kept by a session can only be
+reused by a process that lives. **Trade:** a worker keeps its memory
+high-water mark between jobs unless it collects: after every job it runs a
+full collection and reports its live heap (77 to 132 MiB on four pins),
+and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall-clock wait that decides a
+result; the 30 s grace only bounds how long an unanswering worker is
+given. See [C-48](changes/C-48.md).
+

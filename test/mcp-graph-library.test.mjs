@@ -20,18 +20,17 @@ async function session(run) {
       recursive: true,
     },
   );
-  const jobs = new GraphJobs(
-    root,
-    (request) =>
+  const jobs = new GraphJobs(root, {
+    launch: (control) =>
       new Worker(
         new URL("./fixtures/mcp-graph/toy-worker.mjs", import.meta.url),
         {
-          workerData: request,
+          workerData: { control },
           stdout: true,
           stderr: true,
         },
       ),
-  );
+  });
   const server = new McpServer({ name: "library-graph", version: "1" });
   registerGraphTools(server, { graph: jobs });
   const client = new Client({ name: "library-agent", version: "1" });
