@@ -519,3 +519,49 @@ test("PR 67 review 3: the types entry's own config, API Extractor's extends and 
   for (const name of ["notTwin", "templated"])
     assert.match(String(got[name]), /^unresolved:workspace-/, name);
 });
+
+test("PR 67 review 3: a manifest field as an entry, and output.file beside dir objects", async () => {
+  const got = await calls({
+    // React Hook Form's shape: `input: pkg.source` with pkg the manifest.
+    "packages/m/package.json": pkg("m", {
+      source: "src/index.ts",
+      types: "./dist/index.d.ts",
+      scripts: { build: "rollup -c" },
+    }),
+    "packages/m/rollup.config.mjs": [
+      "import pkg from './package.json' with { type: 'json' };",
+      "export default [{ input: pkg.source, output: { dir: 'dist' } }];",
+    ].join("\n"),
+    "packages/m/src/index.ts": "export function fromManifest() {}\n",
+    // One object writes a single file, another a folder: the folder's
+    // entries still decide outputs the single file does not name.
+    "packages/d/package.json": pkg("d", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "rollup -c" },
+    }),
+    "packages/d/rollup.config.mjs": [
+      "export default [",
+      "  { input: { index: 'src/main.ts' }, output: { dir: 'dist' } },",
+      "  { input: 'src/cli.ts', output: { file: 'dist/cli.js' } },",
+      "];",
+    ].join("\n"),
+    "packages/d/src/main.ts": "export function fromDir() {}\n",
+    "packages/d/src/cli.ts": "export function cli() {}\n",
+    "packages/d/src/index.ts": "export function twinNotUsed() {}\n",
+    "app.ts": [
+      'import { fromManifest } from "m";',
+      'import { fromDir } from "d";',
+      "fromManifest(); fromDir();",
+    ].join("\n"),
+  });
+  assert.deepEqual(got.fromManifest, [
+    "packages/m/src/index.ts#fromManifest",
+    ["ts-unbuilt-entry-is-bundler-entry"],
+    "packages/m/src/index.ts",
+  ]);
+  assert.deepEqual(got.fromDir, [
+    "packages/d/src/main.ts#fromDir",
+    ["ts-unbuilt-entry-is-bundler-entry"],
+    "packages/d/src/main.ts",
+  ]);
+});

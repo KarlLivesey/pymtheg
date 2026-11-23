@@ -106,14 +106,27 @@ function entryData(
   value: ts.Expression,
   constants: ReadonlyMap<string, ts.Expression>,
   depth = 0,
+  /** Names bound to an imported or required JSON file (`pkg`), as data. */
+  json: ReadonlyMap<string, Record<string, unknown>> = new Map(),
 ): EntryList | undefined {
   if (depth > 4) return undefined;
+  // `pkg.source` of `import pkg from "./package.json"`: a field as data.
+  if (
+    ts.isPropertyAccessExpression(value) &&
+    ts.isIdentifier(value.expression) &&
+    json.has(value.expression.text)
+  ) {
+    const field = json.get(value.expression.text)![value.name.text];
+    return typeof field === "string" && literalPath.test(field)
+      ? { entries: [{ path: field }] }
+      : undefined;
+  }
   if (
     ts.isParenthesizedExpression(value) ||
     ts.isAsExpression(value) ||
     ts.isSatisfiesExpression(value)
   )
-    return entryData(value.expression, constants, depth + 1);
+    return entryData(value.expression, constants, depth + 1, json);
   if (ts.isStringLiteralLike(value))
     return literalPath.test(value.text)
       ? { entries: [{ path: value.text }] }
@@ -143,15 +156,19 @@ function entryData(
   }
   if (ts.isIdentifier(value)) {
     const bound = constants.get(value.text);
-    return bound && entryData(bound, constants, depth + 1);
+    return bound && entryData(bound, constants, depth + 1, json);
   }
   if (ts.isCallExpression(value) && value.arguments.length === 1)
-    return entryData(value.arguments[0]!, constants, depth + 1);
+    return entryData(value.arguments[0]!, constants, depth + 1, json);
   return undefined;
 }
 
 /** Read a bundler config's entry lists and output folders as syntax. */
-function readBundlerConfig(path: string, text: string): ConfigData {
+function readBundlerConfig(
+  path: string,
+  text: string,
+  readFile: (path: string) => string | undefined = () => undefined,
+): ConfigData {
   const json = path.endsWith(".json");
   const source = json
     ? ts.parseJsonText(path, text)
@@ -166,6 +183,44 @@ function readBundlerConfig(path: string, text: string): ConfigData {
         for (const declaration of statement.declarationList.declarations)
           if (ts.isIdentifier(declaration.name) && declaration.initializer)
             constants.set(declaration.name.text, declaration.initializer);
+  // Names bound to a relative JSON file, read as data (`pkg.source`).
+  const jsonFiles = new Map<string, Record<string, unknown>>();
+  const bindJson = (name: string, specifier: string) => {
+    if (!specifier.startsWith(".") || !specifier.endsWith(".json")) return;
+    const text = readFile(posix.join(posix.dirname(path), specifier));
+    if (text === undefined) return;
+    try {
+      const value: unknown = JSON.parse(text);
+      if (value && typeof value === "object")
+        jsonFiles.set(name, value as Record<string, unknown>);
+    } catch {}
+  };
+  if (!path.endsWith(".json"))
+    for (const statement of source.statements) {
+      if (
+        ts.isImportDeclaration(statement) &&
+        statement.importClause?.name &&
+        ts.isStringLiteral(statement.moduleSpecifier)
+      )
+        bindJson(
+          statement.importClause.name.text,
+          statement.moduleSpecifier.text,
+        );
+      if (ts.isVariableStatement(statement))
+        for (const declaration of statement.declarationList.declarations) {
+          const init = declaration.initializer;
+          if (
+            ts.isIdentifier(declaration.name) &&
+            init &&
+            ts.isCallExpression(init) &&
+            ts.isIdentifier(init.expression) &&
+            init.expression.text === "require" &&
+            init.arguments.length === 1 &&
+            ts.isStringLiteral(init.arguments[0]!)
+          )
+            bindJson(declaration.name.text, init.arguments[0].text);
+        }
+    }
   const lists: EntryList[] = [];
   const dirs = new Set<string>();
   const pairs: ConfigData["pairs"] = [];
@@ -182,7 +237,8 @@ function readBundlerConfig(path: string, text: string): ConfigData {
         );
       const input = named("input");
       const output = named("output");
-      const entries = input && entryData(input.initializer, constants);
+      const entries =
+        input && entryData(input.initializer, constants, 0, jsonFiles);
       const files = output ? outputFiles(output.initializer) : [];
       if (entries && files.length) pairs.push({ entries, files });
     }
@@ -192,7 +248,7 @@ function readBundlerConfig(path: string, text: string): ConfigData {
     ) {
       const name = node.name.text;
       if (name === "entry" || name === "entries" || name === "input") {
-        const data = entryData(node.initializer, constants);
+        const data = entryData(node.initializer, constants, 0, jsonFiles);
         if (data) lists.push(data);
         else opaque = true;
       } else if (
@@ -279,7 +335,7 @@ export function entryConventions(
     const byScript = namedBy.get(path);
     if (byScript !== undefined) {
       const list = bundlers.get(byScript) ?? [];
-      list.push(readBundlerConfig(path, text));
+      list.push(readBundlerConfig(path, text, (file) => files.get(file)));
       bundlers.set(byScript, list);
       continue;
     }
@@ -301,7 +357,7 @@ export function entryConventions(
     if (posix.dirname(path) !== owner) continue;
     if (bundlerConfig.test(name)) {
       const list = bundlers.get(owner) ?? [];
-      const data = readBundlerConfig(path, text);
+      const data = readBundlerConfig(path, text, (file) => files.get(file));
       if (name.startsWith("rollup.") && !data.lists)
         unreadableRollup.add(owner);
       list.push(data);
@@ -404,8 +460,9 @@ export function entryConventions(
         sources.add(source);
         config = data.path;
       }
-      // A config whose objects name their output files: those decide.
-      if (data.pairs.length) continue;
+      // A config object writing exactly this file decides it: the `dir`
+      // rule does not add another source for the same stem.
+      if (exact.length) continue;
       for (const dir of data.dirs.length ? data.dirs : ["dist"]) {
         if (!relative.startsWith(dir + "/")) continue;
         const stem = relative
