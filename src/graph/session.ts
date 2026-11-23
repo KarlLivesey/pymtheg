@@ -26,9 +26,11 @@
  *   kept is readable before `confirm`.
  * - A confirmed run takes what was kept: a module reads it, and only what
  *   the run `set`s again (or anew) is kept after it. A module must treat a
- *   kept value as immutable, or `set` the value it changed; a value changed
- *   in place and not set again is not kept, so a violation is forgotten
- *   rather than carried into a later run.
+ *   kept value as immutable, or `set` the value it changed; a TAKEN value
+ *   changed in place and not set again is not kept. A value is kept by
+ *   reference, as the object stands when the run completes: a module must
+ *   not change a value after setting it, because a later change in the
+ *   same run is kept under a key that no longer describes it.
  * - Values set during a run are kept only if the run completes (its
  *   completion record is written). A run that fails, is aborted or is taken
  *   over keeps nothing it set, and the session drops what it had.
