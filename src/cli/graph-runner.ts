@@ -12,7 +12,17 @@
 // else it sends `cancel`, and the command stops at its next checkpoint as a
 // cancelled run did before (an asynchronous module call, such as the Rust
 // module's phase worker, receives the abort signal).
+//
+// Child process groups the worker starts (a toolchain, a helper) are
+// recorded in a registry this thread owns (C-54). A terminated worker cannot
+// end them, so this thread kills every group still recorded when the worker
+// exits, before it answers a terminated run; the registry is also killed
+// when this process exits.
 import { Worker } from "node:worker_threads";
+import {
+  jobChildGroups,
+  releaseJobChildGroups,
+} from "../backends/child-groups.js";
 import type {
   GraphProgress,
   GraphRequest,
@@ -53,12 +63,14 @@ export function runGraphInWorker(
     controlLength * Int32Array.BYTES_PER_ELEMENT,
   );
   const shared = new Int32Array(control);
+  const childGroups = jobChildGroups();
   return new Promise<GraphResponse>((resolve, reject) => {
     const worker = new Worker(
       options.workerURL ?? new URL("./graph-worker-main.js", import.meta.url),
-      { workerData: { ...options.workerData, request, control } },
+      { workerData: { ...options.workerData, request, control, childGroups } },
     );
     let settled = false;
+    let terminated = false;
     const finish = (outcome: () => void) => {
       if (settled) return;
       settled = true;
@@ -68,7 +80,9 @@ export function runGraphInWorker(
     const onAbort = () => {
       Atomics.store(shared, CONTROL.cancel, 1);
       if (Atomics.load(shared, CONTROL.section) === SECTION.module) {
-        finish(() => reject(abortError(signal)));
+        // Answered on the worker's exit, after its child processes are
+        // killed, so nothing it started outlives the answer.
+        terminated = true;
         void worker.terminate();
       } else worker.postMessage({ kind: "cancel" });
     };
@@ -85,10 +99,15 @@ export function runGraphInWorker(
         );
     });
     worker.on("error", (error) => finish(() => reject(error)));
-    worker.on("exit", (code) =>
+    worker.on("exit", (code) => {
+      releaseJobChildGroups(childGroups);
       finish(() =>
-        reject(new Error(`The graph worker exited (${code}) before answering`)),
-      ),
-    );
+        reject(
+          terminated
+            ? abortError(signal)
+            : new Error(`The graph worker exited (${code}) before answering`),
+        ),
+      );
+    });
   });
 }
