@@ -4,6 +4,7 @@ import type {
   ContextFile,
   GraphFile,
   LanguageModule,
+  LibraryTarget,
   LinkResolution,
 } from "../../types.js";
 import { crates } from "./cargo.js";
@@ -285,6 +286,38 @@ function decideToolchain(
   const counts: Record<string, number> = {};
   const disagreements: Json[] = [];
   const bump = (key: string) => (counts[key] = (counts[key] ?? 0) + 1);
+  /**
+   * D24: a library answer is offered here and decided in the resolve phase.
+   * The analysis cannot see source-only library targets: the resolver proves
+   * those in the resolve phase only. Here only the cfg-link gate applies; an
+   * answer that passes it is recorded as `toolchainLibrary` (the key, the
+   * written path, the run), which claims nothing on its own. The resolve
+   * phase applies it where the final source-only answer is still open.
+   */
+  const decideLibrary = (
+    l: AnalyzedFile["result"]["links"][number],
+    data: Record<string, Json>,
+  ) => {
+    const { tcl, ...rest } = data;
+    if (beyondTest(rest.conditions as Json[] | undefined)) {
+      bump("library:withheld:cfg-link");
+      return { ...l, data: rest };
+    }
+    bump("library:offered");
+    return {
+      ...l,
+      data: {
+        ...rest,
+        toolchainLibrary: {
+          library: tcl,
+          // The path the code writes, beside the declaring path the key uses.
+          written: l.targetName,
+          rustAnalyzer: toolchain.rustAnalyzer,
+          configuration: toolchain.configuration,
+        },
+      } as Record<string, Json>,
+    };
+  };
   // Final symbol conditions, and how many symbols share each identity.
   const gated = new Set<string>();
   const identityOf = new Map<string, string>();
@@ -324,6 +357,7 @@ function decideToolchain(
     if (!a) return;
     a.result.links = a.result.links.map((l, j) => {
       const data = (l.data ?? {}) as Record<string, Json>;
+      if ("tcl" in data) return decideLibrary(l, data);
       if (!("tc" in data)) return l;
       const { tc, ...rest } = data;
       const target = String(tc);
@@ -615,30 +649,62 @@ export const rustPhases = {
       undefined,
       decide,
     );
-    // C-43: the toolchain's answer, where the source-only one is still open.
-    const upgraded = new Map<string, string>();
+    // C-43: the toolchain's answer, where the source-only one is still open:
+    // a checkout target, or (D24) a library target.
+    const upgraded = new Map<string, LinkResolution>();
     for (const link of ctx.links) {
       const record = (link.data as { toolchain?: Record<string, Json> })
         ?.toolchain;
-      if (
-        record?.origin === "toolchain" &&
-        typeof record.target === "string" &&
-        record.from !== "definite"
-      )
-        upgraded.set(link.id, record.target);
+      if (record?.origin !== "toolchain" || record.from === "definite")
+        continue;
+      if (typeof record.target === "string")
+        upgraded.set(link.id, { linkId: link.id, targetId: record.target });
+    }
+    // D24: library answers the analysis offered, applied where the final
+    // source-only answer is open: unresolved, or a candidate set that already
+    // holds the identical library target. A source-only checkout or library
+    // target stays. The stored target's evidence records the decision.
+    const offered = new Map<string, LibraryTarget>();
+    for (const link of ctx.links) {
+      const offer = (
+        link.data as {
+          toolchainLibrary?: { library?: Omit<LibraryTarget, "evidence"> };
+        }
+      )?.toolchainLibrary?.library;
+      if (offer)
+        offered.set(link.id, {
+          ...offer,
+          evidence: "toolchain-declaring-path",
+        });
+    }
+    if (offered.size) {
+      const keyOf = (t: { ecosystem: string; unit: string; symbol?: string }) =>
+        `${t.ecosystem}\u0000${t.unit}\u0000${t.symbol ?? ""}`;
+      const seen = new Set<string>();
+      resolutions = resolutions.map((r) => {
+        const library = offered.get(r.linkId);
+        if (!library) return r;
+        seen.add(r.linkId);
+        if (r.targetId || r.library) return r;
+        if (r.candidateIds)
+          return (r.libraries ?? []).some((t) => keyOf(t) === keyOf(library))
+            ? { linkId: r.linkId, library }
+            : r;
+        return { linkId: r.linkId, library };
+      });
+      for (const [linkId, library] of offered)
+        if (!seen.has(linkId)) resolutions.push({ linkId, library });
     }
     if (upgraded.size) {
       const seen = new Set<string>();
       resolutions = resolutions.map((r) => {
-        const target = upgraded.get(r.linkId);
-        if (target === undefined) return r;
+        const answer = upgraded.get(r.linkId);
+        if (answer === undefined) return r;
         seen.add(r.linkId);
-        return r.candidateIds || (!r.targetId && !r.library)
-          ? { linkId: r.linkId, targetId: target }
-          : r;
+        return r.candidateIds || (!r.targetId && !r.library) ? answer : r;
       });
-      for (const [linkId, targetId] of upgraded)
-        if (!seen.has(linkId)) resolutions.push({ linkId, targetId });
+      for (const [linkId, answer] of upgraded)
+        if (!seen.has(linkId)) resolutions.push(answer);
     }
     return {
       result: {
@@ -682,25 +748,36 @@ const rust: LanguageModule = {
       projectId,
       files: files.map(({ path, module, result }) => {
         const answers = route?.answers.get(path);
+        const libraries = route?.libraryAnswers.get(path);
         return {
           path,
           module,
-          result: answers
-            ? {
-                ...result,
-                links: result.links.map((link, index) =>
-                  answers.has(index)
-                    ? {
-                        ...link,
-                        data: {
-                          ...((link.data ?? {}) as Record<string, Json>),
-                          tc: answers.get(index)!,
-                        },
-                      }
-                    : link,
-                ),
-              }
-            : result,
+          result:
+            answers || libraries
+              ? {
+                  ...result,
+                  links: result.links.map((link, index) =>
+                    answers?.has(index)
+                      ? {
+                          ...link,
+                          data: {
+                            ...((link.data ?? {}) as Record<string, Json>),
+                            tc: answers.get(index)!,
+                          },
+                        }
+                      : libraries?.has(index)
+                        ? {
+                            ...link,
+                            data: {
+                              ...((link.data ?? {}) as Record<string, Json>),
+                              // D24: the toolchain's library answer.
+                              tcl: libraries.get(index)! as unknown as Json,
+                            },
+                          }
+                        : link,
+                  ),
+                }
+              : result,
         };
       }),
       contextFiles: cargoInputs(contextFiles),

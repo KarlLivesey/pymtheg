@@ -32,7 +32,10 @@ import {
 } from "../dist/graph/index.js";
 import rust from "../dist/graph/languages/rust/index.js";
 import { readScip, parseSymbol } from "../dist/graph/languages/rust/scip.js";
-import { nameSite } from "../dist/graph/languages/rust/toolchain-join.js";
+import {
+  libraryPath,
+  nameSite,
+} from "../dist/graph/languages/rust/toolchain-join.js";
 import { setRunControls } from "../dist/graph/languages/rust/toolchain-route.js";
 import { toolchainState } from "../dist/graph/command-toolchain.js";
 import { executeGraph } from "../dist/graph/commands.js";
@@ -596,11 +599,12 @@ for (const [name, answer, overrides, behaviour, why] of [
     "filter:proc-macro-crate-item",
   ],
   [
-    "a library item (counted, never applied)",
-    ["rust-analyzer cargo std 1.98.1 vec/impl#[Vec]go()."],
+    // D24 applies library answers; a blanket impl has no nameable owner.
+    "a library item of a blanket impl (no nameable owner)",
+    ["rust-analyzer cargo alloc 1.98.1 string/impl#[T][ToString]go()."],
     {},
     {},
-    "unapplied:library",
+    "unapplied:library-blanket",
   ],
 ]) {
   test(`gates: ${name} takes no answer`, async () => {
@@ -927,6 +931,90 @@ test("a library root rust-analyzer did not index makes the index partial", async
   });
 });
 
+// ---------------------------------------------------------------- D24: library answers
+
+test("D24: the declaring path of a library symbol is its module path; impl items are Type::item or <Type as Trait>::item; blanket impls and crate roots have none", () => {
+  const path = (symbol) => libraryPath(parseSymbol(symbol));
+  const core =
+    "rust-analyzer cargo core https://github.com/rust-lang/rust/library/core";
+  assert.equal(path(`${core} ops/range/Range#`), "ops::range::Range");
+  assert.equal(
+    path(`${core} option/impl#[\`Option<T>\`]unwrap().`),
+    "option::Option::unwrap",
+  );
+  assert.equal(
+    path(`${core} result/impl#[\`Result<T, E>\`][Try]branch().`),
+    "<result::Result as Try>::branch",
+  );
+  assert.equal(
+    path(`${core} num/impl#[u64]to_be_bytes().`),
+    "num::u64::to_be_bytes",
+  );
+  assert.equal(
+    path("rust-analyzer cargo tempfile 3.27.0 dir/tempdir()."),
+    "dir::tempdir",
+  );
+  assert.equal(path(`${core} option/Option#None.`), "option::Option::None");
+  // A blanket impl (its self type is a type parameter) has no nameable owner.
+  assert.equal(
+    path("rust-analyzer cargo alloc 1 string/impl#[T][ToString]to_string()."),
+    undefined,
+  );
+  assert.equal(path("rust-analyzer cargo tempfile 3.27.0 crate/"), undefined);
+});
+
+test("D24: an unresolved link answered with a dependency's item becomes a library target keyed by the unit and declaring path, with the lockfile's version and the written path", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, {
+      ...GATES,
+      "Cargo.lock":
+        'version = 4\n\n[[package]]\nname = "gates"\nversion = "0.1.0"\n\n[[package]]\nname = "dep"\nversion = "1.2.3"\n',
+    });
+    const scip = join(root, "answer.scip");
+    // The t.go call is answered with dep's inherent method Thing::go.
+    writeFileSync(
+      scip,
+      gateScip(["rust-analyzer cargo dep 1.2.3 inner/impl#[Thing]go()."]),
+    );
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip,
+      metadata: metadata(),
+    });
+    const dump = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+    const [caller] = goLinks(dump).sort(
+      (x, y) => x.range.start - y.range.start,
+    );
+    assert.equal(caller.resolution, "library");
+    assert.deepEqual(
+      caller.libraries.map(({ id: _id, ...t }) => t),
+      [
+        {
+          ecosystem: "cargo",
+          unit: "dep",
+          symbol: "inner::Thing::go",
+          version: "1.2.3",
+          versionSource: "Cargo.lock",
+          evidence: "toolchain-declaring-path",
+        },
+      ],
+    );
+    // Offered by the analysis with the written path; applied in the resolve
+    // phase (the stored target's evidence records it).
+    assert.equal(caller.data.toolchainLibrary.written, "t.go");
+    assert.equal(caller.data.toolchain, undefined);
+    assert.ok(dump.state.libraryOffered >= 1, JSON.stringify(dump.state));
+    // The gated twin under cfg(feature = "extra") takes no answer.
+    const gated = goLinks(dump).sort(
+      (x, y) => x.range.start - y.range.start,
+    )[1];
+    assert.notEqual(gated.resolution, "library");
+  });
+});
+
 // ---------------------------------------------------------------- policy, cache, cancellation
 
 /** Path, size and content of every file under a directory. */
@@ -1076,7 +1164,24 @@ test("cancellation: aborting the index ends a rust-analyzer that never finishes 
       dump.report.analysisErrors.map((e) => e.message),
       ["Indexing was cancelled"],
     );
-    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+    // The kill and the reaping are asynchronous: wait until the process is
+    // gone, by turns of the event loop (a count, not a clock, bounds it).
+    const alive = () => {
+      try {
+        process.kill(pid, 0);
+      } catch {
+        return false;
+      }
+      try {
+        return !/^\d+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, "utf8"));
+      } catch {
+        return false;
+      }
+    };
+    for (let i = 0; alive(); i++) {
+      assert.ok(i < 20_000, "the fake rust-analyzer is still running");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
     assert.deepEqual(
       readdirSync(join(root, "toolchain", "rust")).filter((n) =>
         n.startsWith("run-"),
@@ -1426,6 +1531,16 @@ test(
         (l) => l.file === "app/src/lib.rs" && l.targetName === "s.area",
       );
       assert.notEqual(dispatch.resolution, "resolved");
+      // D24: standard-library answers are applied as library targets.
+      const library = dump.links.filter(
+        (l) => l.libraries?.[0]?.evidence === "toolchain-declaring-path",
+      );
+      assert.ok(library.length >= 1, "no library answer was applied");
+      assert.ok(
+        library.every((l) =>
+          ["rust-std", "cargo"].includes(l.libraries?.[0]?.ecosystem),
+        ),
+      );
       // A link to code a build-script cfg turns on is withheld.
       assert.ok(
         (note(dump.report, "merged").decided["withheld:cfg-variant"] ?? 0) >= 1,

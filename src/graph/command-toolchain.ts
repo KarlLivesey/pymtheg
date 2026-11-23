@@ -48,7 +48,14 @@ export interface ToolchainModuleState {
   /** Rust: answers a gate withheld, by gate. */
   withheld?: Record<string, number>;
   /** Rust: answers naming another crate, counted and never applied. */
+  /** Library answers the join keyed (D24), before the analysis gates. */
   libraryAnswers?: number;
+  /**
+   * D24: library answers that passed the analysis gates and were offered to
+   * the resolve phase, which applies them where source-only stays open (a
+   * stored target with evidence `toolchain-declaring-path`).
+   */
+  libraryOffered?: number;
 }
 export interface ToolchainState {
   setting: Record<string, boolean | string>;
@@ -136,7 +143,7 @@ function rustState(
     rustc: String(available.rustc),
     configuration: String(available.configuration),
     cached: available.cached === true,
-    libraryAnswers: join["unapplied:library"] ?? 0,
+    libraryAnswers: join["library"] ?? 0,
   };
   if (partial.length)
     return {
@@ -160,6 +167,7 @@ function rustState(
     confirmedLinks: decided["definite:definite"] ?? 0,
     disagreements: decided["kept:source-only-differs"] ?? 0,
     withheld,
+    libraryOffered: decided["library:offered"] ?? 0,
   };
 }
 

@@ -31,7 +31,10 @@ export function joinBucket(why) {
   if (why === "filter:kind-incompatible" || why === "filter:import-names-module") return "gate: kind/namespace";
   if (why === "filter:extern-crate" || why === "filter:collision" || why === "filter:proc-macro-crate-item") return "gate: known error classes";
   if (why === "none:trait-declaration") return "gate: trait-method declaration";
-  if (why === "unapplied:library") return "no identity: library item";
+  // D24: library answers are applied in the analysis (credited there when
+  // they upgrade an open link); unkeyed ones stay here.
+  if (why === "library") return null;
+  if (why === "unapplied:library" || why === "unapplied:library-blanket" || why === "none:library-field") return "no identity: library item";
   if (why === "unapplied:generated") return "no identity: generated item";
   if (why === "none:no-graph-symbol") return "no identity: declaration without a graph symbol";
   if (why === "none:local") return "no identity: local binding";
@@ -86,6 +89,16 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
   };
   const before = read(offPath);
   const after = read(onPath);
+  // D24: links the route gave a library target (its evidence says so).
+  const afterLibrary = new Set();
+  {
+    const db = new DatabaseSync(onPath, { readOnly: true });
+    try {
+      for (const row of db.prepare("SELECT link FROM graph_library_targets WHERE role='target' AND evidence='toolchain-declaring-path'").iterate()) afterLibrary.add(row.link);
+    } finally {
+      db.close();
+    }
+  }
   const gatedIdentities = new Set([...before.symbols.values()].filter((s) => s.gated).map((s) => s.key));
   const variant = (id) => {
     const s = before.symbols.get(id);
@@ -130,11 +143,18 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
           notIndexed[k] = (notIndexed[k] ?? 0) + 1;
           notIndexedFiles.set(f.path, (notIndexedFiles.get(f.path) ?? 0) + 1);
         }
-        if (why === "unapplied:library" && !beyondTest(link.data.conditions)) libraryPassingCfg++;
+        if ((why === "unapplied:library" || why === "unapplied:library-blanket" || why === "none:library-field") && !beyondTest(link.data.conditions)) libraryPassingCfg++;
         return;
       }
       const now = after.links.get(parsed.id);
+      if (afterLibrary.has(parsed.id)) return add("credited: library");
       if (now?.data?.toolchain?.origin === "toolchain" && now.data.toolchain.from !== "definite") return add("credited");
+      if (why === "library") {
+        if (beyondTest(link.data.conditions)) return add("gate: cfg condition other than test");
+        if (link.resolution === "library") return add("library: source-only library target kept");
+        if (link.resolution === "resolved") return add("library: source-only checkout target kept");
+        return add("library: outside the candidate set");
+      }
       const target = answers?.get(index);
       if (beyondTest(link.data.conditions)) return add("gate: cfg condition other than test");
       if (variant(target)) return add("gate: cfg-variant guard");

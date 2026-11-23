@@ -23,9 +23,20 @@ import {
   type RunControls,
 } from "./toolchain.js";
 
+/** D24: a library answer as the analysis applies it (no evidence yet). */
+export interface LibraryAnswer {
+  ecosystem: "cargo" | "rust-std";
+  unit: string;
+  symbol: string;
+  version?: string;
+  versionSource?: string;
+}
+
 export interface RouteAnswers {
   /** Per file, per parsed link index: the checkout symbol id. */
   answers: Map<string, Map<number, string>>;
+  /** Per file, per parsed link index: the library answer (D24). */
+  libraryAnswers: Map<string, Map<number, LibraryAnswer>>;
   rustAnalyzer: string;
   configuration: string;
 }
@@ -155,8 +166,37 @@ async function route(
   // A partial index answers no link: a missing build script output or
   // dependency can make rust-analyzer name another item of the same name.
   if (partial.length) return undefined;
+  // D24: a dependency's version is the lockfile's, recorded only when the
+  // root Cargo.lock (a clean context file) lists that package at exactly the
+  // version rust-analyzer resolved; never a standard-library version.
+  const lock = contextFiles.find(
+    (file) => file.path === "Cargo.lock" && file.status === "clean",
+  )?.text;
+  const locked = new Set<string>();
+  if (lock)
+    for (const block of lock.split(/^\[\[package\]\]\s*$/m).slice(1)) {
+      const name = /^name = "([^"]+)"/m.exec(block)?.[1];
+      const version = /^version = "([^"]+)"/m.exec(block)?.[1];
+      if (name && version) locked.add(`${name} ${version}`);
+    }
+  const libraryAnswers = new Map<string, Map<number, LibraryAnswer>>();
+  for (const [path, group] of joined.libraryAnswers) {
+    const out = new Map<number, LibraryAnswer>();
+    for (const [index, key] of group)
+      out.set(index, {
+        ecosystem: key.ecosystem,
+        unit: key.unit,
+        symbol: key.symbol,
+        ...(key.ecosystem === "cargo" &&
+        locked.has(`${key.unit} ${key.scipVersion}`)
+          ? { version: key.scipVersion, versionSource: "Cargo.lock" }
+          : {}),
+      });
+    libraryAnswers.set(path, out);
+  }
   return {
     answers: joined.answers,
+    libraryAnswers,
     rustAnalyzer: install.analyzerVersion,
     configuration: configurationFor(install, run.target),
   };

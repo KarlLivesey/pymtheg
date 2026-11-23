@@ -13,35 +13,42 @@
   "assumed": 1793,
   "proven": 24099,
   "toolchainDecided": 0,
+  "toolchainCheckout": 0,
+  "toolchainLibrary": 0,
   "libraryModuleLinks": 0,
   "level2Percent": 42.85,
   "withModuleLinksPercent": 42.85
  },
  "route": {
   "links": 60424,
-  "level2": 39351,
+  "level2": 48603,
   "assumed": 1793,
   "proven": 24099,
-  "toolchainDecided": 13459,
+  "toolchainDecided": 22711,
+  "toolchainCheckout": 13459,
+  "toolchainLibrary": 9252,
   "libraryModuleLinks": 0,
-  "level2Percent": 65.12,
-  "withModuleLinksPercent": 65.12,
-  "toolchainDecidedPercent": 22.27
+  "level2Percent": 80.44,
+  "withModuleLinksPercent": 80.44,
+  "toolchainDecidedPercent": 37.59
  },
  "decided": {
+  "library:offered": 13058,
   "definite:unresolved": 13459,
   "definite:definite": 10488,
   "withheld:conditional-candidates": 314,
   "withheld:cfg-variant": 9,
-  "withheld:cfg-link": 418
+  "withheld:cfg-link": 418,
+  "library:withheld:cfg-link": 457
  },
  "join": {
-  "unapplied:library": 13763,
+  "library": 13515,
   "filter:import-names-module": 145,
   "answer": 24566,
   "none:kind-not-joined": 5705,
   "unapplied:generated": 2030,
   "none:local": 8237,
+  "unapplied:library-blanket": 248,
   "none:trait-declaration": 1400,
   "none:no-graph-symbol": 601,
   "none:no-name-site": 163,
@@ -57,6 +64,14 @@
   "percent": 100
  },
  "disagreements": [],
+ "library": {
+  "offered": 13058,
+  "applied": 9252,
+  "agree": 1098,
+  "unverified": 2708,
+  "sourceOnlyCheckout": 0,
+  "twoKeyItems": 146
+ },
  "check": {
   "linksBefore": 60424,
   "linksAfter": 60424,
@@ -64,18 +79,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 74.8,
-  "cpuS": 297.9,
+  "wallS": 103.3,
+  "cpuS": 374.8,
   "peakMiB": 2833
  },
  "index": {
   "sourceOnly": {
-   "wallS": 79.5,
-   "cpuS": 100.7
+   "wallS": 111.8,
+   "cpuS": 127.7
   },
   "route": {
-   "wallS": 222.6,
-   "cpuS": 102.4
+   "wallS": 327.9,
+   "cpuS": 143.5
   }
  },
  "errors": {
@@ -85,11 +100,12 @@
  "funnel": {
   "open": 34256,
   "buckets": {
-   "no identity: library item": 9794,
+   "credited: library": 9252,
    "gate: kind/namespace": 69,
    "credited": 13459,
    "no identity: generated item": 1279,
    "gate: conditional candidates": 44,
+   "no identity: library item": 248,
    "gate: trait-method declaration": 1400,
    "no identity: local binding": 4104,
    "gate: cfg on an enclosing module": 270,
@@ -99,9 +115,9 @@
    "no answer: no-occurrence-at-site": 2292,
    "no answer: file-not-indexed": 530,
    "gate: known error classes": 25,
-   "gate: cfg condition other than test": 239
+   "gate: cfg condition other than test": 533
   },
-  "libraryPassingCfg": 9496,
+  "libraryPassingCfg": 244,
   "notIndexed": {
    "examples": 117,
    "other source": 396,

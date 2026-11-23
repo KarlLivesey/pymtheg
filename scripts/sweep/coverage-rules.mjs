@@ -324,7 +324,7 @@ export function classify(link, evidence, project) {
 // reference-directive. Stored with a library target (graph schema 4): the
 // graph's own evidence kinds, which reuse the last three spellings.
 export const externalEvidenceKinds = ["path", "import-binding", "explicit-trait", "reference-directive",
-  "import-path", "qualified-path", "declared-builtin", "declaring-owner"];
+  "import-path", "qualified-path", "declared-builtin", "declaring-owner", "toolchain-declaring-path"];
 export const externalGapKinds = ["whole-unit", "intrinsic", "dependency", "unknown",
   "go-external-result", "rust-std-path", "rust-std-receiver", "ts-runtime"];
 const identifier = /^[\w$]+$/;

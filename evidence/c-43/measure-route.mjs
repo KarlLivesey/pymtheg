@@ -45,7 +45,7 @@ function rustLinks(path) {
   const db = new DatabaseSync(path, { readOnly: true });
   try {
     const links = new Map();
-    const rows = db.prepare(`SELECT l.id, l.file, l.kind, l.resolution, l.target, l.body, t.unit, t.symbol, t.evidence
+    const rows = db.prepare(`SELECT l.id, l.file, l.kind, l.resolution, l.target, l.body, t.ecosystem, t.unit, t.symbol, t.evidence
       FROM graph_links l LEFT JOIN graph_library_targets t ON l.resolution='library' AND t.link=l.id AND t.role='target'
       WHERE l.module='rust'`).iterate();
     for (const row of rows) {
@@ -55,7 +55,11 @@ function rustLinks(path) {
       const level2 = row.resolution === "resolved" || library?.level === 2;
       const moduleLink = row.kind === "imports" && row.resolution === "library" && !level2 && storedReasons(data).length === 0;
       links.set(row.id, { kind: row.kind, resolution: row.resolution, target: row.target, level2, moduleLink,
-        assumed: level2 && Array.isArray(data.assumes) && data.assumes.length > 0, toolchain: data.toolchain });
+        assumed: level2 && Array.isArray(data.assumes) && data.assumes.length > 0, toolchain: data.toolchain,
+        // D24: a library target the route applied, and the answer it offered.
+        toolchainLibrary: row.evidence === "toolchain-declaring-path",
+        offer: data.toolchainLibrary?.library ?? null,
+        stored: row.resolution === "library" ? { ecosystem: row.ecosystem, unit: row.unit, symbol: row.symbol ?? null, evidence: row.evidence } : null });
     }
     return links;
   } finally {
@@ -63,15 +67,51 @@ function rustLinks(path) {
   }
 }
 
+/**
+ * D24: where the route offered a library answer and source-only kept its own
+ * library target: an identical key is agreement, any other is unverified,
+ * and the declarations with a different source-only key are the items with
+ * two keys.
+ */
+function libraryAgreement(links) {
+  const key = (t) => `${t.ecosystem}\u0000${t.unit}\u0000${t.symbol ?? ""}`;
+  let offered = 0, applied = 0, agree = 0, unverified = 0, sourceOnlyCheckout = 0;
+  const twoKeys = new Map();
+  for (const link of links.values()) {
+    if (!link.offer) continue;
+    offered++;
+    if (link.toolchainLibrary) applied++;
+    else if (link.resolution === "resolved") sourceOnlyCheckout++;
+    else if (link.stored && link.stored.evidence !== "toolchain-declaring-path") {
+      if (key(link.stored) === key(link.offer)) agree++;
+      else {
+        unverified++;
+        if (!twoKeys.has(key(link.offer))) twoKeys.set(key(link.offer), new Set());
+        twoKeys.get(key(link.offer)).add(key(link.stored));
+      }
+    }
+  }
+  return { offered, applied, agree, unverified, sourceOnlyCheckout, twoKeyItems: twoKeys.size };
+}
+
 function score(links) {
-  const s = { links: 0, level2: 0, assumed: 0, proven: 0, toolchainDecided: 0, libraryModuleLinks: 0 };
+  // D24: Level 2 in four parts: proven source-only, assumption-marked,
+  // toolchain checkout and toolchain library (toolchainDecided is the sum of
+  // the last two).
+  const s = { links: 0, level2: 0, assumed: 0, proven: 0, toolchainDecided: 0, toolchainCheckout: 0, toolchainLibrary: 0, libraryModuleLinks: 0 };
   for (const link of links.values()) {
     s.links++;
     if (link.moduleLink) s.libraryModuleLinks++;
     if (!link.level2) continue;
     s.level2++;
     if (link.assumed) s.assumed++;
-    else if (link.toolchain && link.toolchain.from !== "definite") s.toolchainDecided++;
+    else if (link.toolchainLibrary) {
+      s.toolchainDecided++;
+      s.toolchainLibrary++;
+    } else if (link.toolchain && link.toolchain.from !== "definite") {
+      s.toolchainDecided++;
+      s.toolchainCheckout++;
+    }
     else s.proven++;
   }
   return s;
@@ -119,6 +159,9 @@ const result = {
   join: available?.join ?? {},
   agreement: { confirmed, differs, percent: pct(confirmed, confirmed + differs) },
   disagreements: (merged?.disagreements ?? []).slice(0, 10),
+  // D24: offered library answers against the stored source-only library
+  // targets (computed from the stored links).
+  library: libraryAgreement(after),
   check: { linksBefore: before.size, linksAfter: after.size, lost, changedLevel2: changed },
   analyzerRun: existsSync(timeLog) ? parseTime(readFileSync(timeLog, "utf8")) : null,
   index: { sourceOnly: { wallS: Math.round(off.wallS * 10) / 10, cpuS: Math.round(off.cpuS * 10) / 10 },

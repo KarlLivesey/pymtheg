@@ -2460,6 +2460,28 @@ variable declarations disagree on the type (the compiler's own
 library, DOM, workers, Node and compatible runtimes, and packages that
 augment them.
 
+### D24: a Rust library answer is keyed by its unit and declaring path
+
+**Decided (manager, 23 November 2026):** when the opt-in Rust toolchain route
+(C-43) names an item outside the checkout, the link takes a library target
+keyed by the source-only unit (`cargo` and the dependency's package, or
+`rust-std` and `std`, `core` or `alloc`) and the item's normalised
+declaring path in that unit (modules joined with `::`; an inherent impl's
+item `module::Type::item`, a trait impl's `<module::Type as Trait>::item`,
+generic arguments dropped), with evidence `toolchain-declaring-path`,
+`decidedBy: "toolchain"` and the run's configuration. A dependency's version
+is recorded only when the root `Cargo.lock` states that package at exactly
+the version rust-analyzer resolved; a standard-library target has none. The
+path the code writes is recorded beside it (`toolchain.written`).
+**Why:** rust-analyzer proves the declaration; its declaring path is the one
+name it gives, and a public-path table (C-19's `rustpath.mjs`) would be a
+second resolver. **Rules out:** changing a source-only library target (it
+stays: an identical key counts as agreement, any other as unverified, and the
+item is counted as having two keys); narrowing a candidate set except to a
+library target it already holds; fields, locals, blanket impls (no nameable
+owner) and crate roots; trait-method declarations (dispatch); answers from a
+partial index; an answer on a link under a cfg condition other than `test`.
+
 ### D19: coverage is judged with dependencies installed
 
 **Decided (Karl, 21 November 2026):** "we will assume in 99% of cases

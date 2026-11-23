@@ -1075,10 +1075,15 @@ counted apart. A source-only definite target the toolchain disagrees with is
 kept and counted; a source-only library target is kept. An unresolved link, or
 a candidate set holding the answer, becomes definite and records
 `toolchain: {origin: "toolchain", rustAnalyzer, configuration, upgrade, from,
-target}`; a confirmed source-only link records `from: "definite"`. Answers
-naming another crate are counted (`libraryAnswers`) and never applied: telling
-that the toolchain's declaring path and Pymtheg's written path name one item
-needs an identity rule not built yet. Every answer reports
+target}`; a confirmed source-only link records `from: "definite"`. An answer
+naming another crate (D24) takes a library target keyed by the source-only
+unit (`cargo` and the package, or `rust-std` and `std`, `core` or `alloc`)
+and the item's normalised declaring path (`module::Type::item`,
+`<module::Type as Trait>::item`), with evidence `toolchain-declaring-path`,
+the lockfile's version when the root `Cargo.lock` states that exact package
+version, and the written path recorded beside it; a source-only library
+target is kept (an identical key counts as agreement, another as unverified),
+and fields, blanket impls and crate roots take no library answer. Every answer reports
 `toolchain.rust.state`: `used` (upgraded, confirmed, kept-where-different,
 withheld by gate, library answers), `partial` with the causes (offline
 `cargo metadata` failed, so rust-analyzer fell back to the workspace alone;
@@ -1117,9 +1122,8 @@ user's own file (warning `tool-path-inside-checkout`). The question and how each
 
 #### Not built yet
 
-In the Rust toolchain route: library targets from its answers (C-43's
-second part), source-only re-indexing of an edit with a `stale` state (its
-third), partial
+In the Rust toolchain route: source-only re-indexing of an edit with a
+`stale` state (C-43's third part), partial
 indexes used in part, and the network; `go.work` workspaces in the Go
 toolchain route, the join with model declarations, the explore query, a Studio
 screen for the graph, and Lua.

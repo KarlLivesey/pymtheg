@@ -14,6 +14,8 @@
   "assumed": 3668,
   "proven": 69643,
   "toolchainDecided": 0,
+  "toolchainCheckout": 0,
+  "toolchainLibrary": 0,
   "libraryModuleLinks": 0,
   "level2Percent": 48.74,
   "withModuleLinksPercent": 48.74
@@ -24,6 +26,8 @@
   "assumed": 3668,
   "proven": 69643,
   "toolchainDecided": 0,
+  "toolchainCheckout": 0,
+  "toolchainLibrary": 0,
   "libraryModuleLinks": 0,
   "level2Percent": 48.74,
   "withModuleLinksPercent": 48.74,
@@ -34,11 +38,12 @@
   "none:no-name-site": 887,
   "none:kind-not-joined": 16425,
   "answer": 40230,
-  "unapplied:library": 62123,
+  "library": 60099,
   "none:local": 20739,
   "none:no-graph-symbol": 44,
   "filter:collision": 761,
   "none:trait-declaration": 3204,
+  "unapplied:library-blanket": 2024,
   "unapplied:generated": 2683,
   "none:no-occurrence-at-site": 1154,
   "filter:import-names-module": 117,
@@ -53,6 +58,14 @@
   "percent": null
  },
  "disagreements": [],
+ "library": {
+  "offered": 0,
+  "applied": 0,
+  "agree": 0,
+  "unverified": 0,
+  "sourceOnlyCheckout": 0,
+  "twoKeyItems": 0
+ },
  "check": {
   "linksBefore": 150404,
   "linksAfter": 150404,
@@ -60,18 +73,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 582.7,
-  "cpuS": 1521.1,
-  "peakMiB": 9716
+  "wallS": 507.3,
+  "cpuS": 1394.3,
+  "peakMiB": 9721
  },
  "index": {
   "sourceOnly": {
-   "wallS": 739.5,
-   "cpuS": 806.3
+   "wallS": 844,
+   "cpuS": 855.6
   },
   "route": {
-   "wallS": 1901.4,
-   "cpuS": 746.7
+   "wallS": 1637.1,
+   "cpuS": 727.9
   }
  },
  "errors": {
