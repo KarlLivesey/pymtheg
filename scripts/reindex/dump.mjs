@@ -105,6 +105,25 @@ export function withoutGoSurface(rows) {
   };
 }
 
+/** C-36 cold comparisons across a Rust module version change compare everything else. */
+export function withRustVersion(rows, from, to) {
+  return {
+    ...rows,
+    graph_files: rows.graph_files.map((line) => {
+      const row = JSON.parse(line);
+      const file = JSON.parse(row.body);
+      if (file.module !== "rust" || file.version !== from) return line;
+      file.version = to;
+      return JSON.stringify({ ...row, body: JSON.stringify(file) });
+    }),
+    graph_parse_failures: rows.graph_parse_failures.map((line) => {
+      const row = JSON.parse(line);
+      if (row.module === "rust" && row.version === from) row.version = to;
+      return JSON.stringify(row);
+    }),
+  };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [left, right] = process.argv.slice(2);
   const differences = compareRows(storeRows(left), storeRows(right));

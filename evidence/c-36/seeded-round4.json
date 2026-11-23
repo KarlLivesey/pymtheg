@@ -1,0 +1,1110 @@
+{
+ "ripgrep-36411.json": {
+  "id": "BurntSushi/ripgrep",
+  "seed": 36411,
+  "expectedSteps": 40,
+  "steps": [
+   {
+    "step": 0,
+    "file": "crates/searcher/src/line_buffer.rs",
+    "kind": "mod-add",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 19101,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": []
+   },
+   {
+    "step": 1,
+    "file": "crates/searcher/src/line_buffer/c36_random_0.rs",
+    "kind": "file-delete",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 16431,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": []
+   },
+   {
+    "step": 2,
+    "file": "crates/printer/src/counter.rs",
+    "kind": "cfg",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 19403,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 3,
+    "file": "crates/globset/src/pathutil.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5406,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 4,
+    "file": "crates/core/flags/doc/version.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7011,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 5,
+    "file": "crates/core/flags/complete/fish.rs",
+    "kind": "signature",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 13694,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 6,
+    "file": "crates/core/flags/doc/man.rs",
+    "kind": "mod-add",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 13772,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": []
+   },
+   {
+    "step": 7,
+    "file": "crates/matcher/tests/util.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5838,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 8,
+    "file": "crates/printer/src/macros.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5829,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 9,
+    "file": "crates/matcher/tests/test_matcher.rs",
+    "kind": "add-import",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 17731,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 10,
+    "file": "crates/matcher/src/interpolate.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 16629,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "lookup-cut"
+    ]
+   },
+   {
+    "step": 11,
+    "file": "crates/ignore/src/overrides.rs",
+    "kind": "remove-import",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 15051,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 12,
+    "file": "crates/core/flags/doc/man/c36_random_6.rs",
+    "kind": "file-delete",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 16053,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": []
+   },
+   {
+    "step": 13,
+    "file": "crates/cli/src/wtr.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5996,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 14,
+    "file": "crates/core/flags/complete/mod.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 10090,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 15,
+    "file": "crates/regex/src/ast.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7916,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 16,
+    "file": "crates/searcher/src/lines.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6331,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 17,
+    "file": "crates/searcher/src/line_buffer.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 10098,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 18,
+    "file": "crates/globset/src/serde_impl.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 16507,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 19,
+    "file": "crates/ignore/src/incremental.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 16921,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 20,
+    "file": "crates/printer/src/summary.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 18619,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 21,
+    "file": "crates/ignore/tests/gitignore_matched_path_or_any_parents_tests.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7064,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 22,
+    "file": "crates/regex/src/literal.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 19486,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "lookup-cut"
+    ]
+   },
+   {
+    "step": 23,
+    "file": "crates/core/haystack.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7261,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 24,
+    "file": "crates/printer/src/hyperlink/aliases.rs",
+    "kind": "cfg",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 17104,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 25,
+    "file": "tests/regression.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7327,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 26,
+    "file": "crates/searcher/src/searcher/glue.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 9809,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 27,
+    "file": "crates/cli/src/pattern.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6495,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 28,
+    "file": "crates/ignore/src/overrides.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 14952,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 29,
+    "file": "crates/core/flags/config.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 15624,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 30,
+    "file": "crates/searcher/src/searcher/core.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 16002,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "lookup-cut"
+    ]
+   },
+   {
+    "step": 31,
+    "file": "crates/core/main.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 15830,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 32,
+    "file": "crates/core/flags/defs.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 12765,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 33,
+    "file": "crates/printer/src/summary.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7224,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 34,
+    "file": "crates/printer/src/lib.rs",
+    "kind": "add-macro",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 14511,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 35,
+    "file": "crates/searcher/examples/search-stdin.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 14178,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 36,
+    "file": "crates/searcher/src/searcher/mmap.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6542,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 37,
+    "file": "crates/printer/src/hyperlink/aliases.rs",
+    "kind": "mod-add",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 15554,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": []
+   },
+   {
+    "step": 38,
+    "file": "crates/matcher/src/lib.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7420,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 39,
+    "file": "crates/searcher/examples/search-stdin.rs",
+    "kind": "mod-add",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 14907,
+    "failed": 0,
+    "resolvedFiles": 104,
+    "scoped": 0,
+    "fullPass": []
+   }
+  ],
+  "equal": true
+ },
+ "ripgrep-36412.json": {
+  "id": "BurntSushi/ripgrep",
+  "seed": 36412,
+  "expectedSteps": 40,
+  "steps": [
+   {
+    "step": 0,
+    "file": "crates/ignore/src/gitignore.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 8516,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 1,
+    "file": "crates/printer/src/jsont.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5873,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 2,
+    "file": "crates/searcher/src/searcher/core.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 19691,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "lookup-cut"
+    ]
+   },
+   {
+    "step": 3,
+    "file": "tests/hay.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5620,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 4,
+    "file": "crates/globset/src/fnv.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5507,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 5,
+    "file": "crates/matcher/tests/tests.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 14123,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 6,
+    "file": "crates/searcher/src/searcher/mod.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6208,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 7,
+    "file": "crates/core/flags/doc/man.rs",
+    "kind": "signature",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 15208,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 8,
+    "file": "crates/core/messages.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5718,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 9,
+    "file": "crates/pcre2/src/matcher.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6986,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 10,
+    "file": "crates/printer/src/hyperlink/aliases.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6328,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 11,
+    "file": "tests/util.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7243,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 12,
+    "file": "crates/grep/examples/simplegrep.rs",
+    "kind": "mod-add",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 14842,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": []
+   },
+   {
+    "step": 13,
+    "file": "crates/matcher/tests/test_matcher.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 17876,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 14,
+    "file": "tests/feature.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6780,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 15,
+    "file": "crates/ignore/src/overrides.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 16752,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 16,
+    "file": "crates/printer/src/hyperlink/aliases.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5801,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 17,
+    "file": "crates/core/flags/doc/version.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 15793,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 18,
+    "file": "fuzz/fuzz_targets/fuzz_glob.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5493,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 19,
+    "file": "crates/printer/src/color.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7017,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 20,
+    "file": "crates/core/flags/complete/zsh.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7558,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 21,
+    "file": "crates/core/search.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 19645,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 22,
+    "file": "crates/searcher/src/macros.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6901,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 23,
+    "file": "crates/ignore/src/pathutil.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 9071,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 24,
+    "file": "crates/core/logger.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7439,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 25,
+    "file": "tests/util.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 8721,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 26,
+    "file": "crates/regex/src/matcher.rs",
+    "kind": "export",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 19528,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 27,
+    "file": "crates/cli/src/hostname.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7210,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 28,
+    "file": "crates/printer/src/lib.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6729,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 29,
+    "file": "build.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5894,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 30,
+    "file": "crates/grep/src/lib.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5552,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 31,
+    "file": "crates/printer/src/path.rs",
+    "kind": "call",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7424,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 32,
+    "file": "crates/globset/benches/bench.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 14316,
+    "failed": 0,
+    "resolvedFiles": 103,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 33,
+    "file": "crates/regex/src/matcher.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 7437,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 34,
+    "file": "crates/grep/examples/simplegrep/c36_random_12.rs",
+    "kind": "file-delete",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 16436,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": []
+   },
+   {
+    "step": 35,
+    "file": "crates/regex/src/lib.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5376,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 36,
+    "file": "crates/ignore/tests/gitignore_skip_bom.rs",
+    "kind": "remove-import",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 14543,
+    "failed": 0,
+    "resolvedFiles": 102,
+    "scoped": 0,
+    "fullPass": [
+     "surface"
+    ]
+   },
+   {
+    "step": 37,
+    "file": "crates/printer/src/hyperlink/aliases.rs",
+    "kind": "comment",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 5698,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 38,
+    "file": "crates/ignore/src/pathutil.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6399,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   },
+   {
+    "step": 39,
+    "file": "crates/core/flags/mod.rs",
+    "kind": "body",
+    "line": 1,
+    "equal": true,
+    "differences": [],
+    "wallMs": 6341,
+    "failed": 0,
+    "resolvedFiles": 1,
+    "scoped": 1,
+    "fullPass": []
+   }
+  ],
+  "equal": true
+ }
+}

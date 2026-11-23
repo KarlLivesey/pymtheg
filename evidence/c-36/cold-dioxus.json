@@ -1,0 +1,86 @@
+[
+ {
+  "pin": "DioxusLabs_dioxus",
+  "round": 0,
+  "build": "main",
+  "wallS": 674.9,
+  "cpuS": 588.1,
+  "peakMiB": 3349,
+  "equality": {
+   "rows": {
+    "graph_files": 954,
+    "graph_contexts": 144,
+    "graph_parse_failures": 0,
+    "graph_symbols": 17783,
+    "graph_links": 154653,
+    "graph_candidates": 42,
+    "graph_library_targets": 20509,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "round": 0,
+  "build": "after",
+  "wallS": 651.78,
+  "cpuS": 596.6,
+  "peakMiB": 3262,
+  "equality": {
+   "rows": {
+    "graph_files": 954,
+    "graph_contexts": 144,
+    "graph_parse_failures": 0,
+    "graph_symbols": 17783,
+    "graph_links": 154653,
+    "graph_candidates": 42,
+    "graph_library_targets": 20509,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "round": 1,
+  "build": "main",
+  "wallS": 497.04,
+  "cpuS": 522.5,
+  "peakMiB": 3147,
+  "equality": {
+   "rows": {
+    "graph_files": 954,
+    "graph_contexts": 144,
+    "graph_parse_failures": 0,
+    "graph_symbols": 17783,
+    "graph_links": 154653,
+    "graph_candidates": 42,
+    "graph_library_targets": 20509,
+    "project": 1
+   },
+   "differences": []
+  }
+ },
+ {
+  "pin": "DioxusLabs_dioxus",
+  "round": 1,
+  "build": "after",
+  "wallS": 544.91,
+  "cpuS": 545.2,
+  "peakMiB": 3277,
+  "equality": {
+   "rows": {
+    "graph_files": 954,
+    "graph_contexts": 144,
+    "graph_parse_failures": 0,
+    "graph_symbols": 17783,
+    "graph_links": 154653,
+    "graph_candidates": 42,
+    "graph_library_targets": 20509,
+    "project": 1
+   },
+   "differences": []
+  }
+ }
+]

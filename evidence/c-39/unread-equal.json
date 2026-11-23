@@ -1,0 +1,71 @@
+[
+ {
+  "pin": "trpc/trpc",
+  "unreadLinks": 0,
+  "equal": 0,
+  "differ": 0,
+  "missing": 0,
+  "constRemoved": 0,
+  "ownerChanged": 0,
+  "examples": []
+ },
+ {
+  "pin": "vercel/turborepo",
+  "unreadLinks": 18340,
+  "equal": 18285,
+  "differ": 4,
+  "missing": 10,
+  "constRemoved": 4,
+  "ownerChanged": 37,
+  "examples": [
+   [
+    "differs",
+    "examples/with-vitest/packages/math/vitest.config.ts | imports | 75 | @repo/vitest-config",
+    "[\"unresolved\",null,[],[],{\"specifier\":\"@repo/vitest-config\",\"reason\":\"workspace-entry-unavailable\",\"assumes\":[\"no-unseen-declarations\"]}]",
+    "[\"unresolved\",null,[],[],{\"specifier\":\"@repo/vitest-config\",\"reason\":\"workspace-build-output-missing\",\"assumes\":[\"no-unseen-declarations\"]}]"
+   ],
+   [
+    "differs",
+    "examples/with-vitest/packages/math/vitest.config.ts | imports | 55 | sharedConfig",
+    "[\"unresolved\",null,[],[],{\"reason\":\"workspace-entry-unavailable\",\"assumes\":[\"no-unseen-declarations\"]}]",
+    "[\"unresolved\",null,[],[],{\"reason\":\"workspace-build-output-missing\",\"assumes\":[\"no-unseen-declarations\"]}]"
+   ],
+   [
+    "differs",
+    "examples/with-vitest/vitest.config.ts | imports | 75 | @repo/vitest-config",
+    "[\"unresolved\",null,[],[],{\"specifier\":\"@repo/vitest-config\",\"reason\":\"workspace-entry-unavailable\",\"assumes\":[\"no-unseen-declarations\"]}]",
+    "[\"unresolved\",null,[],[],{\"specifier\":\"@repo/vitest-config\",\"reason\":\"workspace-build-output-missing\",\"assumes\":[\"no-unseen-declarations\"]}]"
+   ],
+   [
+    "differs",
+    "examples/with-vitest/vitest.config.ts | imports | 55 | sharedConfig",
+    "[\"unresolved\",null,[],[],{\"reason\":\"workspace-entry-unavailable\",\"assumes\":[\"no-unseen-declarations\"]}]",
+    "[\"unresolved\",null,[],[],{\"reason\":\"workspace-build-output-missing\",\"assumes\":[\"no-unseen-declarations\"]}]"
+   ],
+   [
+    "missing",
+    "examples/with-svelte/apps/docs/eslint.config.js | imports | 23 | @repo/eslint-config"
+   ]
+  ]
+ },
+ {
+  "pin": "vitest-dev/vitest",
+  "unreadLinks": 46102,
+  "equal": 46042,
+  "differ": 0,
+  "missing": 0,
+  "constRemoved": 60,
+  "ownerChanged": 0,
+  "examples": []
+ },
+ {
+  "pin": "withastro/astro",
+  "unreadLinks": 10629,
+  "equal": 10093,
+  "differ": 0,
+  "missing": 0,
+  "constRemoved": 2,
+  "ownerChanged": 534,
+  "examples": []
+ }
+]

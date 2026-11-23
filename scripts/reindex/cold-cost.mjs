@@ -18,6 +18,7 @@ import {
   setPageCache,
   storeRows,
   withoutGoSurface,
+  withRustVersion,
 } from "./dump.mjs";
 
 const args = process.argv.slice(2);
@@ -31,6 +32,8 @@ const option = (name) => {
 };
 const cache = option("--cache-pages");
 const save = option("--save-after");
+// C-36: --rust-version NEW=OLD compares rows across a Rust version bump.
+const rustVersion = option("--rust-version")?.split("=");
 if (save) mkdirSync(save, { recursive: true });
 const split = args.indexOf("--");
 const [storeDir, out, rounds, ...builds] = args.slice(0, split);
@@ -68,7 +71,10 @@ for (const pin of pins) {
       let equality;
       if (child.status === 0 && (compareGo || exact)) {
         const rawRows = storeRows(store);
-        const rows = compareGo ? withoutGoSurface(rawRows) : rawRows;
+        const goRows = compareGo ? withoutGoSurface(rawRows) : rawRows;
+        const rows = rustVersion
+          ? withRustVersion(goRows, rustVersion[0], rustVersion[1])
+          : goRows;
         baseline ??= rows;
         equality = {
           rows: Object.fromEntries(
