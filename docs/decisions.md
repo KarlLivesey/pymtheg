@@ -2481,6 +2481,12 @@ item is counted as having two keys); narrowing a candidate set except to a
 library target it already holds; fields, locals, blanket impls (no nameable
 owner) and crate roots; trait-method declarations (dispatch); answers from a
 partial index; an answer on a link under a cfg condition other than `test`.
+**A cfg twin inside the dependency** is the dependency's own business: the
+SCIP data names the external item by its path and carries no cfg
+information about the dependency's source, so the twin cannot be seen. The
+one configuration's answer is taken as that crate's item path, which names
+the item in every configuration where the path exists. The twin rules of
+C-43 apply to items in the checkout only.
 
 ### D19: coverage is judged with dependencies installed
 
