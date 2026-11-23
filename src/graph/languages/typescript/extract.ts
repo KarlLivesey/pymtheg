@@ -233,6 +233,8 @@ interface NodeDiagnostics {
  * program's parsed and bound files; only its type caches are its own.
  */
 const declarationCheckers = new WeakMap<ts.Program, NodeDiagnostics>();
+/** C-42: the unit pairs in conflict, once per program (`conflictingUnitPairs`). */
+const unitConflictsByProgram = new WeakMap<ts.Program, Set<string>>();
 function checkingDeclarations(program: ts.Program): NodeDiagnostics {
   let known = declarationCheckers.get(program);
   if (!known) {
@@ -947,26 +949,32 @@ export function extractFile(
    * - 2687, all declarations must have identical modifiers.
    *
    * A diagnostic names its declaration. A comparison (2403, 2717, 2428,
-   * 2687) is made against the first declaration, so the diagnosed unit
-   * differs from every unit that agrees with the first: it is paired with
-   * every other unit declaring the name (A and B agree, C differs: A–C and
-   * B–C), which errs towards unmarked when two diagnosed units agree. A
-   * duplicate (2300, 2451) names the other declaration in its related
-   * information ("was also declared here"): those two units are the pair,
-   * so two units' `fetch` functions are not paired by a third unit's
-   * `var fetch`; without related information, it is paired with every
-   * other unit. A
+   * 2687) is made against the first declaration, so a unit found different
+   * differs from every unit with no such diagnostic on the name (they agree
+   * with the first): it is paired with each of them (A and B agree, C
+   * differs: A–C and B–C). Two units both found different (DOM and Node
+   * against a first declaration in Workers) may agree with each other, so
+   * they are paired only when no unit agrees with the first. A duplicate
+   * (2300, 2451) names the other declaration in its related information
+   * ("was also declared here"): those two units are the pair, so two
+   * units' `fetch` functions are not paired by a third unit's `var fetch`;
+   * without related information, it is paired with every other unit. A
    * declaration's unit is the one its library candidate names (its
    * `targetOf` unit: `node:url` for a `global` block inside `declare module
-   * "url"`), so conflicts and link unit sets use one key. Computed once per
-   * program, when a merged global is first met; `typescript.conflictChecks`
-   * counts the declarations checked.
+   * "url"`), so conflicts and link unit sets use one key, and every
+   * `node:*` unit counts as the one package `@types/node`. Computed once per
+   * program (cached by program, as the second checker is), when a merged
+   * global is first met; `typescript.conflictScans` counts the computations
+   * and `typescript.conflictChecks` the declarations checked.
    */
-  let unitConflicts: Set<string> | undefined;
   const CONFLICT_CODES = new Set([2403, 2717, 2300, 2451, 2428, 2687]);
   const COMPARED = new Set([2403, 2717, 2428, 2687]);
+  // Conflicts are between typings packages: every `node:*` unit is one
+  // package, `@types/node` (its modules' globals are one environment).
   const unitKey = (unit: { ecosystem: string; unit: string }) =>
-    `${unit.ecosystem}\0${unit.unit}`;
+    unit.ecosystem === "node"
+      ? "npm\0@types/node"
+      : `${unit.ecosystem}\0${unit.unit}`;
   const pairKey = (a: string, b: string) =>
     a < b ? `${a}\n${b}` : `${b}\n${a}`;
   interface GlobalDeclaration {
@@ -978,7 +986,10 @@ export function extractFile(
     statement: ts.Statement;
   }
   function conflictingUnitPairs(): Set<string> {
-    if (unitConflicts) return unitConflicts;
+    const known = unitConflictsByProgram.get(program);
+    if (known) return known;
+    const unitConflicts = new Set<string>();
+    count("typescript.conflictScans");
     const byName = new Map<string, GlobalDeclaration[]>();
     const byFile = new Map<ts.SourceFile, GlobalDeclaration[]>();
     for (const source of program.getSourceFiles()) {
@@ -1048,13 +1059,15 @@ export function extractFile(
           )
             ambient(statement);
     }
-    unitConflicts = new Set();
     const shared = new Set(
       [...byName.entries()]
         .filter(([, list]) => new Set(list.map(({ unit }) => unit)).size > 1)
         .map(([name]) => name),
     );
-    if (!shared.size) return unitConflicts;
+    if (!shared.size) {
+      unitConflictsByProgram.set(program, unitConflicts);
+      return unitConflicts;
+    }
     const declarationChecker = checkingDeclarations(program);
     // The innermost recorded declaration of a shared name at a position.
     const at = (file: ts.SourceFile | undefined, start: number | undefined) => {
@@ -1071,6 +1084,9 @@ export function extractFile(
       return found;
     };
     let checked = 0;
+    // Per name, the units a comparison with the first declaration found
+    // different (2403, 2717, 2428, 2687).
+    const differing = new Map<string, Set<string>>();
     for (const [file, entries] of byFile) {
       const statements = [
         ...new Set(
@@ -1095,20 +1111,38 @@ export function extractFile(
             (other): other is GlobalDeclaration =>
               !!other && other.name === own.name,
           );
-        // A comparison with the first declaration (2403, 2717, 2428, 2687)
-        // differs from every unit that agrees with the first, not only the
-        // first's: pair it with every other unit declaring the name. A
-        // duplicate (2300, 2451) names both declarations: pair those.
-        const others =
-          COMPARED.has(diagnostic.code) || !related.length
-            ? byName.get(own.name)!
-            : related;
-        for (const other of others)
+        if (COMPARED.has(diagnostic.code)) {
+          const units = differing.get(own.name) ?? new Set<string>();
+          units.add(own.unit);
+          differing.set(own.name, units);
+          continue;
+        }
+        // A duplicate (2300, 2451) names both declarations: pair those.
+        for (const other of related.length ? related : byName.get(own.name)!)
           if (other.unit !== own.unit)
             unitConflicts.add(pairKey(own.unit, other.unit));
       }
     }
+    // A comparison is with the first declaration: a unit found different
+    // differs from every unit that agrees with the first (no diagnostic on
+    // its declarations), not only from the first's. Two units both found
+    // different may agree with each other, so they are paired only when
+    // every unit declaring the name was found different.
+    for (const [name, found] of differing) {
+      const agreeing = new Set(
+        byName
+          .get(name)!
+          .map(({ unit }) => unit)
+          .filter((unit) => !found.has(unit)),
+      );
+      const others = agreeing.size ? agreeing : found;
+      for (const unit of found)
+        for (const other of others)
+          if (other !== unit) unitConflicts.add(pairKey(unit, other));
+    }
     count("typescript.conflictChecks", checked);
+    // Cached only once complete: an exception leaves no partial answer.
+    unitConflictsByProgram.set(program, unitConflicts);
     return unitConflicts;
   }
   /** Whether two of `units` are in conflict on a shared global (TS2403). */

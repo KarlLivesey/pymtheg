@@ -8,26 +8,10 @@
  import { count } from "../../work.js";
  import {
    competingTestNames,
-@@ -1071,6 +1072,7 @@
-       return found;
-     };
-     let checked = 0;
-+    const pairCodes = new Set<string>();
-     for (const [file, entries] of byFile) {
-       const statements = [
-         ...new Set(
-@@ -1104,11 +1106,24 @@
-             ? byName.get(own.name)!
-             : related;
-         for (const other of others)
--          if (other.unit !== own.unit)
-+          if (other.unit !== own.unit) {
-             unitConflicts.add(pairKey(own.unit, other.unit));
-+            pairCodes.add(`${pairKey(own.unit, other.unit)}\n${diagnostic.code}\n${own.name}`);
-+          }
-       }
-     }
+@@ -1143,6 +1144,17 @@
      count("typescript.conflictChecks", checked);
+     // Cached only once complete: an exception leaves no partial answer.
+     unitConflictsByProgram.set(program, unitConflicts);
 +    if (process.env.PYM_CONFLICT_LOG)
 +      appendFileSync(
 +        process.env.PYM_CONFLICT_LOG,
@@ -36,13 +20,13 @@
 +          config: program.getCompilerOptions().configFilePath ?? null,
 +          checked,
 +          names: shared.size,
-+          pairs: [...pairCodes],
++          pairs: [...unitConflicts],
 +        }) + "\n",
 +      );
      return unitConflicts;
    }
    /** Whether two of `units` are in conflict on a shared global (TS2403). */
-@@ -1165,6 +1180,8 @@
+@@ -1199,6 +1211,8 @@
      // whether any library fact is synthesised or outside the global scope.
      const librarySymbols = new Set<ts.Symbol | undefined>();
      let unmergedLibrary = false;
@@ -51,7 +35,7 @@
      let installedType = false;
      let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
      let verifyObjectProducers = false;
-@@ -1436,6 +1453,7 @@
+@@ -1470,6 +1484,7 @@
                      if (node) {
                        (libraryFacts ??= new Map()).set(libraryKey(node), node);
                        unmergedLibrary = true;
@@ -59,7 +43,7 @@
                      } else missingGlobalTypes = true;
                    }
                  } else if (
-@@ -1446,6 +1464,7 @@
+@@ -1480,6 +1495,7 @@
                    if (node) {
                      (libraryFacts ??= new Map()).set(libraryKey(node), node);
                      unmergedLibrary = true;
@@ -67,7 +51,7 @@
                    } else missingGlobalTypes = true;
                  }
                }
-@@ -1456,9 +1475,10 @@
+@@ -1490,9 +1506,10 @@
                importer.targetKey(proved),
                proved,
              );
@@ -80,7 +64,7 @@
            } else if (inCheckout(declaration)) {
              if (!record(declaration, current)) local++;
            } else external++;
-@@ -1575,6 +1595,17 @@
+@@ -1609,6 +1626,17 @@
            ({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit),
          ) &&
          !unitsConflict(libraries);
@@ -98,7 +82,7 @@
        return {
          targets,
          viaAlias,
-@@ -1582,6 +1613,15 @@
+@@ -1616,6 +1644,15 @@
          declarations,
          ...(libraries && { libraryFacts: libraries }),
          ...(merged && { mergedGlobal: true }),
@@ -114,7 +98,7 @@
          ...(unbuiltEntry && { unbuiltEntry }),
          ...(viaSpecifier && { viaSpecifier }),
        };
-@@ -2579,6 +2619,8 @@
+@@ -2613,6 +2650,8 @@
            ...target,
          }));
          if (found.mergedGlobal) facts.mergedGlobal = true;

@@ -1854,6 +1854,71 @@ test("a conflict and a link name a declaration inside @types/node's ambient modu
   assert.equal(link.data.mergedGlobal, undefined);
 });
 
+// C-42 review round 2: conflicts are between typings packages; every
+// node:* unit is @types/node. bun-types conflicts with @types/node's
+// stream/web globals, so console.log {node:console, bun} is unmarked.
+test("every node:* unit is one package for the conflict test", async () => {
+  const link = await globalsCase(
+    {
+      "tsconfig.json": config({ lib: ["es2022"], types: ["node", "env-bun"] }),
+      ...typesPackage(
+        "@types/node",
+        'declare module "stream/web" { global { var Thing: { n: number }; } }\ndeclare module "console" { global { function helper(): void; } }\n',
+      ),
+      ...typesPackage(
+        "env-bun",
+        "declare var Thing: { n: string };\ndeclare function helper(): void;\n",
+      ),
+      "src/main.ts": "helper();\nexport {};\n",
+    },
+    "src/main.ts",
+    "helper",
+  );
+  assert.equal(link.data.mergedGlobal, undefined);
+});
+
+test("two units that differ from the first declaration but agree with each other are not paired", async () => {
+  const link = await globalsCase(
+    {
+      "tsconfig.json": config({
+        lib: ["es2022"],
+        types: ["env-a", "env-b", "env-c"],
+      }),
+      ...typesPackage("env-a", "declare var pair: { n: number };\n"),
+      ...typesPackage(
+        "env-b",
+        "declare var pair: { n: string };\ndeclare function duo(): void;\n",
+      ),
+      ...typesPackage(
+        "env-c",
+        "declare var pair: { n: string };\ndeclare function duo(): void;\n",
+      ),
+      "src/main.ts": "duo();\nexport {};\n",
+    },
+    "src/main.ts",
+    "duo",
+  );
+  assert.equal(link.data.mergedGlobal, true);
+});
+
+test("the units in conflict are computed once per program, not once per file", async () => {
+  const { graphWork, resetGraphWork } = await import("../dist/graph/work.js");
+  resetGraphWork();
+  await globalsCase(
+    {
+      "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+      ...typesPackage("env-a", "declare function helper(): void;\n"),
+      ...typesPackage("env-b", "declare function helper(): void;\n"),
+      "src/main.ts": "helper();\nexport {};\n",
+      "src/other.ts": "helper();\nexport {};\n",
+      "src/third.ts": "helper();\nexport {};\n",
+    },
+    "src/main.ts",
+    "helper",
+  );
+  assert.equal(graphWork.counts["typescript.conflictScans"], 1);
+});
+
 test("an ambient module merged across two packages, a checkout augmentation and a file in two programs are not a merged global", async () => {
   // An ambient `declare module` is not the global scope.
   const ambient = await globalsCase(
