@@ -18,11 +18,25 @@
  *   proves the store equals a cold index of the inputs it records. If the
  *   record differs, or the project, store or configuration does, everything
  *   kept is dropped.
+ * - The completion record is compared twice: when the run begins, and
+ *   again as the run's ownership baseline read it (`confirm`), in the same
+ *   snapshot as the data version and mark its ownership checks start from.
+ *   A run by another process that completes between the two is caught by
+ *   the second; one after it, by the run's own ownership checks. Nothing
+ *   kept is readable before `confirm`.
+ * - A confirmed run takes what was kept: a module reads it, and only what
+ *   the run `set`s again (or anew) is kept after it. A module must treat a
+ *   kept value as immutable, or `set` the value it changed; a value changed
+ *   in place and not set again is not kept, so a violation is forgotten
+ *   rather than carried into a later run.
  * - Values set during a run are kept only if the run completes (its
  *   completion record is written). A run that fails, is aborted or is taken
  *   over keeps nothing it set, and the session drops what it had.
  * - Each module keeps at most `maxValuesPerModule` names; setting another
- *   drops the oldest. `drop()` releases everything.
+ *   drops the oldest. The session bounds kept state by count, not by
+ *   bytes: an embedder must bound the memory of the process (the MCP server
+ *   ends a worker whose resting heap exceeds its bound, C-48).
+ *   `drop()` releases everything.
  *
  * The session holds no store connection or lock between runs: every run is
  * an ordinary index run with its own ownership checks.
@@ -98,10 +112,16 @@ export class IndexSession {
       this.drop();
     return new SessionRun(this, scopeKey);
   }
-  /** @internal */
-  read(module: string, name: string, key: string): unknown {
-    const entry = this.kept.get(module)?.get(name);
-    return entry && entry.key === key ? entry.value : undefined;
+  /**
+   * @internal Confirms a run against the completion record its baseline
+   * read: drops everything unless it is the one the last completed run
+   * recorded, then hands what was kept to the run.
+   */
+  take(completion: string | null): Map<string, Map<string, Kept>> {
+    if (completion === null || this.completion !== completion) this.drop();
+    const taken = new Map(this.kept);
+    this.kept.clear();
+    return taken;
   }
   /** @internal */
   commit(
@@ -110,8 +130,9 @@ export class IndexSession {
     pending: ReadonlyMap<string, ReadonlyMap<string, Kept>>,
   ): void {
     if (this.scopeKey !== undefined && this.scopeKey !== scopeKey) this.drop();
+    this.kept.clear();
     for (const [module, values] of pending) {
-      const map = this.kept.get(module) ?? new Map<string, Kept>();
+      const map = new Map<string, Kept>();
       for (const [name, entry] of values) {
         map.delete(name);
         map.set(name, entry);
@@ -128,6 +149,8 @@ export class IndexSession {
 export class SessionRun {
   private readonly pending = new Map<string, Map<string, Kept>>();
   private settled = false;
+  /** What was kept, once `confirm` has proved it; nothing before. */
+  private taken: Map<string, Map<string, Kept>> | undefined;
   constructor(
     private readonly session: IndexSession,
     private readonly scopeKey: string,
@@ -139,7 +162,8 @@ export class SessionRun {
       get: (name, key) => {
         const own = this.pending.get(module)?.get(name);
         if (own) return own.key === key ? own.value : undefined;
-        return this.session.read(module, name, key);
+        const entry = this.taken?.get(module)?.get(name);
+        return entry && entry.key === key ? entry.value : undefined;
       },
       set: (name, key, value) => {
         if (this.settled) return;
@@ -149,18 +173,29 @@ export class SessionRun {
       },
     };
   }
+  /**
+   * The completion record as the run's ownership baseline read it (null for
+   * none). Until this is called nothing kept is readable; called again, it
+   * changes nothing.
+   */
+  confirm(completion: string | null): void {
+    if (this.settled || this.taken) return;
+    this.taken = this.session.take(completion);
+  }
   /** The run completed with this completion record: its values are kept. */
   complete(completion: string): void {
     if (this.settled) return;
     this.settled = true;
     this.session.commit(this.scopeKey, completion, this.pending);
     this.pending.clear();
+    this.taken = undefined;
   }
   /** The run did not complete: nothing it set is kept, nor what was kept before. */
   abandon(): void {
     if (this.settled) return;
     this.settled = true;
     this.pending.clear();
+    this.taken = undefined;
     this.session.drop();
   }
 }

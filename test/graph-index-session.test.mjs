@@ -7,7 +7,15 @@
 // does not complete. Every store equals a cold index row for row.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -23,6 +31,9 @@ import {
 import { graphWork, resetGraphWork } from "../dist/graph/work.js";
 import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 import { module as synthetic } from "./fixtures/graph-core/synthetic.mjs";
+import { tableModule } from "./fixtures/graph-session/table-module.mjs";
+import { initializeWorkspace } from "../dist/project/workspace.js";
+import { trustFile } from "../dist/project/local-trust.js";
 
 const graphAt = (root) => join(root, ".pymtheg/rebuildable/graph.sqlite");
 function tree(files) {
@@ -231,6 +242,189 @@ test("seeded edits through one production session each equal a cold index", asyn
         `after editing ${path}`,
       );
     }
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+const child = new URL(
+  "./fixtures/graph-session/index-child.mjs",
+  import.meta.url,
+).pathname;
+/** The stored name of every `.k` file, by path. */
+function storedNames(root) {
+  const store = new SqliteGraphStore(graphAt(root), undefined, {
+    readOnly: true,
+  });
+  try {
+    return Object.fromEntries(
+      store
+        .files()
+        .filter((file) => file.path.endsWith(".k"))
+        .map((file) => [file.path, file.result.data?.name ?? null]),
+    );
+  } finally {
+    store.close();
+  }
+}
+
+test("another process's complete index between the session's completion read and its baseline drops what the session kept", async () => {
+  const { base, root, write } = tree({ "a.k": "k=alpha", "b.k": "k=beta" });
+  try {
+    const registry = new LanguageRegistry([tableModule]);
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("a.k", "k=ALPHA2");
+    // The gate: the inventory event just before the run begins, after the
+    // command read the completion record. The other process runs to
+    // completion inside it (spawnSync returns when it has).
+    let raced = 0;
+    const raced_ = await executeGraph(
+      { command: "index", root },
+      {
+        session,
+        progress: (progress) => {
+          if (progress.phase !== "inventory" || progress.done !== 0 || raced)
+            return;
+          raced++;
+          const other = spawnSync(process.execPath, [child, root], {
+            encoding: "utf8",
+          });
+          assert.equal(other.status, 0, other.stderr);
+          assert.equal(JSON.parse(other.stdout).complete, true);
+        },
+      },
+    );
+    assert.equal(raced, 1);
+    assert.equal(raced_.sync.complete, true);
+    write("b.k", "k=beta2");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.deepEqual(storedNames(root), { "a.k": "ALPHA2", "b.k": "beta2" });
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+    assert.ok(session.counts.dropped >= 1, JSON.stringify(session.counts));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a kept value changed in place and not set again is not kept", async () => {
+  const { base, root, write } = tree({ "a.k": "k=alpha", "b.k": "k=beta" });
+  try {
+    let vandal = false;
+    const module = {
+      ...tableModule,
+      analyze(context) {
+        if (vandal) {
+          // Breaks the contract: edits the kept table and keeps nothing.
+          const kept = context.kept?.get("table", "v1");
+          if (kept) kept[0][1] = "vandalised";
+          return context.files.map((file) => ({
+            path: file.path,
+            result: {
+              status: "clean",
+              diagnostics: [],
+              symbols: [],
+              links: [],
+              data: { name: /k=(\S*)/.exec(file.text)?.[1] ?? null },
+            },
+          }));
+        }
+        return tableModule.analyze(context);
+      },
+    };
+    const registry = new LanguageRegistry([module]);
+    const session = new IndexSession({ registry });
+    await index(root, session);
+    vandal = true;
+    write("b.k", "k=beta2");
+    assert.equal((await index(root, session)).sync.complete, true);
+    vandal = false;
+    write("b.k", "k=beta3");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.deepEqual(storedNames(root), { "a.k": "alpha", "b.k": "beta3" });
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a run that fails after reading what was kept leaves nothing kept", async () => {
+  const { base, root, write } = tree({ "a.k": "k=alpha", "b.k": "k=beta" });
+  try {
+    let fail = false;
+    let rebuilt = 0;
+    const module = {
+      ...tableModule,
+      analyze(context) {
+        if (!context.kept?.get("table", "v1")) rebuilt++;
+        if (fail) {
+          // Changes the value it read, then fails.
+          const kept = context.kept?.get("table", "v1");
+          if (kept) kept[0][1] = "broken";
+          throw Error("analysis failed after reading kept state");
+        }
+        return tableModule.analyze(context);
+      },
+    };
+    const registry = new LanguageRegistry([module]);
+    const session = new IndexSession({ registry });
+    await index(root, session);
+    fail = true;
+    write("b.k", "k=beta2");
+    const dropped = session.counts.dropped;
+    assert.equal((await index(root, session)).sync.complete, false);
+    // The failed run is abandoned: the session forgets its scope and
+    // completion as well (what it kept was already taken by the run).
+    assert.equal(session.counts.dropped, dropped + 1);
+    fail = false;
+    const before = rebuilt;
+    write("b.k", "k=beta3");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.equal(rebuilt, before + 1, "the next run rebuilds");
+    assert.deepEqual(storedNames(root), { "a.k": "alpha", "b.k": "beta3" });
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("each change of trust drops what the session kept: source-only, trusted, revoked", async () => {
+  const { base, root, write } = tree({ "a.k": "k=alpha", "b.k": "k=beta" });
+  try {
+    let rebuilt = 0;
+    const module = {
+      ...tableModule,
+      analyze(context) {
+        if (!context.kept?.get("table", "v1")) rebuilt++;
+        return tableModule.analyze(context);
+      },
+    };
+    const registry = new LanguageRegistry([module]);
+    const session = new IndexSession({ registry });
+    await initializeWorkspace(root, undefined, { trust: "source-only" });
+    const answer = async (trust) => {
+      const file = trustFile();
+      const answers = JSON.parse(readFileSync(file, "utf8"));
+      answers.checkouts[realpathSync(root)].trust = trust;
+      writeFileSync(file, JSON.stringify(answers));
+    };
+    let edits = 0;
+    const step = async () => {
+      write("b.k", `k=beta${++edits}`);
+      assert.equal((await index(root, session)).sync.complete, true);
+    };
+    await step();
+    await step();
+    assert.equal(rebuilt, 1, "kept across a run with the same trust");
+    await answer("trusted");
+    await step();
+    assert.equal(rebuilt, 2, "trusted: dropped");
+    await step();
+    assert.equal(rebuilt, 2);
+    await answer("source-only");
+    await step();
+    assert.equal(rebuilt, 3, "revoked: dropped");
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
