@@ -1659,6 +1659,51 @@ test("a global whose variable declarations disagree on the type is not a merged 
   assert.equal(agree.data.mergedGlobal, true);
 });
 
+// C-42 review N1: TS2403 compares the types for identity. Two types each
+// assignable to the other but not identical (`any` against `number`) are in
+// conflict, as the compiler says even under skipLibCheck's default.
+test("variable types assignable both ways but not identical are in conflict (TS2403), and the mark is withheld", async () => {
+  const layout = (a, b) => ({
+    "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+    ...typesPackage("env-a", `declare var shared: { (): void; n: ${a} };\n`),
+    ...typesPackage("env-b", `declare var shared: { (): void; n: ${b} };\n`),
+    "src/main.ts": "shared();\nexport {};\n",
+  });
+  const mutual = await globalsCase(
+    layout("any", "number"),
+    "src/main.ts",
+    "shared",
+  );
+  assert.equal(mutual.data.mergedGlobal, undefined);
+  const identical = await globalsCase(
+    layout("number", "number"),
+    "src/main.ts",
+    "shared",
+  );
+  assert.equal(identical.data.mergedGlobal, true);
+});
+
+// C-42 review N1b: units in conflict on one shared global are alternatives;
+// no other global they both declare is marked, functions included.
+test("two units in conflict on any shared global mark none of their merged globals", async () => {
+  const layout = (agree) => ({
+    "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+    ...typesPackage(
+      "env-a",
+      "declare var Thing: { make(): void };\ndeclare function helper(): void;\n",
+    ),
+    ...typesPackage(
+      "env-b",
+      `declare var Thing: { make(): ${agree ? "void" : "number"} };\ndeclare function helper(): void;\n`,
+    ),
+    "src/main.ts": "helper();\nexport {};\n",
+  });
+  const conflicting = await globalsCase(layout(false), "src/main.ts", "helper");
+  assert.equal(conflicting.data.mergedGlobal, undefined);
+  const agreeing = await globalsCase(layout(true), "src/main.ts", "helper");
+  assert.equal(agreeing.data.mergedGlobal, true);
+});
+
 test("an ambient module merged across two packages, a checkout augmentation and a file in two programs are not a merged global", async () => {
   // An ambient `declare module` is not the global scope.
   const ambient = await globalsCase(

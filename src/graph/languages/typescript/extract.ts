@@ -215,6 +215,42 @@ const TYPE_ONLY = new Set([
   ts.SyntaxKind.TypeAliasDeclaration,
   ts.SyntaxKind.TypeParameter,
 ]);
+/** The checker's diagnostics for chosen nodes (public on the object, not typed). */
+interface NodeDiagnostics {
+  getDiagnostics(
+    file: ts.SourceFile,
+    token: undefined,
+    nodes: readonly ts.Node[],
+  ): readonly ts.Diagnostic[];
+}
+/**
+ * C-42 (review N1): a second checker of `program` that type-checks
+ * declaration files (`skipLibCheck` and `skipDefaultLibCheck` off), one per
+ * program, so the compiler itself answers TS2403 there. It shares the
+ * program's parsed and bound files; only its type caches are its own.
+ */
+const declarationCheckers = new WeakMap<ts.Program, NodeDiagnostics>();
+function checkingDeclarations(program: ts.Program): NodeDiagnostics {
+  let known = declarationCheckers.get(program);
+  if (!known) {
+    const options = {
+      ...program.getCompilerOptions(),
+      skipLibCheck: false,
+      skipDefaultLibCheck: false,
+      noCheck: false,
+    };
+    const host = Object.create(program, {
+      getCompilerOptions: { value: () => options },
+    }) as ts.Program;
+    known = (
+      ts as unknown as {
+        createTypeChecker(host: ts.Program): NodeDiagnostics;
+      }
+    ).createTypeChecker(host);
+    declarationCheckers.set(program, known);
+  }
+  return known;
+}
 const isLimit = (error: unknown) =>
   error instanceof RangeError && /call stack/i.test(error.message);
 /** Thrown when the checker overflows: retry with `key` in RenameContext.skip. */
@@ -876,25 +912,112 @@ export function extractFile(
     return undefined;
   }
   /**
-   * C-42 (narrowed D23): whether every variable declaration of a merged
-   * symbol declares the same type. The compiler's identity relation is not
-   * public, so two declared types agree when each is assignable to the
-   * other; a declaration without a type annotation does not agree.
+   * C-42 (narrowed D23; review N1, N1b): the pairs of library units that the
+   * compiler finds in conflict on a shared global variable, by TS2403
+   * ("Subsequent variable declarations must have the same type"). A set
+   * holding such a pair are alternatives as units, not one target, so no
+   * merged global whose units include the pair is marked, whatever kind of
+   * symbol it is (`Request`, `fetch`, `RequestInit`).
+   *
+   * The answer is the compiler's own: TS2403 compares the types for
+   * identity (`isTypeIdenticalTo`, which the checker does not export), and
+   * `skipLibCheck` suppresses it in declaration files. So a second checker
+   * of the same program, told `skipLibCheck` is off, checks only the
+   * variable statements of globals declared in two or more units, and its
+   * 2403 diagnostics name the conflicting declarations. Computed once per
+   * program, when a merged global is first met.
    */
-  function variableTypesAgree(symbol: ts.Symbol): boolean {
-    const variables = (symbol.declarations ?? []).filter(
-      ts.isVariableDeclaration,
+  let unitConflicts: Set<string> | undefined;
+  const unitKey = (unit: { ecosystem: string; unit: string }) =>
+    `${unit.ecosystem}\0${unit.unit}`;
+  const pairKey = (a: string, b: string) =>
+    a < b ? `${a}\n${b}` : `${b}\n${a}`;
+  function conflictingUnitPairs(): Set<string> {
+    if (unitConflicts) return unitConflicts;
+    const byName = new Map<
+      string,
+      { declaration: ts.VariableDeclaration; unit: string }[]
+    >();
+    for (const source of program.getSourceFiles()) {
+      if (!source.isDeclarationFile) continue;
+      const unit = importer.declarationUnit(source);
+      if (!unit) continue;
+      const key = unitKey(unit);
+      const add = (statement: ts.Statement) => {
+        if (!ts.isVariableStatement(statement)) return;
+        for (const declaration of statement.declarationList.declarations)
+          if (ts.isIdentifier(declaration.name)) {
+            const list = byName.get(declaration.name.text) ?? [];
+            list.push({ declaration, unit: key });
+            byName.set(declaration.name.text, list);
+          }
+      };
+      if (!ts.isExternalModule(source)) source.statements.forEach(add);
+      for (const statement of source.statements)
+        if (
+          ts.isModuleDeclaration(statement) &&
+          statement.flags & ts.NodeFlags.GlobalAugmentation &&
+          statement.body &&
+          ts.isModuleBlock(statement.body)
+        )
+          statement.body.statements.forEach(add);
+    }
+    const shared = [...byName.values()].filter(
+      (list) => new Set(list.map(({ unit }) => unit)).size > 1,
     );
-    if (variables.length < 2) return true;
-    if (variables.some((declaration) => !declaration.type)) return false;
-    const [first, ...rest] = variables.map((declaration) =>
-      checker.getTypeFromTypeNode(declaration.type!),
-    );
-    return rest.every(
-      (type) =>
-        checker.isTypeAssignableTo(type, first!) &&
-        checker.isTypeAssignableTo(first!, type),
-    );
+    const statements = new Map<ts.SourceFile, Set<ts.Node>>();
+    for (const list of shared)
+      for (const { declaration } of list) {
+        const file = declaration.getSourceFile();
+        const nodes = statements.get(file) ?? new Set<ts.Node>();
+        nodes.add(declaration.parent.parent);
+        statements.set(file, nodes);
+      }
+    const reported = new Map<ts.SourceFile, Set<number>>();
+    const declarationChecker = shared.length
+      ? checkingDeclarations(program)
+      : undefined;
+    for (const [file, nodes] of statements) {
+      const diagnostics = declarationChecker!.getDiagnostics(file, undefined, [
+        ...nodes,
+      ]);
+      reported.set(
+        file,
+        new Set(
+          diagnostics
+            .filter(({ code }) => code === 2403)
+            .map(({ start }) => start ?? -1),
+        ),
+      );
+    }
+    unitConflicts = new Set();
+    for (const list of shared) {
+      const first = checker.getSymbolAtLocation(
+        list[0]!.declaration.name,
+      )?.valueDeclaration;
+      const firstUnit =
+        first && importer.declarationUnit(first.getSourceFile());
+      if (!firstUnit) continue;
+      for (const { declaration, unit } of list) {
+        const file = declaration.getSourceFile();
+        if (reported.get(file)?.has(declaration.name.getStart(file)))
+          unitConflicts.add(pairKey(unitKey(firstUnit), unit));
+      }
+    }
+    return unitConflicts;
+  }
+  /** Whether two of `units` are in conflict on a shared global (TS2403). */
+  function unitsConflict(
+    units: readonly { ecosystem: string; unit: string }[],
+  ): boolean {
+    const keys = [...new Set(units.map(unitKey))];
+    if (keys.length < 2) return false;
+    const conflicts = conflictingUnitPairs();
+    if (!conflicts.size) return false;
+    for (let a = 0; a < keys.length; a++)
+      for (let b = a + 1; b < keys.length; b++)
+        if (conflicts.has(pairKey(keys[a]!, keys[b]!))) return true;
+    return false;
   }
   /** The compiler's (merged) symbol of a declaration, from its name. */
   function declaredSymbol(declaration: ts.Declaration): ts.Symbol | undefined {
@@ -1331,9 +1454,8 @@ export function extractFile(
         viaSpecifier && context.unbuilt?.forSpecifier(viaSpecifier);
       // C-42: one global symbol declared in several library units. Narrowed
       // D23: not when a unit is a test framework (competing packages: a file
-      // runs under one of them), nor when the symbol's variable declarations
-      // disagree on the type (the condition behind TS2403, which
-      // `skipLibCheck` hides).
+      // runs under one of them), nor when two of the units are in conflict
+      // on a shared global (TS2403, asked of the compiler).
       const [mergedSymbol] = librarySymbols;
       const merged =
         !!libraries &&
@@ -1347,7 +1469,7 @@ export function extractFile(
         !libraries.some(
           ({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit),
         ) &&
-        variableTypesAgree(mergedSymbol);
+        !unitsConflict(libraries);
       return {
         targets,
         viaAlias,
