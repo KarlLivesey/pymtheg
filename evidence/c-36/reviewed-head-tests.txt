@@ -1,0 +1,11 @@
+C-36 review: the new tests from this branch run against a build of d96a8ba (the reviewed head).
+
+✖ Rust: a glob-chain method call re-decided alone equals cold
+✖ Rust: removing a glob-chain call leaves other files' decisions as cold
+✖ Rust: a glob-chain method call has one cold answer whatever other files call it
+✔ Go: a killed scoped re-index is repaired by the next one
+✖ Rust: a killed scoped re-index with a leading comment is repaired by the next one
+✔ Rust: a killed scoped re-index with a trailing comment is repaired by the next one
+ℹ tests 6
+ℹ pass 2
+ℹ fail 4
