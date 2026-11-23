@@ -601,7 +601,26 @@ function typeSegment(holder: ts.Node, value: ts.Node): string | undefined {
 }
 
 /** A static object member in a named binding or a declaration's return value. */
+/**
+ * The first of a type literal's same-named method signatures (an overload
+ * set), or the node itself. Like an interface's overloads, the set is one
+ * symbol, at its first signature (C-41 review).
+ */
+export function overloadHead(node: ts.Node): ts.Node {
+  if (!ts.isMethodSignature(node) || !ts.isTypeLiteralNode(node.parent))
+    return node;
+  const name = memberName(node.name);
+  return (
+    node.parent.members.find(
+      (member) =>
+        ts.isMethodSignature(member) && memberName(member.name) === name,
+    ) ?? node
+  );
+}
+
 export function objectMember(node: ts.Node): SymbolDraft | undefined {
+  const head = overloadHead(node);
+  if (head !== node) return objectMember(head);
   const parent = node.parent;
   if (!parent) return undefined;
   const literal = ts.isObjectLiteralExpression(parent);

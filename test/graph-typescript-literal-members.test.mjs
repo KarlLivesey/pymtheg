@@ -370,6 +370,58 @@ test("a type-literal member is definite only when the receiver's whole path is w
   assert.equal(written?.[1], "src/use.ts#Shim.[type].process.argv");
 });
 
+test("nested type positions have their places; a type literal's overloads are one symbol", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "c41-ids-"));
+  const root = join(scratch, "project");
+  const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "c41");
+  try {
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(join(root, "tsconfig.json"), tsconfig);
+    await writeFile(
+      join(root, "src/use.ts"),
+      [
+        "export type Over = { run(): void; run(x: number): void };",
+        "declare const o: Over;",
+        "o.run();",
+        "o.run(1);",
+        "declare const box: Promise<{ open(): void }>;",
+        "declare const nested: { inner: { go(): void }[] };",
+        "declare const pair: [{ a(): void }, { b(): void }];",
+        "declare const either: { run(): void } | { stop(): void };",
+        "",
+      ].join("\n"),
+    );
+    await indexProject(root, new LanguageRegistry([typescript]), store);
+    const identities = store.findSymbols().map((s) => s.identity);
+    for (const identity of [
+      "box.[type].[<0>].open",
+      "nested.[type].inner.[].go",
+      "pair.[type].[#0].a",
+      "pair.[type].[#1].b",
+      // Inserting a union arm before another shifts its index.
+      "either.[type].[|0].run",
+      "either.[type].[|1].stop",
+    ])
+      assert.ok(identities.includes(identity), identity);
+    // Like an interface's overloads: one symbol, which both calls reach.
+    assert.equal(
+      identities.filter((identity) => identity === "Over.[type].run").length,
+      1,
+    );
+    const symbols = new Map(store.findSymbols().map((s) => [s.id, s.identity]));
+    const calls = store
+      .links()
+      .filter((link) => link.kind === "calls" && link.targetName === "o.run");
+    assert.deepEqual(
+      calls.map((link) => symbols.get(link.targetId)),
+      ["Over.[type].run", "Over.[type].run"],
+    );
+  } finally {
+    store.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
 test("a call that is not on a declared member of a literal stays unlinked", async () => {
   const got = await outcomes(
     {

@@ -126,6 +126,7 @@ import {
   kindOf,
   nameOf,
   objectMember,
+  overloadHead,
   rangeOf,
   unwrap,
 } from "./symbols.js";
@@ -2981,7 +2982,8 @@ export function extractFile(
   function handle(node: ts.Node, owner: string): string | null {
     const anchor = anchorOf(node);
     if (!anchor) {
-      const member = objectMember(node);
+      // An overload's later signatures share the first one's symbol.
+      const member = overloadHead(node) === node && objectMember(node);
       if (member) symbols.push(member);
     }
     if (anchor === node) {
