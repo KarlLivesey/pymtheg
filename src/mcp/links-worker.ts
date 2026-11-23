@@ -4,7 +4,11 @@ import { agentLimits } from "./limits.js";
 import { parentPort, workerData } from "node:worker_threads";
 import * as library from "../architecture/code-links.js";
 import { makeLinkView } from "./links-view.js";
-const { action, input } = workerData;
+import { useChildGroups } from "../backends/child-groups.js";
+const { action, input, childGroups } = workerData;
+// C-54: every child process this job starts is recorded in the server's
+// registry for the job, so the server can kill it whatever this thread does.
+useChildGroups(childGroups);
 const functions = {
   requirement: library.createRequirement,
   add: library.createCodeLink,
