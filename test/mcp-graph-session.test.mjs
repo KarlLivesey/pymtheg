@@ -424,6 +424,46 @@ test("a cancel while a module's returned promise is awaited aborts it through th
   }
 });
 
+test("a cancel inside a synchronous stretch a module marks after an await ends the worker at once", async () => {
+  // C-50: the stretch reads as inside the module call, so the cancel
+  // retires the worker without the grace. Unmarked, it would read as the
+  // awaited section: the grace clock would be scheduled, and this test
+  // fires it and fails instead of waiting.
+  const { base, root } = tree(synFiles);
+  const clock = controlledClock();
+  const { jobs, stopped } = jobsFor(root, "stretch-module", {
+    cancelClock: clock,
+    graceMs: 30_000,
+  });
+  try {
+    const job = jobs.start({ command: "index" });
+    await stopped();
+    let retired = false;
+    const cancelling = jobs.cancel(job.id).then(() => (retired = true));
+    // Watches for a grace until the cancel has finished; a scheduled grace
+    // is fired at once, so the cancel always finishes.
+    let graced = false;
+    while (!retired) {
+      if (clock.pending > 0) {
+        graced = true;
+        clock.fireNext();
+      }
+      await new Promise(setImmediate);
+    }
+    await cancelling;
+    assert.equal(graced, false, "no grace was scheduled");
+    assert.equal(job.state, "cancelled");
+    assert.equal(job.exited, true);
+    assert.equal(job.answer, undefined, "the worker was ended, not answered");
+    const next = jobs.start({ command: "status" });
+    await next.done;
+    assert.equal(jobs.generation, 2, "a new worker took the next job");
+  } finally {
+    await jobs.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 test("a module that ignores the abort while its promise is awaited is ended when the cancel's grace ends", async () => {
   const { base, root } = tree(synFiles);
   const clock = controlledClock();

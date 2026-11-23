@@ -18,12 +18,16 @@
 //         "await-module" the synthetic module; its analysis returns a promise
 //                        that settles only when the signal aborts
 //         "await-deaf"   the same, never settling
+//         "stretch-module" the synthetic module; its analysis awaits, then
+//                        stops inside a marked synchronous stretch
+//                        (`synchronousStretch`) until released
 //         "table-race"   the table module (C-45 review); while gate[2] is 1,
 //                        the next run's baseline is preceded by another
 //                        process's complete `graph index` (once)
 // A stopped worker sets gate[0] to 1 and waits for gate[1].
 import { workerData } from "node:worker_threads";
 import { serveGraphRequests } from "../../../dist/mcp/graph-worker.js";
+import { synchronousStretch } from "../../../dist/graph/sections.js";
 import {
   LanguageRegistry,
   SqliteGraphStore,
@@ -132,6 +136,20 @@ if (workerData.mode === "await-module" || workerData.mode === "await-deaf") {
               reject(context.signal.reason),
             );
         });
+      },
+    },
+  ]);
+}
+if (workerData.mode === "stretch-module") {
+  // An async analysis (as Go's is): after an await it runs synchronous code
+  // that cannot finish, marked as the module's own stretch. The marking is
+  // what makes it read as inside the call (C-50).
+  registry = new LanguageRegistry([
+    {
+      ...synthetic,
+      async analyze() {
+        await Promise.resolve();
+        return synchronousStretch(stop);
       },
     },
   ]);
