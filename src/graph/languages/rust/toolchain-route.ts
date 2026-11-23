@@ -16,7 +16,12 @@ import type {
 import { fileFacts } from "../../identity.js";
 import { readScip } from "./scip.js";
 import { joinScip } from "./toolchain-join.js";
-import { installation, runAnalyzer, type RunControls } from "./toolchain.js";
+import {
+  installation,
+  runAnalyzer,
+  sweepStaleRuns,
+  type RunControls,
+} from "./toolchain.js";
 
 export interface RouteAnswers {
   /** Per file, per parsed link index: the checkout symbol id. */
@@ -31,7 +36,30 @@ export const setRunControls = (next: RunControls) => {
   controls = next;
 };
 
+/**
+ * The route never makes the source-only result worse (C-43 review): any
+ * failure other than cancellation is reported as `unavailable` with its
+ * reason, and the source-only rows stand.
+ */
 export async function rustRoute(
+  request: ToolchainRequest,
+  projectId: string,
+  files: readonly GraphFile[],
+  contextFiles: readonly ContextFile[],
+): Promise<RouteAnswers | undefined> {
+  try {
+    return await route(request, projectId, files, contextFiles);
+  } catch (error) {
+    if (request.signal?.aborted) throw error;
+    request.note({
+      status: "unavailable",
+      reason: `the toolchain route failed: ${error instanceof Error ? error.message : String(error)}`,
+    });
+    return undefined;
+  }
+}
+
+async function route(
   request: ToolchainRequest,
   projectId: string,
   files: readonly GraphFile[],
@@ -44,6 +72,8 @@ export async function rustRoute(
   if (!contextFiles.some((file) => file.path === "Cargo.toml"))
     return unavailable("no Cargo.toml at the project root");
   const workDir = resolve(request.workDir, "rust");
+  // Folders of runs that are no longer live (killed, or not cleaned up).
+  await sweepStaleRuns(workDir);
   const install = await installation(
     request.setting,
     request.environment,
@@ -89,10 +119,14 @@ export async function rustRoute(
       .filter((path) => !indexed.has(path))
       .map((path) => `crate root ${path} is not in the index`),
   ];
+  // Files where a proc macro failed to expand give no answers.
+  const withheld = run.withheld;
   const joined = joinScip(
     documents,
     rust
-      .filter((file) => file.result.status !== "failed")
+      .filter(
+        (file) => file.result.status !== "failed" && !(file.path in withheld),
+      )
       .map((file) => ({
         path: file.path,
         text: file.text,
@@ -107,13 +141,15 @@ export async function rustRoute(
     version: install.analyzerVersion,
     rustc: install.rustcVersion,
     ...(install.rustupToolchain ? { toolchain: install.rustupToolchain } : {}),
-    configuration: install.configuration,
+    configuration: configurationFor(install, run.target),
+    target: run.target,
     cached: run.cached,
     key: run.key,
     // An observation only; nothing depends on it.
     analyzerMs: Math.round(run.elapsedMs),
     documents: joined.documents,
     partial,
+    withheld: withheld as unknown as Json,
     join: joined.counts as unknown as Json,
   });
   // A partial index answers no link: a missing build script output or
@@ -122,6 +158,18 @@ export async function rustRoute(
   return {
     answers: joined.answers,
     rustAnalyzer: install.analyzerVersion,
-    configuration: install.configuration,
+    configuration: configurationFor(install, run.target),
   };
 }
+
+/** The configuration as it ran: the host, or the configured build target. */
+const configurationFor = (
+  install: { configuration: string; host: string },
+  target: string,
+) =>
+  target === install.host
+    ? install.configuration
+    : install.configuration.replace(
+        `${install.host} (host)`,
+        `${target} ([build] target)`,
+      );

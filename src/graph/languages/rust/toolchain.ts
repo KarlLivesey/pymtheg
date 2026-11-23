@@ -22,20 +22,32 @@
  * No sandbox.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import {
+  chmod,
+  copyFile,
   cp,
   link,
+  lstat,
   mkdir,
   readdir,
   readFile,
+  realpath,
   rename,
   rm,
   stat,
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { basename, delimiter, dirname, isAbsolute, join } from "node:path";
+import {
+  basename,
+  delimiter,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  sep,
+} from "node:path";
 import {
   runProcess,
   type ProcessClock,
@@ -43,7 +55,7 @@ import {
 } from "../../../backends/process.js";
 
 /** Bumped whenever the route's run or its records change: old caches are not read. */
-export const ROUTE_VERSION = "c43-2";
+export const ROUTE_VERSION = "c43-3";
 /** A bound on one rust-analyzer run; a project needing more is reported, not hung on. */
 const RUN_LIMIT_MS = 60 * 60 * 1000;
 /** rust-analyzer's own output (progress and duplicate-symbol reports). */
@@ -185,10 +197,14 @@ export async function installation(
       unavailable: `${tools.rustc} did not answer --print sysroot: ${firstLine(sysrootRun)}`,
     };
   const sysroot = sysrootRun.stdout.trim();
-  // rustup: pin every process to this toolchain.
+  // rustup: pin every process to this toolchain, so a toolchain file in the
+  // project cannot choose another. A toolchain rustup installed is named by
+  // its folder under `toolchains/`; any other (`rustup toolchain link`, a
+  // standalone install) is pinned by its sysroot path, which rustup accepts
+  // as a toolchain and which a direct install ignores.
   const rustupToolchain =
     basename(dirname(sysroot)) === "toolchains" ? basename(sysroot) : undefined;
-  if (rustupToolchain) base.RUSTUP_TOOLCHAIN = rustupToolchain;
+  base.RUSTUP_TOOLCHAIN = rustupToolchain ?? sysroot;
   const verbose = await ask(tools.rustc, ["-vV"]);
   cancelled(verbose);
   const host = /^host: (\S+)$/m.exec(verbose.stdout)?.[1];
@@ -349,8 +365,10 @@ async function linkTree(from: string, to: string): Promise<void> {
 /**
  * The run's own CARGO_HOME. The user's configuration is copied; the
  * registry index is hard-linked file by file (cargo may add cache files
- * there); the downloaded archives and git databases are linked read-only
- * (offline, cargo only reads them). Crates are extracted into the overlay.
+ * there). The downloaded archives and git databases are symbolic links to
+ * the user's own folders, not read-only copies: offline, cargo only reads
+ * them, but nothing stops a build script that writes there. Crates are
+ * extracted into the overlay.
  */
 async function crateCacheOverlay(user: string, overlay: string): Promise<void> {
   await mkdir(join(overlay, "registry"), { recursive: true });
@@ -390,9 +408,101 @@ interface Metadata {
   packages: {
     id: string;
     name: string;
+    version?: string;
     targets: MetadataTarget[];
   }[];
   workspace_members: string[];
+  resolve?: {
+    nodes: {
+      id: string;
+      deps: {
+        pkg: string;
+        dep_kinds?: { kind: string | null }[];
+      }[];
+    }[];
+  } | null;
+}
+
+/** The build scripts and proc macros the run must produce, counted per name. */
+export interface ExpectedUnits {
+  /** Package name → packages of that name with a build script. */
+  buildScripts: Record<string, number>;
+  /** Proc-macro crate name → packages of that name with a proc-macro library. */
+  procMacros: Record<string, number>;
+}
+
+/**
+ * C-43 review: every build script and proc macro the configuration needs.
+ * The packages are those `cargo tree` lists for the workspace and target
+ * with normal, build and dev edges (`built`, as `name version`): cargo's own
+ * feature resolution, as the check rust-analyzer runs, with dev-dependencies
+ * only for the members. `cargo metadata`'s resolve is wider: it lists
+ * optional dependencies that no enabled feature turns on (jiff's `defmt` on
+ * actix-web), and used alone it called that pin partial. Without `built`,
+ * the resolve is walked from the members (normal and build edges, and the
+ * members' dev edges), which errs towards `partial`. Each unit must have
+ * finished, so a unit cargo never attempted (its dependency failed) is
+ * missed no more than a unit that failed.
+ */
+export function expectedUnits(
+  metadata: Metadata,
+  built?: ReadonlySet<string>,
+): ExpectedUnits | undefined {
+  if (built) {
+    const units: ExpectedUnits = { buildScripts: {}, procMacros: {} };
+    for (const pkg of metadata.packages)
+      if (built.has(`${pkg.name} ${pkg.version}`)) countUnits(pkg, units);
+    return units;
+  }
+  if (!metadata.resolve) return undefined;
+  const nodes = new Map(metadata.resolve.nodes.map((node) => [node.id, node]));
+  const members = new Set(metadata.workspace_members);
+  const needed = new Set<string>();
+  const stack = [...members];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (needed.has(id)) continue;
+    needed.add(id);
+    for (const dep of nodes.get(id)?.deps ?? []) {
+      const kinds = dep.dep_kinds?.length
+        ? dep.dep_kinds.map((k) => k.kind)
+        : [null];
+      if (
+        kinds.some(
+          (kind) =>
+            kind === null ||
+            kind === "build" ||
+            (kind === "dev" && members.has(id)),
+        )
+      )
+        stack.push(dep.pkg);
+    }
+  }
+  const units: ExpectedUnits = { buildScripts: {}, procMacros: {} };
+  for (const pkg of metadata.packages)
+    if (needed.has(pkg.id)) countUnits(pkg, units);
+  return units;
+}
+
+function countUnits(pkg: Metadata["packages"][number], units: ExpectedUnits) {
+  for (const target of pkg.targets) {
+    if (target.kind.includes("custom-build"))
+      units.buildScripts[pkg.name] = (units.buildScripts[pkg.name] ?? 0) + 1;
+    if (target.kind.includes("proc-macro")) {
+      const name = target.name.replace(/-/g, "_");
+      units.procMacros[name] = (units.procMacros[name] ?? 0) + 1;
+    }
+  }
+}
+
+/** The packages in `cargo tree`'s output (`--prefix none --format {p}`), as `name version`. */
+export function treePackages(output: string): Set<string> {
+  const out = new Set<string>();
+  for (const line of output.split("\n")) {
+    const match = /^(\S+) v(\S+)/.exec(line.trim());
+    if (match) out.add(`${match[1]} ${match[2]}`);
+  }
+  return out;
 }
 
 /** What `cargo metadata` says about the packages, for the gates and partial detection. */
@@ -423,71 +533,104 @@ function cargoFacts(metadata: Metadata, project: string): CargoFacts {
   };
 }
 
-/**
- * Build scripts that did not finish and proc macros that were not built,
- * read from the run's target directory: rust-analyzer exits 0 and says
- * nothing when a build script fails. Only what the run attempted counts:
- * `cargo metadata` lists packages (optional or dev-only ones) that its
- * check never builds.
- */
-async function unfinished(
-  target: string,
-  facts: CargoFacts,
-): Promise<string[]> {
-  const out: string[] = [];
-  // A build-script package has a compile directory and a run directory;
-  // the run directory holds `output` once the script has finished.
-  const finished = new Map<string, boolean>();
+/** The run's profile directories: `target/debug`, and `target/<triple>/debug` when a target is set. */
+async function profileDirs(target: string): Promise<string[]> {
+  const dirs = [join(target, "debug")];
   try {
-    const build = join(target, "debug", "build");
-    for (const dir of (await readdir(build)).sort()) {
-      const name = dir.replace(/-[0-9a-f]{16}$/, "");
-      finished.set(
-        name,
-        (finished.get(name) ?? false) || existsSync(join(build, dir, "output")),
-      );
-    }
-  } catch {
-    /* no build directory: nothing ran */
-  }
-  for (const [name, done] of finished)
-    if (!done) out.push(`build script of ${name} did not finish`);
-  // A proc macro the run compiled has a fingerprint (`lib-<name>`, or its
-  // compiler messages in `output-lib-<name>`) and, when built, a library.
-  const attempted = new Set<string>();
-  try {
-    const prints = join(target, "debug", ".fingerprint");
-    const wanted = new Set(facts.procMacroTargets);
-    for (const dir of await readdir(prints))
-      for (const file of await readdir(join(prints, dir))) {
-        const name = file.replace(/^(output-)?lib-/, "");
-        if (file !== name && wanted.has(name)) attempted.add(name);
-      }
-  } catch {
-    /* nothing compiled */
-  }
-  let deps: string[] = [];
-  try {
-    deps = await readdir(join(target, "debug", "deps"));
-  } catch {
-    /* none built */
-  }
-  for (const name of [...attempted].sort())
-    if (
-      !deps.some(
-        (file) =>
-          (file.startsWith(`lib${name}-`) && /\.(so|dylib)$/.test(file)) ||
-          (file.startsWith(`${name}-`) && file.endsWith(".dll")),
+    for (const entry of await readdir(target, { withFileTypes: true }))
+      if (
+        entry.isDirectory() &&
+        entry.name !== "debug" &&
+        existsSync(join(target, entry.name, "debug"))
       )
-    )
-      out.push(`proc macro ${name} was not built`);
+        dirs.push(join(target, entry.name, "debug"));
+  } catch {
+    /* no target directory */
+  }
+  return dirs;
+}
+
+/**
+ * Expected build scripts that did not finish and expected proc macros that
+ * were not built, read from the run's target directory (rust-analyzer exits
+ * 0 and says nothing when either fails). A build script has finished when
+ * one of its run directories holds `output`; a proc macro when its library
+ * exists. Counted per name, so two versions of one package need two.
+ */
+export async function unfinished(
+  target: string,
+  units: ExpectedUnits,
+): Promise<string[]> {
+  const finished = new Map<string, number>();
+  const libraries: string[] = [];
+  for (const profile of await profileDirs(target)) {
+    try {
+      const build = join(profile, "build");
+      for (const dir of await readdir(build)) {
+        if (!existsSync(join(build, dir, "output"))) continue;
+        const name = dir.replace(/-[0-9a-f]{16}$/, "");
+        finished.set(name, (finished.get(name) ?? 0) + 1);
+      }
+    } catch {
+      /* no build directory */
+    }
+    try {
+      libraries.push(...(await readdir(join(profile, "deps"))));
+    } catch {
+      /* nothing built */
+    }
+  }
+  const out: string[] = [];
+  for (const [name, count] of Object.entries(units.buildScripts).sort())
+    if ((finished.get(name) ?? 0) < count)
+      out.push(`build script of ${name} did not finish`);
+  for (const [name, count] of Object.entries(units.procMacros).sort()) {
+    const built = libraries.filter(
+      (file) =>
+        (file.startsWith(`lib${name}-`) && /\.(so|dylib)$/.test(file)) ||
+        (file.startsWith(`${name}-`) && file.endsWith(".dll")),
+    ).length;
+    if (built < count) out.push(`proc macro ${name} was not built`);
+  }
   return out;
+}
+
+/**
+ * C-43 review: the files where a proc macro failed to expand (it panicked,
+ * was not built or could not be loaded), from `rust-analyzer diagnostics`.
+ * The SCIP index does not carry diagnostics, and rust-analyzer exits 0 and
+ * logs nothing when a proc macro panics. A link in such a file may name the
+ * wrong item, so its answers are withheld.
+ */
+export function procMacroFailures(
+  output: string,
+  project: string,
+): { files: Map<string, string>; complete: boolean } {
+  const files = new Map<string, string>();
+  const line =
+    /file (.+?): Error Ra\("macro-error", Error\) from LineCol \{ line: (\d+)[^}]*\} to LineCol \{[^}]*\}: (.*)$/;
+  for (const text of output.split(/\r?\n|\r/)) {
+    const match = line.exec(text);
+    if (!match) continue;
+    const [, path, row, message] = match;
+    if (!/proc[- ]macro/i.test(message!)) continue;
+    const rel = path!.startsWith(project + sep)
+      ? path!.slice(project.length + 1)
+      : path!;
+    if (!files.has(rel))
+      files.set(rel, `${message!.trim()} (line ${Number(row) + 1})`);
+  }
+  return { files, complete: /diagnostic scan complete/.test(output) };
 }
 
 export interface AnalyzerRun {
   scip: Uint8Array;
   /** Why the index is partial; empty when it is complete. */
   partial: string[];
+  /** Files whose answers are withheld (a proc macro failed there), with why. */
+  withheld: Record<string, string>;
+  /** The build target the run used: the host, or `[build] target`. */
+  target: string;
   facts: CargoFacts;
   /** Read from the rebuildable folder, not run (inputs unchanged). */
   cached: boolean;
@@ -544,6 +687,183 @@ export async function routeKey(
   );
 }
 
+/**
+ * The build target the configuration names: `[build] target` in the
+ * project's `.cargo/config.toml` (or `.cargo/config`), else the user's
+ * cargo configuration, else the host. A list of targets or a target file is
+ * not one configuration.
+ */
+export function buildTarget(
+  texts: readonly (string | undefined)[],
+  host: string,
+): string | Unavailable {
+  for (const text of texts) {
+    if (!text) continue;
+    const section = /^\s*\[build\]\s*$([\s\S]*?)(?=^\s*\[|(?![\s\S]))/m.exec(
+      text,
+    )?.[1];
+    const inline = /^\s*build\.target\s*=\s*(.+)$/m.exec(text)?.[1];
+    const value =
+      inline ?? (section && /^\s*target\s*=\s*(.+)$/m.exec(section)?.[1]);
+    if (!value) continue;
+    const single = /^"([^"]+)"\s*(#.*)?$/.exec(value.trim())?.[1];
+    if (!single)
+      return {
+        unavailable: `the Cargo configuration names more than one build target (${value.trim()}); the route uses one configuration`,
+      };
+    if (single.endsWith(".json"))
+      return {
+        unavailable: `the Cargo configuration names a target file (${single}); the route supports named targets only`,
+      };
+    return single;
+  }
+  return host;
+}
+
+/** A lock the operating system owns, held while a run's folder is in use. */
+type RunLock = { close(): void };
+function lockRun(path: string): RunLock | undefined {
+  try {
+    const { DatabaseSync } = process.getBuiltinModule(
+      "node:sqlite",
+    ) as typeof import("node:sqlite");
+    const db = new DatabaseSync(path);
+    db.exec("PRAGMA busy_timeout=0");
+    db.exec("BEGIN IMMEDIATE");
+    return {
+      close: () => {
+        try {
+          if (db.isTransaction) db.exec("ROLLBACK");
+          db.close();
+        } catch {
+          /* closed */
+        }
+      },
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Removes a run folder: write permission is added to its directories first
+ * when a plain removal fails (a read-only checkout's copy, read-only crate
+ * sources). Never throws: a folder it cannot remove is left for the next
+ * run's sweep, and the run's own outcome stands.
+ */
+export async function removeRun(path: string): Promise<boolean> {
+  try {
+    await rm(path, { recursive: true, force: true });
+    return true;
+  } catch {
+    /* add write permission and retry */
+  }
+  const open = async (dir: string): Promise<void> => {
+    try {
+      await chmod(dir, 0o700);
+    } catch {
+      /* not ours */
+    }
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries)
+      if (entry.isDirectory()) await open(join(dir, entry.name));
+  };
+  await open(path);
+  try {
+    await rm(path, { recursive: true, force: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Removes run folders left by a run that is no longer live: one killed, or
+ * one whose cleanup failed. A live run holds a lock the operating system
+ * releases when its process ends (`run-<id>.lock`); a folder whose lock can
+ * be taken, or that has none, belongs to no live run.
+ */
+export async function sweepStaleRuns(workDir: string): Promise<number> {
+  let removed = 0;
+  let names: string[];
+  try {
+    names = await readdir(workDir);
+  } catch {
+    return 0;
+  }
+  for (const name of names) {
+    if (!/^run-[0-9a-f-]{36}$/.test(name)) continue;
+    const lockPath = join(workDir, `${name}.lock`);
+    const lock = existsSync(lockPath) ? lockRun(lockPath) : { close() {} };
+    if (!lock) continue; // held: a live run
+    try {
+      if (await removeRun(join(workDir, name))) removed++;
+    } finally {
+      lock.close();
+    }
+    await rm(lockPath, { force: true }).catch(() => {});
+  }
+  return removed;
+}
+
+/**
+ * Copies the project for a run (C-43 review): directories and regular files
+ * only, owner-writable; a FIFO, socket or device is not copied; a symbolic
+ * link is copied only when it resolves inside the project, as a relative
+ * link inside the copy; an unreadable file or folder is left out. Returns
+ * what was left out. The snapshot's Rust files are written over the copy
+ * afterwards, so an unreadable Rust file the index captured is still there.
+ */
+export async function copyProject(
+  root: string,
+  to: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const left: string[] = [];
+  const inside = (path: string) => path === root || path.startsWith(root + sep);
+  const walk = async (dir: string, rel: string, out: string) => {
+    signal?.throwIfAborted();
+    await mkdir(out, { recursive: true, mode: 0o700 });
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      left.push(`${rel || "."}/ (unreadable)`);
+      return;
+    }
+    for (const entry of entries) {
+      const source = join(dir, entry.name);
+      const target = join(out, entry.name);
+      const path = rel ? `${rel}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        if (!skipped(source, entry.name, rel === ""))
+          await walk(source, path, target);
+      } else if (entry.isFile()) {
+        try {
+          const mode = (await lstat(source)).mode;
+          await copyFile(source, target);
+          await chmod(target, 0o600 | (mode & 0o111));
+        } catch {
+          left.push(`${path} (unreadable)`);
+        }
+      } else if (entry.isSymbolicLink()) {
+        const real = await realpath(source).catch(() => null);
+        if (real && inside(real)) {
+          const there = join(to, relative(root, real));
+          await symlink(relative(dirname(target), there) || ".", target);
+        } else left.push(`${path} (a link out of the project)`);
+      } else left.push(`${path} (not a file or folder)`);
+    }
+  };
+  await walk(root, "", to);
+  return left;
+}
+
 /** rust-analyzer's SCIP index of this snapshot, from the cache or a fresh run. */
 export async function runAnalyzer(
   root: string,
@@ -555,23 +875,54 @@ export async function runAnalyzer(
   controls: RunControls = {},
 ): Promise<AnalyzerRun | Unavailable> {
   await mkdir(workDir, { recursive: true });
+  if (existsSync(join(root, "rust-project.json")))
+    return {
+      unavailable:
+        "the project has a rust-project.json, which rust-analyzer reads instead of Cargo.toml; the route supports Cargo projects only",
+    };
+  const configText = (path: string) =>
+    contexts.find((file) => file.path === path)?.text;
+  const userConfig = ["config.toml", "config"].map((name) => {
+    try {
+      return readFileSync(join(install.cargoHome, name), "utf8");
+    } catch {
+      return undefined;
+    }
+  });
+  const buildFor = buildTarget(
+    [
+      configText(".cargo/config.toml"),
+      configText(".cargo/config"),
+      ...userConfig,
+    ],
+    install.host,
+  );
+  if (typeof buildFor !== "string") return buildFor;
   const key = await routeKey(root, install, sources, contexts, signal);
   const stem = join(workDir, `scip-${key.slice(0, 32)}`);
   if (existsSync(`${stem}.json`) && existsSync(`${stem}.scip`)) {
     const record = JSON.parse(await readFile(`${stem}.json`, "utf8")) as {
       partial: string[];
       facts: CargoFacts;
+      withheld?: Record<string, string>;
+      target?: string;
     };
     return {
       scip: await readFile(`${stem}.scip`),
       partial: record.partial,
+      withheld: record.withheld ?? {},
+      target: record.target ?? buildFor,
       facts: record.facts,
       cached: true,
       key,
       elapsedMs: 0,
     };
   }
-  const run = join(workDir, `run-${randomUUID()}`);
+  const id = randomUUID();
+  const run = join(workDir, `run-${id}`);
+  // Held for the whole run; the operating system releases it if this
+  // process dies, so the next run's sweep can remove the folder.
+  const lock = lockRun(`${run}.lock`);
   const project = join(run, "project");
   const target = join(run, "target");
   const env = {
@@ -580,24 +931,18 @@ export async function runAnalyzer(
     CARGO_TARGET_DIR: target,
     CARGO_NET_OFFLINE: "true",
   };
+  const options = (timeoutMs: number) => ({
+    cwd: project,
+    timeoutMs,
+    maxBytes: OUTPUT_LIMIT,
+    env,
+    ...(signal ? { signal } : {}),
+    ...(controls.clock ? { clock: controls.clock } : {}),
+  });
   try {
     signal?.throwIfAborted();
-    await mkdir(run, { recursive: true });
-    await cp(root, project, {
-      recursive: true,
-      verbatimSymlinks: true,
-      filter: (source) => {
-        const rel = source === root ? "" : source.slice(root.length + 1);
-        if (!rel) return true;
-        let isDir = false;
-        try {
-          isDir = statSync(source).isDirectory();
-        } catch {
-          return true;
-        }
-        return !isDir || !skipped(source, basename(source), !rel.includes("/"));
-      },
-    });
+    await mkdir(run, { recursive: true, mode: 0o700 });
+    await copyProject(root, project, signal);
     // The snapshot's Rust files, as the index read them.
     for (const file of sources) {
       const path = join(project, file.path);
@@ -618,16 +963,9 @@ export async function runAnalyzer(
         "1",
         "--offline",
         "--filter-platform",
-        install.host,
+        buildFor,
       ],
-      {
-        cwd: project,
-        timeoutMs: 10 * 60_000,
-        maxBytes: OUTPUT_LIMIT,
-        env,
-        ...(signal ? { signal } : {}),
-        ...(controls.clock ? { clock: controls.clock } : {}),
-      },
+      options(10 * 60_000),
     );
     cancelled(meta);
     let facts: CargoFacts = {
@@ -635,9 +973,39 @@ export async function runAnalyzer(
       procMacroTargets: [],
       libraryRoots: [],
     };
+    let units: ExpectedUnits | undefined;
     if (meta.kind === "exited" && meta.code === 0)
       try {
-        facts = cargoFacts(JSON.parse(meta.stdout) as Metadata, project);
+        const metadata = JSON.parse(meta.stdout) as Metadata;
+        facts = cargoFacts(metadata, project);
+        // What cargo builds for this configuration (feature-resolved).
+        const tree = await runProcess(
+          install.cargo,
+          [
+            "tree",
+            "--workspace",
+            "--offline",
+            "--target",
+            buildFor,
+            "-e",
+            "normal,build,dev",
+            "--prefix",
+            "none",
+            "--format",
+            "{p}",
+            "--charset",
+            "ascii",
+          ],
+          options(10 * 60_000),
+        );
+        cancelled(tree);
+        units = expectedUnits(
+          metadata,
+          tree.kind === "exited" && tree.code === 0
+            ? treePackages(tree.stdout)
+            : undefined,
+        );
+        if (!units) partial.push("cargo metadata gave no resolved graph");
       } catch {
         partial.push("cargo metadata gave unreadable output");
       }
@@ -661,16 +1029,8 @@ export async function runAnalyzer(
         "--config-path",
         join(run, "analyzer.json"),
       ],
-      {
-        cwd: project,
-        timeoutMs: controls.limitMs ?? RUN_LIMIT_MS,
-        maxBytes: OUTPUT_LIMIT,
-        env,
-        ...(signal ? { signal } : {}),
-        ...(controls.clock ? { clock: controls.clock } : {}),
-      },
+      options(controls.limitMs ?? RUN_LIMIT_MS),
     );
-    const elapsedMs = performance.now() - started;
     cancelled(result);
     if (result.kind !== "exited" || result.code !== 0)
       return {
@@ -685,20 +1045,64 @@ export async function runAnalyzer(
     if (size > SCIP_LIMIT)
       return { unavailable: `the index is larger than ${SCIP_LIMIT} bytes` };
     const scip = await readFile(output);
-    partial.push(...(await unfinished(target, facts)));
-    // Keep it: a later index with the same inputs reads it.
-    const id = randomUUID();
-    await writeFile(`${stem}.${id}.partial`, scip);
-    await rename(`${stem}.${id}.partial`, `${stem}.scip`);
-    await writeFile(
-      `${stem}.json.${id}.partial`,
-      JSON.stringify({ partial, facts }),
+    if (units) partial.push(...(await unfinished(target, units)));
+    // Proc macros that failed to expand, per file. The same target folder,
+    // so build scripts and proc macros are not built again.
+    const diagnostics = await runProcess(
+      install.analyzer,
+      ["diagnostics", "."],
+      options(controls.limitMs ?? RUN_LIMIT_MS),
     );
-    await rename(`${stem}.json.${id}.partial`, `${stem}.json`);
-    await prune(workDir, stem);
-    return { scip, partial, facts, cached: false, key, elapsedMs };
+    cancelled(diagnostics);
+    const failures = procMacroFailures(diagnostics.stdout, project);
+    if (diagnostics.kind !== "exited" || !failures.complete)
+      partial.push(
+        `rust-analyzer diagnostics did not finish (${diagnostics.kind === "exited" ? `exited ${diagnostics.code}` : diagnostics.kind}), so proc-macro failures are unknown`,
+      );
+    const withheld = Object.fromEntries([...failures.files].sort());
+    // An item a failed macro would have generated can be called from any
+    // file, and rust-analyzer may then name another item of that name: no
+    // answer is applied anywhere (the files are listed in the report).
+    if (failures.files.size)
+      partial.push(
+        `a proc macro failed to expand in ${failures.files.size} file${failures.files.size === 1 ? "" : "s"}: ${Object.entries(
+          withheld,
+        )
+          .slice(0, 3)
+          .map(([file, why]) => `${file}: ${why}`)
+          .join("; ")}`,
+      );
+    const elapsedMs = performance.now() - started;
+    // Kept only when complete: a partial index or a failed proc macro may
+    // come from the environment (a missing system library), which the key
+    // does not see, so it is run again next time.
+    if (!partial.length && !failures.files.size) {
+      const tmp = randomUUID();
+      await writeFile(`${stem}.${tmp}.partial`, scip);
+      await rename(`${stem}.${tmp}.partial`, `${stem}.scip`);
+      await writeFile(
+        `${stem}.json.${tmp}.partial`,
+        JSON.stringify({ partial, facts, withheld, target: buildFor }),
+      );
+      await rename(`${stem}.json.${tmp}.partial`, `${stem}.json`);
+      await prune(workDir, stem);
+    }
+    return {
+      scip,
+      partial,
+      withheld,
+      target: buildFor,
+      facts,
+      cached: false,
+      key,
+      elapsedMs,
+    };
   } finally {
-    await rm(run, { recursive: true, force: true });
+    // Never masks the run's own outcome: a folder that cannot be removed is
+    // left for the next sweep.
+    await removeRun(run);
+    lock?.close();
+    await rm(`${run}.lock`, { force: true }).catch(() => {});
   }
 }
 

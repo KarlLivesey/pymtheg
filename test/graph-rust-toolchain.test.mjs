@@ -6,6 +6,7 @@ import "./isolated-config.mjs";
 // rust-src. No test asserts a time; the hang is ended by the index's
 // signal or a controlled clock after a readiness handshake.
 import assert from "node:assert/strict";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -20,7 +21,7 @@ import {
 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, dirname, join } from "node:path";
+import { basename, delimiter, dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
@@ -126,31 +127,41 @@ function fakeToolchain(dir, behaviour) {
     rustc: `if (a[0] === "--print") { console.log(b.sysroot); process.exit(0); }
 if (a[0] === "-vV") { console.log("rustc 1.98.1 (fake)\\nbinary: rustc\\nhost: x86_64-unknown-linux-gnu\\nrelease: 1.98.1"); process.exit(0); }
 process.exit(2);`,
-    cargo: `if (a[0] === "metadata") {
+    cargo: `if (a[0] === "tree") {
+  if (!b.tree) process.exit(2);
+  console.log(b.tree.join("\\n").replaceAll("@ROOT@", process.cwd()));
+  process.exit(0);
+}
+if (a[0] === "metadata") {
+  fs.writeFileSync(path.join(__dirname, "cargo-args.json"), JSON.stringify(a));
   if (!b.metadata) { console.error("error: failed to get \`dep\` as a dependency (offline)"); process.exit(101); }
   console.log(JSON.stringify(b.metadata).replaceAll("@ROOT@", process.cwd()));
   process.exit(0);
 }
 process.exit(2);`,
     "rust-analyzer": `if (a[0] === "--version") { console.log("rust-analyzer 1.98.1 (fake 2026-09-01)"); process.exit(0); }
+if (a[0] === "diagnostics") {
+  process.stdout.write((b.diagnostics ?? "diagnostic scan complete\\n").replaceAll("@ROOT@", process.cwd()));
+  process.exit(b.diagnosticsExit ?? 0);
+}
 if (a[0] === "scip") {
   fs.appendFileSync(b.runs, "run\\n");
   fs.writeFileSync(b.seen, JSON.stringify({ cwd: process.cwd(), env: process.env, config: JSON.parse(fs.readFileSync(a[a.indexOf("--config-path") + 1], "utf8")),
     files: fs.readdirSync(process.cwd(), { recursive: true }).map(String).sort(), lib: fs.existsSync("src/lib.rs") ? fs.readFileSync("src/lib.rs", "utf8") : null }));
   if (b.hang) { fs.writeFileSync(b.ready, String(process.pid)); setInterval(() => {}, 1000); return; }
   for (const o of b.buildOutputs ?? []) {
-    const d = path.join(process.env.CARGO_TARGET_DIR, "debug", "build", o.dir);
+    const d = path.join(process.env.CARGO_TARGET_DIR, b.triple ?? "", "debug", "build", o.dir);
     fs.mkdirSync(d, { recursive: true });
     fs.writeFileSync(path.join(d, "invoked.timestamp"), "");
     if (o.output) fs.writeFileSync(path.join(d, "output"), "");
   }
   for (const [dir, file] of b.fingerprints ?? []) {
-    const d = path.join(process.env.CARGO_TARGET_DIR, "debug", ".fingerprint", dir);
+    const d = path.join(process.env.CARGO_TARGET_DIR, b.triple ?? "", "debug", ".fingerprint", dir);
     fs.mkdirSync(d, { recursive: true });
     fs.writeFileSync(path.join(d, file), "");
   }
   for (const file of b.deps ?? []) {
-    const d = path.join(process.env.CARGO_TARGET_DIR, "debug", "deps");
+    const d = path.join(process.env.CARGO_TARGET_DIR, b.triple ?? "", "debug", "deps");
     fs.mkdirSync(d, { recursive: true });
     fs.writeFileSync(path.join(d, file), "");
   }
@@ -224,6 +235,7 @@ const metadata = (extra = {}) => ({
     {
       id: "gates 0.1.0",
       name: "gates",
+      version: "0.1.0",
       targets: [
         { kind: ["lib"], name: "gates", src_path: "@ROOT@/src/lib.rs" },
         ...(extra.targets ?? []),
@@ -232,7 +244,12 @@ const metadata = (extra = {}) => ({
     ...(extra.packages ?? []),
   ],
   workspace_members: ["gates 0.1.0"],
-  resolve: { nodes: [{ id: "gates 0.1.0" }, ...(extra.nodes ?? [])] },
+  resolve: {
+    nodes: [
+      { id: "gates 0.1.0", deps: extra.deps ?? [] },
+      ...(extra.nodes ?? []),
+    ],
+  },
 });
 
 /** The gate project's SCIP with the `t.go` site in caller() answered by `answer` (one or more symbols). */
@@ -705,11 +722,24 @@ test("partial: offline cargo metadata fails, or a build script does not finish; 
             },
           ],
           nodes: [{ id: "pm 0.1.0" }],
+          deps: [{ pkg: "pm 0.1.0", dep_kinds: [{ kind: null }] }],
         }),
-        // Compiled (its compiler messages are recorded) but no library.
-        fingerprints: [["pm-0123456789abcdef", "output-lib-pm"]],
+        // C-43 review: cargo never attempted it (a dependency of the macro
+        // failed to compile), so it left no fingerprint and no library.
       },
       /^proc macro pm was not built$/,
+    ],
+    [
+      {
+        metadata: metadata(),
+        diagnostics:
+          'at crate gates, file @ROOT@/src/lib.rs: Error Ra("macro-error", Error) from LineCol { line: 2, col: 4 } to LineCol { line: 2, col: 9 }: proc-macro panicked: planted panic\ndiagnostic scan complete\n',
+      },
+      /^a proc macro failed to expand in 1 file: src\/lib\.rs: proc-macro panicked: planted panic \(line 3\)$/,
+    ],
+    [
+      { metadata: metadata(), diagnostics: "", diagnosticsExit: 101 },
+      /^rust-analyzer diagnostics did not finish \(exited 101\), so proc-macro failures are unknown$/,
     ],
   ]) {
     await scratch(async (root) => {
@@ -729,6 +759,12 @@ test("partial: offline cargo metadata fails, or a build script does not finish; 
         false,
       );
       assert.equal(note(dump.report, "merged"), undefined);
+      // Never cached: whatever made it partial may be fixed outside the key.
+      const again = await index(project, root, {
+        environment: environment(tools),
+      });
+      assert.equal(again.state.cached, false);
+      assert.equal(again.state.state, "partial");
     });
   }
 });
@@ -761,8 +797,24 @@ test("not partial: packages cargo metadata lists but the run never builds, a fin
     const tools = fakeToolchain(join(root, "tools"), {
       scip,
       metadata: metadata({
+        targets: [
+          {
+            kind: ["custom-build"],
+            name: "build-script-build",
+            src_path: "@ROOT@/build.rs",
+          },
+        ],
         packages: [pm, unused],
-        nodes: [{ id: "pm 0.1.0" }, { id: "opt 0.1.0" }],
+        // pm is needed; opt only as a dev-dependency of pm, which is not a
+        // member, so the run never builds it.
+        nodes: [
+          {
+            id: "pm 0.1.0",
+            deps: [{ pkg: "opt 0.1.0", dep_kinds: [{ kind: "dev" }] }],
+          },
+          { id: "opt 0.1.0" },
+        ],
+        deps: [{ pkg: "pm 0.1.0", dep_kinds: [{ kind: null }] }],
       }),
       buildOutputs: [
         { dir: "gates-0123456789abcdef", output: false },
@@ -775,6 +827,55 @@ test("not partial: packages cargo metadata lists but the run never builds, a fin
       environment: environment(tools),
     });
     assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+  });
+});
+
+test("review: the expected units are what cargo tree builds; an optional dependency cargo metadata's resolve lists is not expected", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, GATES);
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    // As jiff and defmt on actix-web: the resolve lists defmt, no enabled
+    // feature turns it on, and cargo never builds it.
+    const defmt = {
+      id: "defmt 1.0.0",
+      name: "defmt",
+      version: "1.0.0",
+      targets: [
+        { kind: ["lib"], name: "defmt", src_path: "/z/src/lib.rs" },
+        {
+          kind: ["custom-build"],
+          name: "build-script-build",
+          src_path: "/z/build.rs",
+        },
+      ],
+    };
+    const behaviour = {
+      scip,
+      metadata: metadata({
+        packages: [defmt],
+        nodes: [{ id: "defmt 1.0.0" }],
+        deps: [{ pkg: "defmt 1.0.0", dep_kinds: [{ kind: null }] }],
+      }),
+    };
+    const withTree = fakeToolchain(join(root, "tools"), {
+      ...behaviour,
+      tree: ["gates v0.1.0 (@ROOT@)"],
+    });
+    const used = await index(project, root, {
+      environment: environment(withTree),
+    });
+    assert.equal(used.state.state, "used", JSON.stringify(used.state));
+    // Without cargo tree the resolve is walked, and the unbuilt build script
+    // makes the index partial (erring towards partial).
+    const noTree = fakeToolchain(join(root, "tools2"), behaviour);
+    const walked = await index(project, root, {
+      environment: environment(noTree),
+      toolchainDirectory: "toolchain2",
+    });
+    assert.equal(walked.state.state, "partial");
+    assert.equal(walked.state.reason, "build script of defmt did not finish");
   });
 });
 
@@ -1050,6 +1151,212 @@ test("graph answers report the Rust route's state beside Go's", async () => {
   });
 });
 
+// ---------------------------------------------------------------- C-43 review: the route never makes source-only worse
+
+const runFolders = (root) => {
+  const dir = join(root, "toolchain", "rust");
+  return existsSync(dir)
+    ? readdirSync(dir).filter((n) => /^run-[0-9a-f-]{36}$/.test(n))
+    : [];
+};
+
+test("review B2: a FIFO, an unreadable file and a read-only checkout leave the route used, every Rust file analysed and no run folder", async () => {
+  for (const shape of ["fifo", "unreadable", "read-only"]) {
+    await scratch(async (root) => {
+      const project = join(root, "project");
+      writeProject(project, { ...GATES, "notes/data.txt": "data" });
+      if (shape === "fifo")
+        execFileSync("mkfifo", [join(project, "notes", "pipe")]);
+      if (shape === "unreadable") chmodSync(join(project, "notes/data.txt"), 0);
+      const readOnly = (dir) => {
+        for (const name of readdirSync(dir)) {
+          const p = join(dir, name);
+          if (statSync(p).isDirectory()) readOnly(p);
+          else chmodSync(p, 0o444);
+        }
+        chmodSync(dir, 0o555);
+      };
+      if (shape === "read-only") readOnly(project);
+      try {
+        const scip = join(root, "answer.scip");
+        writeFileSync(scip, gateScip());
+        const tools = fakeToolchain(join(root, "tools"), {
+          scip,
+          metadata: metadata(),
+        });
+        const dump = await index(project, root, {
+          environment: environment(tools),
+        });
+        assert.equal(
+          dump.state.state,
+          "used",
+          shape + JSON.stringify(dump.state),
+        );
+        assert.equal(dump.report.failedCount, 0, shape);
+        assert.deepEqual(dump.report.analysisErrors, [], shape);
+        assert.deepEqual(runFolders(root), [], shape);
+        const seen = JSON.parse(readFileSync(tools.seen, "utf8"));
+        assert.equal(seen.files.includes("notes/pipe"), false, shape);
+        assert.equal(seen.files.includes("src/lib.rs"), true, shape);
+      } finally {
+        // The scratch folder must be removable.
+        execFileSync("chmod", ["-R", "u+rwX", project]);
+      }
+    });
+  }
+});
+
+test("review B2: an unexpected failure in the route reports unavailable with its reason and keeps the source-only rows", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, GATES);
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip: join(root, "none.scip"),
+      metadata: metadata(),
+    });
+    const off = await index(project, root, { toolchains: null });
+    // The toolchain folder is a file: creating the run folder fails.
+    writeFileSync(join(root, "blocked"), "a file, not a folder");
+    const dump = await index(project, root, {
+      environment: environment(tools),
+      toolchainDirectory: "blocked",
+    });
+    assert.equal(dump.state.state, "unavailable");
+    assert.match(dump.state.reason, /^the toolchain route failed: /);
+    assert.equal(dump.report.failedCount, 0);
+    assert.deepEqual(dump.report.analysisErrors, []);
+    assert.deepEqual(
+      dump.links.map((l) => [l.id, l.resolution, l.targetId]),
+      off.links.map((l) => [l.id, l.resolution, l.targetId]),
+    );
+  });
+});
+
+test("review B2: run folders of runs that are no longer live are swept; a live run's folder is kept", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, GATES);
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip,
+      metadata: metadata(),
+    });
+    const work = join(root, "toolchain", "rust");
+    const dead = join(work, "run-00000000-0000-4000-8000-000000000001");
+    const live = join(work, "run-00000000-0000-4000-8000-000000000002");
+    mkdirSync(join(dead, "project"), { recursive: true });
+    // A read-only folder in the dead run, as a read-only checkout's copy.
+    mkdirSync(join(dead, "project", "locked"));
+    writeFileSync(join(dead, "project", "locked", "f"), "x");
+    chmodSync(join(dead, "project", "locked"), 0o555);
+    mkdirSync(live, { recursive: true });
+    // Another process holds the live run's lock until told to stop.
+    const holder = spawn(
+      process.execPath,
+      [
+        "-e",
+        "const {DatabaseSync}=require('node:sqlite');const d=new DatabaseSync(process.argv[1]);d.exec('BEGIN IMMEDIATE');console.log('held');process.stdin.on('data',()=>process.exit(0));",
+        live + ".lock",
+      ],
+      { stdio: ["pipe", "pipe", "inherit"] },
+    );
+    await new Promise((resolve) => holder.stdout.once("data", resolve));
+    try {
+      await index(project, root, { environment: environment(tools) });
+      assert.deepEqual(runFolders(root), [basename(live)]);
+    } finally {
+      holder.stdin.write("stop\n");
+      await new Promise((resolve) => holder.once("exit", resolve));
+    }
+    // The holder is gone: the next run sweeps that folder too.
+    writeFileSync(join(project, "notes.txt"), "changed");
+    await index(project, root, { environment: environment(tools) });
+    assert.deepEqual(runFolders(root), []);
+  });
+});
+
+test("review: [build] target is honoured and recorded; a list of targets, a target file and a rust-project.json are unavailable", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    const triple = "aarch64-unknown-linux-gnu";
+    writeProject(project, {
+      ...GATES,
+      ".cargo/config.toml": '[build]\ntarget = "' + triple + '"\n',
+    });
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip,
+      triple,
+      metadata: metadata({
+        targets: [
+          {
+            kind: ["custom-build"],
+            name: "build-script-build",
+            src_path: "@ROOT@/build.rs",
+          },
+        ],
+      }),
+      // The build script's output lives under target/<triple>/debug.
+      buildOutputs: [{ dir: "gates-0123456789abcdef", output: true }],
+    });
+    const dump = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+    assert.match(
+      dump.state.configuration,
+      /^aarch64-unknown-linux-gnu \(\[build\] target\)/,
+    );
+    const args = JSON.parse(
+      readFileSync(join(dirname(tools.runs), "cargo-args.json"), "utf8"),
+    );
+    assert.equal(args[args.indexOf("--filter-platform") + 1], triple);
+  });
+  for (const [files, reason] of [
+    [
+      { ".cargo/config.toml": '[build]\ntarget = ["a-b-c", "d-e-f"]\n' },
+      /names more than one build target/,
+    ],
+    [
+      { ".cargo/config.toml": '[build]\ntarget = "my-board.json"\n' },
+      /names a target file/,
+    ],
+    [{ "rust-project.json": "{}" }, /rust-project\.json/],
+  ])
+    await scratch(async (root) => {
+      const project = join(root, "project");
+      writeProject(project, { ...GATES, ...files });
+      const tools = fakeToolchain(join(root, "tools"), {
+        scip: join(root, "none.scip"),
+        metadata: metadata(),
+      });
+      const dump = await index(project, root, {
+        environment: environment(tools),
+      });
+      assert.equal(dump.state.state, "unavailable");
+      assert.match(dump.state.reason, reason);
+      assert.equal(runs(tools), 0);
+    });
+});
+
+test("review: a toolchain outside rustup's toolchains folder is pinned by its sysroot path", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, GATES);
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip,
+      metadata: metadata(),
+    });
+    await index(project, root, { environment: environment(tools) });
+    const seen = JSON.parse(readFileSync(tools.seen, "utf8"));
+    assert.equal(seen.env.RUSTUP_TOOLCHAIN, tools.sysroot);
+  });
+});
+
 // ---------------------------------------------------------------- the real rust-analyzer
 
 const haveRealAnalyzer = (() => {
@@ -1125,6 +1432,100 @@ test(
         return;
       assert.equal(dump.state.state, "partial", JSON.stringify(dump.state));
       assert.equal(dump.state.reason, "build script of app did not finish");
+      assert.equal(
+        dump.links.some((l) => l.data?.toolchain),
+        false,
+      );
+    });
+  },
+);
+
+/** The reviewer's repro: Greeter also implements a trait with a hello() method. */
+function withHiTrait(project) {
+  const lib = join(project, "app/src/lib.rs");
+  writeFileSync(
+    lib,
+    readFileSync(lib, "utf8") +
+      "\npub trait Hi {\n    fn hello(&self) -> &'static str;\n}\n\nimpl Hi for Greeter {\n    fn hello(&self) -> &'static str {\n        \"hi\"\n    }\n}\n",
+  );
+}
+const helloLink = (dump) =>
+  dump.links.find(
+    (l) => l.file === "app/src/lib.rs" && l.targetName === "Greeter.hello",
+  );
+
+test(
+  "real rust-analyzer, review B1: a proc macro whose dependency fails to compile is never attempted; the route reports partial and applies no answer",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "basic");
+      cpSync(FIXTURE, project, { recursive: true });
+      writeProject(project, {
+        "helper/Cargo.toml":
+          '[package]\nname = "helper"\nversion = "0.1.0"\nedition = "2021"\n',
+        "helper/src/lib.rs": 'pub fn name() -> u32 {\n    "no"\n}\n',
+      });
+      writeFileSync(
+        join(project, "Cargo.toml"),
+        '[workspace]\nmembers = ["app", "macros", "helper"]\nresolver = "2"\n',
+      );
+      writeFileSync(
+        join(project, "macros/Cargo.toml"),
+        readFileSync(join(project, "macros/Cargo.toml"), "utf8") +
+          '\n[dependencies]\nhelper = { path = "../helper" }\n',
+      );
+      await rm(join(project, "Cargo.lock"), { force: true });
+      withHiTrait(project);
+      const dump = await index(project, root, { environment: process.env });
+      if (
+        dump.state.state === "unavailable" &&
+        /rust-src/.test(dump.state.reason)
+      )
+        return;
+      assert.equal(dump.state.state, "partial", JSON.stringify(dump.state));
+      assert.ok(
+        dump.state.partial.some((p) =>
+          /^proc macro macros was not built$/.test(p),
+        ),
+        JSON.stringify(dump.state.partial),
+      );
+      assert.equal(
+        dump.links.some((l) => l.data?.toolchain),
+        false,
+      );
+      assert.equal(helloLink(dump)?.data?.toolchain, undefined);
+    });
+  },
+);
+
+test(
+  "real rust-analyzer, review B1: a proc macro that panics while expanding makes the route partial (rust-analyzer diagnostics), with the file named",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "basic");
+      cpSync(FIXTURE, project, { recursive: true });
+      const macros = join(project, "macros/src/lib.rs");
+      writeFileSync(
+        macros,
+        readFileSync(macros, "utf8").replace(
+          "    let text = input.to_string();",
+          '    let text = input.to_string();\n    if text.contains("Greeter") {\n        panic!("planted panic");\n    }',
+        ),
+      );
+      withHiTrait(project);
+      const dump = await index(project, root, { environment: process.env });
+      if (
+        dump.state.state === "unavailable" &&
+        /rust-src/.test(dump.state.reason)
+      )
+        return;
+      assert.equal(dump.state.state, "partial", JSON.stringify(dump.state));
+      assert.match(
+        dump.state.reason,
+        /^a proc macro failed to expand in 1 file: app\/src\/lib\.rs: proc-macro panicked: planted panic/,
+      );
       assert.equal(
         dump.links.some((l) => l.data?.toolchain),
         false,

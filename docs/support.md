@@ -995,18 +995,33 @@ checkout trusted on this machine (below), indexing runs `rust-analyzer` from
 `PATH`, or the absolute path named in your own trust answer file (never one
 that resolves inside the checkout), as `rust-analyzer scip`, and joins its
 index to the parsed Rust links. `cargo` and `rustc` are taken beside it, then
-from `PATH`; under rustup every process is pinned to the toolchain `rustc`
-names outside the project, and that toolchain needs `rust-src`. Policy:
-offline (`CARGO_NET_OFFLINE`); one configuration (host target, default
-features, all targets, `cfg(test)` on, build scripts and proc macros on),
-recorded on every link it decides; rust-analyzer runs on a copy of the project
-(without `target/`, `.git`, `node_modules`, `.pymtheg`; the snapshot's Rust
-files written over it) with a throwaway target directory and a crate-cache
-overlay, all outside the project and removed afterwards; the user's `PATH`
-follows the toolchain's, since build scripts link and may call `cc` or
-`pkg-config`. Running it runs the project's build scripts and proc macros, as
-building it would; there is no sandbox. The run is bounded (one hour, 256 MiB
-of output, a 1 GiB index) and cancellable. The index is cached in the user's
+from `PATH`; every process is pinned (`RUSTUP_TOOLCHAIN`) to the toolchain
+`rustc` names outside the project, by its rustup name, or by its sysroot path
+when it is not under rustup's `toolchains/` folder (a linked or standalone
+toolchain), so a toolchain file in the project cannot choose another; that
+toolchain needs `rust-src`. Policy: offline (`CARGO_NET_OFFLINE`); one
+configuration (the host target, or the one target `[build] target` names in
+the project's or the user's Cargo configuration; default features, all
+targets, `cfg(test)` on, build scripts and proc macros on), recorded on every
+link it decides; rust-analyzer runs on a copy of the project (directories and
+regular files only, without `target/`, `.git`, `node_modules`, `.pymtheg`,
+links out of the project, FIFOs, devices or unreadable files; the snapshot's
+Rust files written over it) with a throwaway target directory and a
+crate-cache overlay, all outside the project and removed afterwards (a run
+folder left by a killed run is removed by the next run, which can tell it is
+no longer live from a lock the operating system releases); the crate archives
+and git databases are symbolic links to the user's own folders, which offline
+cargo only reads; the user's `PATH` follows the toolchain's, since build
+scripts link and may call `cc` or `pkg-config`. Running it runs the
+project's build scripts and proc macros, as building it would; there is no
+sandbox. The run is bounded (one hour, 256 MiB of output, a 1 GiB index) and
+cancellable: in the CLI the index's signal kills the process groups; over MCP
+a cancel asks the job to abort and then terminates its worker, and the server
+kills every process group the job recorded, on cancel and when it exits. A
+CLI killed with SIGKILL runs no code, so its toolchain processes are left to
+end on their own. Any failure of the route other than cancellation reports
+`unavailable` with its reason and leaves the source-only rows as they are.
+A partial index is never cached. The index is cached in the user's
 cache folder (outside the checkout, as for the Go route), keyed by the tool versions, the configuration, every
 captured manifest, lockfile and Cargo configuration, every captured Rust file,
 every other project file's path, size and time, and which lockfile crates are
@@ -1027,12 +1042,16 @@ that the toolchain's declaring path and Pymtheg's written path name one item
 needs an identity rule not built yet. Every answer reports
 `toolchain.rust.state`: `used` (upgraded, confirmed, kept-where-different,
 withheld by gate, library answers), `partial` with the causes (offline
-`cargo metadata` failed, so rust-analyzer fell back to the workspace alone; a
-build script that did not finish or a proc macro that was not built, read from
-the target directory because rust-analyzer exits 0 and says nothing; a library
+`cargo metadata` failed, so rust-analyzer fell back to the workspace alone;
+a build script or proc macro the configuration needs, from `cargo metadata`'s
+resolved graph, that did not finish or was not built, read from the target
+directory because rust-analyzer exits 0 and says nothing; a proc macro that
+failed to expand in some file, from `rust-analyzer diagnostics`; a library
 root missing from the index), in which case no answer is used, or
-`unavailable` with the reason (no `Cargo.toml` at the root, no rust-analyzer,
-cargo or rustc, no `rust-src`, a failed or timed-out run). An edit re-runs
+`unavailable` with the reason (no `Cargo.toml` at the root, a
+`rust-project.json`, more than one build target or a target file, no
+rust-analyzer, cargo or rustc, no `rust-src`, a failed or timed-out run, or
+any other failure of the route). An edit re-runs
 rust-analyzer in full (a cache miss); applying library answers is C-43's second
 part and re-indexing an edit source-only first, with a `stale` state, its third.
 
