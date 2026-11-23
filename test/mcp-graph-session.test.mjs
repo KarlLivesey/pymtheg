@@ -21,6 +21,7 @@ import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 import { module as synthetic } from "./fixtures/graph-core/synthetic.mjs";
 import { keepingModule } from "./fixtures/mcp-graph/keeping-module.mjs";
 import { tableModule } from "./fixtures/graph-session/table-module.mjs";
+import { controlledClock } from "./controlled-clock.mjs";
 
 const production = await discoverLanguages();
 const worker = new URL(
@@ -399,6 +400,47 @@ test("a cancel during query evaluation is acted on at the query's next store rea
     assert.equal(jobs.generation, 1, "acknowledged at a checkpoint");
     assert.equal((await run(jobs)).state, "complete");
     assert.equal(jobs.generation, 1);
+  } finally {
+    await jobs.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a cancel while a module's returned promise is awaited aborts it through the signal; the worker lives", async () => {
+  const { base, root } = tree(synFiles);
+  const { jobs, stopped } = jobsFor(root, "await-module");
+  try {
+    const job = jobs.start({ command: "index" });
+    await stopped();
+    await jobs.cancel(job.id);
+    assert.equal(job.state, "cancelled");
+    assert.equal(job.answer, "cancelled", "the worker answered");
+    assert.equal(jobs.generation, 1, "cancelled cooperatively, not ended");
+  } finally {
+    await jobs.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a module that ignores the abort while its promise is awaited is ended when the cancel's grace ends", async () => {
+  const { base, root } = tree(synFiles);
+  const clock = controlledClock();
+  const { jobs, stopped } = jobsFor(root, "await-deaf", {
+    cancelClock: clock,
+    graceMs: 30_000,
+  });
+  try {
+    const job = jobs.start({ command: "index" });
+    await stopped();
+    const cancelling = jobs.cancel(job.id);
+    while (clock.pending === 0) await new Promise(setImmediate);
+    assert.equal(clock.fireNext(), 30_000);
+    await cancelling;
+    assert.equal(job.state, "cancelled");
+    assert.equal(job.answer, undefined, "the worker never answered");
+    const next = jobs.start({ command: "status" });
+    await next.done;
+    assert.equal(jobs.generation, 2, "the silent worker was ended");
   } finally {
     await jobs.close();
     rmSync(base, { recursive: true, force: true });

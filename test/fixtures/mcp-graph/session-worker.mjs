@@ -15,6 +15,9 @@
 //                        `writes`th committed write (gate[2])
 //         "pause-query"  the keeping module; a query stops inside its first
 //                        call-link read until released
+//         "await-module" the synthetic module; its analysis returns a promise
+//                        that settles only when the signal aborts
+//         "await-deaf"   the same, never settling
 //         "table-race"   the table module (C-45 review); while gate[2] is 1,
 //                        the next run's baseline is preceded by another
 //                        process's complete `graph index` (once)
@@ -108,6 +111,30 @@ if (workerData.mode === "pause-query") {
     }
     return callLinks.apply(this, args);
   };
+}
+if (workerData.mode === "await-module" || workerData.mode === "await-deaf") {
+  // The synthetic module with an analysis that returns at once a promise
+  // that settles only when the signal aborts ("await-module", as Rust's
+  // phase worker does) or never ("await-deaf"). It reports its start.
+  registry = new LanguageRegistry([
+    {
+      ...synthetic,
+      analyze(context) {
+        // Reported after the call has returned its promise, so the worker
+        // is in its "awaiting" section by then.
+        queueMicrotask(() => {
+          Atomics.store(gate, 0, 1);
+          Atomics.notify(gate, 0);
+        });
+        return new Promise((resolve, reject) => {
+          if (workerData.mode === "await-module")
+            context.signal?.addEventListener("abort", () =>
+              reject(context.signal.reason),
+            );
+        });
+      },
+    },
+  ]);
 }
 if (workerData.mode === "table-race") {
   registry = new LanguageRegistry([tableModule]);

@@ -141,12 +141,16 @@ export interface GraphExecutionOptions {
   session?: IndexSession;
   /**
    * C-48: told when a call into a language module (or a toolchain) begins
-   * (true) and ends (false). Between those, the module may run for long
-   * without passing a cancellation checkpoint, so a caller that must cancel
-   * promptly ends the work another way. The abort signal is checked after
-   * the call is announced, so a cancellation set before it is never missed.
+   * (true), when the call has returned a promise that is being awaited
+   * ("awaiting"), and when it has settled (false). During the call itself
+   * the module may run for long without passing a cancellation checkpoint,
+   * so a caller that must cancel promptly ends the work another way. While
+   * its promise is awaited the event loop is free: a module that honours
+   * the abort signal (Rust's phase worker, a toolchain's child process) is
+   * cancelled through it. The abort signal is checked after the call is
+   * announced, so a cancellation set before it is never missed.
    */
-  onModuleCall?: (inside: boolean) => void;
+  onModuleCall?: (inside: boolean | "awaiting") => void;
 }
 const arity: Record<GraphCommand, number> = {
   index: 0,
@@ -319,16 +323,28 @@ export async function executeGraph(
         metadata,
       );
     const complete = previousState?.fingerprint === currentFingerprint();
-    // A toolchain runs outside this process, between checkpoints (C-48).
-    const toolchainCall = async <T>(call: () => Promise<T>): Promise<T> => {
+    // A module's or a toolchain's call (C-48): "inside" while the call
+    // itself runs, "awaiting" while the promise it returned is awaited.
+    const moduleCall = async <T>(call: () => T | Promise<T>): Promise<T> => {
       options.onModuleCall?.(true);
+      let pending: T | Promise<T>;
       try {
         signal.throwIfAborted();
-        return await call();
+        pending = call();
+      } catch (error) {
+        options.onModuleCall?.(false);
+        throw error;
+      }
+      options.onModuleCall?.("awaiting");
+      try {
+        return await pending;
       } finally {
         options.onModuleCall?.(false);
       }
     };
+    // A toolchain runs outside this process, between checkpoints.
+    const toolchainCall = <T>(call: () => Promise<T>): Promise<T> =>
+      moduleCall(call);
     // D22: outside the checkout (the user's cache folder), never in it.
     const toolchainDirectory = toolchainOn ? toolchainWorkDirectory(root) : "";
     // The completion and the analysis completion are read again in one
@@ -433,15 +449,8 @@ export async function executeGraph(
           (dirty.has(file.path) || retry.has(file.path)) &&
           registry.modules.find((m) => m.id === file.module)?.parse,
       ).length;
-      const inModule = async <T>(call: () => T | Promise<T>): Promise<T> => {
-        options.onModuleCall?.(true);
-        try {
-          signal.throwIfAborted();
-          return await call();
-        } finally {
-          options.onModuleCall?.(false);
-        }
-      };
+      const inModule = <T>(call: () => T | Promise<T>): Promise<T> =>
+        moduleCall(call);
       const tracked = new LanguageRegistry(
         registry.modules.map((module) => ({
           ...module,

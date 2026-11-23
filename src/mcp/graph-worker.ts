@@ -25,7 +25,7 @@ import { agentLimits } from "./limits.js";
 import { graphWork, resetGraphWork } from "../graph/work.js";
 import { getHeapStatistics, setFlagsFromString } from "node:v8";
 import { runInNewContext } from "node:vm";
-import { CONTROL } from "./graph-control.js";
+import { CONTROL, SECTION } from "./graph-control.js";
 import { useChildGroups } from "../backends/child-groups.js";
 
 export interface GraphWorkerOptions {
@@ -127,7 +127,15 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
         progress: (progress) =>
           parentPort!.postMessage({ kind: "progress", id, progress }),
         onModuleCall: (inside) =>
-          Atomics.store(control, CONTROL.section, inside ? 1 : 0),
+          Atomics.store(
+            control,
+            CONTROL.section,
+            inside === true
+              ? SECTION.module
+              : inside === "awaiting"
+                ? SECTION.awaiting
+                : SECTION.core,
+          ),
       });
       const view = new GraphView(response);
       if (view.bytes() > agentLimits.graphResultBytes)

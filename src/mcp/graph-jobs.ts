@@ -366,11 +366,14 @@ export class GraphJobs {
         // the worker is asked to abort through its signal, which unwinds
         // the command and lets the toolchain route remove its folder.
         const live = groups ? liveChildGroups(groups).length : 0;
+        const section = Atomics.load(control, CONTROL.section);
         job.worker.postMessage({ kind: "abort" });
         if (groups) killChildGroups(groups);
-        if (live) {
-          // The worker awaits its children, so it answers; a worker that
-          // does not is ended when the grace ends.
+        if (live || section === SECTION.awaiting) {
+          // The worker awaits its children, or a promise a module returned:
+          // its event loop is free, the abort reaches a module that honours
+          // the signal, and it answers. A worker that does not is ended
+          // when the grace ends.
           let timer: unknown;
           await Promise.race([
             job.done,
@@ -380,7 +383,7 @@ export class GraphJobs {
           ]);
           this.cancelClock.cancel(timer);
           if (!job.exited) await this.retire();
-        } else if (Atomics.load(control, CONTROL.section) === SECTION.module)
+        } else if (section === SECTION.module)
           // Inside a module call there may be no checkpoint for long.
           await this.retire();
       } else await job.worker.terminate();
