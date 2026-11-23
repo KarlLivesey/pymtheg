@@ -50,7 +50,9 @@ process.exit(2);`,
     "rust-analyzer": `if (a[0] === "--version") { console.log("rust-analyzer 1.98.1 (fake)"); process.exit(0); }
 if (a[0] === "scip") {
   const script = cp.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
-  fs.writeFileSync(path.join(__dirname, "ready.json"), JSON.stringify({ analyzer: process.pid, script: script.pid }));
+  // Written whole, then renamed: a reader never sees it half-written.
+  fs.writeFileSync(path.join(__dirname, "ready.json.tmp"), JSON.stringify({ analyzer: process.pid, script: script.pid }));
+  fs.renameSync(path.join(__dirname, "ready.json.tmp"), path.join(__dirname, "ready.json"));
   setInterval(() => {}, 1000);
   return;
 }

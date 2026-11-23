@@ -149,6 +149,22 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
       const now = after.links.get(parsed.id);
       if (afterLibrary.has(parsed.id)) return add("credited: library");
       if (now?.data?.toolchain?.origin === "toolchain" && now.data.toolchain.from !== "definite") return add("credited");
+      // The product records why an answer was not applied (exact).
+      const outcome = now?.data?.toolchainOutcome;
+      if (outcome) {
+        const bucket = {
+          "withheld:cfg-link": "gate: cfg condition other than test",
+          "library:withheld:cfg-link": "gate: cfg condition other than test",
+          "withheld:cfg-variant": "gate: cfg-variant guard",
+          "withheld:module-twin": "gate: module twin, or module conditions unseen",
+          "withheld:conditional-candidates": "gate: conditional candidates",
+          "kept:source-only-library": "gate: source-only library target kept",
+          "kept:outside-candidate-set": "gate: answer outside the candidate set",
+          "kept:source-only-differs": "gate: source-only target differs",
+          "withheld:no-symbol": "no identity: declaration without a graph symbol",
+        }[outcome];
+        return add(bucket ?? `other: ${outcome}`);
+      }
       if (why === "library") {
         if (beyondTest(link.data.conditions)) return add("gate: cfg condition other than test");
         if (link.resolution === "library") return add("library: source-only library target kept");
@@ -160,7 +176,8 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
       if (variant(target)) return add("gate: cfg-variant guard");
       // C-43 review: what the source-only answer recorded as conditional, and
       // targets in a module under cfg (or declared only inside a macro).
-      if (String(link.data.uncertainty ?? "").split("; ").includes("conditional-name-may-be-absent")) return add("gate: conditional candidates");
+      // Reasons are joined with "; " (the product parses them the same way).
+      if (String(link.data.uncertainty ?? "").split(";").map((r) => r.trim()).includes("conditional-name-may-be-absent")) return add("gate: conditional candidates");
       if (now?.data?.toolchain === undefined && target && link.resolution !== "library") return add("gate: cfg on an enclosing module");
       if (link.resolution === "library") return add("gate: source-only library target kept");
       if (link.resolution === "ambiguous" && !(before.candidates.get(parsed.id) ?? []).includes(target)) return add("gate: answer outside the candidate set");
