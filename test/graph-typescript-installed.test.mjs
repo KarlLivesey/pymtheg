@@ -1806,6 +1806,25 @@ test("a conflict declared in a global block inside an ambient module is found", 
   assert.equal(link.data.mergedGlobal, undefined);
 });
 
+test("a conflict inside a global namespace both units declare is found", async () => {
+  const files = (type) => ({
+    "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+    ...typesPackage(
+      "env-a",
+      "declare namespace Env { var mode: string; }\ndeclare function helper(): void;\n",
+    ),
+    ...typesPackage(
+      "env-b",
+      `declare namespace Env { var mode: ${type}; }\ndeclare function helper(): void;\n`,
+    ),
+    "src/main.ts": "helper();\nexport {};\n",
+  });
+  const conflicting = await globalsCase(files("number"), "src/main.ts", "helper");
+  assert.equal(conflicting.data.mergedGlobal, undefined);
+  const agreeing = await globalsCase(files("string"), "src/main.ts", "helper");
+  assert.equal(agreeing.data.mergedGlobal, true);
+});
+
 test("with three units, a unit that differs from the first conflicts with every unit that agrees with it", async () => {
   const files = {
     "tsconfig.json": config({
