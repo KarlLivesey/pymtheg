@@ -459,9 +459,17 @@ export function workspaceEntries(
     const trims = route.trims ?? [];
     for (const tag of ["alpha", "beta"] as const)
       if (trims.includes(tag) && tagged(root, "@" + tag)) return undefined;
-    const compilerStrips = (configs.get(root) ?? []).some(
-      ({ parsed }) => parsed.options.stripInternal,
-    );
+    // Every compiler configuration that governs the source (its files
+    // include it: the package's own, a build config elsewhere, a root
+    // config), not only the package's: one with stripInternal withholds.
+    const compilerStrips =
+      (configs.get(root) ?? []).some(
+        ({ parsed }) => parsed.options.stripInternal,
+      ) ||
+      [...parsedConfigs.values()].some(
+        (parsed) =>
+          parsed.options.stripInternal && parsed.fileNames.includes(source),
+      );
     const stripInternal =
       (trims.includes("internal") || compilerStrips) && mayStrip(root);
     return {

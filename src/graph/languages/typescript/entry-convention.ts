@@ -70,6 +70,32 @@ interface ConfigData {
   /** Undefined when an entry property exists but is not literal data. */
   lists: EntryList[] | undefined;
   dirs: string[];
+  /**
+   * A config object's `input` beside its `output.file` (rollup): that
+   * output file is built from those entries.
+   */
+  pairs: { entries: EntryList; files: string[] }[];
+}
+
+/** The literal `file` paths of an `output` value (an object or a list of them). */
+function outputFiles(value: ts.Expression): string[] {
+  const objects = ts.isArrayLiteralExpression(value)
+    ? value.elements
+    : [value];
+  const files: string[] = [];
+  for (const item of objects)
+    if (ts.isObjectLiteralExpression(item))
+      for (const property of item.properties)
+        if (
+          ts.isPropertyAssignment(property) &&
+          (ts.isIdentifier(property.name) ||
+            ts.isStringLiteral(property.name)) &&
+          property.name.text === "file" &&
+          ts.isStringLiteralLike(property.initializer) &&
+          literalPath.test(property.initializer.text)
+        )
+          files.push(property.initializer.text.replace(/^\.\//, ""));
+  return files;
 }
 
 const below = (file: string, root: string) =>
@@ -144,8 +170,24 @@ function readBundlerConfig(path: string, text: string): ConfigData {
             constants.set(declaration.name.text, declaration.initializer);
   const lists: EntryList[] = [];
   const dirs = new Set<string>();
+  const pairs: ConfigData["pairs"] = [];
   let opaque = false;
   const visit = (node: ts.Node) => {
+    if (ts.isObjectLiteralExpression(node)) {
+      const named = (key: string) =>
+        node.properties.find(
+          (property): property is ts.PropertyAssignment =>
+            ts.isPropertyAssignment(property) &&
+            (ts.isIdentifier(property.name) ||
+              ts.isStringLiteral(property.name)) &&
+            property.name.text === key,
+        );
+      const input = named("input");
+      const output = named("output");
+      const entries = input && entryData(input.initializer, constants);
+      const files = output ? outputFiles(output.initializer) : [];
+      if (entries && files.length) pairs.push({ entries, files });
+    }
     if (
       ts.isPropertyAssignment(node) &&
       (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name))
@@ -165,7 +207,12 @@ function readBundlerConfig(path: string, text: string): ConfigData {
     ts.forEachChild(node, visit);
   };
   visit(source);
-  return { path, lists: opaque ? undefined : lists, dirs: [...dirs] };
+  return {
+    path,
+    lists: opaque ? undefined : lists,
+    dirs: [...dirs],
+    pairs,
+  };
 }
 
 const stemOf = (path: string) =>
@@ -211,6 +258,13 @@ export function entryConventions(
     string,
     { path: string; json: Record<string, unknown> }[]
   >();
+  /**
+   * Packages with a declaration roll-up the walk cannot read (an API
+   * Extractor config that does not parse or whose roll-up fields are not
+   * literal, a rollup config whose entries are not data): the roll-up may
+   * write any entry, so no convention, not even the twin, applies there.
+   */
+  const unreadableRollup = new Set<string>();
   const namedBy = new Map<string, string>();
   for (const [root, paths] of named)
     for (const path of paths) namedBy.set(path, root);
@@ -227,12 +281,16 @@ export function entryConventions(
     if (owner === undefined || posix.dirname(path) !== owner) continue;
     if (bundlerConfig.test(name)) {
       const list = bundlers.get(owner) ?? [];
-      list.push(readBundlerConfig(path, text));
+      const data = readBundlerConfig(path, text);
+      if (name.startsWith("rollup.") && !data.lists) unreadableRollup.add(owner);
+      list.push(data);
       bundlers.set(owner, list);
     } else if (extractorConfig.test(name)) {
       const parsed = ts.parseConfigFileTextToJson(path, text);
-      if (parsed.error || !parsed.config || typeof parsed.config !== "object")
+      if (parsed.error || !parsed.config || typeof parsed.config !== "object") {
+        unreadableRollup.add(owner);
         continue;
+      }
       const list = extractors.get(owner) ?? [];
       list.push({ path, json: parsed.config });
       extractors.set(owner, list);
@@ -268,6 +326,17 @@ export function entryConventions(
       // An entry that is not data says nothing either way: the twin may apply.
       if (!data.lists?.length) continue;
       readable = true;
+      // An `output.file` names this output: its config object's single input.
+      const bare = relative.replace(outputExtension, "");
+      for (const { entries, files } of data.pairs) {
+        if (!files.some((file) => file.replace(outputExtension, "") === bare))
+          continue;
+        if (entries.entries.length !== 1) return "conflicting";
+        const source = sourceAt(root, entries.entries[0]!.path);
+        if (!source) return "conflicting";
+        sources.add(source);
+        config = data.path;
+      }
       for (const dir of data.dirs.length ? data.dirs : ["dist"]) {
         if (!relative.startsWith(dir + "/")) continue;
         const stem = relative
@@ -322,8 +391,24 @@ export function entryConventions(
     for (const { path, json } of extractors.get(root) ?? []) {
       const rollup = json.dtsRollup as Record<string, unknown> | undefined;
       const main = json.mainEntryPointFilePath;
-      if (!rollup || rollup.enabled !== true || typeof main !== "string")
-        continue;
+      if (!rollup || rollup.enabled !== true) continue;
+      // A token other than <projectFolder> (`<unscopedPackageName>`) or a
+      // value that is not a string: the roll-up cannot be read.
+      const readable = (value: unknown) =>
+        typeof value === "string" &&
+        !/<(?!projectFolder>)[^>]*>/.test(value);
+      if (
+        !readable(main) ||
+        [
+          "untrimmedFilePath",
+          "alphaTrimmedFilePath",
+          "betaTrimmedFilePath",
+          "publicTrimmedFilePath",
+        ].some((field) => rollup[field] !== undefined && !readable(rollup[field]))
+      ) {
+        unreadableRollup.add(root);
+        return "conflicting";
+      }
       const at = (field: string) => {
         const value = rollup[field];
         return typeof value === "string" && value
@@ -340,7 +425,10 @@ export function entryConventions(
       ).find(([field]) => at(field) === output);
       if (!level) continue;
       for (const tag of level[1]) trims.add(tag);
-      const entry = posix.join(root, main.replace("<projectFolder>/", ""));
+      const entry = posix.join(
+        root,
+        (main as string).replace("<projectFolder>/", ""),
+      );
       if (!below(entry, root) || !/\.d\.[cm]?ts$/.test(entry))
         return "conflicting";
       routes.add(entry);
@@ -364,6 +452,7 @@ export function entryConventions(
     manifest: string,
   ): ConventionRoute | "conflicting" | undefined => {
     const rollup = rollupEntry(root, output);
+    if (unreadableRollup.has(root)) return "conflicting";
     if (rollup) return rollup;
     const bundled = bundlerEntry(root, output);
     if (bundled === "conflicting") return "conflicting";

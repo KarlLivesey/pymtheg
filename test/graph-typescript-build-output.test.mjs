@@ -293,3 +293,73 @@ test("a config a script names with -c, and the compiler emit under Wireit or bes
     "packages/core/src/api/Page.ts",
   ]);
 });
+
+test("PR 67 review: rollup output.file, unreadable roll-ups block the twin, stripInternal from every governing config", async () => {
+  const got = await calls({
+    // rollup-plugin-dts: `input` beside `output.file` names the roll-up's source.
+    "packages/r/package.json": pkg("r", {
+      types: "./dist/bundle.d.ts",
+      scripts: { build: "rollup -c" },
+    }),
+    "packages/r/rollup.config.mjs":
+      "export default [{ input: 'src/main.ts', output: { file: 'dist/bundle.d.ts', format: 'es' } }];",
+    "packages/r/src/main.ts": "export function rolled() {}",
+    "packages/r/src/bundle.ts": "export function twin() {}",
+    // An API Extractor config that does not parse: its roll-up may write the
+    // entry, so the twin does not apply.
+    "packages/x/package.json": pkg("x", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "api-extractor run" },
+    }),
+    "packages/x/api-extractor.json": "{ mainEntryPointFilePath: ",
+    "packages/x/src/index.ts": "export function broken() {}",
+    // A roll-up field with a token the walk does not expand.
+    "packages/y/package.json": pkg("y", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "api-extractor run" },
+    }),
+    "packages/y/api-extractor.json": JSON.stringify({
+      mainEntryPointFilePath: "<projectFolder>/temp/<unscopedPackageName>.d.ts",
+      dtsRollup: { enabled: true, untrimmedFilePath: "<projectFolder>/dist/index.d.ts" },
+    }),
+    "packages/y/src/index.ts": "export function tokened() {}",
+    // A rollup config whose entries are not data.
+    "packages/z/package.json": pkg("z", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "rollup -c" },
+    }),
+    "packages/z/rollup.config.mjs":
+      "import { entries } from './entries.mjs';\nexport default { input: entries(), output: { dir: 'dist' } };",
+    "packages/z/src/index.ts": "export function opaque() {}",
+    // A build config outside the package governs its sources with stripInternal.
+    "packages/s/package.json": pkg("s", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "tsup" },
+    }),
+    "packages/s/src/index.ts":
+      "export function open() {}\n/** @internal */\nexport function hidden() {}\n",
+    "tsconfig.build.json":
+      '{"compilerOptions":{"stripInternal":true,"declaration":true,"noEmit":false},"include":["packages/s/src"]}',
+    "app.ts": [
+      'import { rolled } from "r";',
+      'import { broken } from "x";',
+      'import { tokened } from "y";',
+      'import { opaque } from "z";',
+      'import { open, hidden } from "s";',
+      "rolled(); broken(); tokened(); opaque(); open(); hidden();",
+    ].join("\n"),
+  });
+  assert.deepEqual(got.rolled, [
+    "packages/r/src/main.ts#rolled",
+    ["ts-unbuilt-entry-is-bundler-entry"],
+    "packages/r/src/main.ts",
+  ]);
+  for (const name of ["broken", "tokened", "opaque"])
+    assert.match(String(got[name]), /^unresolved:workspace-/, name);
+  assert.deepEqual(got.open, [
+    "packages/s/src/index.ts#open",
+    ["ts-unbuilt-entry-is-src-twin"],
+    "packages/s/src/index.ts",
+  ]);
+  assert.match(String(got.hidden), /^unresolved:/);
+});
