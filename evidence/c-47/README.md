@@ -26,14 +26,14 @@ To rebuild it, run that script with the main build until it stops at step 16.
 
 ## Review 2
 
-- `review-2/cold-runs.json`: cold indexes of five pins with a central file
-  broken (`const = ;` appended), by this branch merged with main
-  (`49ddae13`), by main, and on Excalidraw by the previous head
-  (`c19202a`). It also holds three clean pins against main, redux-toolkit
-  and Excalidraw at two other stack sizes, and the link-by-link outcome of
-  the 95 links the previous head bounded on Excalidraw. Row comparisons
-  normalise the module version string. Several runs went at once on the
-  dev server; the seconds are observations only.
+- `review-2/cold-runs.json`: cold indexes of eight broken trees by this
+  branch (merged with main `49ddae13`) and by main. Seven are pins with a
+  central file broken (`const = ;` appended), three of them the second
+  reviewer's cases; the eighth is oclif's hanging tree. It also holds three
+  clean pins against main, and five trees at `--stack-size` 500 and 4000.
+  Both builds ran with a 16 GB heap unless a run says default heap. Row
+  comparisons normalise the module version string. Several runs went at
+  once on the dev server; the seconds are observations only.
 - `review-2/seeded-edits-oclif-{4242,3307,911}.json`: 30 seeded edits each
   on oclif/core with this branch (the pin copied with its symlinks kept).
   Every incremental store equals a cold one.
