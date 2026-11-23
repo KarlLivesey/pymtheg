@@ -651,16 +651,26 @@ export function createJudge(input: JudgeInput): Judge {
     }
     const index = flight++;
     taintIndex.set(key, index);
+    const anchor = anchorOf(judged);
+    const outer = anchor === undefined ? undefined : anchors.get(anchor);
+    if (anchor !== undefined && outer === undefined) anchors.set(anchor, index);
     const pendingFrom = pendingOrder.length;
     let checked: Settled<boolean>;
     try {
-      checked = settled(index, () => deeper(() => taintedParts(judged)));
+      checked = settled(index, () =>
+        deeper(() =>
+          outer === undefined
+            ? taintedParts(judged)
+            : expandedParts(judged, outer),
+        ),
+      );
     } catch (error) {
       for (const entry of pendingOrder.splice(pendingFrom))
         pending.delete(entry);
       throw error;
     } finally {
       taintIndex.delete(key);
+      if (anchor !== undefined && outer === undefined) anchors.delete(anchor);
       flight--;
     }
     const { value: result, final } = checked;
@@ -686,6 +696,35 @@ export function createJudge(input: JudgeInput): Judge {
       }
     }
     return result;
+  }
+  // C-47: an expanding type (each level binds a larger value, as
+  // `TestAPI<AddBuilderWorker<ExtraContext, K, T>>` does) never repeats a
+  // key. A literal's or function's own failures are its declaration's
+  // (seed bindings, failed modules, unhandled kinds), whatever its
+  // environment; the environment only decides which bound values are
+  // reached. So a second check of the same declaration, while the first is
+  // in progress, adds only what its bound values reach: it checks the
+  // values it names and `self`, and leaves the declaration's own parts to
+  // the first check (a cycle on it).
+  const anchors = new Map<string, number>();
+  function anchorOf(judged: Judged): string | undefined {
+    if (judged.k === "literal") return `L${idOf(judged.node)}`;
+    if (judged.k === "function") return `F${judged.decls.map(idOf).join("+")}`;
+    return undefined;
+  }
+  function expandedParts(judged: Judged, outer: number): boolean {
+    if (judged.k !== "literal" && judged.k !== "function") return false;
+    hit(outer, true);
+    const named = relevant(
+      judged.env,
+      judged.k === "literal"
+        ? judged.node.members.flatMap(typeNodesOf)
+        : judged.decls.flatMap(typeNodesOf),
+    );
+    return (
+      named.some(([, value]) => tainted(value())) ||
+      (!!judged.self && tainted(judged.self))
+    );
   }
   function taintedParts(judged: Judged): boolean {
     switch (judged.k) {
