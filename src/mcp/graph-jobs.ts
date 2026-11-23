@@ -7,10 +7,25 @@ import type { GraphRequest, GraphProgress } from "../graph/commands.js";
 import { GraphView } from "./graph-view.js";
 import { agentLimits } from "./limits.js";
 import {
-  createChildGroups,
+  jobChildGroups,
   killChildGroups,
   liveChildGroups,
+  releaseJobChildGroups,
 } from "../backends/child-groups.js";
+import type { ProcessClock } from "../backends/process.js";
+
+/**
+ * How long a cancel waits for the worker's `aborted` answer while a child
+ * process group is live. The answer normally comes at once; the bound only
+ * keeps a worker that will not answer from holding the cancel for ever. It
+ * decides nothing but how long clean-up may take: the job's groups are
+ * killed either way.
+ */
+export const CANCEL_GRACE_MS = 30_000;
+const systemClock: ProcessClock = {
+  schedule: (callback, milliseconds) => setTimeout(callback, milliseconds),
+  cancel: (handle) => clearTimeout(handle as NodeJS.Timeout),
+};
 export interface GraphJob {
   id: string;
   state: "running" | "complete" | "error" | "cancelled";
@@ -27,9 +42,6 @@ export interface GraphJob {
   aborted: Promise<void>;
 }
 
-/** Every job registry of this server, killed when the server exits. */
-const registries = new Set<SharedArrayBuffer>();
-let exitHook = false;
 export class GraphJobs {
   private readonly jobs = new Map<string, GraphJob>();
   private closed = false;
@@ -43,6 +55,8 @@ export class GraphJobs {
         stdout: true,
         stderr: true,
       }),
+    /** Test hooks: the clock and bound of the cancel's grace. */
+    private readonly controls: { clock?: ProcessClock; graceMs?: number } = {},
   ) {}
   activeId() {
     return [...this.jobs.values()].find((j) => !j.exited)?.id ?? null;
@@ -57,16 +71,8 @@ export class GraphJobs {
       throw Error(
         "A graph job is running. Read or cancel its jobId with graph_result before starting another.",
       );
-    const childGroups = createChildGroups();
-    registries.add(childGroups);
-    if (!exitHook) {
-      exitHook = true;
-      // The backstop that needs no worker: a server that exits kills every
-      // process group its jobs recorded.
-      process.once("exit", () => {
-        for (const registry of registries) killChildGroups(registry);
-      });
-    }
+    // The job's own registry; a server that exits kills it (child-groups.ts).
+    const childGroups = jobChildGroups();
     const worker = this.launch({ ...request, root: this.root, childGroups });
     // Only parentPort messages enter the protocol; module logging must not corrupt stdio.
     worker.stdout?.resume();
@@ -128,8 +134,7 @@ export class GraphJobs {
         job.error ??= `Graph worker exited (${code}); restart indexing. Completion may be missing.`;
       }
       // Whatever the worker left running, this server kills.
-      killChildGroups(childGroups);
-      registries.delete(childGroups);
+      releaseJobChildGroups(childGroups);
       abortAnswered();
       settle();
     });
@@ -153,18 +158,33 @@ export class GraphJobs {
    * once the command has settled. The server waits for that answer only
    * while the job has a live child process group: a group is live only
    * while the worker awaits it (`runProcess`), so its event loop is free
-   * and the answer comes; no clock decides. With no live group there is
-   * nothing to clean up, and the worker is terminated at once, as before.
-   * Any group still recorded after the worker has gone is killed by this
-   * server, which needs no help from the worker.
+   * and the answer comes. A worker that does not answer within
+   * `CANCEL_GRACE_MS` (it is stuck, or not the production worker) is
+   * terminated all the same. With no live group there is nothing to clean
+   * up, and the worker is terminated at once, as before. Any group still
+   * recorded after the worker has gone is killed by this server, which needs
+   * no help from the worker.
    */
   async cancel(id: string) {
     const job = this.get(id);
     if (!job.exited) {
       job.state = "cancelled";
       job.worker.postMessage({ kind: "abort" });
-      if (liveChildGroups(job.childGroups).length)
-        await Promise.race([job.aborted, job.done]);
+      if (liveChildGroups(job.childGroups).length) {
+        const clock = this.controls.clock ?? systemClock;
+        let timer: unknown;
+        await Promise.race([
+          job.aborted,
+          job.done,
+          new Promise<void>((resolve) => {
+            timer = clock.schedule(
+              resolve,
+              this.controls.graceMs ?? CANCEL_GRACE_MS,
+            );
+          }),
+        ]);
+        clock.cancel(timer);
+      }
       await job.worker.terminate();
       await job.done;
     }

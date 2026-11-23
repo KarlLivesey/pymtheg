@@ -499,10 +499,11 @@ test(
           "the helper to start",
         );
         controller.abort();
-        const dump = await running;
-        assert.deepEqual(
-          dump.report.analysisErrors.map((item) => item.message),
-          ["Indexing was cancelled"],
+        // C-54: the route rethrows the signal's own reason, so the index is
+        // cancelled as a whole (it was recorded as an analysis error before).
+        await assert.rejects(
+          running,
+          (error) => error === controller.signal.reason,
         );
         await until(
           () => processesWith(root).length === 0,

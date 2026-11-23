@@ -1,18 +1,29 @@
 // SPDX-License-Identifier: MIT
 /**
- * The process groups this server has started, in memory shared by the main
- * thread and its worker threads (C-43 review). `runProcess` starts every
- * child as the leader of its own process group and records the group here
- * as soon as it has a pid, and removes it once the group is killed. The
- * server, which owns the memory, can kill every recorded group itself: when
- * a job is cancelled and its worker is terminated (the worker's own abort
- * and cleanup never run), and when the server exits. That does not depend
- * on the worker cooperating.
+ * The process groups this process has started, in memory shared by the main
+ * thread and its worker threads (C-54). `runProcess` starts every child as
+ * the leader of its own process group and records the group here as soon as
+ * it has a pid, and forgets it once the group is killed. The owner of the
+ * memory can kill every recorded group itself: when a job is cancelled and
+ * its worker is terminated (the worker's own abort and clean-up never run),
+ * and when the process exits. That does not depend on the worker
+ * cooperating.
  *
- * A worker uses the server's registry when it is given one
- * (`useChildGroups(workerData.childGroups)`); the main thread has its own.
- * A process killed with SIGKILL runs no code, so its children are not
- * killed by this; the next run's stale-run sweep removes their folders.
+ * - The main thread has its own registry, killed when the process exits.
+ * - A job manager gives each job a registry of its own (`jobChildGroups`),
+ *   passes it to the job's worker, which records into it
+ *   (`useChildGroups(workerData.childGroups)`), and kills it when the job
+ *   ends or is cancelled, and when the process exits.
+ * - A full registry refuses to start a child (`runProcess` reports it), so
+ *   no child runs untracked.
+ *
+ * Limits. A process that dies without running JavaScript (SIGKILL, a crash,
+ * a signal Node does not turn into an exit) kills nothing it started: the
+ * children are in their own process groups, so a signal to the parent's
+ * group does not reach them, and they run until they end on their own. The
+ * CLI turns SIGINT, SIGTERM and SIGHUP into an orderly exit. On Windows
+ * there are no process groups: the recorded process itself is killed, and
+ * its own children are not.
  */
 import { isMainThread } from "node:worker_threads";
 
@@ -26,31 +37,52 @@ let groups: Int32Array | undefined = isMainThread
   ? new Int32Array(createChildGroups())
   : undefined;
 let exitHook = false;
+/** Every job registry of this process, killed when it exits. */
+const jobRegistries = new Set<SharedArrayBuffer>();
+function hookExit(): void {
+  if (exitHook) return;
+  exitHook = true;
+  process.once("exit", () => {
+    killChildGroups(groups?.buffer as SharedArrayBuffer | undefined);
+    for (const registry of jobRegistries) killChildGroups(registry);
+  });
+}
 
-/** The registry this thread records its children in (the server's, in a worker). */
+/** The registry this thread records its children in (a job's, in a worker). */
 export function useChildGroups(buffer: SharedArrayBuffer | undefined): void {
   if (buffer) groups = new Int32Array(buffer);
 }
 
-/** This thread's registry, to hand to a worker it starts. */
+/** This thread's registry. */
 export function childGroupsBuffer(): SharedArrayBuffer | undefined {
   return groups?.buffer as SharedArrayBuffer | undefined;
 }
 
 /**
- * Records a started group; returns its slot, or -1 when the registry is
- * full (the child then runs untracked by the server, as before C-43's
- * review; the worker's own abort still kills it).
+ * A new registry for one job's worker, killed when this process exits.
+ * `releaseJobChildGroups` kills what it still holds and forgets it.
  */
-export function recordChildGroup(pid: number): number {
+export function jobChildGroups(): SharedArrayBuffer {
+  const buffer = createChildGroups();
+  jobRegistries.add(buffer);
+  hookExit();
+  return buffer;
+}
+export function releaseJobChildGroups(buffer: SharedArrayBuffer): void {
+  killChildGroups(buffer);
+  jobRegistries.delete(buffer);
+}
+
+/**
+ * Records a started group; returns its slot, `-1` when this thread has no
+ * registry (a worker given none), or `"full"` when every slot is taken.
+ */
+export function recordChildGroup(pid: number): number | "full" {
   if (!groups || !(pid > 0)) return -1;
-  if (isMainThread && !exitHook) {
-    exitHook = true;
-    process.once("exit", () => killChildGroups());
-  }
+  if (isMainThread) hookExit();
   for (let slot = 0; slot < groups.length; slot++)
     if (Atomics.compareExchange(groups, slot, 0, pid) === 0) return slot;
-  return -1;
+  return "full";
 }
 
 /** Forgets a group after it was killed (only if the slot still holds it). */
@@ -70,6 +102,16 @@ export function liveChildGroups(buffer?: SharedArrayBuffer): number[] {
   return out;
 }
 
+/** SIGKILL to a process group (to the process itself on Windows). */
+export function killGroup(pid: number): boolean {
+  try {
+    process.kill(process.platform === "win32" ? pid : -pid, "SIGKILL");
+    return true;
+  } catch {
+    return false; // already gone
+  }
+}
+
 /**
  * Sends SIGKILL to every recorded group in `buffer` (default: this
  * thread's) and forgets it. Returns the number of groups signalled.
@@ -81,12 +123,7 @@ export function killChildGroups(buffer?: SharedArrayBuffer): number {
   for (let slot = 0; slot < view.length; slot++) {
     const pid = Atomics.load(view, slot);
     if (!pid) continue;
-    try {
-      process.kill(-pid, "SIGKILL");
-      killed++;
-    } catch {
-      /* already gone */
-    }
+    if (killGroup(pid)) killed++;
     Atomics.compareExchange(view, slot, pid, 0);
   }
   return killed;
