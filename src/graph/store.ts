@@ -29,6 +29,14 @@ import type {
   ResolutionFile,
 } from "./types.js";
 
+/**
+ * C-55: the length of the stored JSON each decoded value came from (records,
+ * a file's symbols, projection rows), so a reader that keeps them can count
+ * their size without encoding them again.
+ */
+const storedSizes = new WeakMap<object, number>();
+export const storedSize = (value: object): number | undefined =>
+  storedSizes.get(value);
 export class SqliteGraphStore implements GraphStorage {
   private readonly db: DatabaseSync;
   readonly projectId: string;
@@ -115,7 +123,9 @@ export class SqliteGraphStore implements GraphStorage {
   private decodeFile(body: string): GraphFile {
     count("store.fileRecordsDecoded");
     count("store.fileRecordBytesDecoded", Buffer.byteLength(body));
-    return JSON.parse(body) as GraphFile;
+    const file = JSON.parse(body) as GraphFile;
+    storedSizes.set(file, body.length);
+    return file;
   }
   constructor(
     path: string,
@@ -622,7 +632,7 @@ export class SqliteGraphStore implements GraphStorage {
             Buffer.byteLength(links) +
             Buffer.byteLength(facts ?? ""),
         );
-        return {
+        const projected: ResolutionFile = {
           path: row.path as string,
           module: row.module as string,
           result: {
@@ -634,6 +644,11 @@ export class SqliteGraphStore implements GraphStorage {
             ...(facts === undefined ? {} : { data: JSON.parse(facts) }),
           },
         };
+        storedSizes.set(
+          projected,
+          diagnostics.length + links.length + (facts?.length ?? 0),
+        );
+        return projected;
       });
   }
   /** Path, module and status of every stored file, without decoding records. */
@@ -760,12 +775,15 @@ export class SqliteGraphStore implements GraphStorage {
       "SELECT body FROM graph_symbols WHERE file=? ORDER BY id",
     );
     return new Map(
-      [...new Set(paths)].map((path) => [
-        path,
-        select
-          .all(path)
-          .map((row) => JSON.parse(row.body as string) as GraphSymbol),
-      ]),
+      [...new Set(paths)].map((path) => {
+        let bytes = 0;
+        const symbols = select.all(path).map((row) => {
+          bytes += (row.body as string).length;
+          return JSON.parse(row.body as string) as GraphSymbol;
+        });
+        storedSizes.set(symbols, bytes);
+        return [path, symbols];
+      }),
     );
   }
   replaceFile(file: GraphFile, parseFailure = false): void {

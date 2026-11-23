@@ -14,6 +14,7 @@
 import { compare } from "./identity.js";
 import type { GraphFile, GraphSymbol, ResolutionFile } from "./types.js";
 import { count } from "./work.js";
+import { storedSize } from "./store.js";
 
 /** What is kept stops being kept above this many bytes of stored JSON. */
 export const keptInputBytes = 128 * 1024 * 1024;
@@ -45,7 +46,10 @@ export function deepFreeze<T>(value: T): T {
   }
   return value;
 }
-const size = (value: unknown) => Buffer.byteLength(JSON.stringify(value));
+// The stored JSON's length when the store recorded it (C-55), else the
+// value encoded again (stores that do not record it).
+const size = (value: object) =>
+  storedSize(value) ?? JSON.stringify(value).length;
 
 /**
  * Builds a module's inputs from what was kept plus fresh reads of the
@@ -205,7 +209,7 @@ export class KeptInputs {
     ].sort((a, b) => compare(a.path, b.path));
   }
 
-  private previousBytes(key: string, value: unknown): number {
+  private previousBytes(key: string, value: object): number {
     return previousSizes.get(this.previous!)?.get(key) ?? size(value);
   }
 
