@@ -422,6 +422,33 @@ test("no step of a member call's receiver is a value the checker reduced from se
   });
 });
 
+test("anchored object-literal members through elements, iteration and callbacks are each element's", async () => {
+  // C-41 review: main linked each of these to `a.setup`, the first element.
+  const got = await outcomes(
+    {
+      "src/use.ts": [
+        "const a = { setup() {} };",
+        "const b = { setup() {} };",
+        "const list = [a, b];",
+        "declare const i: number;",
+        "list[i].setup();",
+        "list[0].setup();",
+        "for (const p of list) p.setup();",
+        "for (const q of [a, b]) q.setup();",
+        "list.forEach((r) => r.setup());",
+        "const impl = { run() {} };",
+        "declare const given: { run(): void } | undefined;",
+        "const api = given ?? impl;",
+        "api.run();",
+        "",
+      ].join("\n"),
+    },
+    "src/use.ts",
+    true,
+  );
+  assert.deepEqual(got, {"list[i].setup(); @(expression).setup":["src/use.ts#a.setup","src/use.ts#b.setup"],"list[0].setup(); @(expression).setup":"src/use.ts#a.setup","for (const p of list) p.setup(); @p.setup":["src/use.ts#a.setup","src/use.ts#b.setup"],"for (const q of [a, b]) q.setup(); @q.setup":["src/use.ts#a.setup","src/use.ts#b.setup"],"list.forEach((r) => r.setup()); @list.forEach":"library:","list.forEach((r) => r.setup()); @r.setup":["src/use.ts#a.setup","src/use.ts#b.setup"],"api.run(); @api.run":["src/use.ts#given.[type].[|0].run","src/use.ts#impl.run"]});
+});
+
 test("nested type positions have their places; a type literal's overloads are one symbol", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "c41-ids-"));
   const root = join(scratch, "project");
