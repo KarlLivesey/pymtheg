@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { posix } from "node:path";
 import ts from "typescript";
+import { count } from "../../work.js";
 import {
   competingTestNames,
   globalTypeAvailability,
@@ -923,98 +924,191 @@ export function extractFile(
     return undefined;
   }
   /**
-   * C-42 (narrowed D23; review N1, N1b): the pairs of library units that the
-   * compiler finds in conflict on a shared global variable, by TS2403
-   * ("Subsequent variable declarations must have the same type"). A set
-   * holding such a pair are alternatives as units, not one target, so no
-   * merged global whose units include the pair is marked, whatever kind of
-   * symbol it is (`Request`, `fetch`, `RequestInit`).
+   * C-42 (narrowed D23; reviews N1, N1b, round 2): the pairs of library units
+   * that the compiler finds in conflict on a shared global. A set holding
+   * such a pair are alternatives as units, not one target, so no merged
+   * global whose units include the pair is marked, whatever kind of symbol
+   * it is (`Request`, `fetch`, `RequestInit`, `reader.cancel`).
    *
-   * The answer is the compiler's own: TS2403 compares the types for
-   * identity (`isTypeIdenticalTo`, which the checker does not export), and
-   * `skipLibCheck` suppresses it in declaration files. So a second checker
-   * of the same program, told `skipLibCheck` is off, checks only the
-   * variable statements of globals declared in two or more units, and its
-   * 2403 diagnostics name the conflicting declarations. Computed once per
-   * program, when a merged global is first met.
+   * The answer is the compiler's own. `skipLibCheck` suppresses these checks
+   * in declaration files, so a second checker of the same program, told
+   * `skipLibCheck` is off, checks every declaration of each global name that
+   * two or more units declare: variables (`var`, `let`, `const`), functions,
+   * classes, interfaces with their members, type aliases, enums and
+   * namespaces. They are read in every global scope: a script file,
+   * `declare global`, and `global {}` inside an ambient `declare module "x"`
+   * (how `@types/node` declares `URL`, `Buffer`, `console` and `process`).
+   * These diagnostics between declarations in two units are a conflict:
+   * - 2403, subsequent variable declarations must have the same type;
+   * - 2717, subsequent property declarations must have the same type;
+   * - 2300, duplicate identifier;
+   * - 2451, cannot redeclare a block-scoped variable;
+   * - 2428, all declarations must have identical type parameters;
+   * - 2687, all declarations must have identical modifiers.
+   *
+   * A diagnostic names its declaration. A comparison (2403, 2717, 2428,
+   * 2687) is made against the first declaration, so the diagnosed unit
+   * differs from every unit that agrees with the first: it is paired with
+   * every other unit declaring the name (A and B agree, C differs: A–C and
+   * B–C), which errs towards unmarked when two diagnosed units agree. A
+   * duplicate (2300, 2451) names the other declaration in its related
+   * information ("was also declared here"): those two units are the pair,
+   * so two units' `fetch` functions are not paired by a third unit's
+   * `var fetch`; without related information, it is paired with every
+   * other unit. A
+   * declaration's unit is the one its library candidate names (its
+   * `targetOf` unit: `node:url` for a `global` block inside `declare module
+   * "url"`), so conflicts and link unit sets use one key. Computed once per
+   * program, when a merged global is first met; `typescript.conflictChecks`
+   * counts the declarations checked.
    */
   let unitConflicts: Set<string> | undefined;
+  const CONFLICT_CODES = new Set([2403, 2717, 2300, 2451, 2428, 2687]);
+  const COMPARED = new Set([2403, 2717, 2428, 2687]);
   const unitKey = (unit: { ecosystem: string; unit: string }) =>
     `${unit.ecosystem}\0${unit.unit}`;
   const pairKey = (a: string, b: string) =>
     a < b ? `${a}\n${b}` : `${b}\n${a}`;
+  interface GlobalDeclaration {
+    name: string;
+    unit: string;
+    /** The span diagnostics are matched against. */
+    node: ts.Node;
+    /** The statement the second checker checks. */
+    statement: ts.Statement;
+  }
   function conflictingUnitPairs(): Set<string> {
     if (unitConflicts) return unitConflicts;
-    const byName = new Map<
-      string,
-      { declaration: ts.VariableDeclaration; unit: string }[]
-    >();
+    const byName = new Map<string, GlobalDeclaration[]>();
+    const byFile = new Map<ts.SourceFile, GlobalDeclaration[]>();
     for (const source of program.getSourceFiles()) {
-      if (!source.isDeclarationFile) continue;
-      const unit = importer.declarationUnit(source);
-      if (!unit) continue;
-      const key = unitKey(unit);
-      const add = (statement: ts.Statement) => {
-        if (!ts.isVariableStatement(statement)) return;
-        for (const declaration of statement.declarationList.declarations)
-          if (ts.isIdentifier(declaration.name)) {
-            const list = byName.get(declaration.name.text) ?? [];
-            list.push({ declaration, unit: key });
-            byName.set(declaration.name.text, list);
-          }
+      const fileUnit = importer.declarationUnit(source);
+      if (!fileUnit) continue;
+      const keyOf = (declaration: ts.Declaration) => {
+        const target = importer.targetOf(declaration, fileUnit, checker);
+        return unitKey(target ?? fileUnit);
       };
-      if (!ts.isExternalModule(source)) source.statements.forEach(add);
-      for (const statement of source.statements)
+      const record = (
+        name: ts.Node | undefined,
+        node: ts.Declaration,
+        statement: ts.Statement,
+      ) => {
+        if (!name || !ts.isIdentifier(name)) return;
+        const entry = { name: name.text, unit: keyOf(node), node, statement };
+        const list = byName.get(entry.name) ?? [];
+        list.push(entry);
+        byName.set(entry.name, list);
+        const inFile = byFile.get(source) ?? [];
+        inFile.push(entry);
+        byFile.set(source, inFile);
+      };
+      const globalStatement = (statement: ts.Statement): void => {
+        if (ts.isVariableStatement(statement))
+          for (const declaration of statement.declarationList.declarations)
+            record(declaration.name, declaration, statement);
+        else if (
+          ts.isFunctionDeclaration(statement) ||
+          ts.isClassDeclaration(statement) ||
+          ts.isInterfaceDeclaration(statement) ||
+          ts.isTypeAliasDeclaration(statement) ||
+          ts.isEnumDeclaration(statement)
+        )
+          record(statement.name, statement, statement);
+        else if (ts.isModuleDeclaration(statement)) {
+          if (statement.flags & ts.NodeFlags.GlobalAugmentation)
+            globalBlock(statement);
+          else if (ts.isIdentifier(statement.name))
+            record(statement.name, statement, statement);
+        }
+      };
+      const globalBlock = (block: ts.ModuleDeclaration) => {
+        if (block.body && ts.isModuleBlock(block.body))
+          block.body.statements.forEach(globalStatement);
+      };
+      // `global {}` blocks inside an ambient `declare module "x"`.
+      const ambient = (statement: ts.Statement): void => {
+        if (!ts.isModuleDeclaration(statement)) return;
+        if (statement.flags & ts.NodeFlags.GlobalAugmentation)
+          return globalBlock(statement);
         if (
-          ts.isModuleDeclaration(statement) &&
-          statement.flags & ts.NodeFlags.GlobalAugmentation &&
+          ts.isStringLiteral(statement.name) &&
           statement.body &&
           ts.isModuleBlock(statement.body)
         )
-          statement.body.statements.forEach(add);
-    }
-    const shared = [...byName.values()].filter(
-      (list) => new Set(list.map(({ unit }) => unit)).size > 1,
-    );
-    const statements = new Map<ts.SourceFile, Set<ts.Node>>();
-    for (const list of shared)
-      for (const { declaration } of list) {
-        const file = declaration.getSourceFile();
-        const nodes = statements.get(file) ?? new Set<ts.Node>();
-        nodes.add(declaration.parent.parent);
-        statements.set(file, nodes);
-      }
-    const reported = new Map<ts.SourceFile, Set<number>>();
-    const declarationChecker = shared.length
-      ? checkingDeclarations(program)
-      : undefined;
-    for (const [file, nodes] of statements) {
-      const diagnostics = declarationChecker!.getDiagnostics(file, undefined, [
-        ...nodes,
-      ]);
-      reported.set(
-        file,
-        new Set(
-          diagnostics
-            .filter(({ code }) => code === 2403)
-            .map(({ start }) => start ?? -1),
-        ),
-      );
+          statement.body.statements.forEach(ambient);
+      };
+      if (!ts.isExternalModule(source))
+        source.statements.forEach(globalStatement);
+      else source.statements.forEach(ambient);
+      if (!ts.isExternalModule(source))
+        for (const statement of source.statements)
+          if (
+            ts.isModuleDeclaration(statement) &&
+            ts.isStringLiteral(statement.name)
+          )
+            ambient(statement);
     }
     unitConflicts = new Set();
-    for (const list of shared) {
-      const first = checker.getSymbolAtLocation(
-        list[0]!.declaration.name,
-      )?.valueDeclaration;
-      const firstUnit =
-        first && importer.declarationUnit(first.getSourceFile());
-      if (!firstUnit) continue;
-      for (const { declaration, unit } of list) {
-        const file = declaration.getSourceFile();
-        if (reported.get(file)?.has(declaration.name.getStart(file)))
-          unitConflicts.add(pairKey(unitKey(firstUnit), unit));
+    const shared = new Set(
+      [...byName.entries()]
+        .filter(([, list]) => new Set(list.map(({ unit }) => unit)).size > 1)
+        .map(([name]) => name),
+    );
+    if (!shared.size) return unitConflicts;
+    const declarationChecker = checkingDeclarations(program);
+    // The innermost recorded declaration of a shared name at a position.
+    const at = (file: ts.SourceFile | undefined, start: number | undefined) => {
+      if (!file || start === undefined) return undefined;
+      let found: GlobalDeclaration | undefined;
+      for (const entry of byFile.get(file) ?? [])
+        if (
+          shared.has(entry.name) &&
+          entry.node.getStart(file) <= start &&
+          start < entry.node.end &&
+          (!found || entry.node.getStart(file) >= found.node.getStart(file))
+        )
+          found = entry;
+      return found;
+    };
+    let checked = 0;
+    for (const [file, entries] of byFile) {
+      const statements = [
+        ...new Set(
+          entries
+            .filter(({ name }) => shared.has(name))
+            .map(({ statement }) => statement),
+        ),
+      ];
+      if (!statements.length) continue;
+      checked += statements.length;
+      for (const diagnostic of declarationChecker.getDiagnostics(
+        file,
+        undefined,
+        statements,
+      )) {
+        if (!CONFLICT_CODES.has(diagnostic.code)) continue;
+        const own = at(diagnostic.file, diagnostic.start);
+        if (!own) continue;
+        const related = (diagnostic.relatedInformation ?? [])
+          .map((info) => at(info.file, info.start))
+          .filter(
+            (other): other is GlobalDeclaration =>
+              !!other && other.name === own.name,
+          );
+        // A comparison with the first declaration (2403, 2717, 2428, 2687)
+        // differs from every unit that agrees with the first, not only the
+        // first's: pair it with every other unit declaring the name. A
+        // duplicate (2300, 2451) names both declarations: pair those.
+        const others =
+          COMPARED.has(diagnostic.code) || !related.length
+            ? byName.get(own.name)!
+            : related;
+        for (const other of others)
+          if (other.unit !== own.unit)
+            unitConflicts.add(pairKey(own.unit, other.unit));
       }
     }
+    count("typescript.conflictChecks", checked);
     return unitConflicts;
   }
   /** Whether two of `units` are in conflict on a shared global (TS2403). */

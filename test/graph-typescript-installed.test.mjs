@@ -1512,7 +1512,7 @@ async function environmentLayout(write, main, extra = {}) {
       "  interface Console { log(...data: any[]): void }",
       "  var console: Console;",
       "  function setTimeout(callback: () => void, ms?: number): number;",
-      "  interface URL { readonly href: string }",
+      "  interface URL { href: string }",
       // As @types/node declares it: the DOM's type where the DOM library is loaded.
       "  var URL: typeof globalThis extends { onmessage: any; URL: infer T } ? T : { new (url: string): URL };",
       "}",
@@ -1723,6 +1723,135 @@ test("two units in conflict on any shared global mark none of their merged globa
   assert.equal(conflicting.data.mergedGlobal, undefined);
   const agreeing = await globalsCase(layout(true), "src/main.ts", "helper");
   assert.equal(agreeing.data.mergedGlobal, true);
+});
+
+// C-42 review round 2: the compiler's other conflicts between two units.
+// bun-types redeclares DOM stream and fetch types with different property
+// types (TS2717); its units are alternatives to the DOM's.
+test("units in conflict by a member's type (the bun-types shape) mark none of their merged globals", async () => {
+  const files = (closed) => ({
+    "tsconfig.json": config({ lib: ["es2022", "dom"], types: ["env-bun"] }),
+    ...typesPackage(
+      "env-bun",
+      `interface ReadableStreamGenericReader { readonly closed: ${closed}; cancel(reason?: any): Promise<void> }\ninterface Headers { toJSON(): Record<string, string> }\n`,
+    ),
+    "src/main.ts":
+      "declare const r: ReadableStreamDefaultReader<string>;\nr.cancel();\nexport const h = new Headers();\n",
+  });
+  const cancel = await globalsCase(
+    files("Promise<undefined>"),
+    "src/main.ts",
+    "r.cancel",
+  );
+  assert.equal(cancel.data.mergedGlobal, undefined);
+  const headers = await globalsCase(
+    files("Promise<undefined>"),
+    "src/main.ts",
+    "Headers",
+  );
+  assert.equal(headers.data.mergedGlobal, undefined);
+  // The same declarations with the DOM's own type for `closed` agree.
+  const agreeing = await globalsCase(
+    files("Promise<void>"),
+    "src/main.ts",
+    "r.cancel",
+  );
+  assert.equal(agreeing.data.mergedGlobal, true);
+});
+
+// One case for each conflict the compiler reports between two units; a
+// function both units declare alike is unmarked because of it.
+for (const [code, a, b] of [
+  [2717, "interface Thing { p: string }", "interface Thing { p: number }"],
+  [2300, "declare var dup: number;", "declare function dup(): void;"],
+  [2451, "declare let block: number;", "declare let block: number;"],
+  [2428, "interface Box<T> { t: T }", "interface Box<U, V> { u: U }"],
+  [
+    2687,
+    "interface Flag { readonly f: string }",
+    "interface Flag { f: string }",
+  ],
+])
+  test(`units the compiler finds in conflict by TS${code} are alternatives`, async () => {
+    const link = await globalsCase(
+      {
+        "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+        ...typesPackage("env-a", `${a}\ndeclare function helper(): void;\n`),
+        ...typesPackage("env-b", `${b}\ndeclare function helper(): void;\n`),
+        "src/main.ts": "helper();\nexport {};\n",
+      },
+      "src/main.ts",
+      "helper",
+    );
+    assert.equal(link.data.mergedGlobal, undefined);
+  });
+
+test("a conflict declared in a global block inside an ambient module is found", async () => {
+  const link = await globalsCase(
+    {
+      "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+      ...typesPackage(
+        "env-a",
+        'declare module "env-a" { global { var shared: { n: number }; function helper(): void; } }\n',
+      ),
+      ...typesPackage(
+        "env-b",
+        "declare var shared: { n: string };\ndeclare function helper(): void;\n",
+      ),
+      "src/main.ts": "helper();\nexport {};\n",
+    },
+    "src/main.ts",
+    "helper",
+  );
+  assert.equal(link.data.mergedGlobal, undefined);
+});
+
+test("with three units, a unit that differs from the first conflicts with every unit that agrees with it", async () => {
+  const files = {
+    "tsconfig.json": config({
+      lib: ["es2022"],
+      types: ["env-a", "env-b", "env-c"],
+    }),
+    ...typesPackage(
+      "env-a",
+      "declare var trio: { n: number };\ndeclare function both(): void;\n",
+    ),
+    ...typesPackage(
+      "env-b",
+      "declare var trio: { n: number };\ndeclare function both(): void;\ndeclare function later(): void;\n",
+    ),
+    ...typesPackage(
+      "env-c",
+      "declare var trio: { n: string };\ndeclare function later(): void;\n",
+    ),
+    "src/main.ts": "both();\nlater();\nexport {};\n",
+  };
+  // A and B agree: their shared global stays marked.
+  const both = await globalsCase(files, "src/main.ts", "both");
+  assert.equal(both.data.mergedGlobal, true);
+  // C differs from the first (A), so from B too.
+  const later = await globalsCase(files, "src/main.ts", "later");
+  assert.equal(later.data.mergedGlobal, undefined);
+});
+
+test("a conflict and a link name a declaration inside @types/node's ambient module by the same unit", async () => {
+  const link = await globalsCase(
+    {
+      "tsconfig.json": config({ lib: ["es2022"], types: ["node", "env-b"] }),
+      ...typesPackage(
+        "@types/node",
+        'declare module "url" { global { var keyed: { n: number }; function helper(): void; } }\n',
+      ),
+      ...typesPackage(
+        "env-b",
+        "declare var keyed: { n: string };\ndeclare function helper(): void;\n",
+      ),
+      "src/main.ts": "helper();\nexport {};\n",
+    },
+    "src/main.ts",
+    "helper",
+  );
+  assert.equal(link.data.mergedGlobal, undefined);
 });
 
 test("an ambient module merged across two packages, a checkout augmentation and a file in two programs are not a merged global", async () => {
