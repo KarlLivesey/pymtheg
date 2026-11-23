@@ -580,6 +580,7 @@ test("nested type positions have their places; a type literal's overloads are on
         "declare const nested: { inner: { go(): void }[] };",
         "declare const pair: [{ a(): void }, { b(): void }];",
         "declare const either: { run(): void } | { stop(): void };",
+        "export function render(db: { getConfig(): number }) {}",
         "",
       ].join("\n"),
     );
@@ -595,6 +596,23 @@ test("nested type positions have their places; a type literal's overloads are on
       "either.[type].[|1].stop",
     ])
       assert.ok(identities.includes(identity), identity);
+    // PR 60's symbol keys carry the nested places and the parameter slot:
+    // `kind:identity`, no ordinal (the overload set is one symbol).
+    const keys = new Map(
+      store.findSymbols().map((s) => [s.identity, [s.key, s.ordinal]]),
+    );
+    for (const [identity, key] of [
+      ["box.[type].[<0>].open", "method:box.[type].[<0>].open"],
+      ["nested.[type].inner.[].go", "method:nested.[type].inner.[].go"],
+      ["pair.[type].[#1].b", "method:pair.[type].[#1].b"],
+      ["either.[type].[|1].stop", "method:either.[type].[|1].stop"],
+      ["Over.[type].run", "method:Over.[type].run"],
+      [
+        "render.[param:db].[type].getConfig",
+        "method:render.[param:db].[type].getConfig",
+      ],
+    ])
+      assert.deepEqual(keys.get(identity), [key, 0], identity);
     // Like an interface's overloads: one symbol, which both calls reach.
     assert.equal(
       identities.filter((identity) => identity === "Over.[type].run").length,
