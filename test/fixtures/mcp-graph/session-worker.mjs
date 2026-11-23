@@ -3,7 +3,9 @@
 //   gate: Int32Array over a SharedArrayBuffer: [paused, released, writes]
 //   mode: "production"   production modules, no pause
 //         "pause-store"  production modules; the worker stops inside its
-//                        first file write (the core section) until released
+//                        first file write (the core section) until the
+//                        server's cancel flag is set (gate[2]: checkpoints
+//                        passed by then)
 //         "pause-module" the synthetic module; stops inside its first parse
 //                        (a module call) until released
 //         "crash-module" the synthetic module; a file named crash.syn exits
@@ -37,12 +39,19 @@ const stop = () => {
 const proto = SqliteGraphStore.prototype;
 let registry;
 if (workerData.mode === "pause-store") {
+  // Stops inside its first file write and cannot go on until the server's
+  // cancel flag is set, so the run cannot finish before the cancel; then
+  // records the checkpoint count at that moment in gate[2].
+  const control = new Int32Array(workerData.control);
   const replaceFile = proto.replaceFile;
   let stopped = false;
   proto.replaceFile = function (...args) {
     if (!stopped) {
       stopped = true;
-      stop();
+      Atomics.store(gate, 0, 1);
+      Atomics.notify(gate, 0);
+      while (Atomics.load(control, 0) === 0) Atomics.wait(control, 0, 0);
+      Atomics.store(gate, 2, Atomics.load(control, 2));
     }
     return replaceFile.apply(this, args);
   };

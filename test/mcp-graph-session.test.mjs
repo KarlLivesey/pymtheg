@@ -114,15 +114,29 @@ test("two jobs reuse one worker and its loaded modules", async () => {
 
 test("a cancel in the graph command is acknowledged and the worker lives on", async () => {
   const { base, root } = tree(goFiles);
-  const { jobs, stopped, release } = jobsFor(root, "pause-store");
+  const { jobs, stopped, gate } = jobsFor(root, "pause-store");
   try {
     const job = jobs.start({ command: "index" });
     await stopped();
-    // The worker is inside a store call: it answers at its next checkpoint.
-    const cancelling = jobs.cancel(job.id);
-    release();
-    await cancelling;
+    // The worker is inside a store call and cannot go on until the cancel
+    // flag is set: it must answer `cancelled` at its next checkpoint.
+    await jobs.cancel(job.id);
     assert.equal(job.state, "cancelled");
+    assert.equal(job.answer, "cancelled", "the worker acknowledged");
+    assert.equal(job.view, undefined, "no result came back");
+    assert.equal(
+      job.abortedAt,
+      Atomics.load(gate, 2) + 1,
+      "acted on at the first checkpoint after the flag",
+    );
+    const store = new SqliteGraphStore(graphAt(root), undefined, {
+      readOnly: true,
+    });
+    try {
+      assert.equal(store.graphCommandState(), null, "no completion record");
+    } finally {
+      store.close();
+    }
     assert.equal(jobs.generation, 1);
     const next = await run(jobs);
     assert.equal(next.state, "complete");

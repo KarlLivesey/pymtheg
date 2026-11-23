@@ -28,6 +28,10 @@ export interface GraphJob {
   workerEnded?: boolean;
   /** The job's work counters and stage times (observations). */
   work?: { counts: Record<string, number>; stages: Record<string, unknown> };
+  /** What the worker answered, if it answered (not set when it exited). */
+  answer?: "result" | "cancelled" | "error";
+  /** For a cancelled answer: the checkpoint (1-based, since the worker started) that acted on the cancel. */
+  abortedAt?: number;
 }
 export interface GraphJobsOptions {
   /** Starts a worker that shares `control` (tests supply their own). */
@@ -86,6 +90,7 @@ type WorkerMessage = {
   session?: GraphJob["session"];
   work?: GraphJob["work"];
   memory?: GraphJob["memory"];
+  abortedAt?: number;
 };
 /**
  * The MCP server's graph jobs (C-48): one job at a time, run by one worker
@@ -222,6 +227,13 @@ export class GraphJobs {
         for (const listener of job.listeners) listener(job.progress);
         return;
       }
+      job.answer =
+        m.kind === "result"
+          ? "result"
+          : m.kind === "cancelled"
+            ? "cancelled"
+            : "error";
+      if (m.abortedAt !== undefined) job.abortedAt = m.abortedAt;
       if (m.kind === "result") {
         job.view = Object.assign(Object.create(GraphView.prototype), m.view);
         if (job.state === "running") job.state = "complete";
@@ -300,6 +312,8 @@ export class GraphJobs {
       const control = job.worker === this.worker ? this.control : undefined;
       if (control) {
         Atomics.store(control, CONTROL.cancel, 1);
+        // Wakes a worker waiting on the flag (tests do).
+        Atomics.notify(control, CONTROL.cancel);
         // Inside a module call there may be no checkpoint for long.
         if (Atomics.load(control, CONTROL.section) === SECTION.module)
           await this.retire();

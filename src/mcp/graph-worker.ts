@@ -88,11 +88,15 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
     const controller = new AbortController();
     const signal = controller.signal;
     const check = signal.throwIfAborted.bind(signal);
-    // Every abort check of the command is a checkpoint.
+    // Every abort check of the command is a checkpoint; the one that acts
+    // on a cancel is reported with the answer.
+    let abortedAt: number | undefined;
     signal.throwIfAborted = () => {
-      Atomics.add(control, CONTROL.checkpoints, 1);
-      if (Atomics.load(control, CONTROL.cancel) === 1 && !signal.aborted)
+      const at = Atomics.add(control, CONTROL.checkpoints, 1) + 1;
+      if (Atomics.load(control, CONTROL.cancel) === 1 && !signal.aborted) {
+        abortedAt = at;
         controller.abort(new Cancelled());
+      }
       check();
     };
     let answer: Record<string, unknown>;
@@ -120,7 +124,7 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
     } catch (error) {
       answer =
         signal.aborted && Object.is(error, signal.reason)
-          ? { kind: "cancelled", id }
+          ? { kind: "cancelled", id, abortedAt }
           : {
               kind: "error",
               id,
