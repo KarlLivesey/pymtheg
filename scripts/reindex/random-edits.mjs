@@ -66,7 +66,12 @@ if (
 if (existsSync(base) && !resume) throw Error(`exists: ${base}`);
 mkdirSync(base, { recursive: true });
 if (!existsSync(root))
-  cpSync(join(scratch, "pins", name), root, { recursive: true });
+  // verbatimSymlinks: a pnpm install links packages by relative symlinks,
+  // which must point into the copy, not back into the pin.
+  cpSync(join(scratch, "pins", name), root, {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
 
 // Deterministic PRNG (mulberry32).
 let state = Number(seedArg) >>> 0;

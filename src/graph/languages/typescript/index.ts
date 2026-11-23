@@ -25,6 +25,7 @@ import { libraryKey, libraryReader } from "./library.js";
 import type { ProjectGroup } from "./project.js";
 import type { Renamed } from "./rename.js";
 import { markTaintExhausted, setTaintBudget, taintExhausted } from "./taint.js";
+import { setJudgeBudget, setJudgeProgramBudget } from "./judge.js";
 import { neutralizeAssumed } from "./untrusted.js";
 import { entryProvenance } from "./workspace-entries.js";
 import { unbuiltEntryAssumption } from "./entry-build.js";
@@ -58,6 +59,10 @@ const exhaustedSessions = new WeakSet<object>();
 export interface TypeScriptModuleOptions {
   /** The taint walk's step budget (taint.ts; TAINT_BUDGET otherwise). */
   taintSteps?: number;
+  /** C-47: the structural judgement's step budget (judge.ts JUDGE_BUDGET). */
+  judgeSteps?: number;
+  /** C-47: the judge's step budget for a whole program (JUDGE_PROGRAM_BUDGET). */
+  judgeProgramSteps?: number;
   /** The program budget in characters (project.ts; MAX_PROGRAM_SOURCE otherwise). */
   programCharacters?: number;
   /** Called before every checker call the module makes; may throw. */
@@ -120,7 +125,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `45+typescript-${ts.version}`;
+const MODULE_VERSION = `48+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -229,6 +234,10 @@ function openSession(
       const checker = attributed(program.getTypeChecker(), hooks.checkerFault);
       if (hooks.taintSteps !== undefined)
         setTaintBudget(checker, hooks.taintSteps);
+      if (hooks.judgeSteps !== undefined)
+        setJudgeBudget(checker, hooks.judgeSteps);
+      if (hooks.judgeProgramSteps !== undefined)
+        setJudgeProgramBudget(checker, hooks.judgeProgramSteps);
       return { program, checker };
     } catch (error) {
       lastProgram = program;
