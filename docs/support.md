@@ -981,6 +981,20 @@ An unfinished run or a direct graph write requires recovery. The opt-in
 toolchain route uses a full pass. The same file tree produces the same
 graph after a fresh or incremental index. [C-27](changes/C-27.md)
 
+Rust can reuse the stored link decisions outside the edited files. A comment,
+whitespace or body edit that leaves every fact another file reads unchanged
+re-decides only the edited file. This includes a body edit that adds calls.
+It does not apply when deciding the file's links meets a lookup cycle, a
+depth limit or a re-entry guard, as in modules that glob each other.
+
+Any other change uses the full Rust pass. This covers changes to symbols,
+imports, macros, modules, attributes or cfg conditions; a Cargo manifest,
+lockfile or configuration change; an added, removed or unreadable file; and
+an unfinished previous run. No answer the resolver caches depends on its
+caller, and the scoped path is used only when the edited file's decisions
+meet no cut. The same file tree therefore produces the same graph after a
+fresh or incremental index. [C-36](changes/C-36.md)
+
 **Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted
 on this machine (below; [code guide](code-guide.md#the-go-toolchain-route)),
 indexing also runs `go` from `PATH`, or the absolute path named in your own
