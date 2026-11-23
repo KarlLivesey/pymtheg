@@ -75,9 +75,7 @@ test("an abort inside a module call kills the child processes the worker started
   let connected;
   const both = new Promise((resolve) => (connected = resolve));
   const server = createServer((connection) => {
-    connections.push(
-      new Promise((resolve) => connection.on("close", resolve)),
-    );
+    connections.push(new Promise((resolve) => connection.on("close", resolve)));
     connection.resume();
     if (connections.length === 2) connected();
   });
