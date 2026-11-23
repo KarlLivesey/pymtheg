@@ -129,6 +129,8 @@ import {
   isLocalCallable,
   isScopedDeclaration,
   keyOf,
+  MODULE_KEY,
+  setKeyNames,
   kindOf,
   nameOf,
   objectMember,
@@ -337,6 +339,7 @@ const requiredProperty = (element: ts.BindingElement) =>
     ? undefined
     : staticName(element.propertyName ?? element.name);
 
+const namedPrograms = new WeakSet<ts.Program>();
 export function extractFile(
   file: ts.SourceFile,
   checker: ts.TypeChecker,
@@ -348,6 +351,14 @@ export function extractFile(
   context: RenameContext,
   library: ReturnType<typeof libraryReader>,
 ): ParseResult {
+  // Keys spell the source's names (setKeyNames): every file of the program
+  // learns the program's fresh names before any key of it is made.
+  if (!namedPrograms.has(program)) {
+    namedPrograms.add(program);
+    const fresh = context.fresh;
+    for (const source of program.getSourceFiles())
+      setKeyNames(source, (text) => restoreNames(text, fresh));
+  }
   const uncertainAt = new Set(context.renamed?.uncertain ?? []);
   const uncertainReason = (offset: number) =>
     context.renamed?.reasons[offset] ?? "dynamic-scope";
@@ -2642,7 +2653,7 @@ export function extractFile(
         ? // A file that cannot be read has failed: no target, its file the cause.
           invalid([file], "import of the failed file")
         : {
-            targets: [{ file, key: "module@0" }],
+            targets: [{ file, key: MODULE_KEY }],
             // A target whose analysis failed has no facts to link to.
             ...(kind === "unavailable" ? { reason: "target-unavailable" } : {}),
           }
@@ -3433,7 +3444,7 @@ export function extractFile(
                 captured.has(target) &&
                 uncertainReason(node.expression.getStart(file)) ===
                   "dynamic-scope"
-                  ? [{ file: target, key: "module@0" }]
+                  ? [{ file: target, key: MODULE_KEY }]
                   : [],
               reason: uncertainReason(node.expression.getStart(file)),
             },
@@ -3865,6 +3876,8 @@ export function extractFile(
         "The TypeScript checker exhausted its stack on some lookups; those links are unresolved (compiler-limit)",
     });
   // Facts of a renamed file report the original names (see rename.ts).
+  // Keys already do: they are made from restored names (setKeyNames), so
+  // they agree across programs, whose fresh names differ.
   if (context.renamed) {
     const fresh = context.fresh;
     for (const symbol of symbols) {
