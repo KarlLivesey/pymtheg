@@ -20,7 +20,8 @@ const compare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const environment = { ...process.env, LC_ALL: "C.UTF-8" };
 delete environment.NODE_OPTIONS; // Measure the released CLI with Node's default heap.
 
-const gitEnvironment = {
+// Exported for tests, which fetch a local fixture repository over file.
+export const gitEnvironment = {
   ...environment,
   GIT_CONFIG_NOSYSTEM: "1",
   GIT_CONFIG_GLOBAL: "/dev/null",
@@ -281,7 +282,7 @@ async function corpusSize(root, listing) {
 }
 
 // toolchain: "go" or "rust" for an opt-in offline toolchain run (C-43 adds Rust).
-async function runRepository(repo, release, scratch, limitSeconds, installed, toolchain) {
+export async function runRepository(repo, release, scratch, limitSeconds, installed, toolchain) {
   // A retry gets a distinct directory even if a previous child is winding down.
   const work = join(scratch, "work", ...repo.id.split("/"), repo.commit, randomUUID());
   const root = join(work, "checkout");
@@ -408,11 +409,16 @@ async function runRepository(repo, release, scratch, limitSeconds, installed, to
     stage = "init";
     // Never use project-supplied Pymtheg settings. init creates default settings.
     if (await exists(join(root, ".pymtheg"))) throw Error("Checkout contains existing Pymtheg settings or storage");
-    await cli("init", ["init", ".", "--name", repo.id, "--format", "json"]);
+    // Since C-44 only this machine's trust answer turns a toolchain route on:
+    // a toolchain mode answers --trust (in the run's isolated configuration
+    // folder, scripts/isolated-home.mjs), and the committed settings turn the
+    // other route off, which committed settings may still do.
+    await cli("init", ["init", ".", "--name", repo.id, ...(toolchain ? ["--trust"] : []), "--format", "json"]);
     if (toolchain) {
       const path = join(root, ".pymtheg/settings.json");
       const settings = JSON.parse(await readFile(path, "utf8"));
-      settings.graph = { ...settings.graph, toolchain: { [toolchain]: true } };
+      const other = toolchain === "go" ? "rust" : "go";
+      settings.graph = { ...settings.graph, toolchain: { [other]: false } };
       await writeFile(path, `${JSON.stringify(settings, null, 2)}\n`);
     }
     const cold = await graph("cold", "index");

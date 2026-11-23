@@ -34,7 +34,7 @@
   "filter:import-names-module": 104,
   "unapplied:library": 9986,
   "none:kind-not-joined": 2997,
-  "answer": 9537,
+  "answer": 9528,
   "none:local": 4974,
   "none:no-occurrence-at-site": 281,
   "unapplied:generated": 1110,
@@ -43,6 +43,7 @@
   "none:no-graph-symbol": 428,
   "filter:kind-incompatible": 2,
   "none:file-not-indexed": 1102,
+  "answer:trait-associated": 9,
   "filter:extern-crate": 5,
   "filter:collision": 5
  },
@@ -59,88 +60,23 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 35.8,
-  "cpuS": 90.8,
-  "peakMiB": 1692
+  "wallS": 45.2,
+  "cpuS": 110.5,
+  "peakMiB": 1679
  },
  "index": {
   "sourceOnly": {
-   "wallS": 32.9,
-   "cpuS": 40.7
+   "wallS": 35.7,
+   "cpuS": 46.8
   },
   "route": {
-   "wallS": 72.4,
-   "cpuS": 40.9
+   "wallS": 145.9,
+   "cpuS": 54.7
   }
  },
  "errors": {
   "sourceOnly": [],
   "route": []
- },
- "funnel": {
-  "open": 15871,
-  "buckets": {
-   "gate: kind/namespace": 32,
-   "no identity: library item": 7012,
-   "no answer: no-occurrence-at-site": 239,
-   "other": 3677,
-   "gate: trait-method declaration": 739,
-   "no identity: local binding": 2326,
-   "no identity: generated item": 835,
-   "no answer: no-name-site": 41,
-   "no identity: declaration without a graph symbol": 428,
-   "gate: cfg-variant guard": 13,
-   "gate: cfg condition other than test": 54,
-   "no answer: file-not-indexed": 467,
-   "gate: known error classes": 8
-  },
-  "libraryPassingCfg": 6705,
-  "notIndexed": {
-   "other source": 467
-  },
-  "notIndexedFiles": 8,
-  "notIndexedTop": [
-   {
-    "path": "alacritty_terminal/src/tty/windows/blocking.rs",
-    "links": 186,
-    "class": "other source"
-   },
-   {
-    "path": "alacritty_terminal/src/tty/windows/child.rs",
-    "links": 75,
-    "class": "other source"
-   },
-   {
-    "path": "alacritty_terminal/src/tty/windows/conpty.rs",
-    "links": 68,
-    "class": "other source"
-   },
-   {
-    "path": "alacritty_terminal/src/tty/windows/mod.rs",
-    "links": 60,
-    "class": "other source"
-   },
-   {
-    "path": "alacritty/src/macos/locale.rs",
-    "links": 30,
-    "class": "other source"
-   },
-   {
-    "path": "alacritty/src/macos/proc.rs",
-    "links": 28,
-    "class": "other source"
-   },
-   {
-    "path": "alacritty/src/panic.rs",
-    "links": 12,
-    "class": "other source"
-   },
-   {
-    "path": "alacritty/src/macos/mod.rs",
-    "links": 8,
-    "class": "other source"
-   }
-  ]
  },
  "c19": {
   "links": 30965,

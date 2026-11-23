@@ -19,25 +19,26 @@
  },
  "route": {
   "links": 54645,
-  "level2": 30895,
+  "level2": 30720,
   "assumed": 2914,
   "proven": 22298,
-  "toolchainDecided": 5683,
+  "toolchainDecided": 5508,
   "libraryModuleLinks": 0,
-  "level2Percent": 56.54,
-  "withModuleLinksPercent": 56.54,
-  "toolchainDecidedPercent": 10.4
+  "level2Percent": 56.22,
+  "withModuleLinksPercent": 56.22,
+  "toolchainDecidedPercent": 10.08
  },
  "decided": {
-  "definite:unresolved": 5683,
-  "definite:definite": 8252,
-  "withheld:cfg-variant": 145,
-  "withheld:cfg-link": 941
+  "definite:unresolved": 5508,
+  "definite:definite": 7507,
+  "withheld:cfg-variant": 973,
+  "withheld:cfg-link": 941,
+  "withheld:conditional-candidates": 92
  },
  "join": {
   "unapplied:library": 21570,
   "filter:import-names-module": 119,
-  "answer": 15021,
+  "answer": 15018,
   "none:no-occurrence-at-site": 134,
   "none:kind-not-joined": 3962,
   "none:trait-declaration": 1114,
@@ -47,10 +48,11 @@
   "none:no-graph-symbol": 53,
   "none:file-not-indexed": 2274,
   "filter:collision": 95,
-  "filter:kind-incompatible": 1
+  "filter:kind-incompatible": 1,
+  "answer:trait-associated": 3
  },
  "agreement": {
-  "confirmed": 8252,
+  "confirmed": 7507,
   "differs": 0,
   "percent": 100
  },
@@ -62,18 +64,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 53.2,
-  "cpuS": 137.2,
-  "peakMiB": 1652
+  "wallS": 57.5,
+  "cpuS": 133.9,
+  "peakMiB": 1646
  },
  "index": {
   "sourceOnly": {
-   "wallS": 65.6,
-   "cpuS": 76.6
+   "wallS": 54.1,
+   "cpuS": 74.8
   },
   "route": {
-   "wallS": 119.8,
-   "cpuS": 82.1
+   "wallS": 149.4,
+   "cpuS": 78.3
   }
  },
  "errors": {
@@ -85,13 +87,14 @@
   "buckets": {
    "gate: kind/namespace": 31,
    "no identity: library item": 13662,
-   "credited": 5683,
+   "credited": 5508,
    "no answer: no-occurrence-at-site": 117,
    "gate: trait-method declaration": 1114,
    "no identity: local binding": 6173,
    "no identity: generated item": 745,
    "gate: cfg-variant guard": 69,
    "gate: cfg condition other than test": 310,
+   "other": 175,
    "no answer: no-name-site": 36,
    "no identity: declaration without a graph symbol": 53,
    "no answer: file-not-indexed": 1415,

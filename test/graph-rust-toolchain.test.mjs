@@ -17,6 +17,7 @@ import {
   readdirSync,
   realpathSync,
   statSync,
+  watch,
   writeFileSync,
 } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -175,6 +176,32 @@ process.exit(2);`,
     chmodSync(join(dir, name), 0o755);
   }
   return full;
+}
+/**
+ * Readiness handshake: resolves once the fake has written `path` (watched,
+ * not polled), and fails at once if `running` settles first. No count or
+ * clock bounds the wait.
+ */
+function ready(path, running) {
+  return new Promise((resolve, reject) => {
+    const watcher = watch(dirname(path), () => check());
+    const done = (fn, value) => {
+      watcher.close();
+      fn(value);
+    };
+    const check = () => {
+      if (existsSync(path)) done(resolve);
+    };
+    running.then(
+      () =>
+        done(
+          reject,
+          Error("the run ended before the fake rust-analyzer was ready"),
+        ),
+      (error) => done(reject, error),
+    );
+    check();
+  });
 }
 const runs = (tools) =>
   existsSync(tools.runs)
@@ -1041,10 +1068,7 @@ test("cancellation: aborting the index ends a rust-analyzer that never finishes 
       signal: controller.signal,
     });
     // Readiness handshake: the fake writes its pid once it is running.
-    for (let i = 0; !existsSync(tools.ready); i++) {
-      assert.ok(i < 100000, "the fake rust-analyzer did not start");
-      await new Promise((resolve) => setImmediate(resolve));
-    }
+    await ready(tools.ready, indexing);
     const pid = Number(readFileSync(tools.ready, "utf8"));
     controller.abort();
     const dump = await indexing;
@@ -1086,10 +1110,7 @@ test("the run limit: a hang past the limit (a controlled clock) makes the route 
       const indexing = index(project, root, {
         environment: environment(tools),
       });
-      for (let i = 0; !existsSync(tools.ready); i++) {
-        assert.ok(i < 100000, "the fake rust-analyzer did not start");
-        await new Promise((resolve) => setImmediate(resolve));
-      }
+      await ready(tools.ready, indexing);
       assert.equal(clock.fireNext(), LIMIT);
       const dump = await indexing;
       assert.equal(dump.state.state, "unavailable");
@@ -1529,6 +1550,156 @@ test(
       assert.equal(
         dump.links.some((l) => l.data?.toolchain),
         false,
+      );
+    });
+  },
+);
+
+/** The second reviewer's shapes in one crate (review B1 and the kind match). */
+const CFG_CRATE = {
+  "Cargo.toml":
+    '[package]\nname = "cfgs"\nversion = "0.1.0"\nedition = "2021"\n',
+  "src/lib.rs": [
+    "// (b) module-level cfg twins through #[path]",
+    "#[cfg(unix)]",
+    '#[path = "sys/unix.rs"]',
+    "mod imp;",
+    "#[cfg(windows)]",
+    '#[path = "sys/windows.rs"]',
+    "mod imp;",
+    "pub fn a_use_imp() -> u32 {",
+    "    imp::platform_a()",
+    "}",
+    "",
+    "// (a) redb's shape: one name re-exported from two cfg-gated modules",
+    "#[cfg(unix)]",
+    "mod optimized;",
+    "#[cfg(unix)]",
+    "pub use optimized::FileBackend;",
+    "#[cfg(not(unix))]",
+    "mod fallback;",
+    "#[cfg(not(unix))]",
+    "pub use fallback::FileBackend;",
+    "pub fn backend() -> u32 {",
+    "    FileBackend::new().size()",
+    "}",
+    "",
+    "// (c) twins declared only inside a macro invocation, as cfg_if! does",
+    "macro_rules! pick {",
+    "    ($($i:item)*) => { $($i)* };",
+    "}",
+    "pick! {",
+    "    #[cfg(unix)]",
+    "    mod c_unix;",
+    "    #[cfg(unix)]",
+    "    use c_unix as c_sys;",
+    "    #[cfg(not(unix))]",
+    "    mod c_other;",
+    "    #[cfg(not(unix))]",
+    "    use c_other as c_sys;",
+    "}",
+    "pub fn open() -> u32 {",
+    "    c_sys::c_open()",
+    "}",
+    "",
+    "// The kind match: a module and the function a macro declares inside it",
+    "macro_rules! accessor {",
+    "    ($n:ident) => {",
+    "        pub fn $n() -> u32 {",
+    "            1",
+    "        }",
+    "    };",
+    "}",
+    "pub mod e_width {",
+    "    accessor!(e_width);",
+    "}",
+    "pub fn width() -> u32 {",
+    "    e_width::e_width()",
+    "}",
+    "",
+    "// Trait associated items in generic code: the trait's declaration",
+    "pub trait Shape {",
+    "    const SIDES: u32;",
+    "}",
+    "pub fn sides<S: Shape>() -> u32 {",
+    "    S::SIDES",
+    "}",
+    "",
+    "// A plain call, decided by the route",
+    "pub fn plain() -> u32 {",
+    "    helper()",
+    "}",
+    "fn helper() -> u32 {",
+    "    2",
+    "}",
+    "",
+  ].join("\n"),
+  "src/sys/unix.rs": "pub fn platform_a() -> u32 {\n    1\n}\n",
+  "src/sys/windows.rs": "pub fn platform_a() -> u32 {\n    2\n}\n",
+  "src/optimized.rs":
+    "pub struct FileBackend;\n\nimpl FileBackend {\n    pub fn new() -> Self {\n        FileBackend\n    }\n    pub fn size(&self) -> u32 {\n        1\n    }\n}\n",
+  "src/fallback.rs":
+    "pub struct FileBackend;\n\nimpl FileBackend {\n    pub fn new() -> Self {\n        FileBackend\n    }\n    pub fn size(&self) -> u32 {\n        2\n    }\n}\n",
+  "src/c_unix.rs": "pub fn c_open() -> u32 {\n    1\n}\n",
+  "src/c_other.rs": "pub fn c_open() -> u32 {\n    2\n}\n",
+};
+
+test(
+  "real rust-analyzer, second review B1: cfg on whole modules, twins in a cfg_if!-style macro and conditional candidates are never narrowed; a module is never the answer for a function",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "cfgs");
+      writeProject(project, CFG_CRATE);
+      const dump = await index(project, root, { environment: process.env });
+      if (
+        dump.state.state === "unavailable" &&
+        /rust-src/.test(dump.state.reason)
+      )
+        return;
+      assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+      const link = (name) =>
+        dump.links.find(
+          (l) => l.file === "src/lib.rs" && l.targetName === name,
+        );
+      // The route ran: the plain call is decided by it.
+      assert.equal(link("helper").targetSymbol?.identity, "helper");
+      for (const name of [
+        "imp::platform_a",
+        "FileBackend::new",
+        "c_sys::c_open",
+      ]) {
+        const l = link(name);
+        assert.ok(l, name);
+        assert.equal(
+          l.data?.toolchain,
+          undefined,
+          name + ": " + JSON.stringify(l.data?.toolchain),
+        );
+        assert.notEqual(
+          l.resolution,
+          "resolved",
+          name + " stays open as source-only left it",
+        );
+      }
+      // Never the module e_width for the call e_width::e_width().
+      const width = link("e_width::e_width");
+      assert.notEqual(
+        width?.targetSymbol?.kind,
+        "module",
+        JSON.stringify(width?.targetSymbol),
+      );
+      const counts = note(dump.report, "available").join;
+      assert.ok(
+        (counts["answer:trait-associated"] ?? 0) >= 1,
+        JSON.stringify(counts),
+      );
+      const decided = note(dump.report, "merged").decided;
+      assert.ok(
+        (decided["withheld:cfg-variant"] ?? 0) +
+          (decided["withheld:conditional-candidates"] ?? 0) >=
+          3,
+        JSON.stringify(decided),
       );
     });
   },

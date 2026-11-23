@@ -19,24 +19,25 @@
  },
  "route": {
   "links": 90583,
-  "level2": 52069,
+  "level2": 51731,
   "assumed": 2491,
   "proven": 38182,
-  "toolchainDecided": 11396,
+  "toolchainDecided": 11058,
   "libraryModuleLinks": 0,
-  "level2Percent": 57.48,
-  "withModuleLinksPercent": 57.48,
-  "toolchainDecidedPercent": 12.58
+  "level2Percent": 57.11,
+  "withModuleLinksPercent": 57.11,
+  "toolchainDecidedPercent": 12.21
  },
  "decided": {
-  "definite:definite": 13924,
-  "definite:unresolved": 11396,
+  "definite:definite": 13784,
+  "definite:unresolved": 11058,
   "withheld:cfg-link": 586,
-  "withheld:cfg-variant": 50
+  "withheld:conditional-candidates": 316,
+  "withheld:cfg-variant": 212
  },
  "join": {
   "filter:import-names-module": 152,
-  "answer": 25956,
+  "answer": 25885,
   "unapplied:library": 33027,
   "none:kind-not-joined": 8315,
   "none:local": 14427,
@@ -47,11 +48,12 @@
   "none:no-occurrence-at-site": 1020,
   "filter:collision": 52,
   "filter:extern-crate": 37,
+  "answer:trait-associated": 71,
   "none:file-not-indexed": 3899,
   "filter:kind-incompatible": 2
  },
  "agreement": {
-  "confirmed": 13924,
+  "confirmed": 13784,
   "differs": 0,
   "percent": 100
  },
@@ -63,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 112.7,
-  "cpuS": 1096.2,
-  "peakMiB": 2460
+  "wallS": 126.9,
+  "cpuS": 1132.2,
+  "peakMiB": 2454
  },
  "index": {
   "sourceOnly": {
-   "wallS": 93.9,
-   "cpuS": 115.4
+   "wallS": 82,
+   "cpuS": 108.6
   },
   "route": {
-   "wallS": 223.1,
-   "cpuS": 139.8
+   "wallS": 384.5,
+   "cpuS": 155
   }
  },
  "errors": {
@@ -84,13 +86,14 @@
  "funnel": {
   "open": 49651,
   "buckets": {
-   "credited": 11396,
+   "credited": 11058,
    "no identity: library item": 23187,
    "gate: trait-method declaration": 1558,
    "no answer: no-name-site": 220,
    "gate: kind/namespace": 51,
    "no identity: local binding": 7954,
    "no identity: generated item": 505,
+   "other": 338,
    "no identity: declaration without a graph symbol": 473,
    "gate: known error classes": 40,
    "gate: cfg-variant guard": 50,

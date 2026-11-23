@@ -19,24 +19,25 @@
  },
  "route": {
   "links": 86640,
-  "level2": 49643,
+  "level2": 46597,
   "assumed": 3111,
   "proven": 33116,
-  "toolchainDecided": 13416,
+  "toolchainDecided": 10370,
   "libraryModuleLinks": 0,
-  "level2Percent": 57.3,
-  "withModuleLinksPercent": 57.3,
-  "toolchainDecidedPercent": 15.48
+  "level2Percent": 53.78,
+  "withModuleLinksPercent": 53.78,
+  "toolchainDecidedPercent": 11.97
  },
  "decided": {
-  "definite:unresolved": 13416,
-  "definite:definite": 10069,
-  "withheld:cfg-link": 1961,
-  "withheld:cfg-variant": 37
+  "definite:unresolved": 10370,
+  "withheld:conditional-candidates": 2582,
+  "definite:definite": 9440,
+  "withheld:cfg-variant": 1088,
+  "withheld:cfg-link": 1951
  },
  "join": {
-  "answer": 25483,
-  "none:no-graph-symbol": 1189,
+  "answer": 25241,
+  "none:no-graph-symbol": 1241,
   "filter:import-names-module": 488,
   "none:kind-not-joined": 7599,
   "unapplied:library": 33355,
@@ -45,13 +46,14 @@
   "none:trait-declaration": 1358,
   "none:no-name-site": 298,
   "none:no-occurrence-at-site": 2172,
+  "answer:trait-associated": 190,
   "filter:collision": 144,
   "none:file-not-indexed": 3001,
   "filter:extern-crate": 12,
   "filter:kind-incompatible": 21
  },
  "agreement": {
-  "confirmed": 10069,
+  "confirmed": 9440,
   "differs": 0,
   "percent": 100
  },
@@ -63,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 92.3,
-  "cpuS": 274,
-  "peakMiB": 3029
+  "wallS": 120.8,
+  "cpuS": 318.8,
+  "peakMiB": 3026
  },
  "index": {
   "sourceOnly": {
-   "wallS": 112.1,
-   "cpuS": 117.3
+   "wallS": 80.2,
+   "cpuS": 107.3
   },
   "route": {
-   "wallS": 195.7,
-   "cpuS": 119.2
+   "wallS": 334.9,
+   "cpuS": 123.7
   }
  },
  "errors": {
@@ -84,15 +86,16 @@
  "funnel": {
   "open": 49944,
   "buckets": {
-   "credited": 13416,
-   "no identity: declaration without a graph symbol": 1189,
+   "credited": 10370,
+   "no identity: declaration without a graph symbol": 1241,
    "gate: kind/namespace": 272,
    "no identity: library item": 22834,
+   "other": 3004,
    "no identity: generated item": 1040,
    "no identity: local binding": 3942,
    "gate: trait-method declaration": 1358,
    "no answer: no-name-site": 254,
-   "gate: cfg condition other than test": 1295,
+   "gate: cfg condition other than test": 1285,
    "no answer: no-occurrence-at-site": 1856,
    "gate: cfg-variant guard": 30,
    "gate: known error classes": 61,

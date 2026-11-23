@@ -259,10 +259,14 @@ function scopedAnalysis(request: ScopedRequest):
  * answer and the cfg conditions this analysis found:
  * - a link under a cfg condition other than `test` takes no answer (the
  *   toolchain sees one configuration);
- * - an answer whose target is under such a condition, or shares its
- *   kind and identity with a symbol under such a condition (a cfg variant:
- *   two items of one path can only both exist under cfg), takes no answer, and a
- *   candidate set holding such a symbol stays a candidate set;
+ * - an answer whose target is under such a condition (its own, or that of
+ *   a module it is declared in, or a module no declaration reaches), or
+ *   shares its kind and identity with a symbol under such a condition (a cfg
+ *   variant: two items of one path can only both exist under cfg), takes no
+ *   answer, and a candidate set holding such a symbol stays a candidate set;
+ * - a link whose source-only answer records conditional candidates
+ *   (`conditional-name-may-be-absent`, or twins among its targets) is only
+ *   ever confirmed, never narrowed;
  * - a source-only definite target that differs is kept, and counted;
  * - a source-only library answer is kept;
  * - a candidate set holding the answer, or an unresolved link, becomes
@@ -275,6 +279,7 @@ function decideToolchain(
   byPath: Map<string, { result: AnalyzedFile["result"] }>,
   resolutions: Map<string, LinkResolution>,
   toolchain: NonNullable<RustAnalysisInput["toolchain"]>,
+  moduleGated: ReadonlySet<string> = new Set(),
 ): ToolchainDecisions {
   const counts: Record<string, number> = {};
   const disagreements: Json[] = [];
@@ -292,7 +297,12 @@ function decideToolchain(
       const data = (symbol.data ?? {}) as Record<string, Json>;
       const identity = `${symbol.kind}\u0000${symbol.identity}`;
       identityOf.set(id, identity);
-      if (beyondTest(data.conditions as Json[] | undefined)) {
+      // Its own cfg, or that of a module it is declared in (review B1:
+      // `#[cfg(unix)] #[path = "sys/unix.rs"] mod imp;` and its twin).
+      if (
+        beyondTest(data.conditions as Json[] | undefined) ||
+        moduleGated.has(id)
+      ) {
         gated.add(id);
         gatedIdentities.add(identity);
       }
@@ -318,6 +328,19 @@ function decideToolchain(
       if (!identityOf.has(target)) return kept("withheld:no-symbol");
       if (variant(target)) return kept("withheld:cfg-variant");
       const r = resolutions.get(id);
+      // Review B1: a link whose source-only answer records conditional
+      // candidates (a name that cfg may remove, or twins under cfg) is never
+      // narrowed by the one configuration the toolchain sees; it may only be
+      // confirmed.
+      const candidates = (rest.targets ?? []) as string[];
+      if (
+        !r?.targetId &&
+        (rest.uncertainty === "conditional-name-may-be-absent" ||
+          candidates.some(variant) ||
+          new Set(candidates.map((c) => identityOf.get(c) ?? c)).size <
+            candidates.length)
+      )
+        return kept("withheld:conditional-candidates");
       let from: "definite" | "candidates" | "unresolved";
       if (r?.targetId) {
         if (r.targetId !== target) {
@@ -408,6 +431,9 @@ export const rustPhases = {
     const conditions = new Map<string, string[]>();
     const assumedScope = new Set<string>();
     const notes = new Map<string, Record<string, Json>>();
+    // C-43 review: symbols declared in a cfg-gated module (or a module no
+    // declaration reaches), for the toolchain's cfg-variant guard only.
+    const moduleGated = new Set<string>();
     const decide: RustDecisionScope = inScope ? { files: inScope } : {};
     const resolutions = resolveRust(
       {
@@ -433,9 +459,10 @@ export const rustPhases = {
             ? [...new Set(attributes)].sort()
             : undefined,
         }),
-      (symbol, attributes, gates) => {
+      (symbol, attributes, gates, modules) => {
         presence.set(symbol.id, attributes);
         conditions.set(symbol.id, gates);
+        if (beyondTest(modules)) moduleGated.add(symbol.id);
       },
       (link, gates) => conditions.set(link.id, gates),
       undefined,
@@ -531,6 +558,7 @@ export const rustPhases = {
               byPath,
               new Map(resolutions.map((r) => [r.linkId, r])),
               toolchain,
+              moduleGated,
             ),
           }
         : {}),

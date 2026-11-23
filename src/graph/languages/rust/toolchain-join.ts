@@ -146,6 +146,21 @@ function category(p: ParsedSymbol): string {
     )[p.kinds[p.kinds.length - 1] ?? ""] ?? "other"
   );
 }
+/**
+ * C-43 review: the graph symbol kinds a SCIP descriptor category can name.
+ * The declaration's name is not enough: `pub mod e_width { accessor!(e_width); }`
+ * declares a module and, inside it, a function of the same name at one
+ * position, and `e_width::e_width()` names the function.
+ */
+const GRAPH_KINDS: Record<string, ReadonlySet<string>> = {
+  module: new Set(["module"]),
+  type: new Set(["struct", "enum", "variant", "trait", "type", "union"]),
+  fn: new Set(["function", "method"]),
+  value: new Set(["const", "static", "variant", "struct", "function", "field"]),
+  macro: new Set(["macro", "function"]),
+  "attr-macro": new Set(["macro", "function"]),
+};
+
 /** What each link kind may name (C-19). Other kinds take no answer. */
 const KINDS: Record<string, ReadonlySet<string>> = {
   calls: new Set(["fn", "type"]),
@@ -243,7 +258,7 @@ export function joinScip(
   // ---- Pymtheg symbols, by file, as byte ranges
   const symbolsByFile = new Map<
     string,
-    { id: string; name: string; start: number; end: number }[]
+    { id: string; name: string; kind: string; start: number; end: number }[]
   >();
   for (const f of files) {
     const t = texts.get(f.path)!;
@@ -252,22 +267,30 @@ export function joinScip(
       f.result.symbols.map((symbol, i) => ({
         id: f.symbolIds[i]!,
         name: symbol.name,
+        kind: symbol.kind,
         start: t.byte(symbol.range.start),
         end: t.byte(symbol.range.end),
       })),
     );
   }
-  const symbolAt = (path: string, at: number, name: string) => {
-    let best: { id: string; start: number; end: number } | null = null;
+  const symbolAt = (
+    path: string,
+    at: number,
+    name: string,
+    kinds: ReadonlySet<string> | undefined,
+  ) => {
+    let best: { id: string; kind: string; start: number; end: number } | null =
+      null;
     for (const sym of symbolsByFile.get(path) ?? [])
       if (
         sym.start <= at &&
         at < sym.end &&
         sym.name === name &&
+        (!kinds || kinds.has(sym.kind)) &&
         (!best || sym.end - sym.start < best.end - best.start)
       )
         best = sym;
-    return best?.id;
+    return best ?? undefined;
   };
   // ---- every parsed link
   const answers = new Map<string, Map<number, string>>();
@@ -337,11 +360,20 @@ export function joinScip(
           .get(def.path)!
           .slice(def.s, def.e)
           .replace(/^r#/, "");
-        const target = symbolAt(def.path, def.s, name);
-        if (!target) return "none:no-graph-symbol";
+        const found = symbolAt(def.path, def.s, name, GRAPH_KINDS[cat]);
+        if (!found) return "none:no-graph-symbol";
         let group = answers.get(f.path);
         if (!group) answers.set(f.path, (group = new Map()));
-        group.set(index, target);
+        group.set(index, found.id);
+        // C-43 review: an associated type or const named through a trait
+        // (`S::Error`, `Self::SIDES` in generic code) is answered with the
+        // trait's declaration, which is what the code names; counted apart.
+        if (
+          p.kinds[n - 2] === "type" &&
+          p.path[n - 2] !== "impl" &&
+          (found.kind === "type" || found.kind === "const")
+        )
+          return "answer:trait-associated";
         return "answer";
       })();
       count(why);

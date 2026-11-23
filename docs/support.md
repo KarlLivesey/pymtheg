@@ -1051,7 +1051,14 @@ defined more than once, no non-macro item of a proc-macro crate from another
 package, no local binding, no trait-method declaration (dispatch stays open or
 a candidate set). No answer is taken on a link under a cfg condition other
 than `test`, nor for a target that has a cfg variant, nor out of a candidate
-set holding one. A source-only definite target the toolchain disagrees with is
+set holding one; a target is gated by its own cfg and by that of every module
+declaration its file is reached through, and a file no module declaration
+reaches (a `mod` written only inside a macro such as `cfg_if!`) counts as
+gated. A link whose source-only answer records conditional candidates is
+only confirmed, never narrowed. The answer's graph symbol must be of a kind
+the SCIP descriptor allows. A trait's associated type or const named in
+generic code (`S::Error`) is answered with the trait's declaration and
+counted apart. A source-only definite target the toolchain disagrees with is
 kept and counted; a source-only library target is kept. An unresolved link, or
 a candidate set holding the answer, becomes definite and records
 `toolchain: {origin: "toolchain", rustAnalyzer, configuration, upgrade, from,

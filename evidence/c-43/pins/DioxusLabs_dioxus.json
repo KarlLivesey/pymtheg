@@ -33,7 +33,7 @@
  "join": {
   "none:no-name-site": 887,
   "none:kind-not-joined": 16425,
-  "answer": 40583,
+  "answer": 40230,
   "unapplied:library": 62123,
   "none:local": 20739,
   "none:no-graph-symbol": 44,
@@ -44,6 +44,7 @@
   "filter:import-names-module": 117,
   "filter:kind-incompatible": 33,
   "filter:extern-crate": 95,
+  "answer:trait-associated": 353,
   "none:file-not-indexed": 1341
  },
  "agreement": {
@@ -59,111 +60,23 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 362.3,
-  "cpuS": 1106.3,
-  "peakMiB": 9734
+  "wallS": 374,
+  "cpuS": 1132.7,
+  "peakMiB": 9718
  },
  "index": {
   "sourceOnly": {
-   "wallS": 542.7,
-   "cpuS": 591.1
+   "wallS": 579.3,
+   "cpuS": 657.9
   },
   "route": {
-   "wallS": 906.6,
-   "cpuS": 598.5
+   "wallS": 1370.3,
+   "cpuS": 656.1
   }
  },
  "errors": {
   "sourceOnly": [],
   "route": []
- },
- "funnel": {
-  "open": 76878,
-  "buckets": {
-   "no answer: no-name-site": 864,
-   "other": 16914,
-   "no identity: library item": 43328,
-   "no identity: local binding": 8646,
-   "no identity: declaration without a graph symbol": 44,
-   "gate: trait-method declaration": 3204,
-   "no identity: generated item": 843,
-   "no answer: no-occurrence-at-site": 1028,
-   "gate: cfg-variant guard": 219,
-   "gate: cfg condition other than test": 613,
-   "gate: known error classes": 134,
-   "gate: kind/namespace": 121,
-   "no answer: kind-not-joined": 5,
-   "no answer: file-not-indexed": 915
-  },
-  "libraryPassingCfg": 40734,
-  "notIndexed": {
-   "other source": 802,
-   "fuzz": 64,
-   "tests": 49
-  },
-  "notIndexedFiles": 26,
-  "notIndexedTop": [
-   {
-    "path": "packages/logger/src/wasm/tests.rs",
-    "links": 229,
-    "class": "other source"
-   },
-   {
-    "path": "packages/logger/src/wasm.rs",
-    "links": 193,
-    "class": "other source"
-   },
-   {
-    "path": "packages/fullstack/src/payloads/msgpack.rs",
-    "links": 104,
-    "class": "other source"
-   },
-   {
-    "path": "packages/fuzz/fuzz/fuzz_targets/vdom_ops.rs",
-    "links": 64,
-    "class": "fuzz"
-   },
-   {
-    "path": "packages/native/src/prelude.rs",
-    "links": 56,
-    "class": "other source"
-   },
-   {
-    "path": "packages/fullstack/src/payloads/postcard.rs",
-    "links": 52,
-    "class": "other source"
-   },
-   {
-    "path": "packages/manganis/manganis/src/android/java.rs",
-    "links": 27,
-    "class": "other source"
-   },
-   {
-    "path": "packages/manganis/manganis/src/android/activity.rs",
-    "links": 23,
-    "class": "other source"
-   },
-   {
-    "path": "packages/manganis/manganis/src/android/callback.rs",
-    "links": 23,
-    "class": "other source"
-   },
-   {
-    "path": "packages/signals/docs/hoist/error.rs",
-    "links": 16,
-    "class": "other source"
-   },
-   {
-    "path": "packages/playwright-tests/windows-hotpatch-fullstack/src/main.rs",
-    "links": 14,
-    "class": "other source"
-   },
-   {
-    "path": "packages/playwright-tests/web-hot-patch/src/main.rs",
-    "links": 13,
-    "class": "other source"
-   }
-  ]
  },
  "c19": {
   "links": 149592,

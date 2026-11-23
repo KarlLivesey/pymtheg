@@ -19,25 +19,26 @@
  },
  "route": {
   "links": 60424,
-  "level2": 39665,
+  "level2": 39258,
   "assumed": 1793,
   "proven": 24099,
-  "toolchainDecided": 13773,
+  "toolchainDecided": 13366,
   "libraryModuleLinks": 0,
-  "level2Percent": 65.64,
-  "withModuleLinksPercent": 65.64,
-  "toolchainDecidedPercent": 22.79
+  "level2Percent": 64.97,
+  "withModuleLinksPercent": 64.97,
+  "toolchainDecidedPercent": 22.12
  },
  "decided": {
-  "definite:unresolved": 13773,
-  "definite:definite": 10488,
-  "withheld:cfg-variant": 9,
+  "withheld:cfg-variant": 170,
+  "definite:unresolved": 13366,
+  "definite:definite": 10453,
+  "withheld:conditional-candidates": 281,
   "withheld:cfg-link": 418
  },
  "join": {
   "unapplied:library": 13763,
   "filter:import-names-module": 145,
-  "answer": 24688,
+  "answer": 24566,
   "none:kind-not-joined": 5705,
   "unapplied:generated": 2030,
   "none:local": 8237,
@@ -45,12 +46,13 @@
   "none:no-graph-symbol": 601,
   "none:no-name-site": 163,
   "none:no-occurrence-at-site": 2450,
+  "answer:trait-associated": 122,
   "none:file-not-indexed": 857,
   "filter:collision": 90,
   "filter:extern-crate": 19
  },
  "agreement": {
-  "confirmed": 10488,
+  "confirmed": 10453,
   "differs": 0,
   "percent": 100
  },
@@ -62,18 +64,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 70.4,
-  "cpuS": 284.8,
-  "peakMiB": 2835
+  "wallS": 66.8,
+  "cpuS": 278,
+  "peakMiB": 2844
  },
  "index": {
   "sourceOnly": {
-   "wallS": 66.2,
-   "cpuS": 83.7
+   "wallS": 65.4,
+   "cpuS": 87.4
   },
   "route": {
-   "wallS": 146.4,
-   "cpuS": 89.8
+   "wallS": 198.5,
+   "cpuS": 94.3
   }
  },
  "errors": {
@@ -85,7 +87,8 @@
   "buckets": {
    "no identity: library item": 9794,
    "gate: kind/namespace": 69,
-   "credited": 13773,
+   "other": 407,
+   "credited": 13366,
    "no identity: generated item": 1279,
    "gate: trait-method declaration": 1400,
    "no identity: local binding": 4104,

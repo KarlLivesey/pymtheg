@@ -19,19 +19,20 @@
  },
  "route": {
   "links": 70802,
-  "level2": 29910,
+  "level2": 28850,
   "assumed": 299,
   "proven": 22761,
-  "toolchainDecided": 6850,
+  "toolchainDecided": 5790,
   "libraryModuleLinks": 0,
-  "level2Percent": 42.24,
-  "withModuleLinksPercent": 42.24,
-  "toolchainDecidedPercent": 9.67
+  "level2Percent": 40.75,
+  "withModuleLinksPercent": 40.75,
+  "toolchainDecidedPercent": 8.18
  },
  "decided": {
-  "definite:unresolved": 6850,
-  "withheld:cfg-variant": 6680,
-  "definite:definite": 6554,
+  "definite:unresolved": 5790,
+  "withheld:cfg-variant": 7198,
+  "definite:definite": 6380,
+  "withheld:conditional-candidates": 716,
   "withheld:cfg-link": 5004
  },
  "join": {
@@ -39,19 +40,20 @@
   "none:kind-not-joined": 7244,
   "filter:import-names-module": 239,
   "unapplied:library": 23317,
-  "answer": 25088,
+  "answer": 25051,
   "none:no-name-site": 117,
   "none:no-graph-symbol": 2173,
   "none:local": 8505,
   "unapplied:generated": 1845,
   "none:trait-declaration": 1550,
   "none:no-occurrence-at-site": 415,
+  "answer:trait-associated": 37,
   "filter:kind-incompatible": 40,
   "filter:extern-crate": 31,
   "filter:collision": 44
  },
  "agreement": {
-  "confirmed": 6554,
+  "confirmed": 6380,
   "differs": 0,
   "percent": 100
  },
@@ -63,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 117.5,
-  "cpuS": 511.9,
-  "peakMiB": 2356
+  "wallS": 120.7,
+  "cpuS": 533.8,
+  "peakMiB": 2365
  },
  "index": {
   "sourceOnly": {
-   "wallS": 143.5,
-   "cpuS": 171
+   "wallS": 129.3,
+   "cpuS": 160.5
   },
   "route": {
-   "wallS": 279.1,
-   "cpuS": 178.5
+   "wallS": 312.9,
+   "cpuS": 175.8
   }
  },
  "errors": {
@@ -86,8 +88,9 @@
   "buckets": {
    "no answer: file-not-indexed": 134,
    "no identity: library item": 18482,
-   "credited": 6850,
+   "credited": 5790,
    "no answer: no-name-site": 96,
+   "other": 1060,
    "gate: cfg-variant guard": 6567,
    "no identity: declaration without a graph symbol": 2173,
    "no identity: generated item": 1263,

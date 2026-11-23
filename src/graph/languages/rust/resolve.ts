@@ -370,6 +370,12 @@ export function resolveRust(
     symbol: GraphSymbol,
     attributes: string[],
     conditions: string[],
+    /**
+     * C-43 review: the conditions of the modules the symbol is declared in
+     * (`#[cfg(..)] mod x;`, through every enclosing declaration). Not stored
+     * on the symbol: only the toolchain route reads them.
+     */
+    moduleConditions: string[],
   ) => void,
   markConditions?: (link: GraphLink, conditions: string[]) => void,
   /** Derived links (R1-K: calls written in macro bodies, at each invocation). */
@@ -4777,11 +4783,24 @@ export function resolveRust(
   // C-36: setup computes every symbol's presence and conditions, as a cold
   // pass does, so the caches it fills are the same whatever the decision
   // scope; only the callbacks are limited to the decided files.
+  /**
+   * C-43 review: the conditions of every module declaration the symbol's
+   * file is reached through (a place's conditions include its parents').
+   * A file no module declaration reaches (`mod x;` written only inside a
+   * macro invocation such as `cfg_if!`) may be conditional in ways the
+   * source cannot see: it is marked `?module-not-declared`.
+   */
+  const moduleGates = (symbol: GraphSymbol): string[] => {
+    const owners = ownerPlace(symbol.file, str(data(symbol).scope));
+    if (!owners.length) return ["?module-not-declared"];
+    return [...new Set(owners.flatMap((own) => own.conditions ?? []))];
+  };
   if (markPresence)
     for (const symbol of symbols) {
       const attributes = itemPresence(symbol);
       const gates = conditionsFor(symbol);
-      if (decided(symbol.file)) markPresence(symbol, attributes, gates);
+      if (decided(symbol.file))
+        markPresence(symbol, attributes, gates, moduleGates(symbol));
     }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
   const unknownImpls = new Map<string, GraphSymbol[]>(),

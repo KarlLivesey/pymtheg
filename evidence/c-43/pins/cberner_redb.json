@@ -19,29 +19,31 @@
  },
  "route": {
   "links": 73731,
-  "level2": 44116,
+  "level2": 43934,
   "assumed": 110,
   "proven": 35113,
-  "toolchainDecided": 8893,
+  "toolchainDecided": 8711,
   "libraryModuleLinks": 0,
-  "level2Percent": 59.83,
-  "withModuleLinksPercent": 59.83,
-  "toolchainDecidedPercent": 12.06
+  "level2Percent": 59.59,
+  "withModuleLinksPercent": 59.59,
+  "toolchainDecidedPercent": 11.81
  },
  "decided": {
-  "definite:definite": 9882,
-  "definite:unresolved": 8893,
-  "withheld:cfg-variant": 662,
-  "withheld:cfg-link": 3423
+  "definite:definite": 9848,
+  "definite:unresolved": 8711,
+  "withheld:cfg-variant": 729,
+  "withheld:cfg-link": 3423,
+  "withheld:conditional-candidates": 149
  },
  "join": {
   "none:kind-not-joined": 5481,
   "unapplied:library": 27584,
   "none:no-name-site": 46,
   "filter:import-names-module": 86,
-  "answer": 22860,
+  "answer": 22532,
   "unapplied:generated": 822,
   "none:local": 10347,
+  "answer:trait-associated": 328,
   "none:no-occurrence-at-site": 1273,
   "none:trait-declaration": 1223,
   "filter:collision": 1088,
@@ -51,7 +53,7 @@
   "filter:extern-crate": 1
  },
  "agreement": {
-  "confirmed": 9882,
+  "confirmed": 9848,
   "differs": 0,
   "percent": 100
  },
@@ -63,18 +65,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 115.9,
-  "cpuS": 1900.1,
-  "peakMiB": 2064
+  "wallS": 147.3,
+  "cpuS": 1969,
+  "peakMiB": 2054
  },
  "index": {
   "sourceOnly": {
-   "wallS": 66.1,
-   "cpuS": 83.9
+   "wallS": 62.9,
+   "cpuS": 82.3
   },
   "route": {
-   "wallS": 189,
-   "cpuS": 87.3
+   "wallS": 285.6,
+   "cpuS": 95.8
   }
  },
  "errors": {
@@ -88,7 +90,7 @@
    "no answer: no-name-site": 45,
    "gate: kind/namespace": 54,
    "no identity: local binding": 3416,
-   "credited": 8893,
+   "credited": 8711,
    "no answer: no-occurrence-at-site": 805,
    "gate: trait-method declaration": 1223,
    "gate: cfg-variant guard": 660,
@@ -96,8 +98,8 @@
    "gate: cfg condition other than test": 1627,
    "no identity: generated item": 364,
    "no answer: file-not-indexed": 2022,
-   "no identity: declaration without a graph symbol": 10,
-   "other": 2
+   "other": 184,
+   "no identity: declaration without a graph symbol": 10
   },
   "libraryPassingCfg": 15384,
   "notIndexed": {

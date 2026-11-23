@@ -19,24 +19,25 @@
  },
  "route": {
   "links": 39819,
-  "level2": 30502,
+  "level2": 29895,
   "assumed": 1,
   "proven": 26306,
-  "toolchainDecided": 4195,
+  "toolchainDecided": 3588,
   "libraryModuleLinks": 0,
-  "level2Percent": 76.6,
-  "withModuleLinksPercent": 76.6,
-  "toolchainDecidedPercent": 10.54
+  "level2Percent": 75.08,
+  "withModuleLinksPercent": 75.08,
+  "toolchainDecidedPercent": 9.01
  },
  "decided": {
-  "definite:definite": 9724,
-  "definite:unresolved": 4195,
+  "definite:definite": 9331,
+  "definite:unresolved": 3588,
   "withheld:cfg-link": 263,
-  "withheld:cfg-variant": 19
+  "withheld:cfg-variant": 463,
+  "withheld:conditional-candidates": 556
  },
  "join": {
   "none:kind-not-joined": 4371,
-  "answer": 14201,
+  "answer": 14066,
   "unapplied:library": 14105,
   "none:local": 4619,
   "filter:import-names-module": 42,
@@ -46,10 +47,11 @@
   "none:no-name-site": 86,
   "filter:extern-crate": 5,
   "none:file-not-indexed": 131,
-  "filter:collision": 41
+  "filter:collision": 41,
+  "answer:trait-associated": 135
  },
  "agreement": {
-  "confirmed": 9724,
+  "confirmed": 9331,
   "differs": 0,
   "percent": 100
  },
@@ -61,18 +63,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 19.8,
-  "cpuS": 41.7,
-  "peakMiB": 1214
+  "wallS": 24,
+  "cpuS": 48,
+  "peakMiB": 1200
  },
  "index": {
   "sourceOnly": {
-   "wallS": 30.6,
-   "cpuS": 40.2
+   "wallS": 35.3,
+   "cpuS": 45.4
   },
   "route": {
-   "wallS": 55.6,
-   "cpuS": 44
+   "wallS": 74.4,
+   "cpuS": 46.3
   }
  },
  "errors": {
@@ -84,7 +86,7 @@
   "buckets": {
    "no identity: library item": 6027,
    "no identity: local binding": 949,
-   "credited": 4195,
+   "credited": 3588,
    "gate: trait-method declaration": 625,
    "no identity: generated item": 125,
    "gate: kind/namespace": 9,
@@ -92,6 +94,7 @@
    "no answer: no-name-site": 60,
    "gate: cfg-variant guard": 19,
    "gate: cfg condition other than test": 38,
+   "other": 607,
    "gate: known error classes": 8,
    "no answer: file-not-indexed": 62
   },

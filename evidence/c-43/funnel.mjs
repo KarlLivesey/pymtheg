@@ -27,7 +27,7 @@ const beyondTest = (gates) => (gates ?? []).some((g) => g !== "test");
 /** Bucket name for a join outcome, before the analysis gates. */
 export function joinBucket(why) {
   if (why === undefined) return "no answer: file not joined (failed parse)";
-  if (why === "answer") return null;
+  if (why === "answer" || why === "answer:trait-associated") return null;
   if (why === "filter:kind-incompatible" || why === "filter:import-names-module") return "gate: kind/namespace";
   if (why === "filter:extern-crate" || why === "filter:collision" || why === "filter:proc-macro-crate-item") return "gate: known error classes";
   if (why === "none:trait-declaration") return "gate: trait-method declaration";
@@ -138,6 +138,10 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
       const target = answers?.get(index);
       if (beyondTest(link.data.conditions)) return add("gate: cfg condition other than test");
       if (variant(target)) return add("gate: cfg-variant guard");
+      // C-43 review: what the source-only answer recorded as conditional, and
+      // targets in a module under cfg (or declared only inside a macro).
+      if (link.data.uncertainty === "conditional-name-may-be-absent") return add("gate: conditional candidates");
+      if (now?.data?.toolchain === undefined && target && link.resolution !== "library") return add("gate: cfg on an enclosing module");
       if (link.resolution === "library") return add("gate: source-only library target kept");
       if (link.resolution === "ambiguous" && !(before.candidates.get(parsed.id) ?? []).includes(target)) return add("gate: answer outside the candidate set");
       add("other");

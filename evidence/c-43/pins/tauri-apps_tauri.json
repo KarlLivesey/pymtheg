@@ -33,7 +33,7 @@
  "join": {
   "unapplied:library": 36543,
   "none:kind-not-joined": 8335,
-  "answer": 17675,
+  "answer": 17627,
   "none:local": 10971,
   "filter:import-names-module": 116,
   "none:trait-declaration": 1506,
@@ -43,6 +43,7 @@
   "none:no-name-site": 137,
   "none:file-not-indexed": 6996,
   "filter:extern-crate": 38,
+  "answer:trait-associated": 48,
   "none:no-graph-symbol": 28,
   "filter:collision": 2
  },
@@ -59,110 +60,23 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 103.9,
-  "cpuS": 517.4,
-  "peakMiB": 5200
+  "wallS": 161.5,
+  "cpuS": 664.1,
+  "peakMiB": 5176
  },
  "index": {
   "sourceOnly": {
-   "wallS": 107.8,
-   "cpuS": 131.4
+   "wallS": 117.4,
+   "cpuS": 144.7
   },
   "route": {
-   "wallS": 228.7,
-   "cpuS": 138.7
+   "wallS": 675.6,
+   "cpuS": 162.3
   }
  },
  "errors": {
   "sourceOnly": [],
   "route": []
- },
- "funnel": {
-  "open": 45007,
-  "buckets": {
-   "no identity: library item": 25104,
-   "gate: kind/namespace": 89,
-   "no identity: local binding": 4915,
-   "gate: trait-method declaration": 1506,
-   "no identity: generated item": 651,
-   "no answer: no-occurrence-at-site": 2866,
-   "other": 4882,
-   "gate: cfg-variant guard": 118,
-   "gate: cfg condition other than test": 643,
-   "no answer: no-name-site": 122,
-   "no answer: file-not-indexed": 4050,
-   "gate: known error classes": 33,
-   "no identity: declaration without a graph symbol": 28
-  },
-  "libraryPassingCfg": 22178,
-  "notIndexed": {
-   "other source": 3445,
-   "build script": 453,
-   "examples": 152
-  },
-  "notIndexedFiles": 37,
-  "notIndexedTop": [
-   {
-    "path": "crates/tauri-bundler/src/bundle/windows/msi/mod.rs",
-    "links": 634,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-cli/src/mobile/ios/build.rs",
-    "links": 445,
-    "class": "build script"
-   },
-   {
-    "path": "crates/tauri-cli/src/mobile/ios/mod.rs",
-    "links": 433,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri/src/plugin/mobile.rs",
-    "links": 333,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-bundler/src/bundle/macos/app.rs",
-    "links": 319,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-utils/src/html.rs",
-    "links": 236,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-bundler/src/bundle/macos/icon.rs",
-    "links": 189,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-cli/src/helpers/pbxproj.rs",
-    "links": 187,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-cli/src/mobile/ios/xcode_script.rs",
-    "links": 182,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-cli/src/mobile/ios/project.rs",
-    "links": 178,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-cli/src/mobile/ios/dev.rs",
-    "links": 177,
-    "class": "other source"
-   },
-   {
-    "path": "crates/tauri-bundler/src/bundle/macos/dmg/mod.rs",
-    "links": 76,
-    "class": "other source"
-   }
-  ]
  },
  "c19": {
   "links": 88051,

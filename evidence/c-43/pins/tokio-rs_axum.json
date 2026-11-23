@@ -19,30 +19,32 @@
  },
  "route": {
   "links": 41067,
-  "level2": 20284,
+  "level2": 18746,
   "assumed": 1144,
   "proven": 15439,
-  "toolchainDecided": 3701,
+  "toolchainDecided": 2163,
   "libraryModuleLinks": 0,
-  "level2Percent": 49.39,
-  "withModuleLinksPercent": 49.39,
-  "toolchainDecidedPercent": 9.01
+  "level2Percent": 45.65,
+  "withModuleLinksPercent": 45.65,
+  "toolchainDecidedPercent": 5.27
  },
  "decided": {
-  "definite:definite": 2756,
-  "definite:unresolved": 3701,
-  "withheld:cfg-variant": 410,
+  "definite:definite": 2413,
+  "definite:unresolved": 2163,
+  "withheld:conditional-candidates": 476,
+  "withheld:cfg-variant": 1815,
   "withheld:cfg-link": 334
  },
  "join": {
   "none:kind-not-joined": 4367,
-  "answer": 7201,
+  "answer": 7058,
   "unapplied:library": 9758,
   "none:local": 3981,
   "none:trait-declaration": 459,
   "unapplied:generated": 580,
   "none:no-graph-symbol": 611,
   "filter:import-names-module": 62,
+  "answer:trait-associated": 143,
   "none:no-name-site": 84,
   "none:no-occurrence-at-site": 196,
   "filter:extern-crate": 3,
@@ -52,7 +54,7 @@
   "filter:kind-incompatible": 3
  },
  "agreement": {
-  "confirmed": 2756,
+  "confirmed": 2413,
   "differs": 0,
   "percent": 100
  },
@@ -64,18 +66,18 @@
   "changedLevel2": 0
  },
  "analyzerRun": {
-  "wallS": 32.4,
-  "cpuS": 79.9,
-  "peakMiB": 1960
+  "wallS": 44.5,
+  "cpuS": 98.6,
+  "peakMiB": 1961
  },
  "index": {
   "sourceOnly": {
-   "wallS": 46.7,
-   "cpuS": 57.9
+   "wallS": 50.6,
+   "cpuS": 66.2
   },
   "route": {
-   "wallS": 78.7,
-   "cpuS": 57.9
+   "wallS": 157.2,
+   "cpuS": 65.3
   }
  },
  "errors": {
@@ -88,8 +90,9 @@
    "no identity: library item": 6748,
    "no identity: local binding": 1325,
    "gate: trait-method declaration": 459,
-   "credited": 3701,
+   "credited": 2163,
    "no identity: declaration without a graph symbol": 611,
+   "other": 1550,
    "no identity: generated item": 197,
    "no answer: no-name-site": 81,
    "no answer: no-occurrence-at-site": 178,
@@ -97,8 +100,7 @@
    "gate: known error classes": 44,
    "no answer: file-not-indexed": 10376,
    "gate: cfg condition other than test": 111,
-   "gate: kind/namespace": 34,
-   "other": 12
+   "gate: kind/namespace": 34
   },
   "libraryPassingCfg": 6514,
   "notIndexed": {
