@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { queryObjects } from "node:v8";
@@ -15,6 +22,7 @@ import typescript, {
   statistics,
   typescriptModule,
 } from "../dist/graph/languages/typescript/index.js";
+import { JUDGE_BOUND_REASON } from "../dist/graph/languages/typescript/judge.js";
 
 /**
  * Indexes `files` (twice when `twice` is set) and returns the report, the
@@ -670,6 +678,431 @@ test(
     assert.equal(fine.target, "other.ts#fine");
   },
 );
+
+// C-47: reduced from oclif/core (MIT; test/fixtures/graph-typescript-judge-bound/LICENSE)
+// after a seeded edit broke src/parser/index.ts. Judging `defaults.options`
+// recurses through Arg, ArgParser, ArgParserContext and Command without end.
+// On main the judge swallowed each stack overflow and went on, so the run
+// could take an unbounded time.
+async function fixtureFiles(name) {
+  const root = new URL(`fixtures/${name}/`, import.meta.url);
+  const files = {};
+  const walk = async (dir) => {
+    for (const entry of await readdir(new URL(dir, root), {
+      withFileTypes: true,
+    })) {
+      const path = `${dir}${entry.name}`;
+      if (entry.isDirectory()) await walk(`${path}/`);
+      else if (entry.name !== "LICENSE")
+        files[path] = await readFile(new URL(path, root), "utf8");
+    }
+  };
+  await walk("");
+  return files;
+}
+
+test(
+  "a recursive generic type beside a failed file is judged once per binding; the judge's bound is the backstop",
+  { timeout: 120_000 },
+  async () => {
+    const files = await fixtureFiles("graph-typescript-judge-bound");
+    const bound = (result) =>
+      result.links
+        .filter((l) => l.cause?.via?.includes("judge-budget-exhausted"))
+        .map((l) => [l.file, l.text, l.reason, l.cause.file]);
+    // The cycle Arg -> ArgParser -> opts: P & Arg<T, P> -> Arg is cut by the
+    // judgement's own cycle check: the link is judged, not bounded.
+    const judged = await indexFiles(files);
+    assert.deepEqual(Object.keys(failedReasons(judged)), [
+      "src/parser/index.ts",
+    ]);
+    assert.deepEqual(bound(judged), []);
+    const options = judged.links.find(
+      (l) => l.file === "src/args.ts" && l.text === "defaults.options",
+    );
+    assert.equal(options.reason, "local");
+    // With a budget of one step the same judgement stops at the bound and
+    // fails the link with the bound as the reason.
+    const stopped = await indexFiles(files, {
+      module: typescriptModule({ judgeSteps: 1 }),
+    });
+    assert.ok(
+      bound(stopped).some(
+        ([file, text, reason, cause]) =>
+          file === "src/args.ts" &&
+          text === "defaults.options" &&
+          reason === "invalid-code" &&
+          cause === "src/parser/index.ts",
+      ),
+      JSON.stringify(bound(stopped)),
+    );
+    // The program-wide budget: once a program's judge has spent it, every
+    // later judgement of that program stops at the same bound.
+    const program = await indexFiles(files, {
+      module: typescriptModule({ judgeProgramSteps: 1 }),
+    });
+    assert.deepEqual(
+      bound(program).filter(
+        ([file, text]) => file === "src/args.ts" && text === "defaults.options",
+      ),
+      [
+        [
+          "src/args.ts",
+          "defaults.options",
+          "invalid-code",
+          "src/parser/index.ts",
+        ],
+      ],
+    );
+    // Every link a one-step budget per judgement bounds is bounded too (a
+    // judgement answered from the memo costs no step there).
+    const programBound = new Set(bound(program).map((row) => row.join("|")));
+    for (const row of bound(stopped))
+      assert.ok(programBound.has(row.join("|")), row.join(" "));
+    // A second, independent index gives the same links.
+    const again = await indexFiles(files, {
+      module: typescriptModule({ judgeSteps: 1 }),
+    });
+    assert.deepEqual(
+      again.links.map((l) => [l.file, l.text, l.resolution, l.reason, l.cause]),
+      stopped.links.map((l) => [
+        l.file,
+        l.text,
+        l.resolution,
+        l.reason,
+        l.cause,
+      ]),
+    );
+  },
+);
+
+// C-47: a stack overflow at any point of the failed-file checks is never a
+// clean answer. The injected overflow is placed on each lookup of `conf` in
+// turn (the order of the module's checker calls is fixed).
+test("a stack overflow in the failed-file checks never makes a link clean", async () => {
+  const files = {
+    "broken.ts": "export const conf = { run() {} };\nconst = ;\n",
+    "dep.ts":
+      'import { conf } from "./broken";\nexport function make() { return conf; }\n',
+    "use.ts": 'import { make } from "./dep";\nmake().run(); // depth-call\n',
+  };
+  const outcomes = [];
+  for (let k = 1; k <= 4; k++) {
+    let seen = 0;
+    const result = await indexFiles(files, {
+      module: typescriptModule({
+        checkerFault: (_method, node) => {
+          if (
+            node?.getSourceFile?.().fileName.endsWith("dep.ts") &&
+            node.getText() === "conf" &&
+            ++seen === k
+          )
+            throw new RangeError("Maximum call stack size exceeded");
+        },
+      }),
+    });
+    const run = linkOn(result, "use.ts", "// depth-call", "run");
+    assert.equal(run.resolution, "unresolved", `overflow at lookup ${k}`);
+    outcomes.push([k, run.reason, run.cause?.via ?? null]);
+  }
+  assert.deepEqual(outcomes, [
+    [1, "taint-budget-exhausted", null],
+    [
+      2,
+      "invalid-code",
+      "callee make; the structural judgement reached its bound (judge-budget-exhausted)",
+    ],
+    [3, "invalid-code", "callee make; binding conf"],
+    [4, "invalid-code", "callee make; binding conf"],
+  ]);
+});
+
+// C-47 review: an overflow at any checker call on a receiver name, in the
+// receiver's causes, its names, its member set or its judgement, is never
+// an answer: the link keeps the answer it has without the overflow, or
+// carries a bound (the walk unknown, the checker's stack at the link, or
+// the judgement's bound), never a different answer.
+const SITES = ["receiverCauses", "namesInReceiver", "structural", "judge"];
+async function overflowAtEachCall(files, file, marker, name, onName) {
+  const site = () => {
+    for (const frame of new Error().stack.split("\n").slice(3)) {
+      if (frame.includes("/judge.js")) return "judge";
+      const fn = frame.trim().split(" ")[1];
+      if (SITES.includes(fn)) return fn;
+    }
+    return "other";
+  };
+  const sites = [];
+  const plain = await indexFiles(files, {
+    module: typescriptModule({
+      checkerFault: (_method, node) => {
+        if (onName(node)) sites.push(site());
+      },
+    }),
+  });
+  const base = linkOn(plain, file, marker, name);
+  const outcomes = [];
+  for (let k = 1; k <= sites.length; k++) {
+    let seen = 0;
+    const result = await indexFiles(files, {
+      module: typescriptModule({
+        checkerFault: (_method, node) => {
+          if (onName(node) && ++seen === k)
+            throw new RangeError("Maximum call stack size exceeded");
+        },
+      }),
+    });
+    const link = linkOn(result, file, marker, name);
+    outcomes.push([sites[k - 1], link.reason ?? null, link.cause?.via ?? null]);
+    const same =
+      link.resolution === base.resolution &&
+      link.reason === base.reason &&
+      link.target === base.target;
+    const bound =
+      link.resolution === "unresolved" &&
+      (link.reason === "taint-budget-exhausted" ||
+        link.reason === "compiler-limit" ||
+        (link.reason === "invalid-code" &&
+          link.cause?.via?.includes(JUDGE_BOUND_REASON)));
+    assert.ok(
+      same || bound,
+      `overflow at call ${k} (${sites[k - 1]}): ${link.resolution} ${link.reason} ${link.cause?.via}`,
+    );
+  }
+  return { base, outcomes };
+}
+
+test("a stack overflow at any checker call on a receiver never changes the member's answer", async () => {
+  const shared = {
+    "clean.ts": "export class CleanBase { run() {} }\n",
+    "broken.ts":
+      'import { CleanBase } from "./clean";\nexport class Base extends CleanBase {}\nexport const pick = 0;\nconst = ;\n',
+    "dep.ts":
+      'import { Base } from "./broken";\nexport class Kid extends Base {}\n',
+  };
+  const inUse = (text) => (node) =>
+    node?.getSourceFile?.().fileName.endsWith("use.ts") &&
+    node.getText() === text;
+  // The reviewer's case: the receiver's causes, its member set and its
+  // judgement.
+  const member = await overflowAtEachCall(
+    {
+      ...shared,
+      "use.ts":
+        'import { Kid } from "./dep";\nconst k = new Kid();\nk.run(); // depth-member\n',
+    },
+    "use.ts",
+    "// depth-member",
+    "run",
+    inUse("k"),
+  );
+  assert.equal(member.base.reason, "invalid-code");
+  assert.deepEqual(member.outcomes, [
+    [
+      "other",
+      "invalid-code",
+      "member of Kid, whose member set reaches the failed file",
+    ],
+    ["other", "compiler-limit", null],
+    ["other", "compiler-limit", null],
+    ["other", "compiler-limit", null],
+    [
+      "receiverCauses",
+      "invalid-code",
+      "member of Kid, whose member set reaches the failed file",
+    ],
+    [
+      "receiverCauses",
+      "invalid-code",
+      "member of Kid, whose member set reaches the failed file",
+    ],
+    ["judge", "invalid-code", `receiver k; ${JUDGE_BOUND_REASON}`],
+    [
+      "structural",
+      "invalid-code",
+      `the receiver's member set is unknown: ${JUDGE_BOUND_REASON}`,
+    ],
+  ]);
+  // A name inside the receiver that its causes do not follow (an index).
+  const names = await overflowAtEachCall(
+    {
+      ...shared,
+      "use.ts":
+        'import { CleanBase } from "./clean";\nimport { pick } from "./broken";\nconst list = [new CleanBase()];\nlist[pick].run(); // index-member\n',
+    },
+    "use.ts",
+    "// index-member",
+    "run",
+    inUse("pick"),
+  );
+  assert.equal(names.base.reason, "invalid-code");
+  assert.deepEqual(names.outcomes, [
+    [
+      "namesInReceiver",
+      "invalid-code",
+      `whether a name in the receiver is tainted is unknown: ${JUDGE_BOUND_REASON}; element access with a key that is not plainly clean`,
+    ],
+    [
+      "judge",
+      "invalid-code",
+      `name pick in the receiver; ${JUDGE_BOUND_REASON}`,
+    ],
+  ]);
+});
+
+// C-47 review: the defect main had before C-47. An overloaded callee with an argument
+// from the failed file fails the link, although the checker resolves the
+// member to a clean class. An overflow in the judgement must not make the
+// link resolved (main before C-47 took it as a clean receiver).
+test("a stack overflow in the judgement never makes a link definite", async () => {
+  const files = {
+    "clean.ts":
+      "export class Clean { run() {} }\nexport class Other { run() {} }\n",
+    "broken.ts": "export const bad = 1;\nconst = ;\n",
+    "dep.ts": [
+      'import { Clean, Other } from "./clean";',
+      "export function pick(x: string): Clean;",
+      "export function pick(x: number): Other;",
+      "export function pick(x: unknown): Clean | Other {",
+      "  return new Clean();",
+      "}",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { bad } from "./broken";',
+      'import { pick } from "./dep";',
+      "pick(bad).run(); // overloaded",
+      "",
+    ].join("\n"),
+  };
+  const onBad = (node) =>
+    node?.getSourceFile?.().fileName.endsWith("use.ts") &&
+    node.getText() === "bad";
+  let calls = 0;
+  const plain = await indexFiles(files, {
+    module: typescriptModule({
+      checkerFault: (_method, node) => {
+        if (onBad(node)) calls++;
+      },
+    }),
+  });
+  const base = linkOn(plain, "use.ts", "// overloaded", "run");
+  assert.equal(base.reason, "invalid-code");
+  assert.equal(base.target, null);
+  assert.ok(calls > 0);
+  for (let k = 1; k <= calls; k++) {
+    let seen = 0;
+    const result = await indexFiles(files, {
+      module: typescriptModule({
+        checkerFault: (_method, node) => {
+          if (onBad(node) && ++seen === k)
+            throw new RangeError("Maximum call stack size exceeded");
+        },
+      }),
+    });
+    const run = linkOn(result, "use.ts", "// overloaded", "run");
+    assert.equal(run.resolution, "unresolved", `overflow at call ${k}`);
+    assert.equal(run.target, null, `overflow at call ${k}`);
+  }
+});
+
+// C-47b: an expanding type (each level binds a larger value) never repeats
+// a key, so its judgement ends at the depth bound: unknown, with the named
+// reason, never clean. A cut for it was built and withdrawn (C-47.md).
+test("an expanding generic type beside a failed file ends at the judge's bound, never clean", async () => {
+  const result = await indexFiles({
+    "broken.ts": "export interface Bad { x: number }\nconst = ;\n",
+    "use.ts": [
+      'import type { Bad } from "./broken";',
+      "type Builder<C> = {",
+      "  add<K extends string>(k: K): Builder<{ prev: C; key: K }>;",
+      "  ctx: C;",
+      "  bad: Bad;",
+      "};",
+      "declare const b: Builder<{ n: number }>;",
+      "declare function wrap<T>(x: { v: T }): T;",
+      "wrap({ v: b }).ctx.n.toFixed(); // expanding",
+      "",
+    ].join("\n"),
+  });
+  const fixed = linkOn(result, "use.ts", "// expanding", "toFixed");
+  assert.equal(fixed.reason, "invalid-code");
+  assert.equal(fixed.target, null);
+  assert.equal(fixed.cause?.file, "broken.ts");
+  assert.ok(
+    fixed.cause.via.includes("judge-budget-exhausted"),
+    fixed.cause.via,
+  );
+});
+
+// C-47b: the three shapes on which the withdrawn cut gave a clean link.
+// Each line is alone in its project, so no answer memoised for one can
+// hide the other's.
+test("builders whose own judgement reads what is bound are failed, not clean", async () => {
+  const builder = [
+    "type Builder<T extends Bad> = {",
+    "  set(v: T): this;",
+    "  get(): T;",
+    "  add(k: string): Builder<T & { k: string }>;",
+    "};",
+    "declare const b: Builder<{ x: number; n: number }>;",
+  ];
+  const seq = [
+    "type Seq<T extends Bad[]> = {",
+    "  items: [...T];",
+    "  next(): Seq<{ [K in keyof T]: T[K] }>;",
+    "  get(): T;",
+    "};",
+    "declare const s: Seq<[{ x: number; n: number }]>;",
+  ];
+  const cases = [
+    [builder, "wrap({ v: b }).get(); // here"],
+    [builder, "wrap({ v: b.add('a') }).get(); // here"],
+    [seq, "wrap({ v: s }).get(); // here"],
+  ];
+  for (const [declarations, line] of cases) {
+    const result = await indexFiles({
+      "broken.ts": "export interface Bad { x: number; n: number }\nconst = ;\n",
+      "use.ts": [
+        'import type { Bad } from "./broken";',
+        ...declarations,
+        "declare function wrap<T>(x: { v: T }): T;",
+        line,
+        "",
+      ].join("\n"),
+    });
+    const link = linkOn(result, "use.ts", "// here", "get");
+    assert.equal(link.reason, "invalid-code", line);
+    assert.equal(link.target, null, line);
+    assert.equal(link.cause?.file, "broken.ts", line);
+  }
+});
+
+// C-47 review F1: a taint check that met a check in progress is provisional;
+// memoising it made `x.a.v.go` depend on `r1.v.go` being judged first.
+test("a taint answer that met a check in progress is not kept for later links", async () => {
+  const result = await indexFiles({
+    "broken.ts": "export interface Bad { go(): void }\nconst = ;\n",
+    "box.ts": "export interface Box<T> { v: T }\n",
+    "use.ts": [
+      'import type { Bad } from "./broken";',
+      'import type { Box } from "./box";',
+      "type L<T> = { a: typeof holder; b: Bad; t: T };",
+      'declare const holder: Box<L<string>["b"]>;',
+      'declare const r1: Box<L<string>["b"]>;',
+      "declare const x: L<string>;",
+      "r1.v.go(); // first",
+      "x.a.v.go(); // second",
+      "",
+    ].join("\n"),
+  });
+  for (const marker of ["// first", "// second"]) {
+    const go = linkOn(result, "use.ts", marker, "go");
+    assert.equal(go.resolution, "unresolved", marker);
+    assert.equal(go.reason, "invalid-code", marker);
+    assert.equal(go.cause?.file, "broken.ts", marker);
+  }
+});
 
 test("loops whose flow analysis returns are not failed", async () => {
   const result = await indexFiles({

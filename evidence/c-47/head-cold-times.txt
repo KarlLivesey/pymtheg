@@ -1,0 +1,9 @@
+t1 30.22 s exit 0
+t2 30.55 s exit 0
+t3 30.64 s exit 0
+t4 30.91 s exit 0
+
+With the cycle fix (three runs at once, no link at the bound):
+t1 31.72 s exit 0
+t2 33.24 s exit 0
+t3 34.18 s exit 0

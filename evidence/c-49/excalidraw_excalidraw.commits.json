@@ -1,0 +1,82 @@
+[
+ {
+  "commit": "609f0f2fff1998e5008da17f0b4d6cf731c10289",
+  "file": "packages/element/src/renderElement.ts"
+ },
+ {
+  "commit": "6f0a4d19b577e781ee5491d6cb89799b3fba7ee8",
+  "file": "excalidraw-app/data/LocalData.ts"
+ },
+ {
+  "commit": "c12a8cd037f562d07c96d1df8a6b74bd06d3069b",
+  "file": "packages/excalidraw/components/CursorHint.tsx"
+ },
+ {
+  "commit": "ea74787447db38be580ceb11f53928b1a291f88f",
+  "file": "excalidraw-app/App.tsx"
+ },
+ {
+  "commit": "46c42a6cb0bfc8c096ac4f232d427e10c2d943d1",
+  "file": "packages/excalidraw/components/App.tsx"
+ },
+ {
+  "commit": "7c0b3295760d3492a980f2f6416a36c9ef592103",
+  "file": "packages/excalidraw/textAutoResizeHandle.ts"
+ },
+ {
+  "commit": "5776e1cc66842ca229c79fbbf3d2ccf208c24ab0",
+  "file": "packages/element/src/selection.ts"
+ },
+ {
+  "commit": "0cf56b19c79a28dda52f0dcb1c5392ed19cb5fcd",
+  "file": "packages/common/tests/binary-heap.test.ts"
+ },
+ {
+  "commit": "d992c10bc1c3ad87eff4e0a45091810242f01ce7",
+  "file": "excalidraw-app/data/LocalData.ts"
+ },
+ {
+  "commit": "091b9053a3db8ef702c0b65bc8d351290f685362",
+  "file": "packages/excalidraw/actions/actionHistory.tsx"
+ },
+ {
+  "commit": "1caec99b290c75cda05385e637138998807a65ae",
+  "file": "dev-docs/docusaurus.config.js"
+ },
+ {
+  "commit": "2b0e4c9623e44b3f2f7d02d532f23128e988cb5d",
+  "file": "packages/excalidraw/data/resave.ts"
+ },
+ {
+  "commit": "3d8c12fba475bad8ebee4c238466c59f08a5458c",
+  "file": "packages/excalidraw/components/main-menu/DefaultItems.tsx"
+ },
+ {
+  "commit": "cae9d2bcbd3e6c70c579a52574d91ea8898a80bb",
+  "file": "packages/excalidraw/components/App.tsx"
+ },
+ {
+  "commit": "0b3a5e7cc4d6ba5bcc5105f694a59f721ee06fc5",
+  "file": "packages/element/src/binding.ts"
+ },
+ {
+  "commit": "f39ac4a653335efaaaf9834bf28e9ffc1452cb59",
+  "file": "packages/element/src/arrows/focus.ts"
+ },
+ {
+  "commit": "6135548534fcfacc0ffa7bd1d1f7d32ce05f137d",
+  "file": "packages/excalidraw/components/TTDDialog/hooks/useMermaidRenderer.ts"
+ },
+ {
+  "commit": "7cc31ac64a9ec3f9ce5bc3a09cd3716c2eb07370",
+  "file": "packages/excalidraw/clipboard.ts"
+ },
+ {
+  "commit": "7c4194485647fcd3a1aaa75612c0193208d65bae",
+  "file": "packages/common/src/binary-heap.ts"
+ },
+ {
+  "commit": "91c7748c3d58a54444193695d3b7d3ced34434ad",
+  "file": "packages/excalidraw/components/App.tsx"
+ }
+]
