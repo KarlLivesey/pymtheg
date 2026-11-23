@@ -229,6 +229,17 @@ export interface ProjectAnalysisContext {
   previousFiles?: ReadonlyMap<string, GraphFile>;
   /** Includes deleted context paths. Analysis runs even when this list is empty. */
   changedContextFiles: readonly string[];
+  /** Reports which analysis path ran (C-38A). */
+  notePath?: (note: AnalysisPath) => void;
+}
+/**
+ * The analysis path a module took for one index (C-38A), shown in the index
+ * report: `reused` built no program, `full` analysed every file.
+ */
+export interface AnalysisPath {
+  path: "reused" | "full";
+  /** Why the path needs no reason, such as "no previous index". */
+  note?: string;
 }
 export interface AnalyzedFile {
   path: string;
@@ -256,6 +267,12 @@ export interface LanguageModule {
   dependencyInputs?: true;
   /** Accepts previousFiles and can prove that some files' decisions still hold. */
   incrementalAnalysis?: true;
+  /**
+   * Reports its analysis path through `notePath` (C-38A). Only a module that
+   * analyses in this process: a context cloned into a worker cannot carry
+   * the function.
+   */
+  reportsAnalysisPath?: true;
   /** For scoped resolution only, the file-level parsed link kinds read across files. */
   scopedFileLinkKinds?: readonly string[];
   /** This resolver uses symbol and link facts without reading file records. */
@@ -385,6 +402,8 @@ export interface GraphStorage {
    * the store, or throws without writing.
    */
   beginIndexRun?(): StorageResult<boolean>;
+  /** Writes the run's mark at once if it has not written yet (C-38A). */
+  claimIndexRun?(): StorageResult<void>;
   /** Module versions whose completed decisions this run found in its opening snapshot. */
   completedAnalysis?(): StorageResult<ReadonlyMap<string, string>>;
   /** An incomplete run retains its mark. A successful owned run records reusable module decisions. */

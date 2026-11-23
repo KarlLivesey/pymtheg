@@ -11,6 +11,7 @@ import {
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import { count, stage } from "./work.js";
 import type {
+  AnalysisPath,
   AnalyzedFile,
   ContextFile,
   GraphFile,
@@ -50,6 +51,8 @@ export interface IndexReport {
   resolutionErrors: { module: string; message: string }[];
   /** Notes from opted-in toolchain routes; absent when no module made one. */
   toolchains?: { module: string; note: Json }[];
+  /** Per module that reported one: the analysis path and why (C-38A). */
+  analysisPaths?: ({ module: string } & AnalysisPath)[];
 }
 export interface IndexOptions {
   excludeDirectories?: readonly string[];
@@ -338,6 +341,13 @@ export async function indexProject(
       }
     }),
   );
+  // Edited files whose writes wait for their module's analysis: the run
+  // claims the store now, as writing them first would (C-22, C-38A). Outside
+  // the write batch above (C-37), whose scope has ended and committed: inside
+  // a batch the claim would only commit when the scope ends, so it is made
+  // here, as its own committed transaction, before any analysis starts.
+  if ([...deferred.values()].some((pending) => pending.length))
+    await store.claimIndexRun?.();
   // Written: release every captured text and parse result (C-2). Only the
   // context files and which captures failed are needed from here on.
   updates.length = 0;
@@ -436,6 +446,13 @@ export async function indexProject(
             ...changedContexts.filter((path) => needsContext(module, path)),
             ...checkedInputs.changed,
           ],
+          ...(module.reportsAnalysisPath && {
+            notePath: (note: AnalysisPath) =>
+              (report.analysisPaths ??= []).push({
+                module: module.id,
+                ...note,
+              }),
+          }),
         }),
       );
       if ("resolutionFiles" in output) {

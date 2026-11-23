@@ -1390,6 +1390,16 @@ export class SqliteGraphStore implements GraphStorage {
     this.transaction(() => {});
     return true;
   }
+  /**
+   * Writes this run's mark now, if it has not written yet (C-38A). A run that
+   * holds back its parsed writes until analysis (C-27) claims the store
+   * before analysing, as a run that writes its parse results first does: a
+   * run that begins meanwhile then takes over, and this one writes nothing
+   * more.
+   */
+  claimIndexRun(): void {
+    if (this.indexRun.state === "pending") this.transaction(() => {});
+  }
   private readCompletedAnalysis(): ReadonlyMap<string, string> {
     const row = this.db
       .prepare("SELECT value FROM graph_meta WHERE key='analysis-complete'")

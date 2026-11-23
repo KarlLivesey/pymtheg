@@ -4,6 +4,7 @@ import ts from "typescript";
 import { contentHash } from "../../index.js";
 import { validSourceRange } from "../../identity.js";
 import type {
+  AnalysisPath,
   AnalyzedFile,
   Diagnostic,
   GraphFile,
@@ -955,8 +956,21 @@ export function typescriptModule(
     extensions: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
     contextFiles: CONTEXT_PATTERNS,
     dependencyInputs: true,
+    reportsAnalysisPath: true,
     analyze(context) {
       const files = context.files.filter(readable);
+      // The report's path (C-38A): no file has a stored analysis yet on a
+      // first index.
+      const firstIndex = files.every(
+        (file) =>
+          (file.result.data as { analyzer?: unknown } | undefined)
+            ?.analyzer === undefined,
+      );
+      const note = (path: AnalysisPath["path"]) =>
+        context.notePath?.({
+          path,
+          ...(firstIndex && { note: "no previous index" }),
+        });
       // Unchanged snapshot: stored facts came from a complete analysis of these
       // exact sources and contexts by this module version, so they are reused
       // without building a program. The core retries a failed file whose content
@@ -1000,6 +1014,7 @@ export function typescriptModule(
           .map((file) => [file, syntaxFailure(file.path, file.text)] as const);
         if (again.every(([, failure]) => failure)) {
           statistics.reused++;
+          note("reused");
           return [
             ...kept.map((file) => ({ path: file.path, result: file.result })),
             ...again.map(([file, failure]) => ({
@@ -1013,6 +1028,7 @@ export function typescriptModule(
         }
       }
       if (context.dependencyInputs) context.dependencyInputs.refreshed = true;
+      note("full");
       const model = projectModel(
         files,
         context.contextFiles,

@@ -3403,3 +3403,17 @@ command, as before; once per sync in a long-lived process). **Rules out
 for now:** streaming a module's results to the store. The results were
 small (298 MiB as JSON on microsoft/TypeScript); the retained program was
 the cost. See [C-40](changes/C-40.md).
+
+### C-38A An index run claims the store before analysis
+
+**Decided (C-38A):** when any module holds back edited files' writes
+until its analysis (C-27), the index run writes its run mark at once, in
+its own committed transaction, before analysis starts. **Why:** a run that
+began during that analysis found no write since its start, answered
+without writing, and the first run then wrote its analysis of the older
+text (a real race on main for Go). With the claim the later run takes
+over and the first writes nothing more. The index report also names each
+reporting module's analysis path (`reused` or `full` for TypeScript).
+**Trade:** one more small transaction per index that edits such files.
+**Rules out:** making the claim inside a write batch, where it would commit
+only at the end of the batch scope. See [C-38A](changes/C-38A.md).

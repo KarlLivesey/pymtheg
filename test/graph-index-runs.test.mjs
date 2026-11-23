@@ -55,11 +55,11 @@ function gate() {
     },
   };
 }
-/** Production modules, with TypeScript's analysis pausing at `pause` (once). */
-function pausing(pause) {
+/** Production modules, with one module's analysis (TypeScript by default) pausing at `pause` (once). */
+function pausing(pause, language = "typescript") {
   return new LanguageRegistry(
     production.modules.map((module) =>
-      module.id !== "typescript"
+      module.id !== language
         ? module
         : {
             ...module,
@@ -341,6 +341,57 @@ test("a FULL checkpoint, a status and a no-sync query by other connections do no
         storeRows(graph),
         await cold(base, root, storeRows(graph).project[0]),
       ),
+      [],
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("Go: A analyses with an export removed and pauses; it is restored; B completes; A resumes and writes nothing", async () => {
+  // Go's parsed writes also wait for its analysis (C-27). Without the run's
+  // early claim (C-38A), B found the store unchanged and answered without
+  // writing, and A then wrote its stale analysis.
+  const goFull =
+    "package a\n\nfunc Hello() int { return 1 }\n\nfunc Gone() int { return 2 }\n";
+  const base = mkdtempSync(join(tmpdir(), "c38-go-runs-"));
+  const root = join(base, "tree");
+  const graph = join(base, "graph.sqlite");
+  const write = (path, text) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  };
+  try {
+    write("go.mod", "module example.com/m\n\ngo 1.22\n");
+    write("a/a.go", goFull);
+    write(
+      "b/b.go",
+      'package b\n\nimport "example.com/m/a"\n\nfunc Use() int { return a.Hello() + a.Gone() }\n',
+    );
+    const first = new SqliteGraphStore(graph);
+    await indexProject(root, production, first);
+    first.close();
+    const rows = () => storeRows(graph);
+    write("a/a.go", "package a\n\nfunc Hello() int { return 1 }\n");
+    const held = gate();
+    const storeA = new SqliteGraphStore(graph);
+    const runA = indexProject(root, pausing([held], "go"), storeA);
+    await held.reached;
+    write("a/a.go", goFull);
+    const storeB = new SqliteGraphStore(graph);
+    await indexProject(root, production, storeB);
+    const projectId = storeB.projectId;
+    storeB.close();
+    const afterB = rows();
+    held.open();
+    await assert.rejects(runA, taken);
+    storeA.close();
+    assert.deepEqual(rows(), afterB, "A wrote nothing after B");
+    const again = new SqliteGraphStore(graph);
+    await indexProject(root, production, again);
+    again.close();
+    assert.deepEqual(
+      compareRows(storeRows(graph), await cold(base, root, projectId)),
       [],
     );
   } finally {
