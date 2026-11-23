@@ -531,6 +531,37 @@ test("the walk keeps what the checker narrows, instantiates or types by context"
   });
 });
 
+test("a callback parameter typed by a generic call keeps the declared container's members", async () => {
+  // C-41 review, from the sweep: `middleware: (gDM) => gDM().concat(…)`.
+  const got = await outcomes(
+    {
+      "src/use.ts": [
+        "declare const pick: boolean;",
+        "declare const c1: { m(): void };",
+        "declare const c2: { m(): void };",
+        "interface Tuple<T> { concat(x: T): Tuple<T> }",
+        "declare function configure<M>(options: { seed: M; middleware: (gdm: () => Tuple<M>) => Tuple<M> }): void;",
+        "configure({ seed: pick ? c1 : c2, middleware: (gdm) => gdm().concat(c1) });",
+        "declare function run<T>(value: T, f: (x: T) => void): void;",
+        "run(pick ? c1 : c2, (x) => x.m());",
+        "",
+      ].join("\n"),
+    },
+    "src/use.ts",
+    true,
+  );
+  assert.deepEqual(got, {
+    "configure({ seed: pick ? c1 : c2, middleware: (gdm) => gdm().concat(c1) }); @configure":
+      "src/use.ts#configure",
+    "configure({ seed: pick ? c1 : c2, middleware: (gdm) => gdm().concat(c1) }); @gdm":
+      "unresolved:local",
+    "configure({ seed: pick ? c1 : c2, middleware: (gdm) => gdm().concat(c1) }); @(expression).concat":
+      "src/use.ts#Tuple.concat",
+    "run(pick ? c1 : c2, (x) => x.m()); @run": "src/use.ts#run",
+    "run(pick ? c1 : c2, (x) => x.m()); @x.m": "unresolved:receiver-unverified",
+  });
+});
+
 test("nested type positions have their places; a type literal's overloads are one symbol", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "c41-ids-"));
   const root = join(scratch, "project");

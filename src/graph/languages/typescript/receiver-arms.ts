@@ -568,7 +568,13 @@ export function receiverArms(
       return declaration.initializer ? arms(declaration.initializer) : WRITTEN;
     const own = callbackElement(declaration);
     if (own !== null) return own;
-    return contextOf(fn) ? WRITTEN : undefined;
+    if (contextOf(fn)) return WRITTEN;
+    // Typed by a generic call whose instantiation the walk cannot prove
+    // unreduced: the parameter keeps its type as the signature declares it.
+    const declared = contextualDeclared(fn, fn.parameters.indexOf(declaration));
+    return declared
+      ? [{ type: typeAt(declaration.name), generic: declared }]
+      : undefined;
   }
 
   /**
@@ -639,6 +645,103 @@ export function receiverArms(
     }
     if (ts.isArrowFunction(parent) && parent.body === at) return !!parent.type;
     return false;
+  }
+
+  /**
+   * The declared type of parameter `index` of the function `fn`, from the
+   * uninstantiated signature of the call it is passed to: through object
+   * literal properties (`{ middleware: (gDM) => … }`) and returned
+   * functions (`() => (next) => …`) on the way.
+   */
+  function contextualDeclared(
+    fn: ts.SignatureDeclaration,
+    index: number,
+  ): ts.Type | undefined {
+    if (index < 0) return undefined;
+    const path: (string | null)[] = [];
+    let at: ts.Node = fn;
+    for (let step = 0; step < 16; step++) {
+      while (
+        ts.isParenthesizedExpression(at.parent) ||
+        ts.isSatisfiesExpression(at.parent)
+      )
+        at = at.parent;
+      const parent = at.parent;
+      if (ts.isPropertyAssignment(parent) && parent.initializer === at) {
+        const key = staticName(parent.name);
+        if (key === undefined) return undefined;
+        path.unshift(key);
+        at = parent.parent;
+        continue;
+      }
+      if (ts.isMethodDeclaration(at) && ts.isObjectLiteralExpression(parent)) {
+        const key = staticName(at.name);
+        if (key === undefined) return undefined;
+        path.unshift(key);
+        at = parent;
+        continue;
+      }
+      // Returned by a function: `null` marks the step through its return.
+      if (ts.isArrowFunction(parent) && parent.body === at) {
+        path.unshift(null);
+        at = parent;
+        continue;
+      }
+      if (ts.isReturnStatement(parent)) {
+        const owner = ts.findAncestor(parent, ts.isFunctionLike);
+        if (
+          !owner ||
+          !(ts.isFunctionExpression(owner) || ts.isArrowFunction(owner))
+        )
+          return undefined;
+        path.unshift(null);
+        at = owner;
+        continue;
+      }
+      if (
+        !(ts.isCallExpression(parent) || ts.isNewExpression(parent)) ||
+        !parent.arguments?.includes(at as ts.Expression)
+      )
+        return undefined;
+      const callee = arms(parent.expression);
+      if (!callee || callee.length > 1) return undefined;
+      const declaration = checker.getResolvedSignature(parent)?.declaration;
+      if (!declaration || ts.isJSDocSignature(declaration)) return undefined;
+      const signature = checker.getSignatureFromDeclaration(declaration);
+      if (!signature?.parameters.length) return undefined;
+      const position = parent.arguments.indexOf(at as ts.Expression);
+      const parameter =
+        signature.parameters[
+          Math.min(position, signature.parameters.length - 1)
+        ]!;
+      let type: ts.Type | undefined = checker.getTypeOfSymbol(parameter);
+      for (const key of path) {
+        const plain = checker.getNonNullableType(type);
+        if (key === null) {
+          const signatures = checker.getSignaturesOfType(
+            plain,
+            ts.SignatureKind.Call,
+          );
+          if (signatures.length !== 1) return undefined;
+          type = signatures[0]!.getReturnType();
+        } else {
+          const member = checker.getPropertyOfType(
+            checker.getApparentType(plain),
+            key,
+          );
+          if (!member) return undefined;
+          type = checker.getTypeOfSymbol(member);
+        }
+      }
+      const signatures = checker.getSignaturesOfType(
+        checker.getNonNullableType(type),
+        ts.SignatureKind.Call,
+      );
+      if (signatures.length !== 1) return undefined;
+      const own = signatures[0]!.parameters[index];
+      return own && checker.getTypeOfSymbol(own);
+    }
+    return undefined;
   }
 
   /** A call's callee is one value and its type arguments are not reduced. */
@@ -1154,7 +1257,11 @@ export function receiverArms(
       if (primitive) return [...own].some((part) => part.flags & primitive);
       return checker.isTypeAssignableTo(arm.type, at);
     });
-    const kept = held.length ? held : split;
+    // Nothing the checker's type holds: it is not one of the arms, so not a
+    // union the checker reduced (a reduction keeps an arm, and every arm is
+    // assignable to it). A narrowing the walk does not see: its answer stands.
+    if (!held.length) return undefined;
+    const kept = held;
     // The checker's own type, part for part: its answer stands.
     if (
       kept.length === own.size &&
