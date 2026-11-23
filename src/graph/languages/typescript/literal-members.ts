@@ -55,6 +55,117 @@ function writtenTypes(
   return type ? [type] : undefined;
 }
 
+/** The single declaration of the value or member `name` denotes, aliases followed. */
+function declarationAt(
+  checker: ts.TypeChecker,
+  name: ts.Node,
+): ts.Declaration | undefined {
+  let symbol = checker.getSymbolAtLocation(name);
+  if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+    symbol = checker.getAliasedSymbol(symbol);
+  const declarations = symbol?.declarations ?? [];
+  return declarations.length === 1 ? declarations[0] : undefined;
+}
+
+/**
+ * Whether every step of `expression`'s path is written or direct (C-41
+ * review): its type is never one the checker computed from several values
+ * and may have reduced to one arm. A step passes when it is:
+ * - a name or member declared with a written type, or a `const` (or an
+ *   object member) initialised from such a path;
+ * - a module, namespace, class, function or enum, or `this`;
+ * - a `new` of such a path;
+ * - a call whose callee is such a path and whose signature writes its
+ *   return type.
+ * An element access, a conditional, `??` or `||`, a `for…of` variable,
+ * a parameter without a written type or an inferred return does not.
+ */
+export function writtenPath(
+  checker: ts.TypeChecker,
+  expression: ts.Expression,
+  depth = 0,
+): boolean {
+  if (depth > DEPTH) return false;
+  const value = unwrap(expression);
+  if (ts.isNonNullExpression(value))
+    return writtenPath(checker, value.expression, depth + 1);
+  if (value.kind === ts.SyntaxKind.ThisKeyword) return true;
+  if (ts.isNewExpression(value))
+    return writtenPath(checker, value.expression, depth + 1);
+  if (ts.isCallExpression(value)) {
+    const declaration = checker.getResolvedSignature(value)?.declaration;
+    return (
+      !!declaration &&
+      !ts.isJSDocSignature(declaration) &&
+      !!declaration.type &&
+      writtenPath(checker, value.expression, depth + 1)
+    );
+  }
+  let name: ts.Node;
+  if (ts.isIdentifier(value)) name = value;
+  else if (ts.isPropertyAccessExpression(value)) {
+    if (!writtenPath(checker, value.expression, depth + 1)) return false;
+    name = value.name;
+  } else return false;
+  const declaration = declarationAt(checker, name);
+  if (!declaration) return false;
+  return writtenDeclaration(checker, declaration, depth + 1);
+}
+
+function writtenDeclaration(
+  checker: ts.TypeChecker,
+  declaration: ts.Declaration,
+  depth: number,
+): boolean {
+  if (depth > DEPTH) return false;
+  if (
+    ts.isSourceFile(declaration) ||
+    ts.isModuleDeclaration(declaration) ||
+    ts.isClassDeclaration(declaration) ||
+    ts.isFunctionDeclaration(declaration) ||
+    ts.isEnumDeclaration(declaration) ||
+    ts.isMethodDeclaration(declaration) ||
+    ts.isMethodSignature(declaration)
+  )
+    return true;
+  if (
+    ts.isVariableDeclaration(declaration) ||
+    ts.isParameter(declaration) ||
+    ts.isPropertySignature(declaration) ||
+    ts.isPropertyDeclaration(declaration)
+  ) {
+    if (declaration.type) return true;
+    // A `const` (never a `let`, a loop variable or a parameter) or a
+    // class property initialised from a written path.
+    const constant =
+      ts.isVariableDeclaration(declaration) &&
+      ts.isIdentifier(declaration.name) &&
+      ts.isVariableDeclarationList(declaration.parent) &&
+      !!(declaration.parent.flags & ts.NodeFlags.Const) &&
+      !ts.isForOfStatement(declaration.parent.parent) &&
+      !ts.isForInStatement(declaration.parent.parent);
+    const initializer =
+      constant || ts.isPropertyDeclaration(declaration)
+        ? declaration.initializer
+        : undefined;
+    return !!initializer && writtenPath(checker, initializer, depth + 1);
+  }
+  if (ts.isPropertyAssignment(declaration))
+    return writtenPath(checker, declaration.initializer, depth + 1);
+  if (ts.isShorthandPropertyAssignment(declaration)) {
+    let value = checker.getShorthandAssignmentValueSymbol(declaration);
+    if (value && value.flags & ts.SymbolFlags.Alias)
+      value = checker.getAliasedSymbol(value);
+    const target = value?.declarations ?? [];
+    return (
+      target.length === 1 && writtenDeclaration(checker, target[0]!, depth + 1)
+    );
+  }
+  if (ts.isExportAssignment(declaration))
+    return writtenPath(checker, declaration.expression, depth + 1);
+  return false;
+}
+
 /** Whether the written type `node` holds the type literal `literal`. */
 function holds(
   checker: ts.TypeChecker,
@@ -195,6 +306,9 @@ export function declaredLiteral(
 ): boolean {
   if (!receiver) return false;
   try {
+    // The whole path, not only its last step: the object a property is read
+    // from can itself be computed (`isNode ? nodeShim : webShim`).
+    if (!writtenPath(checker, receiver)) return false;
     const types = writtenTypes(checker, receiver);
     return (
       !!types?.length && types.every((type) => holds(checker, type, literal, 0))

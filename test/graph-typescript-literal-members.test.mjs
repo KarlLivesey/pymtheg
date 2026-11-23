@@ -30,7 +30,7 @@ const tsconfig = JSON.stringify({
  * line it is on, its outcome: the target's `file#identity`, the sorted
  * candidates, or `<resolution>:<reason>`.
  */
-async function outcomes(files, file) {
+async function outcomes(files, file, byName = false) {
   const scratch = await mkdtemp(join(tmpdir(), "c41-members-"));
   const root = join(scratch, "project");
   const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "c41");
@@ -58,7 +58,7 @@ async function outcomes(files, file) {
       const start = text.lastIndexOf("\n", link.range.start - 1) + 1;
       const end = text.indexOf("\n", link.range.start);
       const site = text.slice(start, end < 0 ? undefined : end).trim();
-      result[site] =
+      result[byName ? `${site} @${link.targetName}` : site] =
         link.resolution === "resolved"
           ? symbols.get(link.targetId)
           : link.resolution === "ambiguous"
@@ -306,6 +306,68 @@ test("member symbols of literals leave every contains link resolved", async () =
     store.close();
     await rm(scratch, { recursive: true, force: true });
   }
+});
+
+test("a type-literal member is definite only when the receiver's whole path is written", async () => {
+  // C-41 review: the object a property is read from can itself be computed;
+  // the checker reduces it to one arm, whose written type passes the last step.
+  const got = await outcomes(
+    {
+      "src/use.ts": [
+        "type Shim = { process: { argv(): string[] } };",
+        "declare const nodeShim: Shim;",
+        "declare const webShim: { process: { argv(): string[] } };",
+        "declare const isNode: boolean;",
+        "const shim = isNode ? nodeShim : webShim;",
+        "shim.process.argv();",
+        "nodeShim.process.argv();",
+        "type Api = { shell: { open(): void } };",
+        "declare const desktop: Api | undefined;",
+        "declare const web: { shell: { open(): void } };",
+        "const api = desktop ?? web;",
+        "api.shell.open();",
+        "declare const pick: boolean;",
+        "declare const a: { util: { run(): void } };",
+        "declare const b: { util: { run(): void } };",
+        "function choose() { if (pick) return a; return b; }",
+        "choose().util.run();",
+        "const list = [a, b];",
+        "list[0].util.run();",
+        "for (const x of list) x.util.run();",
+        "declare const f1: () => { run(): void };",
+        "declare const f2: () => { run(): void };",
+        "(pick ? f1 : f2)().run();",
+        "declare const given: { log: { info(m: string): void } } | undefined;",
+        "const ctx = given ?? { log: { info() {} } };",
+        "ctx.log.info('x');",
+        "",
+      ].join("\n"),
+    },
+    "src/use.ts",
+    true,
+  );
+  const computed = [
+    "shim.process.argv();",
+    "api.shell.open();",
+    "choose().util.run();",
+    "list[0].util.run();",
+    "for (const x of list) x.util.run();",
+    "(pick ? f1 : f2)().run();",
+    "ctx.log.info('x');",
+  ];
+  for (const [key, outcome] of Object.entries(got)) {
+    const site = key.slice(0, key.lastIndexOf(" @"));
+    if (!computed.includes(site)) continue;
+    assert.ok(
+      typeof outcome !== "string" || !outcome.includes(".[type]."),
+      `${key}: ${JSON.stringify(outcome)}`,
+    );
+  }
+  // A written path stays definite.
+  const written = Object.entries(got).find(([key]) =>
+    key.startsWith("nodeShim.process.argv(); @"),
+  );
+  assert.equal(written?.[1], "src/use.ts#Shim.[type].process.argv");
 });
 
 test("a call that is not on a declared member of a literal stays unlinked", async () => {
