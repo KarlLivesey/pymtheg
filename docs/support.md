@@ -805,15 +805,21 @@ accept the arguments.
   checked against its producers too when the receiver's value can choose
   (a conditional, a reassigned `let`): several give candidates. When the
   producers cannot be followed (an element access, a call's result), the
-  checker's single declaration stands
+  checker's single declaration stands. Known wrong link: with
+  `list = [a, b]` of equal literals, `list[i].setup()`, a `for…of` over
+  `list` or `[a, b]`, `list.forEach((p) => p.setup())` and
+  `given ?? impl` link only to the first
   ([C-41](changes/C-41.md)).
-- **Type-literal members:** members of a type literal written outside
-  bodies are symbols, including nested union, intersection, array, tuple
-  and type-argument positions and a named parameter's written type. A call
-  links to one only when the receiver's declaration writes a type holding
-  that literal; a written union gives candidates. A receiver whose type is
-  inferred (a computed union, a generic's result) stays unresolved
-  (`local`). Index signatures and mapped types have no member to link
+- **Type-literal members:** members of a written type literal are
+  symbols, including nested union, intersection, array, tuple and
+  type-argument positions, a named parameter's written type, and inside a
+  function body a local variable's written type and a local function's
+  parameters; overloads are one symbol. A call links to one only when every
+  step of the receiver's path is written and its declaration writes a type
+  holding that literal; a written union gives candidates. A receiver whose
+  type or path is inferred (a computed union, a generic's result, a
+  conditional or `??`, an element access) stays unresolved (`local`).
+  Local type aliases have no member symbols. Index signatures and mapped types have no member to link
   ([C-41](changes/C-41.md)).
   Factory fallthrough and bare returns can contribute `undefined`, including
   after `await`. Static object destructuring follows named properties,
