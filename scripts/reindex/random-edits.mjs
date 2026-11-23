@@ -17,6 +17,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import ts from "typescript";
 import { compareRows, setPageCache, storeRows } from "./dump.mjs";
@@ -56,6 +57,12 @@ const command = flags.includes("--command");
 // holding a local (an anonymous-scoped symbol; a repeated insert is its
 // same-named sibling). A separate flag, so earlier seeds replay as they did.
 const siblings = flags.includes("--siblings");
+// C-55: Go edits also break a file's syntax, edit go.mod and rename a file
+// (a separate flag, so earlier seeds replay as they did).
+const moreGo = flags.includes("--more-go");
+// C-55: each incremental index runs through the MCP server's graph jobs:
+// one persistent worker with its index session, as the server runs it.
+const mcp = flags.includes("--mcp");
 // C-36: --scoped-mix weights Rust edits to those that can keep the surface.
 const scopedMix = flags.includes("--scoped-mix");
 if (command && !temporary) throw Error("--command requires --store-dir");
@@ -124,7 +131,37 @@ const clearStore = (store) => {
 function prepareStore(path) {
   if (cachePages !== undefined) setPageCache(path, cachePages);
 }
-function incremental(metrics) {
+let jobs;
+/** One index through the MCP server's persistent graph worker (C-55). */
+async function incrementalMcp(metrics) {
+  if (!jobs) {
+    const { GraphJobs } = await import(
+      pathToFileURL(join(dist, "mcp/graph-jobs.js")).href
+    );
+    jobs = new GraphJobs(root);
+  }
+  const cpu = process.cpuUsage();
+  const started = performance.now();
+  const job = jobs.start({ command: "index" });
+  await job.done;
+  const used = process.cpuUsage(cpu);
+  if (job.state !== "complete")
+    throw Error(`MCP index ${job.state}: ${JSON.stringify(job.error)}`);
+  writeFileSync(
+    metrics,
+    JSON.stringify({
+      wallMs: Math.round(performance.now() - started),
+      cpuMs: Math.round((used.user + used.system) / 1000),
+      counts: job.work?.counts ?? {},
+      memory: job.memory,
+      session: job.session,
+      generation: jobs.generation,
+      maxRssKiB: process.resourceUsage().maxRSS,
+    }),
+  );
+}
+async function incremental(metrics) {
+  if (mcp) return await incrementalMcp(metrics);
   if (!temporary || command) return run("index-once.mjs", root, metrics);
   clearStore(temporary);
   try {
@@ -139,7 +176,7 @@ function incremental(metrics) {
 }
 if (!existsSync(graph)) {
   if (!temporary || command) init();
-  incremental(join(base, "first.json"));
+  await incremental(join(base, "first.json"));
 }
 const projectId =
   temporary && !command ? directId : storeRows(graph).project[0];
@@ -271,6 +308,7 @@ const goKinds = [
   "file-add",
   "file-delete",
   "build",
+  ...(moreGo ? ["break", "break", "gomod", "gomod", "move", "move"] : []),
 ];
 const goTargets = new Map();
 const created = [];
@@ -389,6 +427,22 @@ function goEdit(step, file, source) {
         kind: "file-add",
         text: `package ${header[1]}\n\nfunc ${name}() int { return 1 }\n`,
       };
+    }
+    case "break":
+      // A parse break: an unterminated declaration after the package line.
+      return { file, kind, text: insert(anchor, "\n\nfunc c55Broken( {\n") };
+    case "gomod": {
+      const text = sourceOf("go.mod");
+      return {
+        file: "go.mod",
+        kind,
+        text: text + `\n// c55 go.mod edit ${step}\n`,
+      };
+    }
+    case "move": {
+      const moved = join(dirname(file), `c55_moved_${step}${suffix}`);
+      sourceByFile.set(moved, source);
+      return { file, kind, text: undefined, also: moved };
     }
     case "build":
       return {
@@ -640,7 +694,7 @@ for (let step = 0; step < expectedSteps; step++) {
     mkdirSync(dirname(join(root, edit.also)), { recursive: true });
     writeFileSync(join(root, edit.also), sourceByFile.get(edit.also));
   }
-  incremental(join(base, `step-${step}.json`));
+  await incremental(join(base, `step-${step}.json`));
   const cold = temporary ?? join(base, `cold-${step}.sqlite`);
   clearStore(cold);
   let differences;
@@ -699,3 +753,4 @@ for (let step = 0; step < expectedSteps; step++) {
     throw Error(`Incremental graph differs after ${id} step ${step}`);
 }
 report();
+await jobs?.close();
