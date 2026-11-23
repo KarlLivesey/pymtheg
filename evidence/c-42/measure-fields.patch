@@ -1,0 +1,83 @@
+--- a/src/graph/languages/typescript/extract.ts
++++ b/src/graph/languages/typescript/extract.ts
+@@ -1060,6 +1060,8 @@
+     // whether any library fact is synthesised or outside the global scope.
+     const librarySymbols = new Set<ts.Symbol | undefined>();
+     let unmergedLibrary = false;
++    const notGlobalSymbols = new Set<ts.Symbol | undefined>();
++    let synthesisedNode = false;
+     let installedType = false;
+     let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
+     let verifyObjectProducers = false;
+@@ -1331,6 +1333,7 @@
+                     if (node) {
+                       (libraryFacts ??= new Map()).set(libraryKey(node), node);
+                       unmergedLibrary = true;
++                      synthesisedNode = true;
+                     } else missingGlobalTypes = true;
+                   }
+                 } else if (
+@@ -1341,6 +1344,7 @@
+                   if (node) {
+                     (libraryFacts ??= new Map()).set(libraryKey(node), node);
+                     unmergedLibrary = true;
++                    synthesisedNode = true;
+                   } else missingGlobalTypes = true;
+                 }
+               }
+@@ -1351,9 +1355,10 @@
+               importer.targetKey(proved),
+               proved,
+             );
+-            if (namespace || !environmentDeclaration(declaration))
++            if (namespace || !environmentDeclaration(declaration)) {
+               unmergedLibrary = true;
+-            else librarySymbols.add(declaredSymbol(declaration));
++              notGlobalSymbols.add(namespace ? undefined : declaredSymbol(declaration));
++            } else librarySymbols.add(declaredSymbol(declaration));
+           } else if (inCheckout(declaration)) {
+             if (!record(declaration, current)) local++;
+           } else external++;
+@@ -1470,6 +1475,17 @@
+           ({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit),
+         ) &&
+         !unitsConflict(libraries);
++      const unitConflict =
++        !merged &&
++        !!libraries &&
++        libraries.length > 1 &&
++        !targets.length &&
++        !unmergedLibrary &&
++        librarySymbols.size === 1 &&
++        !!mergedSymbol &&
++        new Set(libraries.map(({ ecosystem, unit }) => `${ecosystem}\0${unit}`)).size > 1 &&
++        !libraries.some(({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit)) &&
++        unitsConflict(libraries);
+       return {
+         targets,
+         viaAlias,
+@@ -1477,6 +1493,15 @@
+         declarations,
+         ...(libraries && { libraryFacts: libraries }),
+         ...(merged && { mergedGlobal: true }),
++        ...(unitConflict && { unitConflict: true }),
++        ...(!merged &&
++          !!libraries &&
++          new Set(libraries.map(({ ecosystem, unit }) => `${ecosystem}\0${unit}`)).size > 1 &&
++          !targets.length &&
++          !synthesisedNode &&
++          notGlobalSymbols.size > 0 &&
++          !notGlobalSymbols.has(undefined) &&
++          new Set([...librarySymbols, ...notGlobalSymbols]).size === 1 && { oneSymbolNotGlobal: true }),
+         ...(unbuiltEntry && { unbuiltEntry }),
+         ...(viaSpecifier && { viaSpecifier }),
+       };
+@@ -2474,6 +2499,8 @@
+           ...target,
+         }));
+         if (found.mergedGlobal) facts.mergedGlobal = true;
++        if ((found as { oneSymbolNotGlobal?: boolean }).oneSymbolNotGlobal) (facts as Record<string, unknown>).oneSymbolNotGlobal = true;
++        if ((found as { unitConflict?: boolean }).unitConflict) (facts as Record<string, unknown>).unitConflict = true;
+       }
+     }
+     if (reason) facts.reason = reason;

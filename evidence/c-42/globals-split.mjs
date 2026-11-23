@@ -10,32 +10,31 @@
 //         a program lacks @types/node (ecosystem node, evidence
 //         declared-builtin), next to a real declaration;
 //       - a test package among the units (narrowed D23);
-//       - variable declarations that disagree on the type (narrowed D23):
-//         the sets the previous head marked (OLD_MERGED, its list of marked
-//         sites) that none of the above explains;
-//       - different compiler symbols (for example the arms of a union
-//         receiver): the rest;
+//       - one compiler symbol merged by a module augmentation, not a
+//         global (`declare module "fastify" { interface FastifyRequest }`
+//         in a plugin): the module's own `oneSymbolNotGlobal` field, which
+//         only a measurement build records (README);
+//       - two units in conflict on a shared global, by the compiler's TS2403
+//         (narrowed D23): the module's own `unitConflict` field, which only
+//         a measurement build records (README);
+//       - the rest: candidates that are not one compiler symbol (for example
+//         the arms of a union receiver), together with any set no rule
+//         above names;
 //   (c) other: anything else (the site changed outcome or is absent).
 // Also split by the set of declaring units and by name, and the SW-6 group
 // "one name declared by several library typings" (same last name, several
 // units) separately.
-// Usage: node globals-split.mjs SCRATCH MAIN.json HEAD.json BUILD [OLD_MERGED.jsonl.gz] > globals-split.json
+// HEAD.json is a run of the measurement build (README): its stores equal the
+// candidate's but for the two fields that name why a set is not marked.
+// Usage: node globals-split.mjs SCRATCH MAIN.json HEAD.json BUILD > globals-split.json
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { gunzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 
-const [scratch, mainPath, headPath, build, oldMergedPath] = process.argv.slice(2);
+const [scratch, mainPath, headPath, build] = process.argv.slice(2);
 const { isTestPackage } = await import(
   pathToFileURL(resolve(build, "dist/graph/languages/typescript/global-types.js"))
-);
-const siteKey = (row) => `${row.pin}\0${row.file}\0${row.kind}\0${row.start}\0${row.name}`;
-const oldMerged = new Set(
-  oldMergedPath
-    ? gunzipSync(readFileSync(oldMergedPath)).toString("utf8").split("\n").filter(Boolean)
-        .map((line) => siteKey(JSON.parse(line)))
-    : [],
 );
 const runs = [mainPath, headPath].map(
   (path) => new Map(JSON.parse(readFileSync(path, "utf8")).repos.map((repo) => [repo.id, repo])),
@@ -86,7 +85,6 @@ for (const [id, mainRepo] of runs[0]) {
     const sw6 = names.size === 1 && units.includes(" + ");
     const synthesised = now?.libraries.some(({ ecosystem, evidence }) => ecosystem === "node" && evidence === "declared-builtin");
     const testPackage = now?.libraries.some(({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit));
-    const wasMerged = oldMerged.has(siteKey({ pin: id, file: link.file, kind: link.kind, start: link.start, name: link.name }));
     const kind = !now || now.resolution !== "ambiguous" || now.checkout
       ? "(c) other: outcome changed or site absent"
       : now.data.mergedGlobal === true
@@ -95,9 +93,11 @@ for (const [id, mainRepo] of runs[0]) {
           ? "(b) not marked: a synthesised Node target present"
           : testPackage
             ? "(b) not marked: a test package among the units"
-            : wasMerged
-              ? "(b) not marked: variable declarations disagree on the type"
-              : "(b) not marked: different compiler symbols";
+            : now.data.oneSymbolNotGlobal === true
+              ? "(b) not marked: one symbol merged by a module augmentation, not a global"
+              : now.data.unitConflict === true
+                ? "(b) not marked: two units in conflict on a shared global (TS2403)"
+                : "(b) not marked: not one compiler symbol, or no rule above";
     add(totals.all, kind);
     if (sw6) add(totals.sw6Group, kind);
     add((byPin[id] ??= table()), kind);
