@@ -963,8 +963,8 @@ export function typescriptModule(
       // first index.
       const firstIndex = files.every(
         (file) =>
-          (file.result.data as { analyzer?: unknown } | undefined)
-            ?.analyzer === undefined,
+          (file.result.data as { analyzer?: unknown } | undefined)?.analyzer ===
+          undefined,
       );
       const note = (path: AnalysisPath["path"]) =>
         context.notePath?.({

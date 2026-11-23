@@ -3414,6 +3414,8 @@ without writing, and the first run then wrote its analysis of the older
 text (a real race on main for Go). With the claim the later run takes
 over and the first writes nothing more. The index report also names each
 reporting module's analysis path (`reused` or `full` for TypeScript).
-**Trade:** one more small transaction per index that edits such files.
+**Trade:** one more small transaction per index that edits such files,
+and a run stopped during such an analysis leaves its unfinished mark, so a
+`--no-sync` query reports `incomplete` over the previous complete rows.
 **Rules out:** making the claim inside a write batch, where it would commit
 only at the end of the batch scope. See [C-38A](changes/C-38A.md).
