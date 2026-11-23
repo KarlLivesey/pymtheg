@@ -1675,6 +1675,27 @@ test("variable types assignable both ways but not identical are in conflict (TS2
     "shared",
   );
   assert.equal(mutual.data.mergedGlobal, undefined);
+  // The reviewer's repro: a parameter widened in one package only.
+  const flag = await globalsCase(
+    {
+      "tsconfig.json": config({
+        lib: ["es2022", "dom"],
+        types: ["env-a", "env-b"],
+      }),
+      ...typesPackage(
+        "env-a",
+        "declare var flag: { (): void; go(x: string | URL): void };\n",
+      ),
+      ...typesPackage(
+        "env-b",
+        "declare var flag: { (): void; go(x: string): void };\n",
+      ),
+      "src/main.ts": "flag();\nexport {};\n",
+    },
+    "src/main.ts",
+    "flag",
+  );
+  assert.equal(flag.data.mergedGlobal, undefined);
   const identical = await globalsCase(
     layout("number", "number"),
     "src/main.ts",
