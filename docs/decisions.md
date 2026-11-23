@@ -3150,6 +3150,19 @@ uses the importer's own conditions and workspace route. Invalid extracted
 source ranges fail the affected file through the compiler session's
 containment path. [C-32](changes/C-32.md)
 
+### C-39 Configs extended by package name; const assertions
+
+A package-name `extends` whose base is installed as a workspace link into
+the checkout is read like any other base: its settings are complete unless
+it is unreadable (6053/5083) or its JSON has syntax errors. A const
+assertion (`as const`, `<const>x`) is not a reference and stores no link. A
+manifest range the compiler's semver parser throws on is an unknown range:
+it identifies the registry dependency and never yields a version pin.
+Keeping a library target beside an unread file (item 4 of the change) was
+split out to C-51. Here, a program with an unread file withholds library
+targets as before (C-13).
+[C-39](changes/C-39.md)
+
 ### C-47 The structural judgement is bounded by counts
 
 The structural judgement (C-13) recursed without end on oclif/core's
@@ -3276,6 +3289,46 @@ read and hash the bytes of each file. Filesystem timestamps can describe a
 metadata-only change or hide an edit. Scoped Go resolution and validation use
 projections of existing facts. No second copy of the global indexes is kept
 in the store. [C-33](changes/C-33.md)
+
+### Rust re-index can reuse decisions outside the edited files (C-36)
+
+**Decided (C-36).** The Rust module uses the C-27 scoped analysis contract
+unchanged. It returns the edited paths alone when three conditions hold:
+
+- every edited file is clean before and after;
+- it keeps its surface;
+- no cut occurs while its links are decided.
+
+The surface is everything another file's resolution reads from the file:
+its symbols, file data and `imports`, `contains`, `macros` and `modules`
+links. They are listed in the resolver's path and position order, with
+source offsets replaced by their rank. A cut is a lookup cycle cut, a depth
+cut or a re-entry guard. The cut check runs with the new facts and, unless
+all facts are the same up to offset ranks, with the old ones, in both Rust
+passes.
+
+The guarantee rests on the resolver's caches: no cached answer depends on
+its caller.
+
+- A lookup memo entry holds no cut met at an ancestor (C-24), and a hit is
+  ignored if it would carry a lookup past the depth limit.
+- A lazily cached computation starts its lookups with an empty stack and is
+  keyed by the global lookup mode. Its answer is kept even when it met cuts
+  inside, unless a helper re-entry occurred, because a re-entry answers for
+  the caller's stack.
+- Trait risk and receiver typing use limits that depend only on the facts.
+- No answer is evicted.
+
+A key whose computation meets no cut then has the same answer in every
+history, so a cut-free scoped decision equals the cold one. The same holds
+when the edited file's answers are added or removed: another file's
+decision does not change.
+
+Every other edit uses the full Rust pass. So do a changed Cargo context,
+an added, removed or failed file, and missing completion evidence. The
+scoped resolve pass rebuilds every link from the stored records and
+orders them like the full pass. The C-22 cold equality rule and run
+ownership apply. [C-36](changes/C-36.md)
 
 ### C-26 Non-returning analysis: a deterministic check before any deadline
 
