@@ -404,7 +404,7 @@ test("no step of a member call's receiver is a value the checker reduced from se
     "same(pick ? a : b).util.run(); @same": "src/use.ts#same",
     // A generic call whose type argument was inferred from a reduced value.
     "same(pick ? a : b).util.run(); @(expression).run":
-      "unresolved:reduced-receiver",
+      "unresolved:receiver-unverified",
     "same(a).util.run(); @same": "src/use.ts#same",
     "same(a).util.run(); @(expression).run": "src/use.ts#a.[type].util.run",
     "[a, b][0]!.util.run(); @(expression).run": "src/use.ts#a.[type].util.run",

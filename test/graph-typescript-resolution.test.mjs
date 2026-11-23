@@ -1940,8 +1940,10 @@ test("object-member calls account for every explicit producer and withhold opaqu
       assert.equal(callOn("direct[index]!.item();").resolution, "unresolved");
       // Members of literals bound to names (anchored): before C-41 the
       // checker's single declaration stood, a wrong definite link when the
-      // receiver's value chose. Now the producers decide when they can be
-      // followed.
+      // receiver's value chose. Now the receiver's chain is walked to its
+      // producers (C-41): `legacyList[key]` gives both elements' members,
+      // and `legacy` is a script's top-level `let`, which any file can
+      // assign.
       const outcome = (line) => {
         const call = callOn(line);
         return call.resolution === "resolved"
@@ -1959,14 +1961,17 @@ test("object-member calls account for every explicit producer and withhold opaqu
           ].map((line) => [line, outcome(line)]),
         ),
         {
-          "legacy.old();": "unresolved:multiple-object-producers",
+          "legacy.old();": "unresolved:receiver-unverified",
           "legacyChoice.inspect();": [
             "use.ts#legacyFirst.inspect",
             "use.ts#legacySecond.inspect",
           ],
           // An element access the producers cannot follow: the checker's
           // answer stands (docs/changes/C-41.md, "Found, not built").
-          "legacyList[key].inspect();": "use.ts#legacyFirst.inspect",
+          "legacyList[key].inspect();": [
+        "use.ts#legacyFirst.inspect",
+        "use.ts#legacySecond.inspect",
+      ],
         },
       );
     },

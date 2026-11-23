@@ -44,7 +44,12 @@ const WRITTEN = Symbol("written");
 type DeclarationArms = Arms | typeof WRITTEN;
 
 const MAX_ARMS = 16;
-const MAX_DEPTH = 48;
+/**
+ * Steps followed before giving up (unresolved). Chains of inferred returns
+ * are followed through, as the checker itself does; a deeper one, or a
+ * stack overflow, leaves the call unresolved.
+ */
+const MAX_DEPTH = 2000;
 
 /** Array methods whose callback's first parameter is an element. */
 const ELEMENT_CALLBACKS = new Set([
@@ -105,6 +110,7 @@ export function receiverArms(
   const declared = new WeakMap<ts.Node, DeclarationArms | null>();
   const unreducedCache = new WeakMap<ts.Node, boolean>();
   const active = new Set<ts.Node>();
+  const returnLists = new WeakMap<ts.Node, readonly ts.Expression[]>();
   const checking = new Set<ts.Node>();
   const fileWrites = new WeakMap<
     ts.SourceFile,
@@ -351,6 +357,12 @@ export function receiverArms(
     }
     if (ts.isExportAssignment(declaration))
       return arms(declaration.expression);
+    // A JavaScript assignment declaration (`x = value`, `exports.x = value`).
+    if (
+      ts.isBinaryExpression(declaration) &&
+      declaration.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    )
+      return arms(declaration.right);
     if (ts.isVariableDeclaration(declaration)) return variable(declaration);
     if (ts.isParameter(declaration)) return parameter(declaration);
     if (ts.isBindingElement(declaration)) return binding(declaration);
@@ -373,7 +385,8 @@ export function receiverArms(
       );
     const values: (ts.Expression | undefined)[] = [];
     if (declaration.initializer) values.push(declaration.initializer);
-    if (!(list.flags & ts.NodeFlags.Const)) {
+    // A pattern's bindings are assigned one by one (see binding).
+    if (!(list.flags & ts.NodeFlags.Const) && ts.isIdentifier(declaration.name)) {
       const writes = assignments(declaration);
       if (!writes) return undefined;
       values.push(...writes);
@@ -385,13 +398,14 @@ export function receiverArms(
 
   /** Every value assigned to the `let` or `var` `declaration`, if knowable. */
   function assignments(
-    declaration: ts.VariableDeclaration,
+    declaration: ts.VariableDeclaration | ts.BindingElement,
   ): (ts.Expression | undefined)[] | undefined {
     if (!ts.isIdentifier(declaration.name)) return undefined;
     const file = declaration.getSourceFile();
     // A script's top-level `var` can be assigned from any file.
     if (
       !ts.isExternalModule(file) &&
+      !(file as { commonJsModuleIndicator?: ts.Node }).commonJsModuleIndicator &&
       !ts.findAncestor(declaration, (node) => ts.isFunctionLike(node))
     )
       return undefined;
@@ -401,7 +415,16 @@ export function receiverArms(
     if (!writes) {
       const found = new Map<ts.Symbol, (ts.Expression | undefined)[]>();
       const scan = (node: ts.Node): void => {
-        if (ts.isIdentifier(node) && isWrite(node)) {
+        if (
+          ts.isIdentifier(node) &&
+          isWrite(node) &&
+          // A declaration's own name is its initializer, read already.
+          !(
+            (ts.isBindingElement(node.parent) ||
+              ts.isVariableDeclaration(node.parent)) &&
+            node.parent.name === node
+          )
+        ) {
           const written = ts.isShorthandPropertyAssignment(node.parent)
             ? checker.getShorthandAssignmentValueSymbol(node.parent)
             : checker.getSymbolAtLocation(node);
@@ -610,12 +633,32 @@ export function receiverArms(
     if (source === WRITTEN) return WRITTEN;
     if (!source) return undefined;
     let result: Arms;
+    // A default applies only where the value can be `undefined`.
+    let defaults = true;
     if (ts.isObjectBindingPattern(pattern)) {
       if (declaration.dotDotDotToken)
         return source.length <= 1 ? WRITTEN : undefined;
       const key = staticName(declaration.propertyName ?? declaration.name);
       if (key === undefined) return undefined;
       result = property(source, key, declaration.name);
+      defaults = source.some((arm) => {
+        const member = checker.getPropertyOfType(
+          checker.getApparentType(arm.type),
+          key,
+        );
+        if (!member || member.flags & ts.SymbolFlags.Optional) return true;
+        const type = checker.getTypeOfSymbol(member);
+        return (type.isUnion() ? type.types : [type]).some(
+          (part) =>
+            !!(
+              part.flags &
+              (ts.TypeFlags.Undefined |
+                ts.TypeFlags.Void |
+                ts.TypeFlags.Any |
+                ts.TypeFlags.Unknown)
+            ),
+        );
+      });
     } else {
       if (declaration.dotDotDotToken)
         return source.length <= 1 ? WRITTEN : undefined;
@@ -625,15 +668,29 @@ export function receiverArms(
         declaration.name,
       );
     }
-    return declaration.initializer
-      ? merge([result, arms(declaration.initializer)])
-      : result;
+    if (declaration.initializer && defaults)
+      result = merge([result, arms(declaration.initializer)]);
+    // A `let` or `var` binding can be assigned again.
+    const list = ts.findAncestor(declaration, ts.isVariableDeclarationList);
+    if (
+      list &&
+      !(list.flags & ts.NodeFlags.Const) &&
+      ts.isIdentifier(declaration.name)
+    ) {
+      const writes = assignments(declaration);
+      if (!writes) return undefined;
+      result = merge([result, ...writes.map((value) => (value ? arms(value) : undefined))]);
+    }
+    return result;
   }
 
   /** The value returned by calling the body `fn`, as arms. */
-  function returned(fn: Callable): Arms {
+  /** The expressions `fn` returns, or undefined for a generator. */
+  function returnExpressions(fn: Callable): readonly ts.Expression[] | undefined {
     if (!fn.body) return undefined;
     if ("asteriskToken" in fn && fn.asteriskToken) return undefined;
+    const known = returnLists.get(fn);
+    if (known) return known;
     const outs: ts.Expression[] = [];
     if (ts.isBlock(fn.body)) {
       const visit = (node: ts.Node) => {
@@ -644,13 +701,53 @@ export function receiverArms(
       };
       ts.forEachChild(fn.body, visit);
     } else outs.push(fn.body);
-    return merge(outs.map(arms));
+    returnLists.set(fn, outs);
+    return outs;
+  }
+
+  function returned(fn: Callable): Arms {
+    const outs = returnExpressions(fn);
+    return outs && merge(outs.map(arms));
+  }
+
+  /**
+   * For a call to a plain function with one `return` and an inferred
+   * return type (`function f2() { return f1(); }`), that returned
+   * expression: the call's value is its value.
+   */
+  function onlyReturn(node: ts.CallExpression): ts.Expression | undefined {
+    if (!ts.isIdentifier(node.expression) || node.typeArguments) return undefined;
+    let symbol = checker.getSymbolAtLocation(node.expression);
+    if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+      symbol = checker.getAliasedSymbol(symbol);
+    const declarations = symbol?.declarations ?? [];
+    const fn = declarations.length === 1 ? declarations[0]! : undefined;
+    if (
+      !fn ||
+      !ts.isFunctionDeclaration(fn) ||
+      fn.type ||
+      fn.typeParameters?.length ||
+      isAsync(fn)
+    )
+      return undefined;
+    const outs = returnExpressions(fn);
+    return outs?.length === 1 ? skipValue(outs[0]!) : undefined;
   }
 
   const isAsync = (fn: Callable) =>
     !!(ts.getCombinedModifierFlags(fn) & ts.ModifierFlags.Async);
 
-  function call(node: ts.CallExpression): Arms {
+  function call(start: ts.CallExpression): Arms {
+    // A chain of such calls, followed without recursion: the checker infers
+    // each return type from the next one's.
+    let node = start;
+    for (let steps = 0; ; steps++) {
+      const next = steps < 100_000 ? onlyReturn(node) : undefined;
+      if (!next) break;
+      if (!ts.isCallExpression(next)) return arms(next);
+      node = next;
+    }
+    if (node !== start) return arms(node);
     const callee = node.expression;
     // A module's value.
     if (
@@ -688,7 +785,9 @@ export function receiverArms(
         }),
       );
     const declaration = checker.getResolvedSignature(node)?.declaration;
-    if (!declaration || ts.isJSDocSignature(declaration)) return undefined;
+    // No declaration (`require` in JavaScript, an untyped callee) or a JSDoc
+    // signature: the type is not inferred from returns.
+    if (!declaration || ts.isJSDocSignature(declaration)) return leaf(node);
     const generic = !node.typeArguments && !!declaration.typeParameters?.length;
     if (generic && !argumentsUnreduced(node)) return undefined;
     if (declaration.type) return leaf(node);
@@ -730,7 +829,14 @@ export function receiverArms(
         const type = checker.getApparentType(arm.type);
         const member = checker.getPropertyOfType(type, name);
         // An index signature, `any`: the checker's type, if it is the only arm.
-        if (!member) return checked ? leaf(at) : undefined;
+        if (!member) {
+          if (checked) return leaf(at);
+          // An object literal without the key: `undefined`.
+          return arm.type.symbol?.flags & ts.SymbolFlags.ObjectLiteral &&
+            !checker.getIndexInfosOfType(type).length
+            ? NO_ARMS
+            : undefined;
+        }
         const declarations = member.declarations ?? [];
         const result =
           declarations.length === 1
@@ -811,7 +917,16 @@ export function receiverArms(
     symbol: ts.Symbol,
   ): ReceiverVerdict => {
     if (name.startsWith("#")) return undefined;
-    const found = arms(receiver);
+    let found: Arms;
+    try {
+      found = arms(receiver);
+    } catch (error) {
+      if (!(error instanceof RangeError)) throw error;
+      active.clear();
+      checking.clear();
+      depth = 0;
+      return "unverified";
+    }
     if (!found) return "unverified";
     if (!found.length) return undefined;
     const members: ts.Symbol[] = [];

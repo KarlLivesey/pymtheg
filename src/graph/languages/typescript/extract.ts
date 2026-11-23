@@ -1206,7 +1206,7 @@ export function extractFile(
       }
       const verdict = arms(receiver, found.name, found.symbol);
       if (verdict === "unverified")
-        return { targets: [], reason: "reduced-receiver", receiver };
+        return { targets: [], reason: "receiver-unverified", receiver };
       if (verdict) {
         for (const member of verdict) visit(member, 0);
         if (local)
