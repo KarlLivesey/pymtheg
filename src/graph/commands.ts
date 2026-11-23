@@ -145,10 +145,14 @@ export interface GraphExecutionOptions {
    * ("awaiting"), and when it has settled (false). During the call itself
    * the module may run for long without passing a cancellation checkpoint,
    * so a caller that must cancel promptly ends the work another way. While
-   * its promise is awaited the event loop is free: a module that honours
-   * the abort signal (Rust's phase worker, a toolchain's child process) is
-   * cancelled through it. The abort signal is checked after the call is
-   * announced, so a cancellation set before it is never missed.
+   * its promise is awaited, a module that honours the abort signal (Rust's
+   * phase worker, a toolchain's child process) is cancelled through it at
+   * its next await. The module may still run synchronous code between its
+   * awaits during that time (Go's analysis with the toolchain route runs
+   * its notes pass and decision loops after awaiting the facts), so the
+   * abort can take effect only at its next await or when it settles. The
+   * abort signal is checked after the call is announced, so a cancellation
+   * set before it is never missed.
    */
   onModuleCall?: (inside: boolean | "awaiting") => void;
 }

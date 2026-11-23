@@ -370,10 +370,12 @@ export class GraphJobs {
         job.worker.postMessage({ kind: "abort" });
         if (groups) killChildGroups(groups);
         if (live || section === SECTION.awaiting) {
-          // The worker awaits its children, or a promise a module returned:
-          // its event loop is free, the abort reaches a module that honours
-          // the signal, and it answers. A worker that does not is ended
-          // when the grace ends.
+          // The worker awaits its children, or a promise a module returned.
+          // The abort reaches a module that honours the signal at its next
+          // await (it may still be running synchronous code between awaits:
+          // Go's analysis with the toolchain route), and the worker answers.
+          // A worker that does not answer in time is ended when the grace
+          // ends.
           let timer: unknown;
           await Promise.race([
             job.done,

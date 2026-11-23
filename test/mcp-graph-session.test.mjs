@@ -397,6 +397,8 @@ test("a cancel during query evaluation is acted on at the query's next store rea
     release();
     await cancelling;
     assert.equal(job.state, "cancelled");
+    assert.equal(job.answer, "cancelled", "the worker acknowledged");
+    assert.equal(job.view, undefined, "no result came back");
     assert.equal(jobs.generation, 1, "acknowledged at a checkpoint");
     assert.equal((await run(jobs)).state, "complete");
     assert.equal(jobs.generation, 1);
