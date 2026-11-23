@@ -42,8 +42,12 @@ export interface KeptInput {
   readonly bytes: number;
 }
 
-/** Deep-frozen under the test suite only (see above). */
-const guard = <T>(value: T): T =>
+/**
+ * Deep-frozen under the test suite only (see above). The indexer also uses
+ * it on a `keepsInput` module's inputs outside a session, so every test of
+ * such a module runs it on frozen inputs.
+ */
+export const guard = <T>(value: T): T =>
   process.env.PYMTHEG_TEST === "1" ? deepFreeze(value) : value;
 export function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -73,6 +77,8 @@ export class KeptInputs {
     private readonly previous: KeptInput | undefined,
     /** Paths written in this run before a read (from the run's start). */
     private readonly writtenThisRun: () => Set<string>,
+    /** Above this many bytes of stored JSON nothing is kept. */
+    private readonly limitBytes = keptInputBytes,
   ) {}
 
   /** The analysis records of `paths` that are stored, in path order. */
@@ -223,7 +229,10 @@ export class KeptInputs {
   result(writtenSince: (mark: number) => Set<string>): KeptInput | undefined {
     const total = [...this.bytes.values()].reduce((sum, n) => sum + n, 0);
     count("kept.input.bytes", total);
-    if (total > keptInputBytes) return undefined;
+    if (total > this.limitBytes) {
+      count("kept.input.overLimit");
+      return undefined;
+    }
     const kept: KeptInput = {
       records: this.records,
       recordsStale:

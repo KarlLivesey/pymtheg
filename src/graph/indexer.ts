@@ -12,6 +12,7 @@ import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import { count, stage } from "./work.js";
 import type { KeptState } from "./session.js";
 import {
+  guard,
   KEPT_INPUT,
   KeptInputs,
   keptInputKey,
@@ -73,6 +74,8 @@ export interface IndexOptions {
   signal?: AbortSignal;
   /** Progress through the captured files when comparing them with storage. */
   onFileCompared?: (path: string) => void;
+  /** C-55: above this many bytes of stored JSON no input is kept (tests). */
+  keptInputBytes?: number;
   /** C-45: each module's kept state, when the index runs in a session. */
   kept?: (module: LanguageModule) => KeptState | undefined;
 }
@@ -123,8 +126,10 @@ export async function indexProject(
         KEPT_INPUT,
         keptInputKey(module.id, module.version),
       ) as KeptInput | undefined;
-      inputs = new KeptInputs(previous, () =>
-        store.pathsWrittenSince!(runMark),
+      inputs = new KeptInputs(
+        previous,
+        () => store.pathsWrittenSince!(runMark),
+        options.keptInputBytes,
       );
       keptInputs.set(module.id, inputs);
     }
@@ -465,6 +470,9 @@ export async function indexProject(
         files.sort((a, b) => compare(a.path, b.path));
       }
     }
+    // A keepsInput module must not change its inputs in place; under the
+    // test suite they are frozen in every run, session or not (C-55).
+    if (module.keepsInput && !keeping) guard(files);
     const reuse = reusing.has(module.id);
     const filesByPath = new Map(files.map((file) => [file.path, file]));
     const oldPaths = new Set(
@@ -895,6 +903,9 @@ async function finishReport(
  * One module's resolve over freshly read input. The input lives only in this
  * frame, so it is released when the module returns.
  */
+/** A keepsInput module's input, frozen under the test suite (C-55). */
+const frozenFor = <T>(module: LanguageModule, value: T): T =>
+  module.keepsInput ? guard(value) : value;
 async function runResolve(
   module: LanguageModule,
   store: GraphStorage,
@@ -970,13 +981,16 @@ async function runResolve(
                   )
                 : undefined) ??
               (await input("Files", async () =>
-                own(
-                  await read(() =>
-                    resolutionFiles &&
-                    module.scopedFileLinkKinds &&
-                    store.resolutionFiles
-                      ? store.resolutionFiles(module.scopedFileLinkKinds)
-                      : store.files(),
+                frozenFor(
+                  module,
+                  own(
+                    await read(() =>
+                      resolutionFiles &&
+                      module.scopedFileLinkKinds &&
+                      store.resolutionFiles
+                        ? store.resolutionFiles(module.scopedFileLinkKinds)
+                        : store.files(),
+                    ),
                   ),
                 ),
               ))),
@@ -984,7 +998,7 @@ async function runResolve(
         symbols:
           fromKept?.symbols ??
           (await input("Symbols", async () =>
-            own(await read(() => store.findSymbols())),
+            frozenFor(module, own(await read(() => store.findSymbols()))),
           )),
         // Only the parsed link records: their targets are cleared below anyway.
         // Presented unresolved: no target, candidates or library targets

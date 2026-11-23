@@ -569,6 +569,9 @@ export async function executeGraph(
           ? {
               kept: (module: LanguageModule) =>
                 run.kept(module.id, module.version),
+              ...(options.session?.keptInputBytes !== undefined
+                ? { keptInputBytes: options.session.keptInputBytes }
+                : {}),
             }
           : {}),
         onFileCompared: (path) => {

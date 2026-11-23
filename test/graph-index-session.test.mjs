@@ -491,3 +491,71 @@ test("Go's kept inputs are reused for an edit, and dropped when another process 
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("over the kept-input limit nothing is kept; the next run reads everything afresh; both equal cold", async () => {
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go": "package a\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() }\n',
+  });
+  try {
+    const registry = await discoverLanguages();
+    // One byte: whatever a run reads is over the limit.
+    const session = new IndexSession({ registry, keptInputBytes: 1 });
+    resetGraphWork();
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.ok((graphWork.counts["kept.input.overLimit"] ?? 0) >= 1);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+    write(
+      "b/b.go",
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() + 1 }\n',
+    );
+    resetGraphWork();
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.equal(graphWork.counts["kept.input.recordsReused"] ?? 0, 0);
+    assert.equal(graphWork.counts["kept.input.symbolsReused"] ?? 0, 0);
+    assert.ok((graphWork.counts["kept.input.recordsRead"] ?? 0) >= 2);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("kept Go inputs keep the store's order for paths outside the Basic Multilingual Plane", async () => {
+  // U+FFFD sorts after U+1F600 by UTF-16 code units and before it by UTF-8
+  // bytes: the store lists paths by bytes, records are ordered by code units.
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "p/x�.go":
+      "package p\n\ntype T struct{ X int }\n\nfunc F() int { return 1 }\n",
+    "p/x\u{1F600}.go": "package p\n\nfunc G() int { return F() + T{}.X }\n",
+    "p/y.go":
+      "package p\n\ntype U struct{ T }\n\nfunc H() int { return U{}.X }\n",
+  });
+  try {
+    const registry = await discoverLanguages();
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    for (const [step, body] of ["2", "3", "4"].entries()) {
+      write(
+        "p/x�.go",
+        `package p\n\ntype T struct{ X int }\n\nfunc F() int { return ${body} }\n`,
+      );
+      resetGraphWork();
+      assert.equal(
+        (await index(root, session)).sync.complete,
+        true,
+        `step ${step}`,
+      );
+      assert.deepEqual(
+        await differencesFromCold(base, root, registry),
+        [],
+        `step ${step}`,
+      );
+    }
+    assert.ok((graphWork.counts["kept.input.recordsReused"] ?? 0) >= 1);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});

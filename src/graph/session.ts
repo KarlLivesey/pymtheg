@@ -73,15 +73,24 @@ export class IndexSession {
   private completion: string | undefined;
   private readonly kept = new Map<string, Map<string, Kept>>();
   private readonly maxValues: number;
+  /** C-55: the limit on kept module inputs, when not the default. */
+  readonly keptInputBytes?: number;
   /** Module discoveries, runs begun, and times something kept was dropped. */
   readonly counts = { loads: 0, runs: 0, dropped: 0 };
 
   constructor(
-    options: { registry?: LanguageRegistry; maxValuesPerModule?: number } = {},
+    options: {
+      registry?: LanguageRegistry;
+      maxValuesPerModule?: number;
+      /** C-55: above this many bytes of stored JSON no input is kept. */
+      keptInputBytes?: number;
+    } = {},
   ) {
     this.injectedRegistry = !!options.registry;
     if (options.registry) this.loaded = Promise.resolve(options.registry);
     this.maxValues = options.maxValuesPerModule ?? 4;
+    if (options.keptInputBytes !== undefined)
+      this.keptInputBytes = options.keptInputBytes;
   }
   /** The language modules, discovered once per session. */
   registry(): Promise<LanguageRegistry> {
