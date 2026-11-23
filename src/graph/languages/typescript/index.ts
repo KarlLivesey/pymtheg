@@ -127,6 +127,9 @@ import {
 // Bump the leading number whenever extraction or resolution semantics change.
 const MODULE_VERSION = `50+typescript-${ts.version}`;
 
+/** The receiver walk's counters (C-41): member calls walked, expressions computed. */
+export { receiverStatistics } from "./receiver-arms.js";
+
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
   programs: 0,

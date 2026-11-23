@@ -756,6 +756,19 @@ const TWO_PRODUCERS = {
     "declare function load<T>(v: T): Promise<T>;\nasync function go() { (await load(pick ? a : b)).run(); }",
   "a promise callback":
     "declare function load<T>(v: T): Promise<T>;\nload(pick ? a : b).then((v) => v.run());",
+  // Review round 2, reviewer B: promises and arrays of two shims.
+  "Promise.all": "async function go() { const [x] = await Promise.all([a, b]); x.run(); }",
+  "Promise.resolve": "Promise.resolve(pick ? a : b).then((x) => x.run());",
+  "filter then forEach": "const list = [a, b];\nlist.filter((x) => !!k).forEach((x) => x.run());",
+  // Producers added after creation.
+  "an array pushed to": "const plugins = [one];\nplugins.push(two);\nfor (const x of plugins) x.run();",
+  "a field set through a setter":
+    "class L { private logger = one; setLogger(l: typeof two) { this.logger = l; } go() { this.logger.run(); } }",
+  "a property reassigned": "const config = { r: one };\nconfig.r = two;\nconfig.r.run();",
+  "defaults spread under options":
+    "declare const opts: { r?: { run(): void } };\nconst merged = { ...{ r: one }, ...opts };\nmerged.r!.run();",
+  "a spread of a choice": "const merged = { ...(pick ? { r: one } : { r: two }) };\nmerged.r.run();",
+  "as const": "([pick ? one : two] as const)[0].run();",
   // Kinds the first round already covered, kept as a guard.
   "a conditional": "(pick ? a : b).run();",
   "nullish coalescing": "declare const maybe: typeof a | undefined;\n(maybe ?? b).run();",
@@ -786,4 +799,35 @@ test("no step kind gives a definite link to one of two producers", async () => {
     }
   }
   assert.deepEqual(failures, []);
+});
+
+test("an interface or class member keeps its link through a receiver the walk cannot follow", async () => {
+  // C-41 review 2, reviewer B: `Unsubscribable.unsubscribe` and the like are
+  // one declaration whatever producer supplied the value.
+  const got = await outcomes(
+    {
+      "src/use.ts": [
+        "interface Unsubscribable { unsubscribe(): void }",
+        "class Store { getState() { return 1; } }",
+        "declare function subscribe(): Unsubscribable;",
+        "let sub: any;",
+        "[1].forEach(() => { sub = subscribe(); });",
+        "declare const list: Unsubscribable[];",
+        "list.reduce((x, y) => y).unsubscribe();",
+        "declare const stores: Store[];",
+        "Array.from(stores)[0]!.getState();",
+        "",
+      ].join("\n"),
+    },
+    "src/use.ts",
+    true,
+  );
+  assert.equal(
+    got["list.reduce((x, y) => y).unsubscribe(); @(expression).unsubscribe"],
+    "src/use.ts#Unsubscribable.unsubscribe",
+  );
+  assert.equal(
+    got["Array.from(stores)[0]!.getState(); @(expression).getState"],
+    "src/use.ts#Store.getState",
+  );
 });
