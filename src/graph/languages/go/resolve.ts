@@ -13,7 +13,8 @@ import type {
   ResolutionResult,
 } from "../../types.js";
 import { count, stageSync } from "../../work.js";
-import { fileFacts } from "../../identity.js";
+import { contentHash, fileFacts } from "../../identity.js";
+import type { KeptState } from "../../session.js";
 import {
   directoryOf,
   directoryOfImport,
@@ -421,6 +422,7 @@ export function linkNotes(
   files: readonly GraphFile[],
   contextFiles: readonly ContextFile[],
   resolutionFiles?: ReadonlySet<string>,
+  kept?: KeptState,
 ): Map<string, Map<number, LinkNote>> {
   const symbols: GraphSymbol[] = [];
   const links: GraphLink[] = [];
@@ -460,6 +462,15 @@ export function linkNotes(
     symbols,
     links,
     ...(resolutionFiles ? { resolutionFiles } : {}),
+    // C-56: this build's kept values, apart from the resolution build's.
+    ...(kept
+      ? {
+          kept: {
+            get: (name, key) => kept.get(`notes:${name}`, key),
+            set: (name, key, value) => kept.set(`notes:${name}`, key, value),
+          },
+        }
+      : {}),
   });
   resolver.run();
   const output = new Map<string, Map<number, LinkNote>>();
@@ -500,6 +511,12 @@ class FileMemo<T> {
     (this.local ?? this.shared).set(key, value);
   }
 }
+
+/** C-56: the name a build's implements decisions are kept under. */
+const IMPLEMENTS = "go:implements";
+/** C-56: whether a kept value is made again and compared before use. */
+const checkKept = () =>
+  process.env.PYMTHEG_TEST === "1" || process.env.PYMTHEG_CHECK_KEPT === "1";
 
 /**
  * C-56b: the implements pass's decisions, by symbol id, in the order made:
@@ -3357,7 +3374,29 @@ class GoResolver {
   }
 
   private implementsLinks(added: AddedLink[]): void {
-    const decisions = this.implementsDecisions();
+    // C-56: a session keeps the decisions under a key of everything they
+    // are made from; a different key returns nothing, and they are made
+    // again. The lossy-free shadow build (names reasons only) keeps none.
+    const kept = this.ignoreLossy ? undefined : this.context.kept;
+    const key = kept ? this.implementsKey() : undefined;
+    const held = key
+      ? (kept!.get(IMPLEMENTS, key) as ImplementsDecisions | undefined)
+      : undefined;
+    let decisions: ImplementsDecisions;
+    if (held && this.knowsAll(held)) {
+      count("go.implementsReused");
+      decisions = held;
+      // Under the tests, and when asked (seeded edits), the kept value is
+      // made again and must be identical, or the run fails.
+      if (checkKept()) {
+        if (JSON.stringify(this.implementsDecisions()) !== JSON.stringify(held))
+          throw Error(
+            "C-56: the kept implements decisions differ from a recomputation",
+          );
+        count("go.implementsChecked");
+      }
+    } else decisions = this.implementsDecisions();
+    if (key) kept!.set(IMPLEMENTS, key, decisions);
     // Under the test suite the decisions cross JSON before they are used, so
     // every Go test shows they are plain data, as a kept value must be.
     this.applyImplements(
@@ -3365,6 +3404,53 @@ class GoResolver {
         ? (JSON.parse(JSON.stringify(decisions)) as ImplementsDecisions)
         : decisions,
       added,
+    );
+  }
+
+  /**
+   * C-56: what the implements decisions are made from. Every Go file's path,
+   * status and global surface (declarations, method sets, embeds and
+   * signatures, in source order; C-27), or a digest of its facts when it
+   * has none, and its toolchain status; every context file (go.mod, go.work,
+   * vendor and dependency stamps); and the ids of the types and interfaces
+   * the decisions name.
+   */
+  private implementsKey(): string {
+    const files = this.context.files
+      .filter((file) => file.module === this.moduleId)
+      .map((file) => {
+        const data = file.result.data as
+          | { surface?: { global?: string }; toolchain?: unknown }
+          | undefined;
+        return [
+          file.path,
+          file.result.status,
+          data?.surface?.global ?? contentHash(JSON.stringify(data ?? null)),
+          data?.toolchain ?? null,
+        ] as const;
+      })
+      .sort((a, b) => compareText(a[0], b[0]));
+    const contexts = this.context.contextFiles
+      .map(
+        (file) =>
+          [file.path, file.hash, file.status, file.dependency ?? null] as const,
+      )
+      .sort((a, b) => compareText(a[0], b[0]));
+    const types: string[] = [];
+    for (const symbol of this.symbolsById.values())
+      if (TYPE_KINDS.has(symbol.kind)) types.push(symbol.id);
+    return contentHash(
+      JSON.stringify(["C-56", this.moduleId, files, contexts, types.sort()]),
+    );
+  }
+
+  /** Every id the decisions name is a symbol of this build. */
+  private knowsAll(decisions: ImplementsDecisions): boolean {
+    const has = (id: string) => this.symbolsById.has(id);
+    return (
+      decisions.complete.every(has) &&
+      decisions.possible.every(([type, iface]) => has(type) && has(iface)) &&
+      decisions.implementers.every(([type, iface]) => has(type) && has(iface))
     );
   }
 

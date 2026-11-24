@@ -365,6 +365,7 @@ async function analyze(
       ),
       contextFiles,
       scope,
+      context.kept,
     ),
   );
   for (const [path, group] of notes) {
