@@ -39,7 +39,9 @@
     "linksBefore": 150404,
     "linksAfter": 150404,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 0,
+    "outcomeDataDiffers": 0
    },
    "c19": {
     "links": 149592,
@@ -54,18 +56,18 @@
     "generated": 859
    },
    "analyzerRun": {
-    "wallS": 367.5,
-    "cpuS": 1097.1,
-    "peakMiB": 9718
+    "wallS": 400.8,
+    "cpuS": 1133.8,
+    "peakMiB": 9715
    },
    "index": {
     "sourceOnly": {
-     "wallS": 519.4,
-     "cpuS": 580.5
+     "wallS": 521.6,
+     "cpuS": 574.7
     },
     "route": {
-     "wallS": 1673.7,
-     "cpuS": 609.5
+     "wallS": 1585.1,
+     "cpuS": 594.4
     }
    },
    "decided": {},
@@ -106,11 +108,11 @@
    },
    "route": {
     "links": 90583,
-    "level2": 73601,
+    "level2": 73600,
     "assumed": 2491,
     "proven": 38182,
-    "toolchainDecided": 32928,
-    "toolchainCheckout": 11060,
+    "toolchainDecided": 32927,
+    "toolchainCheckout": 11059,
     "toolchainLibrary": 21868,
     "libraryModuleLinks": 0,
     "level2Percent": 81.25,
@@ -126,12 +128,14 @@
     "linksBefore": 90583,
     "linksAfter": 90583,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 11495,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 49651,
     "buckets": {
-     "credited": 11060,
+     "credited": 11059,
      "credited: library": 21868,
      "gate: trait-method declaration": 1558,
      "no answer: no-name-site": 220,
@@ -139,13 +143,14 @@
      "no identity: local binding": 7954,
      "no identity: generated item": 505,
      "no identity: library item": 712,
-     "gate: conditional candidates": 320,
+     "gate: conditional candidates": 319,
      "no identity: declaration without a graph symbol": 473,
      "gate: known error classes": 40,
      "gate: cfg-variant guard": 66,
      "no answer: no-occurrence-at-site": 843,
      "gate: cfg condition other than test": 687,
-     "no answer: file-not-indexed": 3294
+     "no answer: file-not-indexed": 3294,
+     "gate: cfg-selected name (use, alias or function twins)": 2
     },
     "libraryPassingCfg": 688,
     "notIndexed": {
@@ -229,28 +234,29 @@
     "generated": 505
    },
    "analyzerRun": {
-    "wallS": 115.7,
-    "cpuS": 1061.9,
-    "peakMiB": 2464
+    "wallS": 161.3,
+    "cpuS": 1076.1,
+    "peakMiB": 2468
    },
    "index": {
     "sourceOnly": {
-     "wallS": 95.6,
-     "cpuS": 111.9
+     "wallS": 100.2,
+     "cpuS": 113.5
     },
     "route": {
-     "wallS": 399,
-     "cpuS": 132.6
+     "wallS": 647.2,
+     "cpuS": 136.6
     }
    },
    "decided": {
     "definite:definite": 13849,
     "library:offered": 31360,
-    "definite:unresolved": 11060,
+    "definite:unresolved": 11059,
     "withheld:cfg-link": 586,
-    "withheld:conditional-candidates": 320,
+    "withheld:conditional-candidates": 319,
     "library:withheld:cfg-link": 955,
-    "withheld:cfg-variant": 141
+    "withheld:cfg-variant": 141,
+    "withheld:cfg-selected": 2
    },
    "join": {
     "filter:import-names-module": 152,
@@ -310,7 +316,9 @@
     "linksBefore": 88113,
     "linksAfter": 88113,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 0,
+    "outcomeDataDiffers": 0
    },
    "c19": {
     "links": 88051,
@@ -325,18 +333,18 @@
     "generated": 651
    },
    "analyzerRun": {
-    "wallS": 144,
-    "cpuS": 588.1,
-    "peakMiB": 5186
+    "wallS": 114.1,
+    "cpuS": 518.7,
+    "peakMiB": 5197
    },
    "index": {
     "sourceOnly": {
-     "wallS": 93.3,
-     "cpuS": 111.8
+     "wallS": 86.6,
+     "cpuS": 114.8
     },
     "route": {
-     "wallS": 924.7,
-     "cpuS": 135.9
+     "wallS": 475.4,
+     "cpuS": 113.3
     }
    },
    "decided": {},
@@ -377,16 +385,16 @@
    },
    "route": {
     "links": 86640,
-    "level2": 66882,
+    "level2": 66837,
     "assumed": 3111,
     "proven": 33116,
-    "toolchainDecided": 30655,
-    "toolchainCheckout": 10658,
+    "toolchainDecided": 30610,
+    "toolchainCheckout": 10613,
     "toolchainLibrary": 19997,
     "libraryModuleLinks": 0,
-    "level2Percent": 77.2,
-    "withModuleLinksPercent": 77.2,
-    "toolchainDecidedPercent": 35.38
+    "level2Percent": 77.14,
+    "withModuleLinksPercent": 77.14,
+    "toolchainDecidedPercent": 35.33
    },
    "agreement": {
     "confirmed": 10047,
@@ -397,12 +405,14 @@
     "linksBefore": 86640,
     "linksAfter": 86640,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 17712,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 49944,
     "buckets": {
-     "credited": 10658,
+     "credited": 10613,
      "no identity: declaration without a graph symbol": 1241,
      "gate: kind/namespace": 272,
      "credited: library": 19997,
@@ -413,6 +423,7 @@
      "no answer: no-name-site": 254,
      "no identity: library item": 417,
      "gate: cfg condition other than test": 3705,
+     "gate: cfg-selected name (use, alias or function twins)": 45,
      "no answer: no-occurrence-at-site": 1856,
      "gate: cfg-variant guard": 69,
      "gate: known error classes": 61,
@@ -500,27 +511,28 @@
     "generated": 1040
    },
    "analyzerRun": {
-    "wallS": 116.9,
-    "cpuS": 287.7,
-    "peakMiB": 3031
+    "wallS": 106.6,
+    "cpuS": 270.4,
+    "peakMiB": 3023
    },
    "index": {
     "sourceOnly": {
-     "wallS": 85.9,
-     "cpuS": 99.7
+     "wallS": 93.5,
+     "cpuS": 108.9
     },
     "route": {
-     "wallS": 323.4,
-     "cpuS": 117.1
+     "wallS": 383.8,
+     "cpuS": 118.1
     }
    },
    "decided": {
-    "definite:unresolved": 10658,
+    "definite:unresolved": 10613,
     "library:offered": 29784,
     "withheld:conditional-candidates": 2677,
     "definite:definite": 10047,
     "library:withheld:cfg-link": 3154,
     "withheld:cfg-link": 1951,
+    "withheld:cfg-selected": 45,
     "withheld:cfg-variant": 98
    },
    "join": {
@@ -560,16 +572,16 @@
    },
    "route": {
     "links": 73731,
-    "level2": 58972,
+    "level2": 58966,
     "assumed": 110,
     "proven": 35113,
-    "toolchainDecided": 23749,
-    "toolchainCheckout": 8713,
+    "toolchainDecided": 23743,
+    "toolchainCheckout": 8707,
     "toolchainLibrary": 15036,
     "libraryModuleLinks": 0,
-    "level2Percent": 79.98,
-    "withModuleLinksPercent": 79.98,
-    "toolchainDecidedPercent": 32.21
+    "level2Percent": 79.97,
+    "withModuleLinksPercent": 79.97,
+    "toolchainDecidedPercent": 32.2
    },
    "agreement": {
     "confirmed": 9882,
@@ -580,7 +592,9 @@
     "linksBefore": 73731,
     "linksAfter": 73731,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 16456,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 38394,
@@ -589,7 +603,7 @@
      "no answer: no-name-site": 45,
      "gate: kind/namespace": 54,
      "no identity: local binding": 3416,
-     "credited": 8713,
+     "credited": 8707,
      "no answer: no-occurrence-at-site": 805,
      "gate: cfg condition other than test": 5395,
      "gate: trait-method declaration": 1223,
@@ -598,8 +612,9 @@
      "gate: known error classes": 106,
      "no identity: generated item": 364,
      "no answer: file-not-indexed": 2022,
-     "gate: conditional candidates": 182,
-     "no identity: declaration without a graph symbol": 10
+     "gate: conditional candidates": 156,
+     "no identity: declaration without a graph symbol": 10,
+     "gate: cfg-selected name (use, alias or function twins)": 32
     },
     "libraryPassingCfg": 348,
     "notIndexed": {
@@ -663,28 +678,29 @@
     "generated": 364
    },
    "analyzerRun": {
-    "wallS": 186.5,
-    "cpuS": 1959.1,
-    "peakMiB": 2059
+    "wallS": 166.3,
+    "cpuS": 1954.4,
+    "peakMiB": 2058
    },
    "index": {
     "sourceOnly": {
-     "wallS": 62.2,
-     "cpuS": 76.1
+     "wallS": 65.2,
+     "cpuS": 80.3
     },
     "route": {
-     "wallS": 504.5,
-     "cpuS": 90.1
+     "wallS": 319.6,
+     "cpuS": 85.4
     }
    },
    "decided": {
     "library:offered": 21772,
     "definite:definite": 9882,
-    "definite:unresolved": 8713,
+    "definite:unresolved": 8707,
     "library:withheld:cfg-link": 5449,
     "withheld:cfg-variant": 660,
     "withheld:cfg-link": 3423,
-    "withheld:conditional-candidates": 182
+    "withheld:conditional-candidates": 156,
+    "withheld:cfg-selected": 32
    },
    "join": {
     "none:kind-not-joined": 5481,
@@ -743,7 +759,9 @@
     "linksBefore": 70802,
     "linksAfter": 70802,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 21878,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 47713,
@@ -827,18 +845,18 @@
     "generated": 1255
    },
    "analyzerRun": {
-    "wallS": 100.4,
-    "cpuS": 467,
-    "peakMiB": 2367
+    "wallS": 126.4,
+    "cpuS": 488.4,
+    "peakMiB": 2366
    },
    "index": {
     "sourceOnly": {
-     "wallS": 108.8,
-     "cpuS": 138.1
+     "wallS": 125.1,
+     "cpuS": 154.5
     },
     "route": {
-     "wallS": 284.7,
-     "cpuS": 157.1
+     "wallS": 458,
+     "cpuS": 161.4
     }
    },
    "decided": {
@@ -887,15 +905,15 @@
    },
    "route": {
     "links": 60489,
-    "level2": 44349,
+    "level2": 44347,
     "assumed": 41,
     "proven": 20433,
-    "toolchainDecided": 23875,
-    "toolchainCheckout": 13528,
+    "toolchainDecided": 23873,
+    "toolchainCheckout": 13526,
     "toolchainLibrary": 10347,
     "libraryModuleLinks": 0,
-    "level2Percent": 73.32,
-    "withModuleLinksPercent": 73.32,
+    "level2Percent": 73.31,
+    "withModuleLinksPercent": 73.31,
     "toolchainDecidedPercent": 39.47
    },
    "agreement": {
@@ -907,12 +925,14 @@
     "linksBefore": 60489,
     "linksAfter": 60489,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 12347,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 39979,
     "buckets": {
-     "credited": 13528,
+     "credited": 13526,
      "credited: library": 10347,
      "no identity: local binding": 2165,
      "no identity: library item": 332,
@@ -926,7 +946,8 @@
      "no answer: no-occurrence-at-site": 2030,
      "no answer: no-name-site": 50,
      "no answer: file-not-indexed": 2898,
-     "gate: module twin, or module conditions unseen": 572
+     "gate: module twin, or module conditions unseen": 572,
+     "gate: cfg-selected name (use, alias or function twins)": 2
     },
     "libraryPassingCfg": 307,
     "notIndexed": {
@@ -1010,29 +1031,30 @@
     "generated": 316
    },
    "analyzerRun": {
-    "wallS": 42.2,
-    "cpuS": 76.3,
-    "peakMiB": 1671
+    "wallS": 57.3,
+    "cpuS": 87.7,
+    "peakMiB": 1668
    },
    "index": {
     "sourceOnly": {
-     "wallS": 48.9,
+     "wallS": 67.5,
      "cpuS": 64.6
     },
     "route": {
-     "wallS": 216.2,
-     "cpuS": 75
+     "wallS": 252.4,
+     "cpuS": 72.4
     }
    },
    "decided": {
-    "definite:unresolved": 13528,
+    "definite:unresolved": 13526,
     "definite:definite": 4485,
     "library:offered": 15213,
     "withheld:cfg-variant": 528,
     "withheld:conditional-candidates": 781,
     "withheld:cfg-link": 3698,
     "library:withheld:cfg-link": 1900,
-    "withheld:module-twin": 572
+    "withheld:module-twin": 572,
+    "withheld:cfg-selected": 2
    },
    "join": {
     "answer": 23521,
@@ -1090,7 +1112,9 @@
     "linksBefore": 60424,
     "linksAfter": 60424,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 5004,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 34256,
@@ -1174,18 +1198,18 @@
     "generated": 1285
    },
    "analyzerRun": {
-    "wallS": 73.2,
-    "cpuS": 280.5,
-    "peakMiB": 2865
+    "wallS": 80,
+    "cpuS": 269.5,
+    "peakMiB": 2855
    },
    "index": {
     "sourceOnly": {
-     "wallS": 58.7,
-     "cpuS": 81
+     "wallS": 68.4,
+     "cpuS": 85.3
     },
     "route": {
-     "wallS": 286.2,
-     "cpuS": 94.9
+     "wallS": 274.6,
+     "cpuS": 91
     }
    },
    "decided": {
@@ -1253,7 +1277,9 @@
     "linksBefore": 54645,
     "linksAfter": 54645,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 9723,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 29425,
@@ -1357,18 +1383,18 @@
     "generated": 745
    },
    "analyzerRun": {
-    "wallS": 58,
-    "cpuS": 142.8,
-    "peakMiB": 1655
+    "wallS": 55.3,
+    "cpuS": 129.4,
+    "peakMiB": 1643
    },
    "index": {
     "sourceOnly": {
-     "wallS": 52.4,
-     "cpuS": 72.3
+     "wallS": 65.8,
+     "cpuS": 75.8
     },
     "route": {
-     "wallS": 258.5,
-     "cpuS": 80.4
+     "wallS": 256.6,
+     "cpuS": 79.6
     }
    },
    "decided": {
@@ -1416,16 +1442,16 @@
    },
    "route": {
     "links": 41067,
-    "level2": 25702,
+    "level2": 25700,
     "assumed": 1144,
     "proven": 15439,
-    "toolchainDecided": 9119,
-    "toolchainCheckout": 2690,
+    "toolchainDecided": 9117,
+    "toolchainCheckout": 2688,
     "toolchainLibrary": 6429,
     "libraryModuleLinks": 0,
-    "level2Percent": 62.59,
-    "withModuleLinksPercent": 62.59,
-    "toolchainDecidedPercent": 22.21
+    "level2Percent": 62.58,
+    "withModuleLinksPercent": 62.58,
+    "toolchainDecidedPercent": 22.2
    },
    "agreement": {
     "confirmed": 2720,
@@ -1436,7 +1462,9 @@
     "linksBefore": 41067,
     "linksAfter": 41067,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 5037,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 24208,
@@ -1444,7 +1472,7 @@
      "credited: library": 6429,
      "no identity: local binding": 1325,
      "gate: trait-method declaration": 459,
-     "credited": 2690,
+     "credited": 2688,
      "no identity: declaration without a graph symbol": 611,
      "gate: conditional candidates": 1002,
      "no identity: generated item": 197,
@@ -1456,6 +1484,7 @@
      "no answer: file-not-indexed": 10376,
      "gate: cfg condition other than test": 345,
      "gate: kind/namespace": 34,
+     "gate: cfg-selected name (use, alias or function twins)": 2,
      "other": 12
     },
     "libraryPassingCfg": 85,
@@ -1541,28 +1570,29 @@
     "generated": 197
    },
    "analyzerRun": {
-    "wallS": 33.5,
-    "cpuS": 81.4,
-    "peakMiB": 1955
+    "wallS": 43.7,
+    "cpuS": 90.9,
+    "peakMiB": 1954
    },
    "index": {
     "sourceOnly": {
-     "wallS": 38,
-     "cpuS": 54.8
+     "wallS": 45.2,
+     "cpuS": 57.1
     },
     "route": {
-     "wallS": 224,
-     "cpuS": 61.1
+     "wallS": 262.2,
+     "cpuS": 63.2
     }
    },
    "decided": {
     "definite:definite": 2720,
     "library:offered": 9216,
-    "definite:unresolved": 2690,
+    "definite:unresolved": 2688,
     "withheld:conditional-candidates": 1002,
     "withheld:cfg-variant": 455,
     "withheld:cfg-link": 334,
-    "library:withheld:cfg-link": 457
+    "library:withheld:cfg-link": 457,
+    "withheld:cfg-selected": 2
    },
    "join": {
     "none:kind-not-joined": 4367,
@@ -1622,7 +1652,9 @@
     "linksBefore": 39819,
     "linksAfter": 39819,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 9177,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 12255,
@@ -1674,18 +1706,18 @@
     "generated": 125
    },
    "analyzerRun": {
-    "wallS": 28.2,
-    "cpuS": 54,
-    "peakMiB": 1203
+    "wallS": 24.5,
+    "cpuS": 47.8,
+    "peakMiB": 1208
    },
    "index": {
     "sourceOnly": {
-     "wallS": 30.2,
-     "cpuS": 41.9
+     "wallS": 37.3,
+     "cpuS": 44.3
     },
     "route": {
-     "wallS": 135.6,
-     "cpuS": 50.2
+     "wallS": 111.6,
+     "cpuS": 47.9
     }
    },
    "decided": {
@@ -1752,7 +1784,9 @@
     "linksBefore": 34081,
     "linksAfter": 34081,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 10597,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 14929,
@@ -1806,18 +1840,18 @@
     "generated": 42
    },
    "analyzerRun": {
-    "wallS": 37.9,
-    "cpuS": 50.9,
-    "peakMiB": 1251
+    "wallS": 42.4,
+    "cpuS": 54.8,
+    "peakMiB": 1252
    },
    "index": {
     "sourceOnly": {
-     "wallS": 26.9,
-     "cpuS": 37.7
+     "wallS": 29.4,
+     "cpuS": 39.3
     },
     "route": {
-     "wallS": 361.9,
-     "cpuS": 47.4
+     "wallS": 121.4,
+     "cpuS": 45
     }
    },
    "decided": {
@@ -1888,7 +1922,9 @@
     "linksBefore": 31393,
     "linksAfter": 31393,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 0,
+    "outcomeDataDiffers": 0
    },
    "c19": {
     "links": 30965,
@@ -1903,18 +1939,18 @@
     "generated": 830
    },
    "analyzerRun": {
-    "wallS": 40.6,
-    "cpuS": 96.9,
-    "peakMiB": 1697
+    "wallS": 35,
+    "cpuS": 89.2,
+    "peakMiB": 1692
    },
    "index": {
     "sourceOnly": {
-     "wallS": 29.3,
-     "cpuS": 38.1
+     "wallS": 24.6,
+     "cpuS": 36.3
     },
     "route": {
-     "wallS": 261,
-     "cpuS": 47.1
+     "wallS": 106.5,
+     "cpuS": 38.2
     }
    },
    "decided": {},
@@ -1975,7 +2011,9 @@
     "linksBefore": 30714,
     "linksAfter": 30714,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 8712,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 22417,
@@ -2079,18 +2117,18 @@
     "generated": 777
    },
    "analyzerRun": {
-    "wallS": 32.4,
-    "cpuS": 51.4,
-    "peakMiB": 1147
+    "wallS": 28,
+    "cpuS": 47.5,
+    "peakMiB": 1144
    },
    "index": {
     "sourceOnly": {
-     "wallS": 39.8,
-     "cpuS": 54.5
+     "wallS": 33.7,
+     "cpuS": 47.9
     },
     "route": {
-     "wallS": 318.6,
-     "cpuS": 62.1
+     "wallS": 138,
+     "cpuS": 52.6
     }
    },
    "decided": {
@@ -2159,7 +2197,9 @@
     "linksBefore": 13866,
     "linksAfter": 13866,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 2770,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 6570,
@@ -2261,18 +2301,18 @@
     "generated": 38
    },
    "analyzerRun": {
-    "wallS": 27.3,
-    "cpuS": 106.8,
-    "peakMiB": 1902
+    "wallS": 30,
+    "cpuS": 107.9,
+    "peakMiB": 1906
    },
    "index": {
     "sourceOnly": {
-     "wallS": 18.5,
-     "cpuS": 31.1
+     "wallS": 23.3,
+     "cpuS": 32.5
     },
     "route": {
-     "wallS": 280.7,
-     "cpuS": 41.4
+     "wallS": 190.7,
+     "cpuS": 37.1
     }
    },
    "decided": {
@@ -2338,7 +2378,9 @@
     "linksBefore": 13361,
     "linksAfter": 13361,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 1767,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 7289,
@@ -2438,18 +2480,18 @@
     "generated": 86
    },
    "analyzerRun": {
-    "wallS": 17.3,
-    "cpuS": 30.6,
-    "peakMiB": 1104
+    "wallS": 18.6,
+    "cpuS": 30.7,
+    "peakMiB": 1094
    },
    "index": {
     "sourceOnly": {
-     "wallS": 13.7,
-     "cpuS": 20.4
+     "wallS": 13.5,
+     "cpuS": 19.8
     },
     "route": {
-     "wallS": 87.4,
-     "cpuS": 27.5
+     "wallS": 90.9,
+     "cpuS": 21.8
     }
    },
    "decided": {
@@ -2514,7 +2556,9 @@
     "linksBefore": 12911,
     "linksAfter": 12911,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 1800,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 6412,
@@ -2618,17 +2662,17 @@
    },
    "analyzerRun": {
     "wallS": 39.9,
-    "cpuS": 45.1,
-    "peakMiB": 933
+    "cpuS": 45.7,
+    "peakMiB": 925
    },
    "index": {
     "sourceOnly": {
-     "wallS": 11.8,
-     "cpuS": 16
+     "wallS": 11.5,
+     "cpuS": 16.2
     },
     "route": {
-     "wallS": 358.4,
-     "cpuS": 26.1
+     "wallS": 128,
+     "cpuS": 19.2
     }
    },
    "decided": {
@@ -2697,7 +2741,9 @@
     "linksBefore": 5531,
     "linksAfter": 5531,
     "lost": 0,
-    "changedLevel2": 0
+    "changedLevel2": 0,
+    "outcomes": 1151,
+    "outcomeDataDiffers": 0
    },
    "funnel": {
     "open": 2171,
@@ -2799,18 +2845,18 @@
     "generated": 0
    },
    "analyzerRun": {
-    "wallS": 15.2,
-    "cpuS": 35.2,
-    "peakMiB": 929
+    "wallS": 16.7,
+    "cpuS": 35.8,
+    "peakMiB": 930
    },
    "index": {
     "sourceOnly": {
-     "wallS": 7.6,
-     "cpuS": 10.2
+     "wallS": 7,
+     "cpuS": 9.7
     },
     "route": {
-     "wallS": 82.2,
-     "cpuS": 17.2
+     "wallS": 63.5,
+     "cpuS": 12.3
     }
    },
    "decided": {
@@ -2843,7 +2889,7 @@
   "pins": 15,
   "links": 688664,
   "sourceOnlyPercent": 43.59,
-  "routePercent": 75.62,
+  "routePercent": 75.61,
   "libraryWorthPercent": 0.54
  }
 }

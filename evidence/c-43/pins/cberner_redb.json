@@ -21,25 +21,26 @@
  },
  "route": {
   "links": 73731,
-  "level2": 58972,
+  "level2": 58966,
   "assumed": 110,
   "proven": 35113,
-  "toolchainDecided": 23749,
-  "toolchainCheckout": 8713,
+  "toolchainDecided": 23743,
+  "toolchainCheckout": 8707,
   "toolchainLibrary": 15036,
   "libraryModuleLinks": 0,
-  "level2Percent": 79.98,
-  "withModuleLinksPercent": 79.98,
-  "toolchainDecidedPercent": 32.21
+  "level2Percent": 79.97,
+  "withModuleLinksPercent": 79.97,
+  "toolchainDecidedPercent": 32.2
  },
  "decided": {
   "library:offered": 21772,
   "definite:definite": 9882,
-  "definite:unresolved": 8713,
+  "definite:unresolved": 8707,
   "library:withheld:cfg-link": 5449,
   "withheld:cfg-variant": 660,
   "withheld:cfg-link": 3423,
-  "withheld:conditional-candidates": 182
+  "withheld:conditional-candidates": 156,
+  "withheld:cfg-selected": 32
  },
  "join": {
   "none:kind-not-joined": 5481,
@@ -71,27 +72,30 @@
   "agree": 2776,
   "unverified": 3960,
   "sourceOnlyCheckout": 0,
-  "twoKeyItems": 128
+  "candidates": 0,
+  "notApplied": 0
  },
  "check": {
   "linksBefore": 73731,
   "linksAfter": 73731,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 16456,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 148.1,
-  "cpuS": 1964.1,
-  "peakMiB": 2055
+  "wallS": 166.3,
+  "cpuS": 1954.4,
+  "peakMiB": 2058
  },
  "index": {
   "sourceOnly": {
-   "wallS": 68.4,
-   "cpuS": 82.7
+   "wallS": 65.2,
+   "cpuS": 80.3
   },
   "route": {
-   "wallS": 273.9,
-   "cpuS": 91.8
+   "wallS": 319.6,
+   "cpuS": 85.4
   }
  },
  "errors": {
@@ -105,7 +109,7 @@
    "no answer: no-name-site": 45,
    "gate: kind/namespace": 54,
    "no identity: local binding": 3416,
-   "credited": 8713,
+   "credited": 8707,
    "no answer: no-occurrence-at-site": 805,
    "gate: cfg condition other than test": 5395,
    "gate: trait-method declaration": 1223,
@@ -114,8 +118,9 @@
    "gate: known error classes": 106,
    "no identity: generated item": 364,
    "no answer: file-not-indexed": 2022,
-   "gate: conditional candidates": 182,
-   "no identity: declaration without a graph symbol": 10
+   "gate: conditional candidates": 156,
+   "no identity: declaration without a graph symbol": 10,
+   "gate: cfg-selected name (use, alias or function twins)": 32
   },
   "libraryPassingCfg": 348,
   "notIndexed": {

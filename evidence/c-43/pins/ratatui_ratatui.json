@@ -70,27 +70,30 @@
   "agree": 1098,
   "unverified": 2708,
   "sourceOnlyCheckout": 0,
-  "twoKeyItems": 146
+  "candidates": 0,
+  "notApplied": 0
  },
  "check": {
   "linksBefore": 60424,
   "linksAfter": 60424,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 5004,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 59.6,
-  "cpuS": 255,
-  "peakMiB": 2835
+  "wallS": 80,
+  "cpuS": 269.5,
+  "peakMiB": 2855
  },
  "index": {
   "sourceOnly": {
-   "wallS": 61.3,
-   "cpuS": 82.1
+   "wallS": 68.4,
+   "cpuS": 85.3
   },
   "route": {
-   "wallS": 176,
-   "cpuS": 85.2
+   "wallS": 274.6,
+   "cpuS": 91
   }
  },
  "errors": {

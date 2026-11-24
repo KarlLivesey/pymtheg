@@ -21,11 +21,11 @@
  },
  "route": {
   "links": 90583,
-  "level2": 73601,
+  "level2": 73600,
   "assumed": 2491,
   "proven": 38182,
-  "toolchainDecided": 32928,
-  "toolchainCheckout": 11060,
+  "toolchainDecided": 32927,
+  "toolchainCheckout": 11059,
   "toolchainLibrary": 21868,
   "libraryModuleLinks": 0,
   "level2Percent": 81.25,
@@ -35,11 +35,12 @@
  "decided": {
   "definite:definite": 13849,
   "library:offered": 31360,
-  "definite:unresolved": 11060,
+  "definite:unresolved": 11059,
   "withheld:cfg-link": 586,
-  "withheld:conditional-candidates": 320,
+  "withheld:conditional-candidates": 319,
   "library:withheld:cfg-link": 955,
-  "withheld:cfg-variant": 141
+  "withheld:cfg-variant": 141,
+  "withheld:cfg-selected": 2
  },
  "join": {
   "filter:import-names-module": 152,
@@ -71,27 +72,30 @@
   "agree": 687,
   "unverified": 8805,
   "sourceOnlyCheckout": 0,
-  "twoKeyItems": 287
+  "candidates": 0,
+  "notApplied": 0
  },
  "check": {
   "linksBefore": 90583,
   "linksAfter": 90583,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 11495,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 132.7,
-  "cpuS": 1071.8,
-  "peakMiB": 2456
+  "wallS": 161.3,
+  "cpuS": 1076.1,
+  "peakMiB": 2468
  },
  "index": {
   "sourceOnly": {
-   "wallS": 96.3,
-   "cpuS": 116.9
+   "wallS": 100.2,
+   "cpuS": 113.5
   },
   "route": {
-   "wallS": 417.5,
-   "cpuS": 174.4
+   "wallS": 647.2,
+   "cpuS": 136.6
   }
  },
  "errors": {
@@ -101,7 +105,7 @@
  "funnel": {
   "open": 49651,
   "buckets": {
-   "credited": 11060,
+   "credited": 11059,
    "credited: library": 21868,
    "gate: trait-method declaration": 1558,
    "no answer: no-name-site": 220,
@@ -109,13 +113,14 @@
    "no identity: local binding": 7954,
    "no identity: generated item": 505,
    "no identity: library item": 712,
-   "gate: conditional candidates": 320,
+   "gate: conditional candidates": 319,
    "no identity: declaration without a graph symbol": 473,
    "gate: known error classes": 40,
    "gate: cfg-variant guard": 66,
    "no answer: no-occurrence-at-site": 843,
    "gate: cfg condition other than test": 687,
-   "no answer: file-not-indexed": 3294
+   "no answer: file-not-indexed": 3294,
+   "gate: cfg-selected name (use, alias or function twins)": 2
   },
   "libraryPassingCfg": 688,
   "notIndexed": {

@@ -21,24 +21,25 @@
  },
  "route": {
   "links": 86640,
-  "level2": 66882,
+  "level2": 66837,
   "assumed": 3111,
   "proven": 33116,
-  "toolchainDecided": 30655,
-  "toolchainCheckout": 10658,
+  "toolchainDecided": 30610,
+  "toolchainCheckout": 10613,
   "toolchainLibrary": 19997,
   "libraryModuleLinks": 0,
-  "level2Percent": 77.2,
-  "withModuleLinksPercent": 77.2,
-  "toolchainDecidedPercent": 35.38
+  "level2Percent": 77.14,
+  "withModuleLinksPercent": 77.14,
+  "toolchainDecidedPercent": 35.33
  },
  "decided": {
-  "definite:unresolved": 10658,
+  "definite:unresolved": 10613,
   "library:offered": 29784,
   "withheld:conditional-candidates": 2677,
   "definite:definite": 10047,
   "library:withheld:cfg-link": 3154,
   "withheld:cfg-link": 1951,
+  "withheld:cfg-selected": 45,
   "withheld:cfg-variant": 98
  },
  "join": {
@@ -71,27 +72,30 @@
   "agree": 742,
   "unverified": 9045,
   "sourceOnlyCheckout": 0,
-  "twoKeyItems": 280
+  "candidates": 0,
+  "notApplied": 0
  },
  "check": {
   "linksBefore": 86640,
   "linksAfter": 86640,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 17712,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 113.3,
-  "cpuS": 282.3,
-  "peakMiB": 3028
+  "wallS": 106.6,
+  "cpuS": 270.4,
+  "peakMiB": 3023
  },
  "index": {
   "sourceOnly": {
-   "wallS": 90.5,
-   "cpuS": 107.2
+   "wallS": 93.5,
+   "cpuS": 108.9
   },
   "route": {
-   "wallS": 337.4,
-   "cpuS": 128.4
+   "wallS": 383.8,
+   "cpuS": 118.1
   }
  },
  "errors": {
@@ -101,7 +105,7 @@
  "funnel": {
   "open": 49944,
   "buckets": {
-   "credited": 10658,
+   "credited": 10613,
    "no identity: declaration without a graph symbol": 1241,
    "gate: kind/namespace": 272,
    "credited: library": 19997,
@@ -112,6 +116,7 @@
    "no answer: no-name-site": 254,
    "no identity: library item": 417,
    "gate: cfg condition other than test": 3705,
+   "gate: cfg-selected name (use, alias or function twins)": 45,
    "no answer: no-occurrence-at-site": 1856,
    "gate: cfg-variant guard": 69,
    "gate: known error classes": 61,

@@ -64,27 +64,30 @@
   "agree": 0,
   "unverified": 0,
   "sourceOnlyCheckout": 0,
-  "twoKeyItems": 0
+  "candidates": 0,
+  "notApplied": 0
  },
  "check": {
   "linksBefore": 31393,
   "linksAfter": 31393,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 0,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 39.4,
-  "cpuS": 93.8,
-  "peakMiB": 1688
+  "wallS": 35,
+  "cpuS": 89.2,
+  "peakMiB": 1692
  },
  "index": {
   "sourceOnly": {
-   "wallS": 28,
-   "cpuS": 38.3
+   "wallS": 24.6,
+   "cpuS": 36.3
   },
   "route": {
-   "wallS": 151,
-   "cpuS": 53.5
+   "wallS": 106.5,
+   "cpuS": 38.2
   }
  },
  "errors": {

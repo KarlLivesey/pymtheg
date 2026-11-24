@@ -21,26 +21,27 @@
  },
  "route": {
   "links": 60489,
-  "level2": 44349,
+  "level2": 44347,
   "assumed": 41,
   "proven": 20433,
-  "toolchainDecided": 23875,
-  "toolchainCheckout": 13528,
+  "toolchainDecided": 23873,
+  "toolchainCheckout": 13526,
   "toolchainLibrary": 10347,
   "libraryModuleLinks": 0,
-  "level2Percent": 73.32,
-  "withModuleLinksPercent": 73.32,
+  "level2Percent": 73.31,
+  "withModuleLinksPercent": 73.31,
   "toolchainDecidedPercent": 39.47
  },
  "decided": {
-  "definite:unresolved": 13528,
+  "definite:unresolved": 13526,
   "definite:definite": 4485,
   "library:offered": 15213,
   "withheld:cfg-variant": 528,
   "withheld:conditional-candidates": 781,
   "withheld:cfg-link": 3698,
   "library:withheld:cfg-link": 1900,
-  "withheld:module-twin": 572
+  "withheld:module-twin": 572,
+  "withheld:cfg-selected": 2
  },
  "join": {
   "answer": 23521,
@@ -71,27 +72,30 @@
   "agree": 327,
   "unverified": 4539,
   "sourceOnlyCheckout": 0,
-  "twoKeyItems": 156
+  "candidates": 0,
+  "notApplied": 0
  },
  "check": {
   "linksBefore": 60489,
   "linksAfter": 60489,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 12347,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 47.1,
-  "cpuS": 83.7,
-  "peakMiB": 1671
+  "wallS": 57.3,
+  "cpuS": 87.7,
+  "peakMiB": 1668
  },
  "index": {
   "sourceOnly": {
-   "wallS": 61.6,
-   "cpuS": 71.1
+   "wallS": 67.5,
+   "cpuS": 64.6
   },
   "route": {
-   "wallS": 139.9,
-   "cpuS": 75.2
+   "wallS": 252.4,
+   "cpuS": 72.4
   }
  },
  "errors": {
@@ -101,7 +105,7 @@
  "funnel": {
   "open": 39979,
   "buckets": {
-   "credited": 13528,
+   "credited": 13526,
    "credited: library": 10347,
    "no identity: local binding": 2165,
    "no identity: library item": 332,
@@ -115,7 +119,8 @@
    "no answer: no-occurrence-at-site": 2030,
    "no answer: no-name-site": 50,
    "no answer: file-not-indexed": 2898,
-   "gate: module twin, or module conditions unseen": 572
+   "gate: module twin, or module conditions unseen": 572,
+   "gate: cfg-selected name (use, alias or function twins)": 2
   },
   "libraryPassingCfg": 307,
   "notIndexed": {

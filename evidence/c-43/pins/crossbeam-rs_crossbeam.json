@@ -23,9 +23,9 @@
   "links": 34081,
   "level2": 27747,
   "assumed": 0,
-  "proven": 19137,
-  "toolchainDecided": 8610,
-  "toolchainCheckout": 2474,
+  "proven": 19138,
+  "toolchainDecided": 8609,
+  "toolchainCheckout": 2473,
   "toolchainLibrary": 6136,
   "libraryModuleLinks": 0,
   "level2Percent": 81.41,
@@ -72,27 +72,30 @@
   "agree": 1748,
   "unverified": 3555,
   "sourceOnlyCheckout": 0,
-  "twoKeyItems": 99
+  "candidates": 0,
+  "notApplied": 0
  },
  "check": {
   "linksBefore": 34081,
   "linksAfter": 34081,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 10597,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 30.7,
-  "cpuS": 43.1,
-  "peakMiB": 1255
+  "wallS": 42.4,
+  "cpuS": 54.8,
+  "peakMiB": 1252
  },
  "index": {
   "sourceOnly": {
-   "wallS": 25.7,
-   "cpuS": 36
+   "wallS": 29.4,
+   "cpuS": 39.3
   },
   "route": {
-   "wallS": 73,
-   "cpuS": 39.7
+   "wallS": 121.4,
+   "cpuS": 45
   }
  },
  "errors": {
