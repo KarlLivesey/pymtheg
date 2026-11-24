@@ -3555,6 +3555,8 @@ over, leaves its unfinished mark: a `--no-sync` query reports
 `incomplete` over the previous complete rows, and the next index is a full
 analysis (reviewer A, 20 Go packages with one edited: `unchanged=0
 indexed=20` after an interrupted run, `unchanged=19 indexed=1` before).
-**Limit:** a run paused in parse, before its claim, can still write rows
-of a tree that was then reverted; it is reported `incomplete` and the next
-index repairs it. See [C-38A](changes/C-38A.md).
+**Limit:** before its claim a run is unprotected: paused after parsing a
+file that is then restored, it overwrites a completed run's rows; paused
+after its walk, it deletes the row of a file another run added. Both end
+`incomplete` and the next index repairs them; closing the window is the
+next chunk. See [C-38A](changes/C-38A.md).

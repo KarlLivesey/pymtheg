@@ -50,9 +50,8 @@ test("the index report names the TypeScript analysis path", async () => {
     ]);
     assert.match(text, /^Analysis typescript: full \(no previous index\)$/m);
     // Nothing changed: the stored results are reused, no program built.
-    // Only an injected module list gets here: with the production modules
-    // a no-edit index takes the verified shortcut (C-33) and nothing
-    // analyses, so the report has no path.
+    // With the production modules a no-edit index takes the verified
+    // shortcut (C-33) instead, which reports `reused` too (tested below).
     assert.deepEqual(await index(), [{ module: "typescript", path: "reused" }]);
     assert.match(text, /^Analysis typescript: reused$/m);
     // Any edit: the whole analysis runs again.
@@ -139,8 +138,13 @@ test("Go-only and Rust-only projects report no analysis path, cold and after an 
     const got = await bothWays(files, [
       async () => {},
       async (write) => write(...edit),
+      async () => {},
     ]);
-    assert.deepEqual(got, { json: [null, null], text: [[], []] }, name);
+    assert.deepEqual(
+      got,
+      { json: [null, null, null], text: [[], [], []] },
+      name,
+    );
   }
 });
 
@@ -185,6 +189,38 @@ test("a TypeScript index after a run stopped during analysis is full, not a firs
     text: [
       ["Analysis typescript: full (no previous index)"],
       ["Analysis typescript: full"],
+    ],
+  });
+});
+
+test("a one-file TypeScript project: a first index, a body edit, and a no-edit index through the verified shortcut (real CLI)", async () => {
+  const a = "export function a(): number {\n  return 1;\n}\n";
+  const got = await bothWays(
+    {
+      "tsconfig.json": JSON.stringify({
+        compilerOptions: { strict: true, module: "ESNext", moduleResolution: "Bundler" },
+        include: ["."],
+      }),
+      "a.ts": a,
+    },
+    [
+      async () => {},
+      // The only file's record is new after the edit: the note still
+      // comes from the store's history.
+      async (write) => write("a.ts", a.replace("return 1", "return 2")),
+      async () => {},
+    ],
+  );
+  assert.deepEqual(got, {
+    json: [
+      [{ module: "typescript", path: "full", note: "no previous index" }],
+      [{ module: "typescript", path: "full" }],
+      [{ module: "typescript", path: "reused" }],
+    ],
+    text: [
+      ["Analysis typescript: full (no previous index)"],
+      ["Analysis typescript: full"],
+      ["Analysis typescript: reused"],
     ],
   });
 });
