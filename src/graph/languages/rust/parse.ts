@@ -1110,7 +1110,8 @@ async function createHelper(): Promise<Helper> {
             return;
           }
           paths.push(value);
-          if (conditional) alternatives.push({ path: value, conditions: [...guards] });
+          if (conditional)
+            alternatives.push({ path: value, conditions: [...guards] });
           if (!conditional) {
             if (paths.length === 1 && !pathOpaque) {
               path = value;
