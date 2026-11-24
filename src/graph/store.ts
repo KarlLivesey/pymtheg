@@ -381,6 +381,8 @@ export class SqliteGraphStore implements GraphStorage {
         completed: ReadonlyMap<string, string>;
         /** A run finished completely before this one began (C-38A). */
         indexedBefore: boolean;
+        /** The store already holds that record (written once, then kept). */
+        recorded: boolean;
         /** Another connection committed between two of its commits. */
         interleaved: boolean;
         /** The completion record in the run's baseline snapshot (C-45). */
@@ -1375,6 +1377,7 @@ export class SqliteGraphStore implements GraphStorage {
     let takeOver: boolean;
     let completed: ReadonlyMap<string, string>;
     let indexedBefore: boolean;
+    let recorded: boolean;
     let commandState: unknown;
     this.db.exec("BEGIN");
     try {
@@ -1384,12 +1387,13 @@ export class SqliteGraphStore implements GraphStorage {
       // The record that a run finished completely is kept across later runs,
       // also one that was taken over; a store written before it existed
       // shows a completed analysis instead.
-      indexedBefore =
+      recorded =
         this.db
           .prepare(
             "SELECT 1 AS found FROM graph_meta WHERE key='index-completed'",
           )
-          .get() !== undefined || completed.size > 0;
+          .get() !== undefined;
+      indexedBefore = recorded || completed.size > 0;
       commandState = this.graphCommandState();
     } finally {
       this.db.exec("COMMIT");
@@ -1401,6 +1405,7 @@ export class SqliteGraphStore implements GraphStorage {
       takeOver,
       completed,
       indexedBefore,
+      recorded,
       interleaved: false,
       commandState,
     };
@@ -1466,11 +1471,13 @@ export class SqliteGraphStore implements GraphStorage {
         this.transaction(() => {
           if (run.interleaved) return;
           this.db.prepare("DELETE FROM graph_meta WHERE key='index-run'").run();
-          this.db
-            .prepare(
-              "INSERT OR REPLACE INTO graph_meta VALUES ('index-completed','1')",
-            )
-            .run();
+          // Written once: a later run that finds it writes nothing more.
+          if (!run.recorded)
+            this.db
+              .prepare(
+                "INSERT OR REPLACE INTO graph_meta VALUES ('index-completed','1')",
+              )
+              .run();
           if (completed.size)
             this.db
               .prepare("INSERT INTO graph_meta VALUES ('analysis-complete',?)")
