@@ -12,7 +12,7 @@
 # Usage: CARGO_HOME=<scratch cache> fetch-crates.sh PINS_DIR NAME...
 set -uo pipefail
 pins="$1"; shift
-: "${CARGO_HOME:?set CARGO_HOME to the measurement's own crate cache}"
+: "${CARGO_HOME:?set CARGO_HOME to a crate cache for the measurement}"
 mkdir -p "$CARGO_HOME"
 for name in "$@"; do
   copy="$PYM_SCRATCH/fetch-copy/$name"
