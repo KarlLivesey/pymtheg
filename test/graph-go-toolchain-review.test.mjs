@@ -10,6 +10,7 @@ import "./isolated-config.mjs";
 // These tests need the user's `go`; without one on PATH they are skipped.
 import assert from "node:assert/strict";
 import { toolchainWorkDirectory } from "../dist/project/local-trust.js";
+import { isProcessId } from "../dist/backends/child-groups.js";
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
@@ -520,9 +521,9 @@ test(
       }
     } finally {
       // A writer unblocks any reader left behind, so cleanup cannot hang.
-      for (const pid of processesWith(dir))
+      for (const pid of processesWith(dir).map(Number).filter(isProcessId))
         try {
-          process.kill(Number(pid), "SIGKILL");
+          process.kill(pid, "SIGKILL");
         } catch {
           /* gone */
         }
@@ -576,9 +577,9 @@ test(
         [],
       );
     } finally {
-      for (const pid of processesWith(dir))
+      for (const pid of processesWith(dir).map(Number).filter(isProcessId))
         try {
-          process.kill(Number(pid), "SIGKILL");
+          process.kill(pid, "SIGKILL");
         } catch {
           /* gone */
         }

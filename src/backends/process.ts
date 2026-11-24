@@ -5,6 +5,7 @@ import {
   CHILD_GROUP_SLOTS,
   forgetChildGroup,
   recordChildGroup,
+  isProcessId,
 } from "./child-groups.js";
 export interface ProcessClock {
   schedule(callback: () => void, milliseconds: number): unknown;
@@ -56,7 +57,7 @@ export async function runProcess(
     const kill = (signal: NodeJS.Signals): void => {
       try {
         // The child's process group; Windows has none, so the process.
-        if (child.pid)
+        if (isProcessId(child.pid))
           process.kill(
             process.platform === "win32" ? child.pid : -child.pid,
             signal,

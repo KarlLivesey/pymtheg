@@ -27,6 +27,7 @@ import { LinkJobs } from "../dist/mcp/links-jobs.js";
 import {
   CHILD_GROUP_SLOTS,
   forgetChildGroup,
+  isProcessId,
   killGroup,
   recordChildGroup,
 } from "../dist/backends/child-groups.js";
@@ -72,8 +73,19 @@ process.exit(2);
   return realpathSync(go);
 }
 
+/**
+ * The pid in a ready file, once it holds one: an integer above 1, never a
+ * number read from a file that exists but is still empty (`Number("")` is
+ * 0, and `killGroup(0)` once signalled this test run's own group).
+ */
+function readPid(path) {
+  if (!existsSync(path)) return undefined;
+  const pid = Number(readFileSync(path, "utf8"));
+  return isProcessId(pid) ? pid : undefined;
+}
 /** Whether a process is running (a zombie is not). */
 function running(pid) {
+  if (!isProcessId(pid)) return false;
   try {
     process.kill(pid, 0);
   } catch {
@@ -304,8 +316,8 @@ test("C-54: a worker that never answers the abort is terminated when the cancel'
       graceMs: 30_000,
     });
     const job = jobs.start({ command: "index" });
-    await until(() => existsSync(ready), "the child did not start");
-    const pid = Number(readFileSync(ready, "utf8"));
+    await until(() => readPid(ready), "the child did not start");
+    const pid = readPid(ready);
     const cancelling = jobs.cancel(job.id);
     // The child is killed at once, before any grace ends.
     await until(() => !running(pid), "the child outlived the cancel's kill");
@@ -317,7 +329,8 @@ test("C-54: a worker that never answers the abort is terminated when the cancel'
     await until(() => !running(pid), "the child outlived the cancel");
     await jobs.close();
   } finally {
-    if (existsSync(ready)) killGroup(Number(readFileSync(ready, "utf8")));
+    const pid = readPid(ready);
+    if (pid) killGroup(pid);
     await rm(root, { recursive: true, force: true });
   }
 });

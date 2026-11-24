@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: MIT
 import { readFileSync, readdirSync } from "node:fs";
+
+/** An integer above 1: never this process's own group (0) or every process (-1). */
+const isProcessId = (pid) => Number.isInteger(pid) && pid > 1;
 /** This bound reports missing evidence; it never establishes correctness. */
 export async function within(promise, waitingFor, cleanup = () => {}) {
   let timer,
@@ -74,14 +77,15 @@ export function killFixtureGroups(token) {
       if (!["ENOENT", "ESRCH", "EACCES"].includes(error.code)) throw error;
     }
   }
-  for (const pid of members) {
+  // Never 0, 1 or a negative number: kill(0) is this process's own group.
+  for (const pid of members.filter(isProcessId)) {
     try {
       process.kill(pid, "SIGKILL");
     } catch (error) {
       if (error.code !== "ESRCH") throw error;
     }
   }
-  for (const group of groups) {
+  for (const group of [...groups].filter(isProcessId)) {
     try {
       process.kill(-group, "SIGKILL");
     } catch (error) {
