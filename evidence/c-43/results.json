@@ -54,18 +54,18 @@
     "generated": 859
    },
    "analyzerRun": {
-    "wallS": 311.5,
-    "cpuS": 1022.8,
-    "peakMiB": 9715
+    "wallS": 367.5,
+    "cpuS": 1097.1,
+    "peakMiB": 9718
    },
    "index": {
     "sourceOnly": {
-     "wallS": 497.5,
-     "cpuS": 574
+     "wallS": 519.4,
+     "cpuS": 580.5
     },
     "route": {
-     "wallS": 1116.5,
-     "cpuS": 526.7
+     "wallS": 1673.7,
+     "cpuS": 609.5
     }
    },
    "decided": {},
@@ -229,18 +229,18 @@
     "generated": 505
    },
    "analyzerRun": {
-    "wallS": 132.7,
-    "cpuS": 1071.8,
-    "peakMiB": 2456
+    "wallS": 115.7,
+    "cpuS": 1061.9,
+    "peakMiB": 2464
    },
    "index": {
     "sourceOnly": {
-     "wallS": 96.3,
-     "cpuS": 116.9
+     "wallS": 95.6,
+     "cpuS": 111.9
     },
     "route": {
-     "wallS": 417.5,
-     "cpuS": 174.4
+     "wallS": 399,
+     "cpuS": 132.6
     }
    },
    "decided": {
@@ -325,18 +325,18 @@
     "generated": 651
    },
    "analyzerRun": {
-    "wallS": 116.4,
-    "cpuS": 537.8,
-    "peakMiB": 5188
+    "wallS": 144,
+    "cpuS": 588.1,
+    "peakMiB": 5186
    },
    "index": {
     "sourceOnly": {
-     "wallS": 157.1,
-     "cpuS": 113.2
+     "wallS": 93.3,
+     "cpuS": 111.8
     },
     "route": {
-     "wallS": 667.6,
-     "cpuS": 182.9
+     "wallS": 924.7,
+     "cpuS": 135.9
     }
    },
    "decided": {},
@@ -500,18 +500,18 @@
     "generated": 1040
    },
    "analyzerRun": {
-    "wallS": 113.3,
-    "cpuS": 282.3,
-    "peakMiB": 3028
+    "wallS": 116.9,
+    "cpuS": 287.7,
+    "peakMiB": 3031
    },
    "index": {
     "sourceOnly": {
-     "wallS": 90.5,
-     "cpuS": 107.2
+     "wallS": 85.9,
+     "cpuS": 99.7
     },
     "route": {
-     "wallS": 337.4,
-     "cpuS": 128.4
+     "wallS": 323.4,
+     "cpuS": 117.1
     }
    },
    "decided": {
@@ -663,18 +663,18 @@
     "generated": 364
    },
    "analyzerRun": {
-    "wallS": 148.1,
-    "cpuS": 1964.1,
-    "peakMiB": 2055
+    "wallS": 186.5,
+    "cpuS": 1959.1,
+    "peakMiB": 2059
    },
    "index": {
     "sourceOnly": {
-     "wallS": 68.4,
-     "cpuS": 82.7
+     "wallS": 62.2,
+     "cpuS": 76.1
     },
     "route": {
-     "wallS": 273.9,
-     "cpuS": 91.8
+     "wallS": 504.5,
+     "cpuS": 90.1
     }
    },
    "decided": {
@@ -827,18 +827,18 @@
     "generated": 1255
    },
    "analyzerRun": {
-    "wallS": 106.5,
-    "cpuS": 499,
-    "peakMiB": 2355
+    "wallS": 100.4,
+    "cpuS": 467,
+    "peakMiB": 2367
    },
    "index": {
     "sourceOnly": {
-     "wallS": 121.7,
-     "cpuS": 152.9
+     "wallS": 108.8,
+     "cpuS": 138.1
     },
     "route": {
-     "wallS": 280.6,
-     "cpuS": 163.3
+     "wallS": 284.7,
+     "cpuS": 157.1
     }
    },
    "decided": {
@@ -1010,18 +1010,18 @@
     "generated": 316
    },
    "analyzerRun": {
-    "wallS": 47.1,
-    "cpuS": 83.7,
+    "wallS": 42.2,
+    "cpuS": 76.3,
     "peakMiB": 1671
    },
    "index": {
     "sourceOnly": {
-     "wallS": 61.6,
-     "cpuS": 71.1
+     "wallS": 48.9,
+     "cpuS": 64.6
     },
     "route": {
-     "wallS": 139.9,
-     "cpuS": 75.2
+     "wallS": 216.2,
+     "cpuS": 75
     }
    },
    "decided": {
@@ -1174,18 +1174,18 @@
     "generated": 1285
    },
    "analyzerRun": {
-    "wallS": 59.6,
-    "cpuS": 255,
-    "peakMiB": 2835
+    "wallS": 73.2,
+    "cpuS": 280.5,
+    "peakMiB": 2865
    },
    "index": {
     "sourceOnly": {
-     "wallS": 61.3,
-     "cpuS": 82.1
+     "wallS": 58.7,
+     "cpuS": 81
     },
     "route": {
-     "wallS": 176,
-     "cpuS": 85.2
+     "wallS": 286.2,
+     "cpuS": 94.9
     }
    },
    "decided": {
@@ -1357,18 +1357,18 @@
     "generated": 745
    },
    "analyzerRun": {
-    "wallS": 43.4,
-    "cpuS": 113.7,
-    "peakMiB": 1646
+    "wallS": 58,
+    "cpuS": 142.8,
+    "peakMiB": 1655
    },
    "index": {
     "sourceOnly": {
-     "wallS": 55.5,
-     "cpuS": 76.6
+     "wallS": 52.4,
+     "cpuS": 72.3
     },
     "route": {
-     "wallS": 123.2,
-     "cpuS": 73.7
+     "wallS": 258.5,
+     "cpuS": 80.4
     }
    },
    "decided": {
@@ -1541,18 +1541,18 @@
     "generated": 197
    },
    "analyzerRun": {
-    "wallS": 38.9,
-    "cpuS": 88.3,
-    "peakMiB": 1953
+    "wallS": 33.5,
+    "cpuS": 81.4,
+    "peakMiB": 1955
    },
    "index": {
     "sourceOnly": {
-     "wallS": 41.6,
-     "cpuS": 57.9
+     "wallS": 38,
+     "cpuS": 54.8
     },
     "route": {
-     "wallS": 136.7,
-     "cpuS": 63.5
+     "wallS": 224,
+     "cpuS": 61.1
     }
    },
    "decided": {
@@ -1674,18 +1674,18 @@
     "generated": 125
    },
    "analyzerRun": {
-    "wallS": 24.6,
-    "cpuS": 48.4,
-    "peakMiB": 1211
+    "wallS": 28.2,
+    "cpuS": 54,
+    "peakMiB": 1203
    },
    "index": {
     "sourceOnly": {
-     "wallS": 36.4,
-     "cpuS": 47.4
+     "wallS": 30.2,
+     "cpuS": 41.9
     },
     "route": {
-     "wallS": 78.2,
-     "cpuS": 48.1
+     "wallS": 135.6,
+     "cpuS": 50.2
     }
    },
    "decided": {
@@ -1734,9 +1734,9 @@
     "links": 34081,
     "level2": 27747,
     "assumed": 0,
-    "proven": 19137,
-    "toolchainDecided": 8610,
-    "toolchainCheckout": 2474,
+    "proven": 19138,
+    "toolchainDecided": 8609,
+    "toolchainCheckout": 2473,
     "toolchainLibrary": 6136,
     "libraryModuleLinks": 0,
     "level2Percent": 81.41,
@@ -1806,18 +1806,18 @@
     "generated": 42
    },
    "analyzerRun": {
-    "wallS": 30.7,
-    "cpuS": 43.1,
-    "peakMiB": 1255
+    "wallS": 37.9,
+    "cpuS": 50.9,
+    "peakMiB": 1251
    },
    "index": {
     "sourceOnly": {
-     "wallS": 25.7,
-     "cpuS": 36
+     "wallS": 26.9,
+     "cpuS": 37.7
     },
     "route": {
-     "wallS": 73,
-     "cpuS": 39.7
+     "wallS": 361.9,
+     "cpuS": 47.4
     }
    },
    "decided": {
@@ -1903,18 +1903,18 @@
     "generated": 830
    },
    "analyzerRun": {
-    "wallS": 39.4,
-    "cpuS": 93.8,
-    "peakMiB": 1688
+    "wallS": 40.6,
+    "cpuS": 96.9,
+    "peakMiB": 1697
    },
    "index": {
     "sourceOnly": {
-     "wallS": 28,
-     "cpuS": 38.3
+     "wallS": 29.3,
+     "cpuS": 38.1
     },
     "route": {
-     "wallS": 151,
-     "cpuS": 53.5
+     "wallS": 261,
+     "cpuS": 47.1
     }
    },
    "decided": {},
@@ -2079,18 +2079,18 @@
     "generated": 777
    },
    "analyzerRun": {
-    "wallS": 30.6,
-    "cpuS": 51.5,
-    "peakMiB": 1148
+    "wallS": 32.4,
+    "cpuS": 51.4,
+    "peakMiB": 1147
    },
    "index": {
     "sourceOnly": {
-     "wallS": 43.7,
-     "cpuS": 58.2
+     "wallS": 39.8,
+     "cpuS": 54.5
     },
     "route": {
-     "wallS": 115.7,
-     "cpuS": 57.1
+     "wallS": 318.6,
+     "cpuS": 62.1
     }
    },
    "decided": {
@@ -2261,18 +2261,18 @@
     "generated": 38
    },
    "analyzerRun": {
-    "wallS": 25.7,
-    "cpuS": 106.1,
-    "peakMiB": 1900
+    "wallS": 27.3,
+    "cpuS": 106.8,
+    "peakMiB": 1902
    },
    "index": {
     "sourceOnly": {
-     "wallS": 19,
-     "cpuS": 30.8
+     "wallS": 18.5,
+     "cpuS": 31.1
     },
     "route": {
-     "wallS": 78.7,
-     "cpuS": 35
+     "wallS": 280.7,
+     "cpuS": 41.4
     }
    },
    "decided": {
@@ -2438,18 +2438,18 @@
     "generated": 86
    },
    "analyzerRun": {
-    "wallS": 13.8,
-    "cpuS": 25.7,
-    "peakMiB": 1100
+    "wallS": 17.3,
+    "cpuS": 30.6,
+    "peakMiB": 1104
    },
    "index": {
     "sourceOnly": {
-     "wallS": 13.3,
-     "cpuS": 19.8
+     "wallS": 13.7,
+     "cpuS": 20.4
     },
     "route": {
-     "wallS": 41.5,
-     "cpuS": 20.4
+     "wallS": 87.4,
+     "cpuS": 27.5
     }
    },
    "decided": {
@@ -2617,18 +2617,18 @@
     "generated": 20
    },
    "analyzerRun": {
-    "wallS": 39.6,
-    "cpuS": 45.2,
-    "peakMiB": 935
+    "wallS": 39.9,
+    "cpuS": 45.1,
+    "peakMiB": 933
    },
    "index": {
     "sourceOnly": {
-     "wallS": 12.3,
-     "cpuS": 16.6
+     "wallS": 11.8,
+     "cpuS": 16
     },
     "route": {
-     "wallS": 94.5,
-     "cpuS": 17.4
+     "wallS": 358.4,
+     "cpuS": 26.1
     }
    },
    "decided": {
@@ -2799,18 +2799,18 @@
     "generated": 0
    },
    "analyzerRun": {
-    "wallS": 14.6,
-    "cpuS": 33,
+    "wallS": 15.2,
+    "cpuS": 35.2,
     "peakMiB": 929
    },
    "index": {
     "sourceOnly": {
-     "wallS": 5.9,
-     "cpuS": 9.2
+     "wallS": 7.6,
+     "cpuS": 10.2
     },
     "route": {
-     "wallS": 33.9,
-     "cpuS": 11
+     "wallS": 82.2,
+     "cpuS": 17.2
     }
    },
    "decided": {
