@@ -26,7 +26,7 @@ const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
   process.argv.slice(2);
 if (!outArg)
   throw Error(
-    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--scoped-mix]",
+    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--scoped-mix] [--more-go] [--gomod-meaning] [--mcp]",
   );
 const dist = resolve(distArg);
 const expectedSteps = Number(countArg);
@@ -60,6 +60,10 @@ const siblings = flags.includes("--siblings");
 // C-55: Go edits also break a file's syntax, edit go.mod and rename a file
 // (a separate flag, so earlier seeds replay as they did).
 const moreGo = flags.includes("--more-go");
+// C-55 review: a go.mod edit that changes meaning, alternately the module
+// path and the first require's version, each toggled back on its next turn
+// (a separate flag, so earlier seeds replay as they did).
+const goModMeaning = flags.includes("--gomod-meaning");
 // C-55: each incremental index runs through the MCP server's graph jobs:
 // one persistent worker with its index session, as the server runs it.
 const mcp = flags.includes("--mcp");
@@ -312,6 +316,7 @@ const goKinds = [
   ...(moreGo ? ["break", "break", "gomod", "gomod", "move", "move"] : []),
 ];
 const goTargets = new Map();
+let gomodTurn = 0;
 const created = [];
 function report() {
   writeFileSync(
@@ -434,6 +439,35 @@ function goEdit(step, file, source) {
       return { file, kind, text: insert(anchor, "\n\nfunc c55Broken( {\n") };
     case "gomod": {
       const text = sourceOf("go.mod");
+      if (goModMeaning) {
+        gomodTurn++;
+        if (gomodTurn % 2 === 1) {
+          const module = /^module\s+(\S+)\s*$/m.exec(text);
+          if (module) {
+            const path = module[1].endsWith("/c55renamed")
+              ? module[1].slice(0, -"/c55renamed".length)
+              : `${module[1]}/c55renamed`;
+            return {
+              file: "go.mod",
+              kind: "gomod-module",
+              text: text.replace(module[0], `module ${path}`),
+            };
+          }
+        }
+        const require =
+          /^(require\s+|\t)(\S+)\s+(v\S+?)(-c55)?(\s*(?:\/\/.*)?)$/m.exec(text);
+        if (require) {
+          const [line, lead, path, version, marked, rest] = require;
+          return {
+            file: "go.mod",
+            kind: "gomod-require",
+            text: text.replace(
+              line,
+              `${lead}${path} ${version}${marked ? "" : "-c55"}${rest}`,
+            ),
+          };
+        }
+      }
       return {
         file: "go.mod",
         kind,

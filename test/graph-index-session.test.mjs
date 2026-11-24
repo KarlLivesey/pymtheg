@@ -720,8 +720,8 @@ test("a session's Go inputs follow added, renamed and rewritten files; each step
   }
 });
 
-test("the kept-input limit is exact, in UTF-8 bytes of stored JSON", async () => {
-  // Non-ASCII source text, so UTF-8 bytes and UTF-16 units differ.
+test("the kept-input limit is exact at its boundary", async () => {
+  // The count itself is checked against the stored rows below.
   const files = {
     "go.mod": "module example.com/m\n\ngo 1.22\n",
     "a/a.go":
@@ -850,4 +850,127 @@ test("kept inputs re-read this run's writes and paths written after the last rea
   assert.deepEqual(reads.records, [[]]);
   assert.deepEqual(reads.symbols, [[]]);
   assert.deepEqual(reads.projection, [[]]);
+});
+
+test("kept inputs count the UTF-8 bytes of the stored rows they were read from", async () => {
+  // Non-ASCII in every kept kind: source text (records), identifiers
+  // (symbol bodies), and an embedded type's name (projection links).
+  const { base, root } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go":
+      'package a\n\n// Grüße, 世界, \u{1F600}\ntype 世界 struct{ Ä int }\n\nfunc Hëllo() string { return "héllo \u{1F600}" }\n',
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.世界 }\n\nfunc B() string { return a.Hëllo() }\n',
+  });
+  const store = new SqliteGraphStore(join(base, "graph.sqlite"));
+  try {
+    await indexProject(root, await discoverLanguages(), store);
+    const { KeptInputs } = await import("../dist/graph/kept-input.js");
+    const kinds = ["embeds"];
+    const all = store.fileSummaries().map((file) => file.path);
+    const go = store
+      .fileSummaries()
+      .filter((file) => file.module === "go")
+      .map((file) => file.path);
+    const inputs = new KeptInputs(undefined, () => new Set());
+    await inputs.analysisInput(go, async (paths) => store.filesAt(paths), 0);
+    await inputs.resolverInput(
+      kinds,
+      {
+        allPaths: async () => all,
+        symbols: async (paths) => store.symbolsOfFiles(paths),
+        projection: async (paths) => store.resolutionFiles(kinds, paths),
+      },
+      0,
+    );
+    const counted = inputs.result(() => new Set()).bytes;
+    // The same rows, measured here from the database.
+    const db = new DatabaseSync(join(base, "graph.sqlite"), { readOnly: true });
+    let expected = 0;
+    let units = 0;
+    const add = (text) => {
+      expected += Buffer.byteLength(text ?? "");
+      units += (text ?? "").length;
+    };
+    try {
+      for (const path of go)
+        add(
+          db.prepare("SELECT body FROM graph_files WHERE path=?").get(path)
+            .body,
+        );
+      for (const path of all)
+        for (const row of db
+          .prepare("SELECT body FROM graph_symbols WHERE file=?")
+          .all(path))
+          add(row.body);
+      for (const row of db
+        .prepare(
+          `SELECT body -> '$.result.data' AS facts,
+            body -> '$.result.diagnostics' AS diagnostics,
+            (SELECT json_group_array(json(value) ORDER BY key)
+             FROM json_each(f.body,'$.result.links')
+             WHERE value ->> '$.kind' IN (SELECT value FROM json_each(?))) AS links
+          FROM graph_files f`,
+        )
+        .all(JSON.stringify(kinds))) {
+        add(row.facts);
+        add(row.diagnostics);
+        add(row.links);
+      }
+    } finally {
+      db.close();
+    }
+    assert.notEqual(expected, units, "the rows hold non-ASCII text");
+    assert.equal(counted, expected);
+  } finally {
+    store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("Go's analysis gets only frozen records in every session run", async () => {
+  // Held records (parsed this run) included: a session's first run and
+  // edit runs, an added file among them.
+  const production = await discoverLanguages();
+  let unfrozen = 0;
+  let seen = 0;
+  const registry = new LanguageRegistry(
+    production.modules.map((module) =>
+      module.id !== "go"
+        ? module
+        : {
+            ...module,
+            analyze(context) {
+              for (const file of context.files) {
+                seen++;
+                if (!Object.isFrozen(file) || !Object.isFrozen(file.result))
+                  unfrozen++;
+              }
+              return module.analyze(context);
+            },
+          },
+    ),
+  );
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go": "package a\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() }\n',
+    "c/c.go": "package c\n\nfunc C() int { return 3 }\n",
+  });
+  try {
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("c/c.go", "package c\n\nfunc C() int { return 4 }\n");
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("d/d.go", "package d\n\nfunc D() int { return 5 }\n");
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("a/a.go", "package a\n\nfunc Hello() int { return 2 }\n");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.ok(seen > 0);
+    assert.equal(unfrozen, 0, `${unfrozen} of ${seen} records unfrozen`);
+    assert.deepEqual(await differencesFromCold(base, root, production), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });
