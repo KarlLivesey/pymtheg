@@ -11,19 +11,21 @@
  *   key is not returned.
  * - The session's state belongs to one project, store and configuration (the
  *   module ids, versions and claims, and the index settings), and to the
- *   store as the session's last run completed it. When a run begins, the
- *   session compares the store's completion record with the one it recorded
- *   after its last completed run. Every graph write by anyone deletes that
+ *   store as the session's last run completed it. A run compares the store's
+ *   completion record with the one the session recorded after its last
+ *   completed run. Every graph write by anyone deletes that
  *   record (C-22, C-27), and a record written by another completed run
  *   proves the store equals a cold index of the inputs it records. If the
  *   record differs, or the project, store or configuration does, everything
  *   kept is dropped.
- * - The completion record is compared twice: when the run begins, and
- *   again as the run's ownership baseline read it (`confirm`), in the same
- *   snapshot as the data version and mark its ownership checks start from.
- *   A run by another process that completes between the two is caught by
- *   the second; one after it, by the run's own ownership checks. Nothing
- *   kept is readable before `confirm`.
+ * - The completion record is compared once, as the run's ownership baseline
+ *   read it (`confirm`), in the same snapshot as the data version and mark
+ *   its ownership checks start from. A run by another process that
+ *   completes before that is caught by it; one after it, by the run's own
+ *   ownership checks. Nothing kept is readable before `confirm`, and a run
+ *   that never confirms keeps only what it sets itself (`commit` replaces
+ *   everything), so no earlier comparison is needed (C-55 review: an
+ *   earlier one, when the run began, could not change any outcome).
  * - A confirmed run takes what was kept: a module reads it, and only what
  *   the run `set`s again (or anew) is kept after it. A module must treat a
  *   kept value as immutable, or `set` the value it changed; a TAKEN value
@@ -108,19 +110,13 @@ export class IndexSession {
     this.completion = undefined;
   }
   /**
-   * Begins a run on `scope`, given the completion record's fingerprint found
-   * when the run began (null when there is none). Everything kept is dropped
-   * unless both match what the session recorded after its last completed run.
+   * Begins a run on `scope`. Everything kept is dropped unless the scope is
+   * the session's; the completion record is checked by `confirm`.
    */
-  beginRun(scope: SessionScope, completion: string | null): SessionRun {
+  beginRun(scope: SessionScope): SessionRun {
     this.counts.runs++;
     const scopeKey = JSON.stringify(scope);
-    if (
-      this.scopeKey !== scopeKey ||
-      completion === null ||
-      this.completion !== completion
-    )
-      this.drop();
+    if (this.scopeKey !== scopeKey) this.drop();
     return new SessionRun(this, scopeKey);
   }
   /**

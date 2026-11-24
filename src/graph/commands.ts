@@ -550,18 +550,15 @@ export async function executeGraph(
       const started = performance.now();
       options.progress?.({ phase: "inventory", done: 0, total });
       // C-45: what a session kept is used only if the store is as its last
-      // completed run left it (the completion record), for this project,
-      // store and configuration.
-      sessionRun = options.session?.beginRun(
-        {
-          root,
-          store: path,
-          projectId: currentStore.projectId,
-          configuration,
-          settings,
-        },
-        previousState?.fingerprint ?? null,
-      );
+      // completed run left it (the completion record, checked at the run's
+      // baseline by `confirm`), for this project, store and configuration.
+      sessionRun = options.session?.beginRun({
+        root,
+        store: path,
+        projectId: currentStore.projectId,
+        configuration,
+        settings,
+      });
       const run = sessionRun;
       const indexed = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
