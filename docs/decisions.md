@@ -3585,3 +3585,19 @@ declaration by its stored id. Under the test suite the decisions cross
 JSON before use. **Why:** C-56 can keep a value, not caches that close over
 a resolver. **Unchanged:** every decision, link, note and stored row.
 See [C-56b](changes/C-56b.md).
+
+
+### An index session keeps Go's implements decisions (C-56)
+
+**Decided (C-56):** each build of Go's global index keeps its implements
+decisions (C-56b's value) in the index session under C-45's rules, keyed
+by every Go file's path, status, global surface (C-27) and toolchain
+status, every context file's path, hash, status and dependency stamp, and
+the ids of the types the decisions name. A different key returns nothing
+and the decisions are made again; a value naming an id the build does not
+have is not used. Under the test suite, and with `PYMTHEG_CHECK_KEPT=1`, a
+reused value is made again and must be identical, or the run fails. The
+structure is rebuilt every run. **Why:** the implements pass weighs about
+0.65 s per build on a cli/cli body edit, and a body edit cannot change its
+decisions. **Unchanged:** without a session, and on every key miss, the
+pass runs as before. See [C-56](changes/C-56.md).
