@@ -90,14 +90,50 @@ test("Go's overloaded-looking shapes get distinct notes ids, the ones the store 
           `${symbol.kind} ${symbol.identity} in ${file.path}`,
         );
     }
-    // Several init functions and blank declarations: ties broken by source
-    // order (the ordinal), never shared.
-    const a = store.getFile("p/a.go");
-    const inits = notesSymbols(a).filter((symbol) => symbol.name === "init");
+    // Each shape as Go's extractor names it. Several init functions share
+    // kind and identity: the tie is broken by the ordinal, in source order.
+    const named = (path) =>
+      notesSymbols(store.getFile(path)).map(
+        (symbol) => `${symbol.kind} ${symbol.identity} ${symbol.ordinal}`,
+      );
+    const a = named("p/a.go");
+    for (const shape of [
+      "method (A).Run 0",
+      "method (B).Run 0",
+      "function init 0",
+      "function init 1",
+      "function _ 0",
+      "struct Box 0",
+      "field Box.v 0",
+      "field Box.u 0",
+      "function Map 0",
+      "field a.go:Anon.anon#1.A 0",
+      "field a.go:Anon.anon#1.B.anon#1.A 0",
+      "field a.go:Anon2.anon#1.A 0",
+    ])
+      assert.ok(a.includes(shape), shape);
+    // Blank variables, locals and type parameters are not symbols, so they
+    // cannot share an id.
+    for (const line of a) assert.doesNotMatch(line, /^\S+ (x|T|U) /, line);
+    assert.ok(a.every((line) => !line.startsWith("var _")));
     assert.deepEqual(
-      inits.map((symbol) => symbol.ordinal),
-      [0, 1],
+      named("p/b.go").filter((line) => line.startsWith("function")),
+      ["function init 0", "function init 1"],
     );
+    // init across files and build-tag twins: one identity, distinct ids,
+    // because the file is part of the id.
+    const ids = (path, identity) =>
+      notesSymbols(store.getFile(path))
+        .filter((symbol) => symbol.identity === identity)
+        .map((symbol) => symbol.id);
+    const inits = [...ids("p/a.go", "init"), ...ids("p/b.go", "init")];
+    assert.equal(new Set(inits).size, 4);
+    const twins = [
+      ...ids("p/os_linux.go", "Twin"),
+      ...ids("p/os_windows.go", "Twin"),
+    ];
+    assert.equal(twins.length, 2);
+    assert.notEqual(twins[0], twins[1]);
   } finally {
     store.close();
     rmSync(base, { recursive: true, force: true });
