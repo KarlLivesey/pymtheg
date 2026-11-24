@@ -820,8 +820,12 @@ and never yields a version pin.
   checker named another (`[csv, tsv][1].format()` → `tsv.format`). A
   receiver the walk cannot follow (an expando, a `let` written by
   destructuring, a generic call with a reduced argument) is unresolved
-  (`receiver-unverified`). Interface, class, type-literal and
-  object-literal members alike
+  (`receiver-unverified`), as is a defaulted parameter whose function is
+  referenced other than by direct calls. Logical assignments follow their
+  plain forms; an accessor follows its getter. Limits: narrowing to an
+  intersection, `require` of a conditional `module.exports` and written
+  types derived from inference keep the checker's reduced answer.
+  Interface, class, type-literal and object-literal members alike
   ([C-41](changes/C-41.md)).
 - **Type-literal members:** members of a written type literal are
   symbols, including nested union, intersection, array, tuple and

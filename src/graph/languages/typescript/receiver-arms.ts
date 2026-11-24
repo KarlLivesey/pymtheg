@@ -62,11 +62,21 @@ type DeclarationArms = Arms | typeof WRITTEN;
 
 const MAX_ARMS = 16;
 /**
- * Steps followed before giving up (unresolved). Chains of inferred returns
- * are followed through, as the checker itself does; a deeper one, or a
- * stack overflow, leaves the call unresolved.
+ * Nested steps followed before giving up (unresolved). Low enough that the
+ * walk's own recursion cannot exhaust the stack at the limit, so the
+ * outcome depends on this count, not on how deep the process already is
+ * (C-41 review 3). A stack overflow inside the walk is the checker's limit
+ * (extract.ts: CheckerLimit, the program is rebuilt), never an answer.
  */
-const MAX_DEPTH = 2000;
+export const MAX_DEPTH = 200;
+/**
+ * Expressions a member call's walk may compute, a cached result counted at
+ * what it cost when computed, so the count does not depend on what earlier
+ * walks cached (C-41 review 3: results touched by a cycle are not cached,
+ * so a self-assigned `let` under nested choices grows exponentially). A
+ * walk that reaches it leaves the call unresolved.
+ */
+export const MAX_STEPS = 20_000;
 
 /** Array methods whose callback's first parameter is an element. */
 const ELEMENT_CALLBACKS = new Set([
@@ -135,7 +145,16 @@ const PRIMITIVE_FLAGS =
   ts.TypeFlags.Null;
 
 /** Observation counters (C-41 review 2): member calls walked, expressions computed. */
-export const receiverStatistics = { calls: 0, expressions: 0 };
+export const receiverStatistics = {
+  calls: 0,
+  expressions: 0,
+  /** The largest step count and nesting depth one call reached. */
+  maxSteps: 0,
+  maxDepth: 0,
+  /** Calls that reached MAX_STEPS or MAX_DEPTH. */
+  budgetCuts: 0,
+  depthCuts: 0,
+};
 
 export type ReceiverVerdict =
   /** The checker's member stands. */
@@ -162,6 +181,38 @@ export function receiverArms(
     Map<ts.Symbol, (ts.Expression | undefined)[]>
   >();
   let depth = 0;
+  /** This call's step count (MAX_STEPS) and deepest nesting. */
+  let steps = 0;
+  let deepest = 0;
+  let overBudget = false;
+  let overDepth = false;
+  /** What each cached result cost when computed, in steps. */
+  const valueCosts = new WeakMap<ts.Node, number>();
+  const declaredCosts = new WeakMap<ts.Node, number>();
+  const unreducedCosts = new WeakMap<ts.Node, number>();
+  const costsOf = new WeakMap<object, WeakMap<ts.Node, number>>([
+    [values, valueCosts],
+    [declared, declaredCosts],
+  ]);
+  /** Charges `cost` steps; false (a cut) once the budget is spent. */
+  const charge = (cost: number) => {
+    steps += cost;
+    if (steps <= MAX_STEPS) return true;
+    overBudget = true;
+    cuts++;
+    return false;
+  };
+  /** Enters one nested step; false (a cut) at the depth limit. */
+  const enter = () => {
+    if (depth >= MAX_DEPTH) {
+      overDepth = true;
+      cuts++;
+      return false;
+    }
+    depth++;
+    if (depth > deepest) deepest = depth;
+    return true;
+  };
   const options: ts.CompilerOptions = program?.getCompilerOptions() ?? {};
   /**
    * Failures caused by the depth limit or a cycle: a result computed while
@@ -228,19 +279,26 @@ export function receiverArms(
     node: ts.Node,
     compute: () => T,
   ): T | undefined {
+    const costs = costsOf.get(cache);
     const known = cache.get(node);
-    if (known !== undefined) return known === null ? undefined : known;
-    if (active.has(node) || depth >= MAX_DEPTH) {
+    if (known !== undefined) {
+      if (!charge(costs?.get(node) ?? 0)) return undefined;
+      return known === null ? undefined : known;
+    }
+    if (active.has(node)) {
       cuts++;
       return undefined;
     }
+    if (!charge(1) || !enter()) return undefined;
     active.add(node);
-    depth++;
     const before = cuts;
+    const start = steps - 1;
     try {
       const result = compute();
-      if (result !== undefined || cuts === before)
+      if (result !== undefined || cuts === before) {
         cache.set(node, result === undefined ? null : result);
+        costs?.set(node, steps - start);
+      }
       return result;
     } finally {
       depth--;
@@ -632,19 +690,37 @@ export function receiverArms(
           });
           found.set(key ?? "\0", list);
         }
+        // `Object.assign(target, …)` writes any member of its target, as a
+        // computed key does (C-41 review 3).
+        if (
+          ts.isCallExpression(node) &&
+          node.arguments.length &&
+          ts.isPropertyAccessExpression(node.expression) &&
+          node.expression.name.text === "assign" &&
+          ts.isIdentifier(node.expression.expression) &&
+          node.expression.expression.text === "Object"
+        ) {
+          const list = found.get("\0") ?? [];
+          list.push({ target: node.arguments[0]!, value: undefined });
+          found.set("\0", list);
+        }
         ts.forEachChild(node, scan);
       };
       for (const file of program.getSourceFiles())
         if (!file.isDeclarationFile) scan(file);
       propertyWrites = found;
     }
-    // A write through a computed key to an object that has this member.
+    // A write through a computed key, or `Object.assign`, to an object
+    // that has this member: by declaration, since an object literal's or a
+    // class's property symbol differs from the declaration's own (C-41
+    // review 3).
     for (const { target } of propertyWrites.get("\0") ?? []) {
       const member = checker.getPropertyOfType(
         checker.getApparentType(checker.getTypeAtLocation(target)),
         name,
       );
-      if (member === own) return undefined;
+      if (member === own || member?.declarations?.includes(declaration))
+        return undefined;
     }
     const values: ts.Expression[] = [];
     for (const { target, value } of propertyWrites.get(name) ?? []) {
@@ -1083,14 +1159,16 @@ export function receiverArms(
   /** Whether the value of `expression` (and what a generic infers from it) is one arm. */
   function unreduced(expression: ts.Expression): boolean {
     const known = unreducedCache.get(expression);
-    if (known !== undefined) return known;
-    if (checking.has(expression) || depth >= MAX_DEPTH) {
+    if (known !== undefined)
+      return charge(unreducedCosts.get(expression) ?? 0) && known;
+    if (checking.has(expression)) {
       cuts++;
       return false;
     }
+    if (!charge(1) || !enter()) return false;
     checking.add(expression);
-    depth++;
     const before = cuts;
+    const start = steps - 1;
     let result: boolean;
     try {
       const value = skipValue(expression);
@@ -1128,7 +1206,10 @@ export function receiverArms(
       depth--;
       checking.delete(expression);
     }
-    if (result || cuts === before) unreducedCache.set(expression, result);
+    if (result || cuts === before) {
+      unreducedCache.set(expression, result);
+      unreducedCosts.set(expression, steps - start);
+    }
     return result;
   }
 
@@ -1752,16 +1833,31 @@ export function receiverArms(
   ): ReceiverVerdict => {
     if (name.startsWith("#")) return undefined;
     receiverStatistics.calls++;
+    steps = 0;
+    deepest = 0;
+    overBudget = false;
+    overDepth = false;
     let found: Arms;
     try {
       found = arms(receiver);
     } catch (error) {
-      if (!(error instanceof RangeError)) throw error;
+      // A stack overflow (in the walk or the checker it asks) is not an
+      // answer: it reaches extract.ts, which rebuilds the program (CheckerLimit).
       active.clear();
       checking.clear();
       depth = 0;
-      return "unverified";
+      throw error;
+    } finally {
+      if (steps > receiverStatistics.maxSteps)
+        receiverStatistics.maxSteps = steps;
+      if (deepest > receiverStatistics.maxDepth)
+        receiverStatistics.maxDepth = deepest;
+      if (overBudget) receiverStatistics.budgetCuts++;
+      if (overDepth) receiverStatistics.depthCuts++;
     }
+    // The budget or the depth limit was reached: whatever was found is not
+    // all the walk would follow.
+    if (overBudget || overDepth) return "unverified";
     if (!found) return "unverified";
     if (!found.length) return undefined;
     // Control flow narrows the value at the receiver (`typeof r === "string"

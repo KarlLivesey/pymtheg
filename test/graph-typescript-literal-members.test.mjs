@@ -15,6 +15,11 @@ import {
   SqliteGraphStore,
 } from "../dist/graph/index.js";
 import typescript from "../dist/graph/languages/typescript/index.js";
+import {
+  MAX_DEPTH,
+  MAX_STEPS,
+  receiverStatistics,
+} from "../dist/graph/languages/typescript/receiver-arms.js";
 import ts from "typescript";
 
 const tsconfig = JSON.stringify({
@@ -784,6 +789,15 @@ const TWO_PRODUCERS = {
   "a spread of a choice":
     "const merged = { ...(pick ? { r: one } : { r: two }) };\nmerged.r.run();",
   "as const": "([pick ? one : two] as const)[0].run();",
+  // Review round 3, reviewer B: writes the walk does not follow.
+  "a write through a computed key":
+    "const state = { h: one, g: one };\nexport function set(k: keyof typeof state) { state[k] = two; }\nstate.h.run();",
+  "a class field written through a computed key":
+    'class C { h = one; g = one; go() { this.h.run(); } }\nconst c = new C();\nexport function set(k: "h" | "g") { c[k] = two; }',
+  "Object.assign to an object":
+    "const state = { h: one };\nObject.assign(state, { h: two });\nstate.h.run();",
+  "Object.assign to this":
+    "class C { h = one; constructor(opts: { h?: typeof two }) { Object.assign(this, opts); } go() { this.h.run(); } }",
   // Kinds the first round already covered, kept as a guard.
   "a conditional": "(pick ? a : b).run();",
   "nullish coalescing":
@@ -1019,4 +1033,102 @@ test("review 3: escaping defaults, generic shorthand returns, accessor pairs and
     want[kind] = { head, tsc };
   }
   assert.deepEqual(got, want);
+});
+
+test("review 3: the walk's work per call is bounded by a step count, cached results charged at their cost", async () => {
+  // A chain of choices over the previous name: each level doubles the
+  // expressions the walk would visit without its cache. Cached results are
+  // charged what they cost, so the outcome follows the count alone.
+  const chain = (k) =>
+    [
+      "const l0 = { run() {} };",
+      ...Array.from(
+        { length: k },
+        (_, i) => `const l${i + 1} = Math.random() > 0.5 ? l${i} : l${i};`,
+      ),
+      `l${k}.run();`,
+      "",
+    ].join("\n");
+  const seen = [];
+  for (let k = 8; k <= 16; k++) {
+    receiverStatistics.maxSteps = 0;
+    const cuts = receiverStatistics.budgetCuts;
+    const got = await outcomes({ "src/use.ts": chain(k) }, "src/use.ts");
+    const outcome = got[`l${k}.run();`];
+    const steps = receiverStatistics.maxSteps;
+    const cut = receiverStatistics.budgetCuts > cuts;
+    seen.push({ k, steps, cut, outcome });
+    // Definite below the budget; unresolved once it is reached.
+    assert.equal(cut, steps > MAX_STEPS, JSON.stringify(seen.at(-1)));
+    assert.equal(
+      outcome,
+      cut ? "unresolved:receiver-unverified" : "src/use.ts#l0.run",
+      JSON.stringify(seen.at(-1)),
+    );
+  }
+  assert.ok(seen.some(({ cut }) => cut) && seen.some(({ cut }) => !cut));
+  // A self-assigned `let` under nested choices: results touched by the
+  // cycle are not cached. The walk stops at the budget (main's review
+  // counted 327,679 expressions at 16 levels).
+  const choices = (depth) =>
+    depth ? `(pick ? ${choices(depth - 1)} : ${choices(depth - 1)})` : "x";
+  const before = receiverStatistics.expressions;
+  await outcomes(
+    {
+      "src/use.ts": [
+        "declare const pick: boolean;",
+        "let x = { run() {} };",
+        `x = ${choices(16)};`,
+        "x.run();",
+        "",
+      ].join("\n"),
+    },
+    "src/use.ts",
+  );
+  const spent = receiverStatistics.expressions - before;
+  assert.ok(spent <= MAX_STEPS + 1, `expressions computed: ${spent}`);
+});
+
+test("review 3: a long alias chain has the same outcome first or last in a process, top-level or nested", async () => {
+  // The depth limit is a count low enough that the walk cannot exhaust the
+  // stack at it: the outcome does not depend on what ran before or on how
+  // deeply the call is nested.
+  const aliases = (n) => [
+    "const a0 = { run() {} };",
+    ...Array.from({ length: n }, (_, i) => `const a${i + 1} = a${i};`),
+  ];
+  const nested = (body, levels) =>
+    `${"(() => ".repeat(levels)}{ ${body} }${")".repeat(levels)};`;
+  const file = (n, levels) =>
+    [
+      ...aliases(n),
+      levels ? nested(`a${n}.run();`, levels) : `a${n}.run();`,
+      "",
+    ].join("\n");
+  const run = async (n, levels) => {
+    const got = await outcomes({ "src/use.ts": file(n, levels) }, "src/use.ts");
+    const [key] = Object.keys(got).filter((site) => site.includes(`a${n}.run`));
+    return got[key];
+  };
+  const short = 40;
+  const long = 520;
+  assert.ok(2 * short < MAX_DEPTH && long > MAX_DEPTH);
+  const order = [
+    [long, 60],
+    [short, 0],
+    [long, 0],
+    [short, 60],
+    [long, 60],
+    [long, 0],
+  ];
+  const got = [];
+  for (const [n, levels] of order) got.push([n, levels, await run(n, levels)]);
+  assert.deepEqual(
+    got,
+    order.map(([n, levels]) => [
+      n,
+      levels,
+      n === short ? "src/use.ts#a0.run" : "unresolved:receiver-unverified",
+    ]),
+  );
 });

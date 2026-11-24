@@ -3569,7 +3569,15 @@ type-literal member unresolved (an interface or class member keeps the
 checker's answer); on the 19 pins 15 of main's definite links change (14
 to candidate sets, 1 lost) against 5,541 gained, a walked choice is not
 narrowed beyond what assignability shows, and a member read that is not
-called keeps the checker's answer. **Rules out:** a
+called keeps the checker's answer. Three shapes keep the checker's
+reduced answer (limits in the note): narrowing to an intersection,
+`require` of a conditional `module.exports`, and written types derived
+from inference (`typeof x`, `(typeof list)[number]`). Without
+`strictNullChecks`, `??` and `||` take both sides; logical assignments
+are followed as their plain forms, and any other operator only to a
+primitive. A defaulted parameter is followed only when every reference to
+its function is a direct call, and an open type parameter of a generic body
+never supplies a member. **Rules out:** a
 definite link to one member of a union the checker reduced, including
 main's on interfaces (`pick ? ia : ib`) and object literals (`[csv,
 tsv][1]`). See [C-41](changes/C-41.md).
