@@ -623,6 +623,78 @@ test("the analysis input drops a previous run's record, outcome and library offe
   assert.deepEqual(input.result.links[0].data, { scope: "g", conditions: [] });
 });
 
+test("D24 (PR 70 ruling): an offer the stored link does not take leaves it, and the outcome says why; the rest of the data is the route-off data exactly", () => {
+  const symbol = {
+    id: "s1",
+    projectId: "p",
+    module: "rust",
+    file: "src/lib.rs",
+    key: "k1",
+    kind: "function",
+    name: "f",
+    identity: "f",
+    range: { start: 0, end: 1 },
+    status: "clean",
+  };
+  const offData = {
+    scope: "f",
+    uncertainty: "multiple-checkout-candidates",
+    conditions: [],
+  };
+  const offer = {
+    library: { ecosystem: "rust-std", unit: "core", symbol: "fmt::Debug::fmt" },
+    written: "fmt",
+    rustAnalyzer: "rust-analyzer (fake)",
+    configuration: "host",
+  };
+  const link = {
+    id: "l1",
+    projectId: "p",
+    module: "rust",
+    file: "src/lib.rs",
+    origin: "parse",
+    sourceId: null,
+    kind: "calls",
+    targetName: "fmt",
+    range: { start: 2, end: 3 },
+    targetId: null,
+    targetStatus: null,
+    candidates: [],
+    resolution: "unresolved",
+    data: { ...offData, toolchainLibrary: offer },
+  };
+  const library = (symbolPath, evidence) => ({
+    linkId: "l1",
+    library: {
+      ecosystem: "rust-std",
+      unit: "core",
+      symbol: symbolPath,
+      evidence,
+    },
+  });
+  const decided = (decision) =>
+    decideLink(structuredClone(link), decision, [symbol]);
+  // Applied: the stored target is the offer; the record stays.
+  const applied = decided(
+    library("fmt::Debug::fmt", "toolchain-declaring-path"),
+  );
+  assert.equal(applied.data.toolchainLibrary.written, "fmt");
+  assert.equal(applied.data.toolchainOutcome, undefined);
+  for (const [decision, outcome] of [
+    [library("fmt::Debug::fmt", "qualified-path"), "library:agrees"],
+    [library("fmt::Display::fmt", "qualified-path"), "library:kept-other-key"],
+    [{ linkId: "l1", targetId: "s1" }, "library:kept-checkout"],
+    [undefined, "library:not-applied"],
+  ]) {
+    const kept = decided(decision);
+    assert.equal(
+      JSON.stringify(kept.data),
+      JSON.stringify({ ...offData, toolchainOutcome: outcome }),
+      outcome,
+    );
+  }
+});
+
 test("the SCIP reader reads documents, ranges, roles and rust-analyzer symbols; name sites end at the written name", () => {
   const docs = readScip(
     encodeScip({

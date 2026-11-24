@@ -2475,7 +2475,9 @@ generic arguments dropped), with evidence `toolchain-declaring-path`,
 `decidedBy: "toolchain"` and the run's configuration. A dependency's version
 is recorded only when the root `Cargo.lock` states that package at exactly
 the version rust-analyzer resolved; a standard-library target has none. The
-path the code writes is recorded beside it (`toolchain.written`).
+path the code writes is recorded beside it (`toolchainLibrary.written`). An
+offer the stored link does not take leaves the link, which keeps its
+route-off data and records why in `toolchainOutcome` (ruling on PR 70).
 **Why:** rust-analyzer proves the declaration; its declaring path is the one
 name it gives, and a public-path table (C-19's `rustpath.mjs`) would be a
 second resolver. **Rules out:** changing a source-only library target (it

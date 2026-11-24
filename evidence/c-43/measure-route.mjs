@@ -58,13 +58,11 @@ function rustLinks(path) {
         assumed: level2 && Array.isArray(data.assumes) && data.assumes.length > 0, toolchain: data.toolchain,
         // D24: a library target the route applied, and the answer it offered.
         toolchainLibrary: row.evidence === "toolchain-declaring-path",
-        offer: data.toolchainLibrary?.library ?? null,
         stored: row.resolution === "library" ? { ecosystem: row.ecosystem, unit: row.unit, symbol: row.symbol ?? null, evidence: row.evidence } : null,
-        // The stored data without the route's outcome and offer fields, for the
-        // check that a link the route did not decide stores its route-off data
-        // exactly.
+        // The stored data without the route's outcome field, for the check that
+        // a link the route did not decide stores its route-off data exactly.
         outcome: data.toolchainOutcome ?? null,
-        plain: JSON.stringify(Object.fromEntries(Object.entries(data).filter(([key]) => key !== "toolchainOutcome" && key !== "toolchainLibrary"))) });
+        plain: JSON.stringify(Object.fromEntries(Object.entries(data).filter(([key]) => key !== "toolchainOutcome"))) });
     }
     return links;
   } finally {
@@ -79,24 +77,18 @@ function rustLinks(path) {
  * two keys.
  */
 function libraryAgreement(links) {
-  const key = (t) => `${t.ecosystem}\u0000${t.unit}\u0000${t.symbol ?? ""}`;
-  let offered = 0, applied = 0, agree = 0, unverified = 0, sourceOnlyCheckout = 0;
-  const twoKeys = new Map();
+  // D24 (PR 70 ruling): an offer not applied leaves the link, and its
+  // outcome says why; the counts come from those outcomes.
+  const counts = { offered: 0, applied: 0, agree: 0, unverified: 0, sourceOnlyCheckout: 0, candidates: 0, notApplied: 0 };
+  const field = { "library:agrees": "agree", "library:kept-other-key": "unverified", "library:kept-checkout": "sourceOnlyCheckout",
+    "library:kept-candidates": "candidates", "library:not-applied": "notApplied" };
   for (const link of links.values()) {
-    if (!link.offer) continue;
-    offered++;
-    if (link.toolchainLibrary) applied++;
-    else if (link.resolution === "resolved") sourceOnlyCheckout++;
-    else if (link.stored && link.stored.evidence !== "toolchain-declaring-path") {
-      if (key(link.stored) === key(link.offer)) agree++;
-      else {
-        unverified++;
-        if (!twoKeys.has(key(link.offer))) twoKeys.set(key(link.offer), new Set());
-        twoKeys.get(key(link.offer)).add(key(link.stored));
-      }
-    }
+    if (link.toolchainLibrary) counts.applied++;
+    else if (field[link.outcome]) counts[field[link.outcome]]++;
+    else continue;
+    counts.offered++;
   }
-  return { offered, applied, agree, unverified, sourceOnlyCheckout, twoKeyItems: twoKeys.size };
+  return counts;
 }
 
 function score(links) {
