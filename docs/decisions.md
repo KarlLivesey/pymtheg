@@ -3578,6 +3578,11 @@ are followed as their plain forms, and any other operator only to a
 primitive. A defaulted parameter is followed only when every reference to
 its function is a direct call, and an open type parameter of a generic body
 never supplies a member. **Rules out:** a
-definite link to one member of a union the checker reduced, including
-main's on interfaces (`pick ? ia : ib`) and object literals (`[csv,
-tsv][1]`). See [C-41](changes/C-41.md).
+definite link to one member of a union the checker reduced where the walk
+enumerates the producers: interfaces (`pick ? ia : ib`) and object
+literals (`[csv, tsv][1]`). Where the walk cannot follow the receiver, an
+object- or type-literal member is unresolved, while an interface or class
+member keeps the checker's answer (`[ia, ib].reduce((x, y) => y).run()`
+→ `IA.run`). A walk stops at 20,000 steps (cached results counted at their
+cost) or 200 nested steps, both unresolved, so the outcome never depends on
+the stack or on what was walked before. See [C-41](changes/C-41.md).

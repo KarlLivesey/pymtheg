@@ -812,20 +812,25 @@ and never yields a version pin.
 - **Reduced receivers:** every member call's receiver chain is walked to
   its producers (conditionals, `??`, `||`, array elements, `for…of`
   variables, array callbacks' parameters, initialisers, a `let`'s
-  assignments, object-literal properties and fields with every write,
+  assignments, object-literal properties and fields with every plain
+  assignment to them,
   inferred returns, a defaulted parameter's call sites). Only listed step
   kinds can give a definite link; any other step is unresolved. Written steps (annotations,
   written return types, assertions) are one arm. Several arms give each
   arm's member as candidates; one arm gives its own member, also where the
   checker named another (`[csv, tsv][1].format()` → `tsv.format`). A
   receiver the walk cannot follow (an expando, a `let` written by
-  destructuring, a generic call with a reduced argument) is unresolved
-  (`receiver-unverified`), as is a defaulted parameter whose function is
+  destructuring, a generic call with a reduced argument) leaves an
+  object- or type-literal member unresolved (`receiver-unverified`); an
+  interface or class member keeps the checker's answer, which is one
+  declaration whatever the producer (`[ia, ib].reduce((x, y) => y).run()`
+  links `IA.run`). So is a defaulted parameter whose function is
   referenced other than by direct calls. Logical assignments follow their
   plain forms; an accessor follows its getter. Limits: narrowing to an
   intersection, `require` of a conditional `module.exports` and written
-  types derived from inference keep the checker's reduced answer.
-  Interface, class, type-literal and object-literal members alike
+  types derived from inference, an array mutated through an alias, and a
+  member written through `any` keep the checker's reduced answer.
+  A walk stops at 20,000 steps or 200 nested steps (unresolved)
   ([C-41](changes/C-41.md)).
 - **Type-literal members:** members of a written type literal are
   symbols, including nested union, intersection, array, tuple and

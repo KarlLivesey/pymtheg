@@ -47,7 +47,10 @@ const MUTATIONS = {
     if (declarations.some(ts.isSetAccessorDeclaration)) return undefined;`,
       ``,
     ],
-    [`if (ts.isSetAccessorDeclaration(property)) {`, `if (false) {`],
+    [
+      `if (ts.isSetAccessorDeclaration(property)) {`,
+      `if (ts.isSetAccessorDeclaration(property) && property.pos < 0) {`,
+    ],
   ],
   "4: logical assignment as the checker's type (round 2)": [
     [
@@ -84,7 +87,11 @@ const changed = (output) => {
 };
 
 try {
+  // Optional arguments: run only the mutations whose names start with one.
+  const only = process.argv.slice(2);
   for (const [name, edits] of Object.entries(MUTATIONS)) {
+    if (only.length && !only.some((prefix) => name.startsWith(prefix)))
+      continue;
     let text = original;
     for (const [from, to] of edits) {
       if (text.split(from).length !== 2) throw new Error(`${name}: anchor`);
