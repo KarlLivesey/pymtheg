@@ -60,6 +60,19 @@ export async function serveGraphRequest(
     if (message?.kind === "cancel") cancel.abort();
   };
   parentPort!.on("message", onMessage);
+  // C-50 review: every checkpoint of the command (each abort check) also
+  // reads the cancel flag the coordinator sets before it sends `cancel`, as
+  // the MCP worker does. Synchronous work does not let this thread read the
+  // message, so once the flag is set no later checkpoint passes.
+  const flagged = () => {
+    if (Atomics.load(shared, CONTROL.cancel) === 1 && !cancel.signal.aborted)
+      cancel.abort();
+  };
+  const check = cancel.signal.throwIfAborted.bind(cancel.signal);
+  cancel.signal.throwIfAborted = () => {
+    flagged();
+    check();
+  };
   try {
     const response = await executeGraph(request, {
       ...options,
@@ -81,6 +94,10 @@ export async function serveGraphRequest(
         }
       },
     });
+    // The last checkpoint: a cancel set before here answers as cancelled,
+    // even when the command finished (an index's completion is then
+    // already written). A signal after it may still see the result.
+    cancel.signal.throwIfAborted();
     post({ kind: "result", response });
   } catch (error) {
     post({

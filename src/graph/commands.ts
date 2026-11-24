@@ -616,6 +616,9 @@ export async function executeGraph(
         !report.resolutionErrors.length
       )
         stageSync("command.checkpointWrite", () => {
+          // A checkpoint just before the completion is written: a cancel
+          // acknowledged by now leaves the index incomplete.
+          signal.throwIfAborted();
           const written = currentStore.completeGraphCommandState(
             {
               schema: checkpointSchema,

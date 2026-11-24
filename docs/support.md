@@ -1013,7 +1013,10 @@ an await (Go marks its notes pass and its parse, Rust its parse), the
 worker is terminated;
 the next index repairs the store. Anywhere else the run's processes are
 killed, the module's abort signal fires, and the command stops at its next
-checkpoint with the index incomplete. A module that ignores the signal
+checkpoint with the index incomplete; every checkpoint reads the
+coordinator's cancel flag, so none passes once it is set, and a signal
+after the last one (before the result is posted) may still see exit 0. A
+module that ignores the signal
 while its promise is awaited holds the run until that promise settles; a
 second signal does nothing more. A link query that does not sync runs in
 place. A graph run that exhausts the worker's heap ends with exit code 3
@@ -1027,7 +1030,8 @@ server that exits ends them too, and the CLI (and `pymtheg mcp`) turns
 SIGINT, SIGTERM, SIGHUP and SIGQUIT into an orderly end that does the same;
 a cancel kills the job's children at once, whatever its worker does. Only a
 death the process cannot observe (SIGKILL, a crash of the runtime) leaves
-children running. On Windows the recorded
+children running. Closing the MCP server's stdin during a Go toolchain
+run leaves one Go build directory behind. On Windows the recorded
 process is killed, not its children. [C-54](changes/C-54.md)
 
 **Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted

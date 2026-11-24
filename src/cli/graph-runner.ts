@@ -80,6 +80,8 @@ export function runGraphInWorker(
     };
     const onAbort = () => {
       Atomics.store(shared, CONTROL.cancel, 1);
+      // Wakes a worker waiting on the flag (tests do), as the MCP server does.
+      Atomics.notify(shared, CONTROL.cancel);
       if (Atomics.load(shared, CONTROL.section) === SECTION.module) {
         // Answered on the worker's exit, after its child processes are
         // killed, so nothing it started outlives the answer.

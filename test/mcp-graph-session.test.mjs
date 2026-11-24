@@ -431,10 +431,19 @@ test("a cancel inside a synchronous stretch a module marks after an await ends t
   // fires it and fails instead of waiting.
   const { base, root } = tree(synFiles);
   const clock = controlledClock();
-  const { jobs, stopped } = jobsFor(root, "stretch-module", {
+  const { jobs, stopped, release } = jobsFor(root, "stretch-module", {
     cancelClock: clock,
     graceMs: 30_000,
   });
+  // C-50 review: if the worker is neither retired nor given a grace, the
+  // cancel would wait forever. After this bound the stretch is released, so
+  // the worker goes on and the test fails instead of hanging; the bound
+  // decides nothing when the test passes.
+  let bounded = false;
+  const bound = setTimeout(() => {
+    bounded = true;
+    release();
+  }, 3 * 60_000);
   try {
     const job = jobs.start({ command: "index" });
     await stopped();
@@ -451,6 +460,7 @@ test("a cancel inside a synchronous stretch a module marks after an await ends t
       await new Promise(setImmediate);
     }
     await cancelling;
+    assert.equal(bounded, false, "the cancel did not end the worker");
     assert.equal(graced, false, "no grace was scheduled");
     assert.equal(job.state, "cancelled");
     assert.equal(job.exited, true);
@@ -459,6 +469,8 @@ test("a cancel inside a synchronous stretch a module marks after an await ends t
     await next.done;
     assert.equal(jobs.generation, 2, "a new worker took the next job");
   } finally {
+    clearTimeout(bound);
+    release();
     await jobs.close();
     rmSync(base, { recursive: true, force: true });
   }
