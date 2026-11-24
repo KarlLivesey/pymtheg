@@ -1,0 +1,86 @@
+[
+ {
+  "pin": "dexie/Dexie.js",
+  "site": "typescript|src/classes/dexie/transaction-helpers.ts|calls|4724|4728|(expression).then",
+  "before": "[\"typescript\",\"src/public/types/promise-extended.d.ts\",\"method\",\"PromiseExtended.then\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|6555|6563|provider.supports",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.supports\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|6660|6667|provider.getName",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|6961|6968|provider.getName",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|7215|7222|provider.getName",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|7353|7367|provider.getDownloadUrl",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getDownloadUrl\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|7479|7486|provider.getName",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|7676|7683|provider.getName",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|8023|8030|provider.getName",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|8130|8137|provider.getName",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|19305|19313|provider.supports",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.supports\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "site": "typescript|packages/browsers/src/install.ts|calls|19388|19402|provider.getDownloadUrl",
+  "before": "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getDownloadUrl\",0]",
+  "after": "ambiguous"
+ },
+ {
+  "pin": "vercel/turborepo",
+  "site": "typescript|crates/turborepo-trace-lang-js/tests/flow_oracle/cases/each2.cjs|calls|2382|2386|describe.only.each",
+  "before": "[\"typescript\",\"crates/turborepo-trace-lang-js/tests/flow_oracle/cases/each2.cjs\",\"function\",\"each\",0]",
+  "after": "unresolved"
+ },
+ {
+  "pin": "vitest-dev/vitest",
+  "site": "typescript|packages/expect/src/jest-expect.ts|calls|6695|6703|actual.contains",
+  "before": "[\"typescript\",\"packages/expect/src/jest-expect.ts\",\"method\",\"Node.contains\",0]",
+  "after": "ambiguous"
+ }
+]
