@@ -992,9 +992,10 @@ test("review 3: escaping defaults, generic shorthand returns, accessor pairs and
   ].join("\n");
   const got = {};
   const want = {};
-  for (const [kind, { body, file = "src/use.ts", text, tsc, head }] of Object.entries(
-    ROUND_3,
-  )) {
+  for (const [
+    kind,
+    { body, file = "src/use.ts", text, tsc, head },
+  ] of Object.entries(ROUND_3)) {
     const files = {
       [file]: text ?? header + body + "\n",
       ...(file.endsWith(".js") && {

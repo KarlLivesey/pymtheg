@@ -290,18 +290,20 @@ export function receiverArms(
         const nullish =
           operator === ts.SyntaxKind.QuestionQuestionToken ||
           operator === ts.SyntaxKind.QuestionQuestionEqualsToken;
-        const always = strict && parts.every((part) =>
-          nullish
-            ? !(
-                part.flags &
-                (ts.TypeFlags.Undefined |
-                  ts.TypeFlags.Null |
-                  ts.TypeFlags.Void |
-                  ts.TypeFlags.Any |
-                  ts.TypeFlags.Unknown)
-              )
-            : !!(part.flags & ts.TypeFlags.Object),
-        );
+        const always =
+          strict &&
+          parts.every((part) =>
+            nullish
+              ? !(
+                  part.flags &
+                  (ts.TypeFlags.Undefined |
+                    ts.TypeFlags.Null |
+                    ts.TypeFlags.Void |
+                    ts.TypeFlags.Any |
+                    ts.TypeFlags.Unknown)
+                )
+              : !!(part.flags & ts.TypeFlags.Object),
+          );
         return always
           ? arms(node.left)
           : merge([arms(node.left), arms(node.right)]);
@@ -1211,8 +1213,8 @@ export function receiverArms(
   function expandArrays(found: Arms): Arms {
     if (!found) return undefined;
     return merge(
-      found.map(
-        (arm): Arms => (arm.array || arm.items ? elementsOf([arm]) : [arm]),
+      found.map((arm): Arms =>
+        arm.array || arm.items ? elementsOf([arm]) : [arm],
       ),
     );
   }
@@ -1540,8 +1542,7 @@ export function receiverArms(
       if (ts.isSetAccessorDeclaration(property)) {
         const getter = node.properties.find(
           (item): item is ts.GetAccessorDeclaration =>
-            ts.isGetAccessorDeclaration(item) &&
-            staticName(item.name) === name,
+            ts.isGetAccessorDeclaration(item) && staticName(item.name) === name,
         );
         if (!getter) return undefined;
         const value = declarationArms(getter);
@@ -1804,7 +1805,10 @@ export function receiverArms(
         (arm) =>
           !arm.generic &&
           !own.has(arm.type) &&
-          !!(arm.type.flags & (ts.TypeFlags.TypeParameter | ts.TypeFlags.IndexedAccess)) &&
+          !!(
+            arm.type.flags &
+            (ts.TypeFlags.TypeParameter | ts.TypeFlags.IndexedAccess)
+          ) &&
           !(arm.type as { isThisType?: boolean }).isThisType,
       )
     )
