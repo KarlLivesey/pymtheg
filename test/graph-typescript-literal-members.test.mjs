@@ -1050,7 +1050,8 @@ test("review 3: the walk's work per call is bounded by a step count, cached resu
       "",
     ].join("\n");
   const seen = [];
-  for (let k = 8; k <= 16; k++) {
+  // Up to the first level the budget cuts, and one more.
+  for (let k = 10; k <= 26 && seen.filter(({ cut }) => cut).length < 2; k++) {
     receiverStatistics.maxSteps = 0;
     const cuts = receiverStatistics.budgetCuts;
     const got = await outcomes({ "src/use.ts": chain(k) }, "src/use.ts");
@@ -1067,26 +1068,33 @@ test("review 3: the walk's work per call is bounded by a step count, cached resu
     );
   }
   assert.ok(seen.some(({ cut }) => cut) && seen.some(({ cut }) => !cut));
-  // A self-assigned `let` under nested choices: results touched by the
-  // cycle are not cached. The walk stops at the budget (main's review
-  // counted 327,679 expressions at 16 levels).
-  const choices = (depth) =>
-    depth ? `(pick ? ${choices(depth - 1)} : ${choices(depth - 1)})` : "x";
+  // Self-assigned `let`s, each choosing twice from the one before: every
+  // result is touched by a cycle, so none is cached and the work doubles
+  // per level (reviewer B: 327,679 expressions at 16 levels). At 24 levels
+  // it would be tens of millions; the walk stops at the budget.
+  const k = 24;
   const before = receiverStatistics.expressions;
-  await outcomes(
+  const cuts = receiverStatistics.budgetCuts;
+  const got = await outcomes(
     {
       "src/use.ts": [
         "declare const pick: boolean;",
-        "let x = { run() {} };",
-        `x = ${choices(16)};`,
-        "x.run();",
+        "let l0 = { run() {} };",
+        "l0 = l0;",
+        ...Array.from(
+          { length: k },
+          (_, i) => `let l${i + 1} = pick ? l${i} : l${i};\nl${i + 1} = l${i + 1};`,
+        ),
+        `l${k}.run();`,
         "",
       ].join("\n"),
     },
     "src/use.ts",
   );
   const spent = receiverStatistics.expressions - before;
+  assert.ok(receiverStatistics.budgetCuts > cuts, "the budget was reached");
   assert.ok(spent <= MAX_STEPS + 1, `expressions computed: ${spent}`);
+  assert.equal(got[`l${k}.run();`], "unresolved:receiver-unverified");
 });
 
 test("review 3: a long alias chain has the same outcome first or last in a process, top-level or nested", async () => {

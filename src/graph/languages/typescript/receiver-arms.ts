@@ -76,7 +76,7 @@ export const MAX_DEPTH = 200;
  * so a self-assigned `let` under nested choices grows exponentially). A
  * walk that reaches it leaves the call unresolved.
  */
-export const MAX_STEPS = 20_000;
+export const MAX_STEPS = 1_000_000;
 
 /** Array methods whose callback's first parameter is an element. */
 const ELEMENT_CALLBACKS = new Set([
