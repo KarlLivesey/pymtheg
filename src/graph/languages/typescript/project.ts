@@ -788,7 +788,8 @@ export function projectModel(
   // Reference redirects reuse the parsed snapshot config across programs.
   const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
   const emitConfigs = new Map<string, ts.ParsedCommandLine>();
-  /** Configs whose settings are incomplete (a base that was not read). */
+  /** Configs whose settings are incomplete or unknown: a base that was not
+   * read, or a config that failed (C-46 review 4). */
   const incompleteConfigs = new Set<string>();
   const claimed = new Map<string, ProjectGroup[]>();
   const claim = (path: string, group: ProjectGroup) => {
@@ -1048,6 +1049,9 @@ export function projectModel(
           if (path !== undefined) claim(path, group);
         }
     }
+    // A config that failed (a missing relative base, a JSON syntax error in
+    // it or a base) has unknown settings too (C-46 review 4).
+    if (group.failure) incompleteConfigs.add(toVirtual(config.path));
     // Its own file selection cannot be read: it could own anything below its
     // directory (decided after every config, see below).
     if (group.failure && selectionUnreadable) unreadable.push(group);

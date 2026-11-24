@@ -45,7 +45,9 @@ const entryAssumption = (entry: { proof?: string } | undefined) =>
  * the entries' sources and every file that imports one of them, directly
  * or through other files, by the program's module resolution. Undefined
  * (every file) when one of them declares globals or augments a module,
- * which reaches files that do not import it.
+ * which reaches files that do not import it, and so too when a file only
+ * the route brings into the program does (C-46 review 5: an entry's source
+ * importing a plugin's `declare module "host"`).
  */
 function assumedDependents(
   program: ts.Program,
@@ -56,6 +58,7 @@ function assumedDependents(
     if (entry.assumed) seeds.add(resolved.resolvedFileName);
   const checker = program.getTypeChecker();
   const importers = new Map<string, Set<string>>();
+  const imported = new Map<string, Set<string>>();
   for (const file of program.getSourceFiles()) {
     const imports =
       (file as ts.SourceFile & { imports?: readonly ts.StringLiteralLike[] })
@@ -68,15 +71,24 @@ function assumedDependents(
       const list = importers.get(target.fileName) ?? new Set();
       list.add(file.fileName);
       importers.set(target.fileName, list);
+      const out = imported.get(file.fileName) ?? new Set();
+      out.add(target.fileName);
+      imported.set(file.fileName, out);
+    }
+    for (const reference of file.referencedFiles) {
+      const target = program.getSourceFile(
+        posix.resolve(posix.dirname(file.fileName), reference.fileName),
+      );
+      if (!target) continue;
+      const out = imported.get(file.fileName) ?? new Set();
+      out.add(target.fileName);
+      imported.set(file.fileName, out);
     }
   }
-  const reached = new Set(seeds);
-  const queue = [...seeds];
-  while (queue.length) {
-    const file = queue.pop()!;
+  const declaresBeyondItself = (file: string) => {
     const source = program.getSourceFile(file);
-    if (
-      source &&
+    return (
+      !!source &&
       (!ts.isExternalModule(source) ||
         source.statements.some(
           (statement) =>
@@ -84,8 +96,41 @@ function assumedDependents(
             (ts.isStringLiteral(statement.name) ||
               statement.flags & ts.NodeFlags.GlobalAugmentation),
         ))
-    )
+    );
+  };
+  // What the route brings in: files reached from the entries' sources that
+  // the program does not reach otherwise (from a file nothing imports, not
+  // through an entry's source). The neutral program lacks them.
+  const closure = (starts: Iterable<string>, stop: Set<string>) => {
+    const found = new Set<string>();
+    const stack = [...starts].filter((file) => !stop.has(file));
+    while (stack.length) {
+      const file = stack.pop()!;
+      if (found.has(file)) continue;
+      found.add(file);
+      for (const next of imported.get(file) ?? [])
+        if (!stop.has(next) && !found.has(next)) stack.push(next);
+    }
+    return found;
+  };
+  const elsewhere = closure(
+    program
+      .getSourceFiles()
+      .map((file) => file.fileName)
+      .filter((file) => !importers.has(file)),
+    seeds,
+  );
+  for (const file of closure(
+    [...seeds].flatMap((seed) => [...(imported.get(seed) ?? [])]),
+    new Set(),
+  ))
+    if (!seeds.has(file) && !elsewhere.has(file) && declaresBeyondItself(file))
       return undefined;
+  const reached = new Set(seeds);
+  const queue = [...seeds];
+  while (queue.length) {
+    const file = queue.pop()!;
+    if (declaresBeyondItself(file)) return undefined;
     for (const importer of importers.get(file) ?? [])
       if (!reached.has(importer)) {
         reached.add(importer);

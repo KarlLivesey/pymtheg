@@ -25,7 +25,8 @@ const root = {
 };
 
 /** Each `calls` link in app.ts by its callee text: the target's
- * `file#identity` and assumptions, or `<resolution>:<reason>`. */
+ * `file#identity` and assumptions, or `<resolution>:<reason>`. Links in
+ * other top-level files are keyed `<file>:<callee>`. */
 async function calls(files) {
   const scratch = await mkdtemp(join(tmpdir(), "c46-"));
   const dir = join(scratch, "project");
@@ -46,8 +47,12 @@ async function calls(files) {
     );
     const out = {};
     for (const link of store.links()) {
-      if (link.file !== "app.ts" || link.kind !== "calls") continue;
-      out[link.targetName] =
+      if (link.file.includes("/") || link.kind !== "calls") continue;
+      out[
+        link.file === "app.ts"
+          ? link.targetName
+          : `${link.file}:${link.targetName}`
+      ] =
         link.resolution === "resolved"
           ? [
               symbols.get(link.targetId),
@@ -564,4 +569,134 @@ test("PR 67 review 3: a manifest field as an entry, and output.file beside dir o
     ["ts-unbuilt-entry-is-bundler-entry"],
     "packages/d/src/main.ts",
   ]);
+});
+
+test("PR 67 review 4: an entry source that augments a module or declares globals sends every file through", async () => {
+  // A plugin package's shape (Fastify, vue-router, Pinia): the entry's
+  // source imports `declare module "host"` and `declare global`, which
+  // reach files that never import the entry.
+  const variant = (fields, extra = {}) => ({
+    "tsconfig.json":
+      '{"compilerOptions":{"strict":true,"module":"ESNext","moduleResolution":"Bundler","target":"ES2022"},"files":["app.ts","app2.ts","app3.ts"]}',
+    "packages/p/package.json": pkg("p", fields),
+    "packages/p/src/index.ts":
+      'import "./aug"; import "./glob"; export function open() {}',
+    "packages/p/src/aug.ts":
+      'export {}; declare module "host" { interface Thing { extraMethod(): void } }',
+    "packages/p/src/glob.ts":
+      "export {}; declare global { function pGlobal(): void }",
+    "packages/host/package.json": pkg("host", { types: "./index.d.ts" }),
+    "packages/host/index.d.ts":
+      "export interface Thing { base(): void }\nexport declare function make(): Thing;",
+    "app.ts": 'import { open } from "p"; open();',
+    "app2.ts": 'import { make } from "host"; make().extraMethod();',
+    "app3.ts": "pGlobal();",
+    ...extra,
+  });
+  const before = { ...statistics };
+  const routes = {
+    // The src/ twin (C-46).
+    twin: await calls(
+      variant({ types: "./dist/index.d.ts", scripts: { build: "tsup" } }),
+    ),
+    // The compiler's emit (C-25).
+    emit: await calls(
+      variant(
+        { types: "./dist/index.d.ts", scripts: { build: "tsc" } },
+        {
+          "packages/p/tsconfig.json":
+            '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"dist"},"include":["src"]}',
+        },
+      ),
+    ),
+  };
+  const extracted = statistics.neutralExtracted - before.neutralExtracted;
+  for (const [route, got] of Object.entries(routes)) {
+    const [target, assumes] = got.open;
+    assert.equal(target, "packages/p/src/index.ts#open", route);
+    assert.equal(assumes.length, 1, route);
+    // Each link that rests on the route carries its assumption.
+    for (const key of ["app2.ts:(expression).extraMethod", "app3.ts:pGlobal"])
+      assert.deepEqual(
+        got[key].slice(0, 2),
+        [
+          key.endsWith("extraMethod")
+            ? "packages/p/src/aug.ts#host.Thing.extraMethod"
+            : "packages/p/src/glob.ts#[global].pGlobal",
+          assumes,
+        ],
+        `${route} ${key}: ${JSON.stringify(got[key])}`,
+      );
+  }
+  // Cost: the three files, each route.
+  assert.equal(extracted, 6);
+});
+
+test("PR 67 review 4: a package config with a missing base or a syntax error gives no route", async () => {
+  const twin = (name) => ({
+    [`packages/${name}/package.json`]: pkg(name, {
+      types: "./dist/index.d.ts",
+      scripts: { build: "tsup" },
+    }),
+    [`packages/${name}/src/index.ts`]: `export function ${name}() {}`,
+  });
+  const got = await calls({
+    ...twin("missingbase"),
+    "packages/missingbase/tsconfig.json":
+      '{"extends":"./tsconfig.base.json","include":["src"]}',
+    ...twin("badjson"),
+    "packages/badjson/tsconfig.json": '{"include":["src"],}}',
+    ...twin("badbase"),
+    "packages/badbase/tsconfig.json":
+      '{"extends":"./tsconfig.base.json","include":["src"]}',
+    "packages/badbase/tsconfig.base.json": '{"compilerOptions":{"strict":true,}}',
+    ...twin("readable"),
+    "packages/readable/tsconfig.json":
+      '{"extends":"./tsconfig.base.json","include":["src"]}',
+    "packages/readable/tsconfig.base.json":
+      '{"compilerOptions":{"strict":true}}',
+    "app.ts": [
+      'import { missingbase } from "missingbase";',
+      'import { badjson } from "badjson";',
+      'import { badbase } from "badbase";',
+      'import { readable } from "readable";',
+      "missingbase();",
+      "badjson();",
+      "badbase();",
+      "readable();",
+    ].join("\n"),
+  });
+  const none = "unresolved:workspace-build-output-missing";
+  assert.deepEqual(
+    {
+      missingbase: got.missingbase,
+      badjson: got.badjson,
+      badbase: got.badbase,
+      readable: got.readable,
+    },
+    {
+      missingbase: none,
+      badjson: none,
+      badbase: none,
+      readable: [
+        "packages/readable/src/index.ts#readable",
+        ["ts-unbuilt-entry-is-src-twin"],
+        "packages/readable/src/index.ts",
+      ],
+    },
+  );
+});
+
+test("PR 67 review 4: a package with no config of its own under a root config with an unread base gives no route", async () => {
+  const got = await calls({
+    "tsconfig.json":
+      '{"extends":"@missing/tsconfig/base.json","compilerOptions":{"strict":true,"module":"ESNext","moduleResolution":"Bundler","target":"ES2022"},"files":["app.ts"]}',
+    "packages/a/package.json": pkg("a", {
+      types: "./dist/index.d.ts",
+      scripts: { build: "tsup" },
+    }),
+    "packages/a/src/index.ts": "export function a() {}",
+    "app.ts": 'import { a } from "a"; a();',
+  });
+  assert.equal(got.a, "unresolved:workspace-build-output-missing");
 });

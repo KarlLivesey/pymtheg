@@ -113,7 +113,8 @@ export function workspaceEntries(
    * emit paths are scoped): their `stripInternal` counts (C-46 review).
    */
   allConfigs: ReadonlyMap<string, ts.ParsedCommandLine> = parsedConfigs,
-  /** Configs whose settings are incomplete: a base that was not read. */
+  /** Configs whose settings are incomplete or unknown: a base that was not
+   * read, or a config that failed to read (C-46 review 4). */
   incompleteConfigs: ReadonlySet<string> = new Set(),
 ) {
   const packages = new Map(
@@ -485,6 +486,15 @@ export function workspaceEntries(
     // A config of this package whose base was not read: whether it strips
     // internals is unknown, so no convention route (C-46 review).
     if ([...incompleteConfigs].some((path) => packageOf(path) === root))
+      return undefined;
+    // A package with no config of its own, under an unread config (a root
+    // config whose base was not read) that may cover it: unknown too.
+    if (
+      ![...allConfigs.keys()].some((path) => packageOf(path) === root) &&
+      [...incompleteConfigs].some((path) =>
+        (root + "/").startsWith(posix.dirname(path).replace(/\/?$/, "/")),
+      )
+    )
       return undefined;
     const compilerStrips =
       (configs.get(root) ?? []).some(
