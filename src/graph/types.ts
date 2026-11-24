@@ -423,6 +423,12 @@ export interface GraphStorage {
    */
   claimIndexRun?(): StorageResult<void>;
   /**
+   * C-62: a synchronous check the run's first write after this call makes
+   * under its write lock, before it publishes anything: false means the
+   * capture is stale, and the run writes nothing.
+   */
+  verifyIndexCapture?(verify: () => boolean): void;
+  /**
    * C-38A: whether a run finished completely before this one began (kept
    * across later runs, including a run taken over). Read in the run's
    * opening snapshot.

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import { readdirSync, readFileSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { toolchainWorkDirectory } from "../project/local-trust.js";
 import { join, resolve } from "node:path";
@@ -143,15 +144,17 @@ export async function indexProject(
         paths.push(path);
     }
   }
-  await stage("index.walk", () => walk(""));
-  paths.sort(compare);
-  // The run begins before it reads the store, so that any other run's write
-  // from here on stops this one before it writes (C-22). A mark found here
-  // belongs to a run that did not finish or is still running: it may have
-  // replaced some files' records and not others, while each still matches
-  // its source hash, so nothing it touched can be trusted as unchanged.
+  // The run begins before it walks the tree and reads the store, so that any
+  // other run's write from here on stops this one before it writes (C-22;
+  // C-62: the walk too, so a file another run indexes after this run's walk
+  // is never deleted by it). A mark found here belongs to a run that did not
+  // finish or is still running: it may have replaced some files' records and
+  // not others, while each still matches its source hash, so nothing it
+  // touched can be trusted as unchanged.
   const unfinished =
     (await stage("store.beginRun", () => store.beginIndexRun?.())) === true;
+  await stage("index.walk", () => walk(""));
+  paths.sort(compare);
   const completed = await stage("store.beginRun", () =>
     store.completedAnalysis?.(),
   );
@@ -340,6 +343,31 @@ export async function indexProject(
         !incompatible.has(module.id)
       )
         reusing.add(module.id);
+  // C-62: before its first write publishes anything, under that write's
+  // lock, the run checks that its capture is still the tree on disk: the
+  // same walk, and the same text for every file it writes and every context
+  // file. Another run, even one that wrote nothing because it found the tree
+  // current, may have seen a newer tree than this run captured; then this
+  // run writes nothing. A run that writes nothing never checks.
+  {
+    const expected = new Map<string, string>();
+    for (const file of updates)
+      expected.set(file.path, captures.get(file.path)?.hash ?? "");
+    for (const file of contexts) expected.set(file.path, file.hash);
+    store.verifyIndexCapture?.(
+      () =>
+        sameWalk(root, excluded, options.excludeFiles, paths) &&
+        [...expected].every(([path, hash]) => {
+          let now = "";
+          try {
+            now = contentHash(readFileSync(join(root, path)));
+          } catch {
+            // Unreadable now, as a failed capture is: its hash is "".
+          }
+          return now === hash;
+        }),
+    );
+  }
   const writeParsed = async (file: GraphFile) => {
     await store.replaceFile(file, cacheableFailures.has(file.path));
     report.indexed++;
@@ -955,5 +983,39 @@ async function parsedLinks(store: GraphStorage, module: string) {
     (await store.links()).filter(
       (link) => link.module === module && link.origin === "parse",
     )
+  );
+}
+
+/**
+ * C-62: whether the tree's files are still `paths`, walked as the run walked
+ * it (synchronously: this runs under a write lock).
+ */
+function sameWalk(
+  root: string,
+  excluded: ReadonlySet<string>,
+  excludeFiles: readonly string[] | undefined,
+  paths: readonly string[],
+): boolean {
+  const found: string[] = [];
+  const walk = (directory: string): void => {
+    const entries = readdirSync(join(root, directory), { withFileTypes: true });
+    for (const entry of entries) {
+      const path = directory ? `${directory}/${entry.name}` : entry.name;
+      if (entry.isSymbolicLink()) continue;
+      if (entry.isDirectory()) {
+        if (!excluded.has(entry.name)) walk(path);
+      } else if (entry.isFile() && !excludeFiles?.includes(path))
+        found.push(path);
+    }
+  };
+  try {
+    walk("");
+  } catch {
+    return false;
+  }
+  found.sort(compare);
+  return (
+    found.length === paths.length &&
+    found.every((path, index) => path === paths[index])
   );
 }
