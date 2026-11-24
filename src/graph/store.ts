@@ -30,7 +30,7 @@ import type {
 } from "./types.js";
 
 /**
- * C-55: the length of the stored JSON each decoded value came from (records,
+ * C-55: the UTF-8 bytes of the stored JSON each decoded value came from (records,
  * a file's symbols, projection rows), so a reader that keeps them can count
  * their size without encoding them again.
  */
@@ -122,9 +122,10 @@ export class SqliteGraphStore implements GraphStorage {
    */
   private decodeFile(body: string): GraphFile {
     count("store.fileRecordsDecoded");
-    count("store.fileRecordBytesDecoded", Buffer.byteLength(body));
+    const bytes = Buffer.byteLength(body);
+    count("store.fileRecordBytesDecoded", bytes);
     const file = JSON.parse(body) as GraphFile;
-    storedSizes.set(file, body.length);
+    storedSizes.set(file, bytes);
     return file;
   }
   constructor(
@@ -625,13 +626,12 @@ export class SqliteGraphStore implements GraphStorage {
         const diagnostics = row.diagnostics as string;
         const links = row.links as string;
         const facts = typeof row.facts === "string" ? row.facts : undefined;
-        count("store.resolutionFileProjectionRows");
-        count(
-          "store.resolutionFileProjectionBytes",
+        const bytes =
           Buffer.byteLength(diagnostics) +
-            Buffer.byteLength(links) +
-            Buffer.byteLength(facts ?? ""),
-        );
+          Buffer.byteLength(links) +
+          Buffer.byteLength(facts ?? "");
+        count("store.resolutionFileProjectionRows");
+        count("store.resolutionFileProjectionBytes", bytes);
         const projected: ResolutionFile = {
           path: row.path as string,
           module: row.module as string,
@@ -644,10 +644,7 @@ export class SqliteGraphStore implements GraphStorage {
             ...(facts === undefined ? {} : { data: JSON.parse(facts) }),
           },
         };
-        storedSizes.set(
-          projected,
-          diagnostics.length + links.length + (facts?.length ?? 0),
-        );
+        storedSizes.set(projected, bytes);
         return projected;
       });
   }
@@ -778,7 +775,7 @@ export class SqliteGraphStore implements GraphStorage {
       [...new Set(paths)].map((path) => {
         let bytes = 0;
         const symbols = select.all(path).map((row) => {
-          bytes += (row.body as string).length;
+          bytes += Buffer.byteLength(row.body as string);
           return JSON.parse(row.body as string) as GraphSymbol;
         });
         storedSizes.set(symbols, bytes);

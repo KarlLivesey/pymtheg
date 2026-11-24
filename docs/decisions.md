@@ -3548,10 +3548,12 @@ every file's resolver projection and every symbol, as session kept state
 under C-45's rules. A run re-reads only the paths the store has written
 since they were read; the store records every path its `replaceFile` and
 `removeFile` calls write, and those are the only writers of file-level
-facts. Inputs are assembled in the store's own order. The module must not
+facts. Each input is given in the order the same read gives without a
+session: records by UTF-16 code units, the resolver projection by UTF-8
+bytes (SQL `ORDER BY path`), symbols by id. The module must not
 change its inputs in place; the test suite freezes them, production does
 not (freezing costs about two thirds of decoding). A kept value above
-128 MiB of stored JSON is not kept. **Why:** a Go body edit decoded every
+128 MiB (UTF-8 bytes) of stored JSON is not kept. **Why:** a Go body edit decoded every
 stored record twice per run (about 3.9 s of a cli/cli body edit through
 the MCP worker); kept, those reads take 0.4 s. **Trade:** the worker's
 resting heap grows by the kept value (cli/cli 94 → 247 MiB, under the

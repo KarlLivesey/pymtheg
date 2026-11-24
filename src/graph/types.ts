@@ -270,7 +270,8 @@ export interface LanguageModule {
    * inputs (analysis records, resolver projection and symbols) between
    * runs and re-reads only the files written since. The module must not
    * change its inputs in place: they may be handed to the next run. The
-   * test suite freezes them, so a module that does fails there.
+   * test suite freezes them, so a module that does fails there. Each input
+   * comes in the order the same read gives without a session.
    */
   keepsInput?: true;
   /** For scoped resolution only, the file-level parsed link kinds read across files. */

@@ -522,34 +522,77 @@ test("over the kept-input limit nothing is kept; the next run reads everything a
   }
 });
 
+/** Production modules, with Go's resolver recording the files it is given. */
+async function recordingGo() {
+  const production = await discoverLanguages();
+  const seen = [];
+  const registry = new LanguageRegistry(
+    production.modules.map((module) =>
+      module.id !== "go"
+        ? module
+        : {
+            ...module,
+            resolve(context) {
+              seen.push(context.files.map((file) => file.path));
+              return module.resolve(context);
+            },
+          },
+    ),
+  );
+  return { registry, production, seen };
+}
+const storedPaths = (root) => {
+  const db = new DatabaseSync(graphAt(root), { readOnly: true });
+  try {
+    return db
+      .prepare("SELECT path FROM graph_files ORDER BY path")
+      .all()
+      .map((row) => row.path);
+  } finally {
+    db.close();
+  }
+};
+
 test("kept Go inputs keep the store's order for paths outside the Basic Multilingual Plane", async () => {
   // U+FFFD sorts after U+1F600 by UTF-16 code units and before it by UTF-8
-  // bytes: the store lists paths by bytes, records are ordered by code units.
+  // bytes, the order of the store's projection query (SQL ORDER BY path).
+  // Go's resolver must be given the projection in that order in a session
+  // too, whatever it does with it.
   const { base, root, write } = tree({
     "go.mod": "module example.com/m\n\ngo 1.22\n",
-    "p/x�.go":
+    "p/x\uFFFD.go":
       "package p\n\ntype T struct{ X int }\n\nfunc F() int { return 1 }\n",
     "p/x\u{1F600}.go": "package p\n\nfunc G() int { return F() + T{}.X }\n",
     "p/y.go":
       "package p\n\ntype U struct{ T }\n\nfunc H() int { return U{}.X }\n",
   });
   try {
-    const registry = await discoverLanguages();
+    const { registry, production, seen } = await recordingGo();
     const session = new IndexSession({ registry });
     assert.equal((await index(root, session)).sync.complete, true);
+    const stored = storedPaths(root);
+    // The paths do tell the two orders apart.
+    assert.notDeepEqual([...stored].sort(), stored);
     for (const [step, body] of ["2", "3", "4"].entries()) {
       write(
-        "p/x�.go",
+        "p/x\uFFFD.go",
         `package p\n\ntype T struct{ X int }\n\nfunc F() int { return ${body} }\n`,
       );
+      seen.length = 0;
       resetGraphWork();
       assert.equal(
         (await index(root, session)).sync.complete,
         true,
         `step ${step}`,
       );
+      if (step > 0)
+        assert.ok(
+          (graphWork.counts["kept.input.projectionReused"] ?? 0) >= 1,
+          `step ${step}: the projection is kept`,
+        );
+      assert.deepEqual(seen, [storedPaths(root)], `step ${step}`);
       assert.deepEqual(
-        await differencesFromCold(base, root, registry),
+        await differencesFromCold(base, root, production),
         [],
         `step ${step}`,
       );
@@ -558,4 +601,153 @@ test("kept Go inputs keep the store's order for paths outside the Basic Multilin
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
+});
+
+test("a session's Go inputs follow added, renamed and rewritten files; each step equals cold", async () => {
+  // Each step can only equal cold if the session re-reads what it wrote:
+  // the paths this run wrote before its reads, the stale paths of kept
+  // symbols, and the stale paths of the kept projection (C-55 review).
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go":
+      "package a\n\ntype Base struct{ X int }\n\ntype Other struct{ Y int }\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.Base }\n\nfunc B() int { return a.Hello() + S{}.X }\n',
+    "c/c.go": "package c\n\nfunc C() int { return 3 }\n",
+  });
+  const remove = (path) => rmSync(join(root, path));
+  const steps = [
+    [
+      "add a/hello.go declaring World",
+      () => write("a/hello.go", "package a\n\nfunc World() int { return 2 }\n"),
+    ],
+    [
+      "case-rename it",
+      () => {
+        remove("a/hello.go");
+        write("a/Hello.go", "package a\n\nfunc World() int { return 2 }\n");
+      },
+    ],
+    [
+      "use a.World() from c/c.go",
+      () =>
+        write(
+          "c/c.go",
+          'package c\n\nimport "example.com/m/a"\n\nfunc C() int { return a.World() }\n',
+        ),
+    ],
+    [
+      "rename the file",
+      () => {
+        remove("a/Hello.go");
+        write("a/world.go", "package a\n\nfunc World() int { return 2 }\n");
+      },
+    ],
+    [
+      "rename World's signature",
+      () =>
+        write("a/world.go", "package a\n\nfunc Planet() int { return 2 }\n"),
+    ],
+    [
+      "edit the caller to match",
+      () =>
+        write(
+          "c/c.go",
+          'package c\n\nimport "example.com/m/a"\n\nfunc C() int { return a.Planet() }\n',
+        ),
+    ],
+    [
+      "change b's embedded type",
+      () =>
+        write(
+          "b/b.go",
+          'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.Other }\n\nfunc B() int { return a.Hello() + S{}.Y }\n',
+        ),
+    ],
+    [
+      "a body edit of b",
+      () =>
+        write(
+          "b/b.go",
+          'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.Other }\n\nfunc B() int { return a.Hello() + S{}.Y + 1 }\n',
+        ),
+    ],
+  ];
+  try {
+    const registry = await discoverLanguages();
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    let reused = 0;
+    for (const [name, edit] of steps) {
+      edit();
+      resetGraphWork();
+      assert.equal((await index(root, session)).sync.complete, true, name);
+      reused += graphWork.counts["kept.input.symbolsReused"] ?? 0;
+      assert.deepEqual(
+        await differencesFromCold(base, root, registry),
+        [],
+        name,
+      );
+    }
+    assert.ok(reused > 0, "kept inputs were used");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("the kept-input limit is exact, in UTF-8 bytes of stored JSON", async () => {
+  // Non-ASCII source text, so UTF-8 bytes and UTF-16 units differ.
+  const files = {
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go":
+      'package a\n\n// Grüße, 世界, \u{1F600}\nfunc Hello() string { return "héllo \u{1F600}" }\n',
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() string { return a.Hello() }\n',
+  };
+  const firstRun = async (limit) => {
+    const { base, root } = tree(files);
+    try {
+      const session = new IndexSession({
+        registry: await discoverLanguages(),
+        ...(limit === undefined ? {} : { keptInputBytes: limit }),
+      });
+      resetGraphWork();
+      assert.equal((await index(root, session)).sync.complete, true);
+      return { ...graphWork.counts };
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  };
+  const total = (await firstRun())["kept.input.bytes"];
+  assert.ok(total > 0);
+  assert.equal((await firstRun(total))["kept.input.overLimit"] ?? 0, 0);
+  assert.equal((await firstRun(total - 1))["kept.input.overLimit"], 1);
+});
+
+test("kept analysis input reads a wanted path it never kept", async () => {
+  const { KeptInputs } = await import("../dist/graph/kept-input.js");
+  const record = (path) => ({
+    path,
+    module: "go",
+    result: { status: "parsed", symbols: [], links: [], diagnostics: [] },
+  });
+  const reads = [];
+  const read = async (paths) => {
+    reads.push([...paths]);
+    return paths.map(record);
+  };
+  const first = new KeptInputs(undefined, () => new Set());
+  await first.analysisInput(["a.go"], read, 0);
+  const kept = first.result(() => new Set());
+  assert.ok(kept);
+  // Nothing written since: a.go comes from what was kept, b.go (never
+  // kept, never written) is read as a fresh read would give it.
+  reads.length = 0;
+  const second = new KeptInputs(kept, () => new Set());
+  const input = await second.analysisInput(["a.go", "b.go"], read, 0);
+  assert.deepEqual(reads, [["b.go"]]);
+  assert.deepEqual(
+    input.map((file) => file.path),
+    ["a.go", "b.go"],
+  );
 });
