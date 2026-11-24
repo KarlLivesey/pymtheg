@@ -59,7 +59,12 @@ function rustLinks(path) {
         // D24: a library target the route applied, and the answer it offered.
         toolchainLibrary: row.evidence === "toolchain-declaring-path",
         offer: data.toolchainLibrary?.library ?? null,
-        stored: row.resolution === "library" ? { ecosystem: row.ecosystem, unit: row.unit, symbol: row.symbol ?? null, evidence: row.evidence } : null });
+        stored: row.resolution === "library" ? { ecosystem: row.ecosystem, unit: row.unit, symbol: row.symbol ?? null, evidence: row.evidence } : null,
+        // The stored data without the route's outcome and offer fields, for the
+        // check that a link the route did not decide stores its route-off data
+        // exactly.
+        outcome: data.toolchainOutcome ?? null,
+        plain: JSON.stringify(Object.fromEntries(Object.entries(data).filter(([key]) => key !== "toolchainOutcome" && key !== "toolchainLibrary"))) });
     }
     return links;
   } finally {
@@ -131,11 +136,17 @@ const off = await cold("source-only", {});
 const on = await cold("route", { toolchains: { rust: wrapper }, toolchainDirectory: join(work, "toolchain") });
 const before = rustLinks(off.path);
 const after = rustLinks(on.path);
-let lost = 0, changed = 0;
+let lost = 0, changed = 0, outcomes = 0, outcomeDataDiffers = 0;
 for (const [id, link] of before) {
   const now = after.get(id);
   if (!now) { lost++; continue; }
   if (link.level2 && (!now.level2 || now.target !== link.target || now.resolution !== link.resolution)) changed++;
+  // Fifth review: a link that records an outcome took no answer; its data
+  // must be the route-off data exactly, apart from the outcome.
+  if (now.outcome) {
+    outcomes++;
+    if (now.plain !== link.plain) outcomeDataDiffers++;
+  }
 }
 const notes = (on.report.toolchains ?? []).filter((n) => n.module === "rust").map((n) => n.note);
 const available = notes.find((n) => n.status === "available");
@@ -162,7 +173,7 @@ const result = {
   // D24: offered library answers against the stored source-only library
   // targets (computed from the stored links).
   library: libraryAgreement(after),
-  check: { linksBefore: before.size, linksAfter: after.size, lost, changedLevel2: changed },
+  check: { linksBefore: before.size, linksAfter: after.size, lost, changedLevel2: changed, outcomes, outcomeDataDiffers },
   analyzerRun: existsSync(timeLog) ? parseTime(readFileSync(timeLog, "utf8")) : null,
   index: { sourceOnly: { wallS: Math.round(off.wallS * 10) / 10, cpuS: Math.round(off.cpuS * 10) / 10 },
     route: { wallS: Math.round(on.wallS * 10) / 10, cpuS: Math.round(on.cpuS * 10) / 10 } },

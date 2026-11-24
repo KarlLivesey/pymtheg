@@ -46,6 +46,7 @@ import {
   isAbsolute,
   join,
   relative,
+  resolve,
   sep,
 } from "node:path";
 import {
@@ -643,20 +644,89 @@ export interface AnalyzerRun {
 export interface RunControls {
   clock?: ProcessClock;
   limitMs?: number;
+  /** The output limit (tests: the over-limit path without 256 MiB). */
+  outputLimit?: number;
+}
+
+/** What a run is prepared from, before anything runs (cheap checks only). */
+export interface PreparedRun {
+  /** The build target: `[build] target`, or the host. */
+  target: string;
+  /**
+   * A hash of the Cargo configuration outside the project that the run
+   * reads: the user's (copied into the run's crate cache) and any
+   * `.cargo/config(.toml)` in a folder above the run. Only the hash is kept.
+   */
+  outside: string;
+}
+
+/**
+ * The checks a run makes before it starts, shared with the warm query's key
+ * (fifth review): a rust-project.json, and the build target the Cargo
+ * configuration names. Both give the same `unavailable` reason in either
+ * place, so an unchanged checkout keys the same way.
+ */
+export function prepareRun(
+  root: string,
+  install: Pick<RustInstallation, "cargoHome" | "host">,
+  contexts: readonly { path: string; text?: string | undefined }[],
+  workDir: string,
+): PreparedRun | Unavailable {
+  if (existsSync(join(root, "rust-project.json")))
+    return {
+      unavailable:
+        "the project has a rust-project.json, which rust-analyzer reads instead of Cargo.toml; the route supports Cargo projects only",
+    };
+  const read = (path: string) => {
+    try {
+      return readFileSync(path, "utf8");
+    } catch {
+      return undefined;
+    }
+  };
+  // Cargo reads `.cargo/config(.toml)` in every folder above the run's copy
+  // of the project, nearest first, then its CARGO_HOME (the user's, copied).
+  const above: (string | undefined)[] = [];
+  for (let dir = resolve(workDir); ; dir = dirname(dir)) {
+    for (const name of ["config.toml", "config"])
+      above.push(read(join(dir, ".cargo", name)));
+    if (dirname(dir) === dir) break;
+  }
+  const user = ["config.toml", "config"].map((name) =>
+    read(join(install.cargoHome, name)),
+  );
+  const configText = (path: string) =>
+    contexts.find((file) => file.path === path)?.text;
+  const target = buildTarget(
+    [
+      configText(".cargo/config.toml"),
+      configText(".cargo/config"),
+      ...above,
+      ...user,
+    ],
+    install.host,
+  );
+  if (typeof target !== "string") return target;
+  return {
+    target,
+    outside: sha(...[...above, ...user].map((text) => text ?? "\u0000absent")),
+  };
 }
 
 /**
  * The route's key for this snapshot: the route and tool versions, the
- * configuration, every captured manifest, lockfile and Cargo configuration,
- * every captured Rust file's path and content hash, every other project
- * file's path, size and time, and which lockfile packages are in the crate
- * cache.
+ * configuration and build target, the Cargo configuration outside the
+ * project (hashed), every captured manifest, lockfile and Cargo
+ * configuration, every captured Rust file's path and content hash, every
+ * other project file's path, size and time, and which lockfile packages are
+ * in the crate cache.
  */
 export async function routeKey(
   root: string,
   install: RustInstallation,
   sources: readonly { path: string; hash: string }[],
   contexts: readonly { path: string; text?: string | undefined }[],
+  prepared: PreparedRun,
   signal?: AbortSignal,
 ): Promise<string> {
   const captured = new Set([
@@ -673,6 +743,8 @@ export async function routeKey(
     install.configuration,
     JSON.stringify(ANALYZER_CONFIG),
     install.cargoHome,
+    prepared.target,
+    prepared.outside,
     ...[...contexts]
       .sort((a, b) => (a.path < b.path ? -1 : 1))
       .map(
@@ -871,34 +943,14 @@ export async function runAnalyzer(
   sources: readonly { path: string; text: string; hash: string }[],
   contexts: readonly { path: string; text?: string | undefined }[],
   workDir: string,
+  /** From prepareRun, and the key routeKey gave for it. */
+  prepared: PreparedRun,
+  key: string,
   signal?: AbortSignal,
   controls: RunControls = {},
 ): Promise<AnalyzerRun | Unavailable> {
   await mkdir(workDir, { recursive: true });
-  if (existsSync(join(root, "rust-project.json")))
-    return {
-      unavailable:
-        "the project has a rust-project.json, which rust-analyzer reads instead of Cargo.toml; the route supports Cargo projects only",
-    };
-  const configText = (path: string) =>
-    contexts.find((file) => file.path === path)?.text;
-  const userConfig = ["config.toml", "config"].map((name) => {
-    try {
-      return readFileSync(join(install.cargoHome, name), "utf8");
-    } catch {
-      return undefined;
-    }
-  });
-  const buildFor = buildTarget(
-    [
-      configText(".cargo/config.toml"),
-      configText(".cargo/config"),
-      ...userConfig,
-    ],
-    install.host,
-  );
-  if (typeof buildFor !== "string") return buildFor;
-  const key = await routeKey(root, install, sources, contexts, signal);
+  const buildFor = prepared.target;
   const stem = join(workDir, `scip-${key.slice(0, 32)}`);
   if (existsSync(`${stem}.json`) && existsSync(`${stem}.scip`)) {
     const record = JSON.parse(await readFile(`${stem}.json`, "utf8")) as {
@@ -934,7 +986,7 @@ export async function runAnalyzer(
   const options = (timeoutMs: number) => ({
     cwd: project,
     timeoutMs,
-    maxBytes: OUTPUT_LIMIT,
+    maxBytes: controls.outputLimit ?? OUTPUT_LIMIT,
     env,
     ...(signal ? { signal } : {}),
     ...(controls.clock ? { clock: controls.clock } : {}),

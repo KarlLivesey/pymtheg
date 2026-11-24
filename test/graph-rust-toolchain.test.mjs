@@ -30,7 +30,7 @@ import {
   SqliteGraphStore,
   indexProject,
 } from "../dist/graph/index.js";
-import rust from "../dist/graph/languages/rust/index.js";
+import rust, { analysisInput } from "../dist/graph/languages/rust/index.js";
 import { readScip, parseSymbol } from "../dist/graph/languages/rust/scip.js";
 import {
   libraryPath,
@@ -154,6 +154,9 @@ if (a[0] === "scip") {
   fs.writeFileSync(b.seen, JSON.stringify({ cwd: process.cwd(), env: process.env, config: JSON.parse(fs.readFileSync(a[a.indexOf("--config-path") + 1], "utf8")),
     files: fs.readdirSync(process.cwd(), { recursive: true }).map(String).sort(), lib: fs.existsSync("src/lib.rs") ? fs.readFileSync("src/lib.rs", "utf8") : null }));
   if (b.hang) { fs.writeFileSync(b.ready, String(process.pid)); setInterval(() => {}, 1000); return; }
+  if (b.noise) process.stdout.write("x".repeat(b.noise));
+  if (b.scipExit) { console.error("error: the fake scip failed"); process.exit(b.scipExit); }
+  if (b.garbage) { fs.writeFileSync(a[a.indexOf("--output") + 1], "not a scip index"); process.exit(0); }
   for (const o of b.buildOutputs ?? []) {
     const d = path.join(process.env.CARGO_TARGET_DIR, b.triple ?? "", "debug", "build", o.dir);
     fs.mkdirSync(d, { recursive: true });
@@ -338,7 +341,10 @@ async function scratch(use) {
  */
 async function index(project, work, options = {}) {
   const store = new SqliteGraphStore(
-    join(work, `graph-${Math.random().toString(36).slice(2)}.sqlite`),
+    join(
+      work,
+      options.store ?? `graph-${Math.random().toString(36).slice(2)}.sqlite`,
+    ),
     "tc",
   );
   try {
@@ -531,6 +537,90 @@ test("a toolchain record stands only on a link stored with its target; a kept so
     [symbol],
   );
   assert.equal(confirmed.data.toolchain.from, "definite");
+  // Fifth review: an open link carrying candidates. Taken, the listed open
+  // data goes with the list; kept, the data is the route-off data exactly,
+  // in its order, with the outcome added last.
+  const offData = {
+    scope: "f",
+    targets: ["s1", "s2"],
+    targetCount: 2,
+    uncertainty: "multiple-checkout-candidates",
+    conditions: [],
+  };
+  const open = {
+    ...structuredClone(link),
+    data: {
+      ...offData,
+      toolchain: {
+        origin: "toolchain",
+        from: "candidates",
+        target: "s1",
+        clears: ["uncertainty", "targets", "targetCount"],
+      },
+    },
+  };
+  const openTaken = decideLink(
+    structuredClone(open),
+    { linkId: "l1", targetId: "s1" },
+    [symbol],
+  );
+  assert.equal(
+    JSON.stringify(openTaken.data),
+    JSON.stringify({
+      scope: "f",
+      conditions: [],
+      toolchain: { origin: "toolchain", from: "candidates", target: "s1" },
+    }),
+  );
+  const openKept = decideLink(
+    structuredClone(open),
+    {
+      linkId: "l1",
+      library: {
+        ecosystem: "rust-std",
+        unit: "core",
+        symbol: "fmt::Debug::fmt",
+        evidence: "qualified-path",
+      },
+    },
+    [symbol],
+  );
+  assert.equal(
+    JSON.stringify(openKept.data),
+    JSON.stringify({ ...offData, toolchainOutcome: "kept:source-only" }),
+  );
+});
+
+test("the analysis input drops a previous run's record, outcome and library offer, and keeps the rest", () => {
+  const input = analysisInput(
+    {
+      path: "src/lib.rs",
+      result: {
+        status: "clean",
+        diagnostics: [],
+        symbols: [],
+        links: [
+          {
+            sourceKey: null,
+            kind: "calls",
+            targetName: "f",
+            range: { start: 0, end: 1 },
+            data: {
+              scope: "g",
+              conditions: [],
+              toolchain: { origin: "toolchain", from: "unresolved", target: "x" },
+              toolchainOutcome: "withheld:cfg-variant",
+              toolchainLibrary: {
+                library: { ecosystem: "cargo", unit: "dep", symbol: "f" },
+              },
+            },
+          },
+        ],
+      },
+    },
+    new Map(),
+  );
+  assert.deepEqual(input.result.links[0].data, { scope: "g", conditions: [] });
 });
 
 test("the SCIP reader reads documents, ranges, roles and rust-analyzer symbols; name sites end at the written name", () => {
@@ -2008,11 +2098,638 @@ test(
       );
       const decided = note(dump.report, "merged").decided;
       assert.ok(
+        // The fifth review's cfg-selected guard now takes some of these
+        // first (the use twins); together they withhold at least three.
         (decided["withheld:cfg-variant"] ?? 0) +
-          (decided["withheld:conditional-candidates"] ?? 0) >=
+          (decided["withheld:conditional-candidates"] ?? 0) +
+          (decided["withheld:cfg-selected"] ?? 0) >=
           3,
         JSON.stringify(decided),
       );
     });
   },
 );
+
+// Fifth review: names defined more than once under cfg select between items
+// the toolchain sees only one of (aliases, test doubles, function twins).
+const SEL_CRATE = {
+  "Cargo.toml":
+    '[package]\nname = "sel"\nversion = "0.1.0"\nedition = "2021"\n\n[features]\ndefault = ["fast"]\nfast = []\n',
+  "src/lib.rs": [
+    "#![allow(dead_code, unused_imports)]",
+    "",
+    "// B1, feature form: type alias twins over always-compiled types",
+    "pub struct FastB;",
+    "impl FastB {",
+    "    pub fn b_new() -> Self {",
+    "        FastB",
+    "    }",
+    "    pub fn b_run(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct SlowB;",
+    "impl SlowB {",
+    "    pub fn b_new() -> Self {",
+    "        SlowB",
+    "    }",
+    "    pub fn b_run(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    '#[cfg(feature = "fast")]',
+    "pub type Backend = FastB;",
+    '#[cfg(not(feature = "fast"))]',
+    "pub type Backend = SlowB;",
+    "pub fn backend() -> u32 {",
+    "    let b = Backend::b_new();",
+    "    b.b_run()",
+    "}",
+    "",
+    "// B1: a field typed by such an alias",
+    "pub struct Holder {",
+    "    inner: Backend,",
+    "}",
+    "pub fn held(h: &Holder) -> u32 {",
+    "    h.inner.b_run()",
+    "}",
+    "",
+    "// B1, platform form",
+    "pub struct UnixS;",
+    "impl UnixS {",
+    "    pub fn s_open() -> Self {",
+    "        UnixS",
+    "    }",
+    "}",
+    "pub struct OtherS;",
+    "impl OtherS {",
+    "    pub fn s_open() -> Self {",
+    "        OtherS",
+    "    }",
+    "}",
+    "#[cfg(unix)]",
+    "pub type Sys = UnixS;",
+    "#[cfg(not(unix))]",
+    "pub type Sys = OtherS;",
+    "pub fn sys() -> Sys {",
+    "    Sys::s_open()",
+    "}",
+    "",
+    "// F1: a test double selected by cfg(test) on the use",
+    "mod mdb;",
+    "mod rdb;",
+    "#[cfg(test)]",
+    "use mdb::MockDb as Db;",
+    "#[cfg(not(test))]",
+    "use rdb::RealDb as Db;",
+    "pub fn db() -> u32 {",
+    "    Db::get_db()",
+    "}",
+    "",
+    "// F2, feature form: function twins returning different types",
+    "pub struct FastT;",
+    "impl FastT {",
+    "    pub fn run_t(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct SlowT;",
+    "impl SlowT {",
+    "    pub fn run_t(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    '#[cfg(feature = "fast")]',
+    "fn mk() -> FastT {",
+    "    FastT",
+    "}",
+    '#[cfg(not(feature = "fast"))]',
+    "fn mk() -> SlowT {",
+    "    SlowT",
+    "}",
+    "pub fn made() -> u32 {",
+    "    mk().run_t()",
+    "}",
+    "",
+    "// F2, platform form",
+    "pub struct UnixT;",
+    "impl UnixT {",
+    "    pub fn run_u(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct OtherT;",
+    "impl OtherT {",
+    "    pub fn run_u(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    "#[cfg(unix)]",
+    "fn mk2() -> UnixT {",
+    "    UnixT",
+    "}",
+    "#[cfg(not(unix))]",
+    "fn mk2() -> OtherT {",
+    "    OtherT",
+    "}",
+    "pub fn made2() -> u32 {",
+    "    mk2().run_u()",
+    "}",
+    "",
+    "// Control: one definition under cfg(test) selects nothing",
+    "pub struct Plain;",
+    "impl Plain {",
+    "    pub fn p_go() -> u32 {",
+    "        7",
+    "    }",
+    "}",
+    "#[cfg(test)]",
+    "mod tests {",
+    "    use super::Plain;",
+    "    pub fn t_go() -> u32 {",
+    "        Plain::p_go()",
+    "    }",
+    "}",
+    "pub fn plain() -> u32 {",
+    "    Plain::p_go()",
+    "}",
+    "",
+    "mod extra;",
+    "",
+  ].join("\n"),
+  "src/mdb.rs":
+    "pub struct MockDb;\n\nimpl MockDb {\n    pub fn get_db() -> u32 {\n        1\n    }\n}\n",
+  "src/rdb.rs":
+    "pub struct RealDb;\n\nimpl RealDb {\n    pub fn get_db() -> u32 {\n        2\n    }\n}\n",
+  "src/extra.rs": "pub fn extra() -> u32 {\n    crate::plain()\n}\n",
+};
+
+test(
+  "real rust-analyzer, fifth review: a cfg-selected name (alias twins, a cfg(test) double, function twins) is never narrowed; one cfg(test) definition selects nothing",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "sel");
+      writeProject(project, SEL_CRATE);
+      const dump = await index(project, root, { environment: process.env });
+      if (
+        dump.state.state === "unavailable" &&
+        /rust-src/.test(dump.state.reason)
+      )
+        return;
+      assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+      const all = (name) =>
+        dump.links.filter(
+          (l) => l.file === "src/lib.rs" && l.targetName === name,
+        );
+      const wrong = [];
+      for (const name of [
+        "Backend::b_new",
+        "b.b_run",
+        "h.inner.b_run",
+        "Sys::s_open",
+        "Db::get_db",
+        "mk().run_t",
+        "mk2().run_u",
+      ]) {
+        const links = all(name);
+        if (!links.length) wrong.push(`${name}: no link`);
+        for (const l of links)
+          if (
+            l.data?.toolchain !== undefined ||
+            l.resolution === "resolved" ||
+            l.data?.toolchainOutcome !== "withheld:cfg-selected"
+          )
+            wrong.push(
+              `${name}: ${l.resolution} ${l.data?.toolchainOutcome ?? l.data?.toolchain?.origin}`,
+            );
+      }
+      // Every shape is checked before failing, so a run names them all.
+      assert.deepEqual(wrong, []);
+      // The control: the plain call and the one in cfg(test) code are
+      // answered (or confirmed) by the route.
+      for (const l of all("Plain::p_go"))
+        assert.equal(
+          l.resolution,
+          "resolved",
+          `Plain::p_go: ${JSON.stringify(l.data)}`,
+        );
+    });
+  },
+);
+
+test(
+  "real rust-analyzer, fifth review: an incremental re-index stores the same link rows as a cold index, byte for byte",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "sel");
+      writeProject(project, SEL_CRATE);
+      const run = async (path) => {
+        const store = new SqliteGraphStore(path, "tc");
+        try {
+          const report = await indexProject(
+            project,
+            new LanguageRegistry([rust]),
+            store,
+            {
+              toolchainDirectory: join(root, "toolchain"),
+              environment: process.env,
+              toolchains: { rust: true },
+              signal: new AbortController().signal,
+            },
+          );
+          return {
+            state: toolchainState({ rust: true }, report.toolchains).rust,
+            rows: new Map(
+              store
+                .links()
+                .map((l) => [
+                  l.id,
+                  JSON.stringify([
+                    l.file,
+                    l.kind,
+                    l.targetName,
+                    l.range,
+                    l.resolution,
+                    l.targetId,
+                    l.candidates,
+                    l.data,
+                  ]),
+                ]),
+            ),
+          };
+        } finally {
+          store.close();
+        }
+      };
+      const first = await run(join(root, "warm.sqlite"));
+      if (
+        first.state.state === "unavailable" &&
+        /rust-src/.test(first.state.reason)
+      )
+        return;
+      assert.equal(first.state.state, "used", JSON.stringify(first.state));
+      // Edit another file than the one holding the withheld links.
+      writeFileSync(
+        join(project, "src/extra.rs"),
+        SEL_CRATE["src/extra.rs"] +
+          "\npub fn extra_two() -> u32 {\n    crate::plain()\n}\n",
+      );
+      const warm = await run(join(root, "warm.sqlite"));
+      const cold = await run(join(root, "cold.sqlite"));
+      assert.equal(warm.state.state, "used");
+      assert.equal(cold.state.state, "used");
+      assert.ok(
+        [...cold.rows.values()].some((row) =>
+          row.includes("withheld:cfg-selected"),
+        ),
+        "the rows hold recorded outcomes",
+      );
+      assert.equal(warm.rows.size, cold.rows.size);
+      for (const [id, row] of cold.rows)
+        assert.equal(warm.rows.get(id), row, id);
+    });
+  },
+);
+
+// ---------------------------------------------------------------- fifth review: stale outcomes, failures and the key
+
+/** Every stored link row, whole data included, in stored key order. */
+const rowsOf = (dump) =>
+  new Map(
+    dump.links.map((l) => [
+      l.id,
+      JSON.stringify([
+        l.file,
+        l.kind,
+        l.targetName,
+        l.range,
+        l.resolution,
+        l.targetId,
+        l.candidates,
+        l.data,
+      ]),
+    ]),
+  );
+const sameRows = (warm, cold) => {
+  const a = rowsOf(warm),
+    b = rowsOf(cold);
+  assert.equal(a.size, b.size);
+  for (const [id, row] of b) assert.equal(a.get(id), row, id);
+};
+
+test("fifth review: an edit that makes the route partial leaves no earlier outcome; the rows equal a cold index", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, GATES);
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip,
+      metadata: metadata(),
+    });
+    const first = await index(project, root, {
+      environment: environment(tools),
+      store: "warm.sqlite",
+    });
+    assert.equal(first.state.state, "used");
+    assert.ok(
+      first.links.some(
+        (l) => l.data?.toolchainOutcome === "withheld:cfg-variant",
+      ),
+      "the used index records an outcome",
+    );
+    // cargo metadata now fails offline (partial), and a Rust file changes.
+    fakeToolchain(join(root, "tools"), { scip, metadata: null });
+    writeFileSync(
+      join(project, "src/a.rs"),
+      GATES["src/a.rs"] + "\npub fn added() {}\n",
+    );
+    const warm = await index(project, root, {
+      environment: environment(tools),
+      store: "warm.sqlite",
+    });
+    const cold = await index(project, root, {
+      environment: environment(tools),
+      store: "cold.sqlite",
+    });
+    assert.equal(warm.state.state, "partial");
+    assert.equal(cold.state.state, "partial");
+    assert.equal(
+      warm.links.some((l) => l.data?.toolchainOutcome),
+      false,
+      "no outcome survives",
+    );
+    sameRows(warm, cold);
+  });
+});
+
+test("fifth review: turning the route off leaves no outcome or record; the rows equal a cold index without it", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, GATES);
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip,
+      metadata: metadata(),
+    });
+    const on = await index(project, root, {
+      environment: environment(tools),
+      store: "warm.sqlite",
+    });
+    assert.equal(on.state.state, "used");
+    assert.ok(on.links.some((l) => l.data?.toolchainOutcome));
+    const off = await index(project, root, {
+      environment: environment(tools),
+      store: "warm.sqlite",
+      toolchains: null,
+    });
+    const cold = await index(project, root, {
+      environment: environment(tools),
+      store: "cold.sqlite",
+      toolchains: null,
+    });
+    assert.equal(
+      off.links.some((l) => l.data?.toolchainOutcome || l.data?.toolchain),
+      false,
+    );
+    sameRows(off, cold);
+  });
+});
+
+/**
+ * Index once and query three times through the graph command, trusted, with
+ * the fake toolchain first on PATH and a crate cache of its own. Returns
+ * each answer's sync mode and the count of `rust-analyzer scip` runs after
+ * each step.
+ */
+async function failingRoute(root, behaviour, { setup, controls, edit } = {}) {
+  const project = join(root, "project");
+  writeProject(project, GATES);
+  setup?.(project);
+  const scip = join(root, "answer.scip");
+  writeFileSync(scip, gateScip());
+  const tools = fakeToolchain(join(root, "tools"), {
+    scip,
+    metadata: metadata(),
+    ...behaviour,
+  });
+  await initializeWorkspace(project, undefined, { trust: "trusted" });
+  const file = trustFile();
+  const answers = JSON.parse(readFileSync(file, "utf8"));
+  answers.checkouts[realpathSync(project)].toolchain = {
+    go: false,
+    rust: true,
+  };
+  writeFileSync(file, JSON.stringify(answers));
+  const saved = {
+    PATH: process.env.PATH,
+    CARGO_HOME: process.env.CARGO_HOME,
+  };
+  process.env.PATH = `${dirname(tools.runs)}${delimiter}${saved.PATH}`;
+  process.env.CARGO_HOME = join(root, "cargo-home");
+  mkdirSync(process.env.CARGO_HOME, { recursive: true });
+  try {
+    const steps = [];
+    const indexing = executeGraph({ command: "index", root: project });
+    if (controls) await controls(tools, indexing);
+    const first = await indexing;
+    steps.push([first.sync.mode, first.toolchain.rust?.state, runs(tools)]);
+    for (let i = 0; i < 3; i++) {
+      const answer = await executeGraph({
+        command: "search",
+        args: ["g"],
+        root: project,
+      });
+      steps.push([answer.sync.mode, answer.toolchain.rust?.state, runs(tools)]);
+    }
+    if (edit) {
+      edit(project);
+      const answer = await executeGraph({
+        command: "search",
+        args: ["g"],
+        root: project,
+      });
+      steps.push([answer.sync.mode, answer.toolchain.rust?.state, runs(tools)]);
+    }
+    return { steps, reason: first.toolchain.rust?.reason };
+  } finally {
+    process.env.PATH = saved.PATH;
+    if (saved.CARGO_HOME === undefined) delete process.env.CARGO_HOME;
+    else process.env.CARGO_HOME = saved.CARGO_HOME;
+  }
+}
+const editRust = (project) =>
+  writeFileSync(
+    join(project, "src/a.rs"),
+    GATES["src/a.rs"] + "\npub fn edited() {}\n",
+  );
+
+for (const [name, behaviour, reason, options] of [
+  ["rust-analyzer scip exits 1", { scipExit: 1 }, /^rust-analyzer exited 1/],
+  [
+    "rust-analyzer writes an unreadable index",
+    { garbage: true },
+    /^rust-analyzer's index cannot be read/,
+  ],
+  [
+    "rust-analyzer's output is over the limit",
+    { noise: 4096 },
+    /^rust-analyzer /,
+    { limits: { outputLimit: 1024 } },
+  ],
+]) {
+  test(`fifth review: after a failure (${name}) an unchanged checkout is current: one run, then queries are unchanged; an edit runs it again`, async () => {
+    if (options?.limits) setRunControls(options.limits);
+    try {
+      await scratch(async (root) => {
+        const { steps, reason: why } = await failingRoute(root, behaviour, {
+          edit: editRust,
+        });
+        assert.match(why, reason);
+        assert.deepEqual(steps, [
+          ["index", "unavailable", 1],
+          ["unchanged", "unavailable", 1],
+          ["unchanged", "unavailable", 1],
+          ["unchanged", "unavailable", 1],
+          ["updated", "unavailable", 2],
+        ]);
+      });
+    } finally {
+      setRunControls({});
+    }
+  });
+}
+
+test("fifth review: after a timeout (a controlled clock) an unchanged checkout is current: queries do not run rust-analyzer again", async () => {
+  const clock = controlledClock();
+  const LIMIT = 654321;
+  setRunControls({
+    clock: {
+      schedule: (cb, ms) =>
+        ms === LIMIT ? clock.schedule(cb, ms) : setTimeout(cb, ms),
+      cancel: (h) =>
+        typeof h === "number" ? clock.cancel(h) : clearTimeout(h),
+    },
+    limitMs: LIMIT,
+  });
+  try {
+    await scratch(async (root) => {
+      const { steps, reason } = await failingRoute(
+        root,
+        { hang: true },
+        {
+          controls: async (tools, indexing) => {
+            await ready(tools.ready, indexing);
+            assert.equal(clock.fireNext(), LIMIT);
+            // A later run would no longer hang, so one that should not
+            // happen finishes and is counted instead of blocking the test.
+            fakeToolchain(dirname(tools.runs), {
+              scip: tools.scip,
+              metadata: metadata(),
+            });
+          },
+        },
+      );
+      assert.match(reason, /^rust-analyzer timed_out/);
+      assert.deepEqual(steps, [
+        ["index", "unavailable", 1],
+        ["unchanged", "unavailable", 1],
+        ["unchanged", "unavailable", 1],
+        ["unchanged", "unavailable", 1],
+      ]);
+    });
+  } finally {
+    setRunControls({});
+  }
+});
+
+for (const [name, setup, reason] of [
+  [
+    "a rust-project.json",
+    (project) => writeFileSync(join(project, "rust-project.json"), "{}"),
+    /rust-project\.json/,
+  ],
+  [
+    "a list of build targets",
+    (project) => {
+      mkdirSync(join(project, ".cargo"), { recursive: true });
+      writeFileSync(
+        join(project, ".cargo/config.toml"),
+        '[build]\ntarget = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]\n',
+      );
+    },
+    /more than one build target/,
+  ],
+]) {
+  test(`fifth review: ${name} is found by the warm key as by the run: queries are unchanged and rust-analyzer never runs`, async () => {
+    await scratch(async (root) => {
+      const { steps, reason: why } = await failingRoute(root, {}, { setup });
+      assert.match(why, reason);
+      assert.deepEqual(steps, [
+        ["index", "unavailable", 0],
+        ["unchanged", "unavailable", 0],
+        ["unchanged", "unavailable", 0],
+        ["unchanged", "unavailable", 0],
+      ]);
+    });
+  });
+}
+
+test("fifth review: the Cargo configuration outside the project is in the key; changing its build target re-runs, never serves the old index", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, GATES);
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip,
+      metadata: metadata(),
+    });
+    // The user's crate cache and configuration (CARGO_HOME).
+    const home = join(dirname(tools.runs), "cargo-home");
+    const first = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(first.state.state, "used");
+    const again = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(note(again.report, "available").cached, true);
+    assert.equal(runs(tools), 1);
+    // The user's Cargo configuration now names a build target.
+    mkdirSync(home, { recursive: true });
+    writeFileSync(
+      join(home, "config.toml"),
+      '[build]\ntarget = "aarch64-unknown-linux-gnu"\n',
+    );
+    const changed = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(note(changed.report, "available").cached, false);
+    assert.equal(
+      note(changed.report, "available").target,
+      "aarch64-unknown-linux-gnu",
+    );
+    assert.equal(runs(tools), 2);
+    // A value the route does not read itself (cfg flags), same target: the
+    // run reads it, so it is in the key too.
+    writeFileSync(
+      join(home, "config.toml"),
+      '[build]\ntarget = "aarch64-unknown-linux-gnu"\nrustflags = ["--cfg", "fast_path"]\n',
+    );
+    const flagged = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(note(flagged.report, "available").cached, false);
+    assert.equal(runs(tools), 3);
+    // Nothing of the file is stored or reported but its effect.
+    assert.equal(
+      JSON.stringify(changed.report).includes(home),
+      false,
+      "the configuration's path is not reported",
+    );
+  });
+});

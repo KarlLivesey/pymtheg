@@ -2390,8 +2390,11 @@ configuration, the project never written, no claim of a security boundary.
 The measured shape is in [C-19](changes/C-19.md): answers are taken only for
 links the source-only route leaves open, under the strict join and the gates
 (no answers under a cfg condition other than `test`; trait methods stay
-candidate sets); an edit re-indexes source-only at once and no stale toolchain
-answer is shown as definite. **Why:** the owner's standing rule is that a
+candidate sets); no stale toolchain answer is shown as definite. In the first
+part of C-43 an edit misses the route's cache and re-runs rust-analyzer in
+full before the index completes; re-indexing source-only first, with a
+`stale` state, is the third part's work (see the note and
+`docs/support.md`). **Why:** the owner's standing rule is that a
 language's own build chain is an allowed dependency; source-only Rust stays
 near 43% because most open links need type inference. **Rules out:** running
 the route on a project that has not opted in; reporting the opted-in figure

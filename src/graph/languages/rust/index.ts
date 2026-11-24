@@ -109,11 +109,20 @@ export function analysisInput(
           cause,
           opaqueAttributes,
           receiverTyping,
-          // C-43: a previous run's toolchain record is decided again.
+          // C-43: a previous run's toolchain record and outcome are decided
+          // again (and re-added last, as in a cold run, so stored rows
+          // compare byte for byte).
           toolchain: _toolchain,
+          toolchainOutcome: _toolchainOutcome,
+          // D24: a previous run's library offer too; the resolve phase
+          // applies any offer it finds, so a stale one must not survive a
+          // run that is partial, failed or off.
+          toolchainLibrary: _toolchainLibrary,
           ...rest
         } = (l.data ?? {}) as Record<string, Json>;
         void _toolchain;
+        void _toolchainOutcome;
+        void _toolchainLibrary;
         return {
           ...l,
           data: {
@@ -370,12 +379,22 @@ function decideToolchain(
   /** Two candidates of one kind and in-file path: cfg twins. */
   const twins = (ids: readonly string[]) =>
     new Set(ids.map((c) => identityOf.get(c) ?? c)).size < ids.length;
-  // Third review B: the cfg can sit on the `use` that selects between two
-  // ungated items (`#[cfg(feature = "fast")] pub use z_fmt::ZGrayV08 as
-  // ZGray;` beside a `not` twin naming ZGrayV09). Each item a `use` under a
-  // condition other than `test` brings in, by the name it binds. Keyed by
-  // file and in-file path, so an item's members (`ZGray::zg()` reaching
-  // `ZGrayV08::zg`) count as brought in under the same name.
+  // Fourth and fifth reviews: a name defined more than once under cfg in one
+  // file selects between items the toolchain sees only one of:
+  // - `use` items (`#[cfg(feature = "fast")] pub use z_fmt::ZGrayV08 as
+  //   ZGray;` beside a `not` twin naming ZGrayV09; `#[cfg(test)] use
+  //   mdb::MockDb as Db;` beside `#[cfg(not(test))] use rdb::RealDb as Db;`);
+  // - `type` aliases (`#[cfg(feature = "fast")] pub type Backend = FastB;`
+  //   beside a `not` twin naming SlowB);
+  // - function twins, through their return types (`#[cfg(feature = "fast")]
+  //   fn mk() -> FastT` beside a `not` twin returning SlowT).
+  // `test` counts here: a test double is a real second definition. A name
+  // with one definition (ordinary `#[cfg(test)] mod tests` code) selects
+  // nothing. The items the definitions do not all name are cfg-selected: an
+  // answer into one, or into an item it holds (`Backend::b_new()` and
+  // `h.inner.run2()` reaching `FastB`'s methods), may confirm source-only's
+  // own definite target but never narrows or decides anything else.
+  // Places are file and in-file path, so members are found by prefix.
   const placeOf = new Map<string, string>();
   updated.forEach((f, i) => {
     byPath.get(f.path)?.result.symbols.forEach((symbol, j) => {
@@ -385,33 +404,93 @@ function decideToolchain(
       );
     });
   });
-  const importedUnderCfg = new Map<string, Set<string>>();
+  const conditioned = (data: Record<string, Json>) =>
+    ((data.conditions ?? []) as Json[]).length > 0;
+  const lastSegment = (name: string) =>
+    name.split("::").at(-1)!.replace(/<.*$/, "");
+  const targetsOf = (linkId: string): string[] => {
+    const r = resolutions.get(linkId);
+    return [
+      ...(r?.targetId ? [r.targetId] : []),
+      ...(r?.candidateIds ?? []),
+    ].flatMap((id) => {
+      const place = placeOf.get(id);
+      return place === undefined ? [] : [place];
+    });
+  };
+  /** Per selecting name (file and in-file path): each definition's items. */
+  const definitions = new Map<string, Set<string>[]>();
+  const define = (key: string, items: readonly string[]) => {
+    const list = definitions.get(key) ?? [];
+    list.push(new Set(items));
+    definitions.set(key, list);
+  };
   updated.forEach((f, i) => {
-    byPath.get(f.path)?.result.links.forEach((l, j) => {
-      if (l.kind !== "imports") return;
+    const result = byPath.get(f.path)?.result;
+    if (!result) return;
+    // The `types` links, for the types aliases and return types name.
+    const typeLinks: {
+      name: string;
+      id: string;
+      start: number;
+      end: number;
+    }[] = [];
+    result.links.forEach((l, j) => {
+      const link = facts[i]!.links[j]!;
       const data = (l.data ?? {}) as Record<string, Json>;
-      if (!beyondTest(data.conditions as Json[] | undefined)) return;
-      const r = resolutions.get(facts[i]!.links[j]!.id);
-      const name =
-        (typeof data.alias === "string" && data.alias) ||
-        l.targetName.split("::").at(-1)!;
-      for (const target of [
-        ...(r?.targetId ? [r.targetId] : []),
-        ...(r?.candidateIds ?? []),
-      ]) {
-        const place = placeOf.get(target);
-        if (place === undefined) continue;
-        const names = importedUnderCfg.get(place) ?? new Set<string>();
-        names.add(name);
-        importedUnderCfg.set(place, names);
+      if (l.kind === "imports" && conditioned(data)) {
+        const name =
+          (typeof data.alias === "string" && data.alias) ||
+          lastSegment(l.targetName);
+        const scope = typeof data.scope === "string" ? data.scope : "";
+        define(
+          `${f.path}\u0000${scope ? `${scope}::` : ""}${name}`,
+          targetsOf(link.id),
+        );
       }
+      if (l.kind === "types")
+        typeLinks.push({
+          name: lastSegment(l.targetName),
+          id: link.id,
+          start: l.range.start,
+          end: l.range.end,
+        });
+    });
+    result.symbols.forEach((symbol) => {
+      const data = (symbol.data ?? {}) as Record<string, Json>;
+      if (!conditioned(data) || symbol.identity.startsWith("impl ")) return;
+      const written =
+        symbol.kind === "type" && typeof data.aliasType === "string"
+          ? data.aliasType
+          : symbol.kind === "function" && typeof data.returnType === "string"
+            ? data.returnType
+            : undefined;
+      if (!written) return;
+      const words = new Set(written.match(/\w+/g) ?? []);
+      define(
+        `${f.path}\u0000${symbol.kind === "function" ? "fn " : ""}${symbol.identity}`,
+        typeLinks
+          .filter(
+            (t) =>
+              t.start >= symbol.range.start &&
+              t.end <= symbol.range.end &&
+              words.has(t.name),
+          )
+          .flatMap((t) => targetsOf(t.id)),
+      );
     });
   });
-  /** The names `use` items under cfg bind an item, or an item it is in. */
-  const namesUnderCfg = (id: string): Set<string> => {
-    const names = new Set<string>();
+  const selectedPlaces = new Set<string>();
+  for (const list of definitions.values()) {
+    if (list.length < 2) continue;
+    for (const items of list)
+      for (const place of items)
+        if (!list.every((other) => other.has(place))) selectedPlaces.add(place);
+  }
+  /** An item cfg selects through a name, or an item inside one. */
+  const cfgSelected = (id: string): boolean => {
     const place = placeOf.get(id);
-    if (place === undefined) return names;
+    if (place === undefined || selectedPlaces.size === 0) return false;
     const [file, identity] = place.split("\u0000") as [string, string];
     // A method's identity is `impl Type::m` or `impl Trait for Type<T>::m`;
     // the item it is in is `Type`.
@@ -422,20 +501,8 @@ function decideToolchain(
       .split("::")
       .map((segment) => segment.replace(/<.*$/, ""));
     for (let n = 1; n <= segments.length; n++)
-      for (const name of importedUnderCfg.get(
-        `${file}\u0000${segments.slice(0, n).join("::")}`,
-      ) ?? [])
-        names.add(name);
-    return names;
-  };
-  /** Two candidates bound to one name by `use` items under cfg. */
-  const cfgSelected = (ids: readonly string[]) => {
-    const seen = new Set<string>();
-    for (const id of ids)
-      for (const name of namesUnderCfg(id)) {
-        if (seen.has(name)) return true;
-        seen.add(name);
-      }
+      if (selectedPlaces.has(`${file}\u0000${segments.slice(0, n).join("::")}`))
+        return true;
     return false;
   };
   updated.forEach((f, i) => {
@@ -464,6 +531,9 @@ function decideToolchain(
             : "withheld:cfg-variant",
         );
       const r = resolutions.get(id);
+      // An item cfg selects through a name: confirm only (see above).
+      if (r?.targetId !== target && cfgSelected(target))
+        return kept("withheld:cfg-selected");
       // Review B1: a link whose source-only answer records conditional
       // candidates (a name that cfg may remove, or twins under cfg) is never
       // narrowed by the one configuration the toolchain sees; it may only be
@@ -476,8 +546,7 @@ function decideToolchain(
       const reasons = uncertaintyReasons(rest.uncertainty);
       const single = candidates.length === 1 && candidates[0] === target;
       const conditionalSet = (ids: readonly string[]) =>
-        ids.length > 1 &&
-        (ids.some(conditional) || twins(ids) || cfgSelected(ids));
+        ids.length > 1 && (ids.some(conditional) || twins(ids));
       if (
         !r?.targetId &&
         ((reasons.includes("conditional-name-may-be-absent") && !single) ||
@@ -509,8 +578,13 @@ function decideToolchain(
         from = "candidates";
       } else from = "unresolved";
       bump(`definite:${from}`);
+      // The open link's data stays until the stored link takes the answer:
+      // the record lists what then goes (`clears`), and the link decider
+      // removes it only then. A link whose source-only answer is kept in
+      // the resolve phase keeps its route-off data exactly (fifth review).
       const decided: Record<string, Json> = { ...rest };
-      if (from !== "definite") for (const key of OPEN_DATA) delete decided[key];
+      const clears =
+        from === "definite" ? [] : OPEN_DATA.filter((key) => key in rest);
       decided.toolchain = {
         origin: "toolchain",
         rustAnalyzer: toolchain.rustAnalyzer,
@@ -518,6 +592,7 @@ function decideToolchain(
         upgrade: "definite",
         from,
         ...(from === "definite" ? {} : { target }),
+        ...(clears.length ? { clears } : {}),
       };
       return { ...l, data: decided };
     });

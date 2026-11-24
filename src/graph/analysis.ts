@@ -103,10 +103,20 @@ export class LinkDecider {
     if (
       !d ||
       record?.origin !== "toolchain" ||
-      typeof record.target !== "string" ||
-      link.targetId === record.target
+      typeof record.target !== "string"
     )
       return link;
+    if (link.targetId === record.target) {
+      // Taken: the open link's data the record lists goes now, and the list
+      // with it (the record keeps its other fields, in order).
+      if (!Array.isArray(record.clears)) return link;
+      const { clears, ...kept } = record;
+      const data: Record<string, unknown> = { ...d, toolchain: kept };
+      for (const key of clears as unknown[])
+        if (typeof key === "string") delete data[key];
+      link.data = data as Json;
+      return link;
+    }
     const { toolchain: _withdrawn, ...data } = d;
     void _withdrawn;
     link.data = { ...data, toolchainOutcome: "kept:source-only" } as Json;
