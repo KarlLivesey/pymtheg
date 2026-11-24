@@ -228,3 +228,64 @@ for (const language of Object.keys(LANGUAGES)) {
     },
   );
 }
+
+// Three runs. A holds an older capture, before its claim; B has claimed for
+// a newer tree and holds its mark; C, a full index, takes over and finishes.
+// In either resume order, A and B write nothing more and disturb nothing:
+// C's result stands, complete, with no further index.
+for (const order of ["A, B", "B, A"])
+  test(
+    `three runs: an older capture and a taken-over run resumed ${order} leave the third run's complete result`,
+    { skip: !proc && "needs /proc to see the child stopped" },
+    async () => {
+      const L = LANGUAGES.go;
+      const { base, root, write, read } = project("go");
+      try {
+        const original = read(L.exported);
+        write(L.exported, L.removeExport(original));
+        const A = await stopped(root, "command", "after-parse");
+        write(L.exported, L.edit(original));
+        const B = await stopped(root, "command", "before-finish");
+        write(...L.added);
+        assert.equal(cli(root).sync.complete, true);
+        const runs = { A, B };
+        for (const name of order.split(", "))
+          overtaken(await runs[name].resume(), name);
+        await settled(base, root, `after ${order}`);
+      } finally {
+        rmSync(base, { recursive: true, force: true });
+      }
+    },
+  );
+
+// A run killed at any gate leaves a store that one more index makes equal
+// to a cold index of the tree; a run killed before its claim wrote nothing.
+for (const gate of ["after-walk", "after-parse", "before-finish", "before-publish"])
+  test(
+    `a run killed at ${gate} needs at most one more index`,
+    { skip: !proc && "needs /proc to see the child stopped" },
+    async () => {
+      const L = LANGUAGES.go;
+      const { base, root, write, read } = project("go");
+      try {
+        const before = storeRows(graphAt(root));
+        write(L.exported, L.edit(read(L.exported)));
+        const A = await stopped(
+          root,
+          gate === "after-walk" ? "index" : "command",
+          gate,
+        );
+        await A.kill();
+        if (gate === "after-walk" || gate === "after-parse")
+          assert.deepEqual(
+            compareRows(before, storeRows(graphAt(root))),
+            [],
+            "nothing written before the claim",
+          );
+        assert.equal(cli(root).sync.complete, true);
+        await settled(base, root, `after ${gate}`);
+      } finally {
+        rmSync(base, { recursive: true, force: true });
+      }
+    },
+  );
