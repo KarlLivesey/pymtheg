@@ -493,7 +493,11 @@ test("a toolchain record stands only on a link stored with its target; a kept so
     },
   };
   // The answer is stored: the record stands.
-  const taken = decideLink(structuredClone(link), { linkId: "l1", targetId: "s1" }, [symbol]);
+  const taken = decideLink(
+    structuredClone(link),
+    { linkId: "l1", targetId: "s1" },
+    [symbol],
+  );
   assert.equal(taken.targetId, "s1");
   assert.equal(taken.data.toolchain.target, "s1");
   assert.equal(taken.data.toolchainOutcome, undefined);
@@ -502,7 +506,12 @@ test("a toolchain record stands only on a link stored with its target; a kept so
     structuredClone(link),
     {
       linkId: "l1",
-      library: { ecosystem: "rust-std", unit: "core", symbol: "fmt::Debug::fmt", evidence: "qualified-path" },
+      library: {
+        ecosystem: "rust-std",
+        unit: "core",
+        symbol: "fmt::Debug::fmt",
+        evidence: "qualified-path",
+      },
     },
     [symbol],
   );
@@ -511,7 +520,10 @@ test("a toolchain record stands only on a link stored with its target; a kept so
   assert.equal(kept.data.toolchainOutcome, "kept:source-only");
   // A confirmation names no target and is left alone.
   const confirmed = decideLink(
-    { ...structuredClone(link), data: { toolchain: { origin: "toolchain", from: "definite" } } },
+    {
+      ...structuredClone(link),
+      data: { toolchain: { origin: "toolchain", from: "definite" } },
+    },
     { linkId: "l1", targetId: "s1" },
     [symbol],
   );
