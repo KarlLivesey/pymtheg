@@ -3428,9 +3428,9 @@ only the route brings into the program declares globals or augments a
 module, every file is checked without the route. Configs are read as
 syntax or JSON, never executed. **Trade:** a convention can name the wrong
 source where a build does something the convention does not see; on the
-two packages built for real, the 545 `@trpc/server` links this head
-follows agreed (`@reduxjs/toolkit`'s 243, which agreed in round 1, are no
-longer followed: its entry is not data). **Rules out:** executing build configs or scripts to learn their
+two packages built for real, 788 links agreed in round 1: 545 on
+`@trpc/server`, still followed, and 243 on `@reduxjs/toolkit`, no longer
+followed (its entry is not data). **Rules out:** executing build configs or scripts to learn their
 outputs. See [C-46](changes/C-46.md).
 
 ### C-37 Graph index writes commit in bounded batches

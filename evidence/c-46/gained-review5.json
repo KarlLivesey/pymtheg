@@ -1,0 +1,661 @@
+{
+ "newlyLevel2": 18160,
+ "byConvention": {
+  "bundler-entry unresolved → resolved": 8701,
+  "wrapped-compiler-emit unresolved → resolved": 6928,
+  "src-twin unresolved → resolved": 1681,
+  "rollup-entry unresolved → resolved": 850,
+  "bundler-entry unresolved → unresolved": 126,
+  "src-twin unresolved → unresolved": 40,
+  "rollup-entry unresolved → unresolved": 8,
+  "wrapped-compiler-emit unresolved → unresolved": 2,
+  "bundler-entry unresolved → ambiguous": 2,
+  "wrapped-compiler-emit unresolved → ambiguous": 1
+ },
+ "byOutcome": {
+  "unresolved:workspace-entry-unavailable → resolved": 8592,
+  "unresolved:no-symbol → resolved": 6944,
+  "unresolved:workspace-build-output-missing → resolved": 1959,
+  "unresolved:any-receiver → resolved": 665,
+  "unresolved:workspace-entry-unavailable → unresolved": 113,
+  "unresolved:no-symbol → unresolved": 60,
+  "unresolved:workspace-build-output-missing → unresolved": 3,
+  "unresolved:workspace-entry-unavailable → ambiguous": 2,
+  "unresolved:workspace-build-output-missing → ambiguous": 1
+ },
+ "byPackage": {
+  "puppeteer/puppeteer packages/puppeteer-core/package.json (wrapped-compiler-emit)": 6915,
+  "vitest-dev/vitest packages/vitest/package.json (bundler-entry)": 6496,
+  "vitejs/vite packages/vite/package.json (bundler-entry)": 861,
+  "trpc/trpc packages/server/package.json (bundler-entry)": 565,
+  "honojs/hono package.json (src-twin)": 556,
+  "puppeteer/puppeteer packages/puppeteer/package.json (rollup-entry)": 469,
+  "changesets/changesets packages/types/package.json (src-twin)": 394,
+  "puppeteer/puppeteer packages/puppeteer-core/package.json (rollup-entry)": 311,
+  "trpc/trpc packages/client/package.json (bundler-entry)": 224,
+  "puppeteer/puppeteer packages/testserver/package.json (src-twin)": 219,
+  "react-hook-form/react-hook-form package.json (bundler-entry)": 216,
+  "vercel/turborepo packages/turbo-workspaces/package.json (bundler-entry)": 112,
+  "changesets/changesets packages/git/package.json (src-twin)": 95,
+  "puppeteer/puppeteer packages/browsers/package.json (src-twin)": 94,
+  "vitest-dev/vitest packages/expect/package.json (bundler-entry)": 89,
+  "mermaid-js/mermaid packages/parser/package.json (rollup-entry)": 78,
+  "changesets/changesets packages/write/package.json (src-twin)": 77,
+  "trpc/trpc packages/next/package.json (bundler-entry)": 70,
+  "changesets/changesets packages/errors/package.json (src-twin)": 65,
+  "vitest-dev/vitest packages/browser/package.json (bundler-entry)": 59,
+  "changesets/changesets packages/should-skip-package/package.json (src-twin)": 38,
+  "vitest-dev/vitest packages/browser-preview/package.json (bundler-entry)": 37,
+  "vitest-dev/vitest packages/browser-playwright/package.json (bundler-entry)": 35,
+  "changesets/changesets packages/config/package.json (src-twin)": 33,
+  "changesets/changesets packages/read/package.json (src-twin)": 27,
+  "vitejs/vite packages/plugin-legacy/package.json (bundler-entry)": 24,
+  "changesets/changesets packages/pre/package.json (src-twin)": 23,
+  "vercel/turborepo examples/with-tailwind/packages/ui/package.json (src-twin)": 20,
+  "puppeteer/puppeteer packages/puppeteer/package.json (wrapped-compiler-emit)": 16,
+  "trpc/trpc packages/react-query/package.json (bundler-entry)": 16,
+  "changesets/changesets packages/get-dependents-graph/package.json (src-twin)": 15,
+  "vercel/turborepo examples/with-nestjs/packages/api/package.json (src-twin)": 15,
+  "changesets/changesets packages/parse/package.json (src-twin)": 11,
+  "changesets/changesets packages/assemble-release-plan/package.json (src-twin)": 10,
+  "trpc/trpc packages/openapi/package.json (bundler-entry)": 9,
+  "vercel/turborepo crates/turborepo-trace-testkit/fixtures/frameworks/playwright-factory/tooling/playwright/package.json (src-twin)": 9,
+  "changesets/changesets packages/get-github-info/package.json (src-twin)": 7,
+  "vitest-dev/vitest packages/coverage-istanbul/package.json (bundler-entry)": 4,
+  "vitest-dev/vitest packages/coverage-v8/package.json (bundler-entry)": 4,
+  "changesets/changesets packages/apply-release-plan/package.json (src-twin)": 3,
+  "vercel/turborepo examples/with-react-native-web/packages/ui/package.json (bundler-entry)": 3,
+  "vercel/turborepo crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/analytics/package.json (src-twin)": 3,
+  "vercel/turborepo crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/typed/package.json (src-twin)": 3,
+  "changesets/changesets packages/changelog-git/package.json (src-twin)": 2,
+  "vercel/turborepo packages/eslint-plugin-turbo/package.json (bundler-entry)": 2,
+  "vercel/turborepo crates/turborepo-trace-testkit/fixtures/tasks/data-inputs/packages/tool/package.json (src-twin)": 2,
+  "changesets/changesets packages/cli/package.json (bundler-entry)": 1,
+  "vercel/turborepo examples/design-system/packages/ui/package.json (bundler-entry)": 1,
+  "vercel/turborepo examples/with-changesets/packages/acme-core/package.json (bundler-entry)": 1
+ },
+ "sample": [
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/network.test.ts",
+   "kind": "calls",
+   "targetName": "response.request",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/HTTPResponse.ts#HTTPResponse.request",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/HTTPResponse.d.ts",
+    "source": "packages/puppeteer-core/src/api/HTTPResponse.ts"
+   },
+   "line": 220,
+   "code": "const cookie1 = response.request().redirectChain()[0]!.headers()["
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/browser/fixtures/expect-dom/toHaveFormValues.test.ts",
+   "kind": "calls",
+   "targetName": "expect",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vitest/src/integrations/chai/index.ts#globalExpect",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 249,
+   "code": "expect(form).toHaveFormValues({category: newValue})"
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/browser/test/userEvent.test.ts",
+   "kind": "calls",
+   "targetName": "expect",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vitest/src/integrations/chai/index.ts#globalExpect",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 398,
+   "code": "expect(mouseEntered).toBe(true)"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "packages/puppeteer-core/src/node/PuppeteerNode.ts",
+   "kind": "imports",
+   "targetName": "resolveBuildId",
+   "convention": "src-twin",
+   "before": "unresolved:workspace-build-output-missing",
+   "target": "packages/browsers/src/browser-data/browser-data.ts#resolveBuildId",
+   "entry": {
+    "proof": "src-twin",
+    "build": "packages/browsers/package.json",
+    "assumed": true,
+    "config": "packages/browsers/package.json",
+    "output": "packages/browsers/lib/main.d.ts",
+    "source": "packages/browsers/src/main.ts"
+   },
+   "line": 9,
+   "code": "resolveBuildId,"
+  },
+  {
+   "repo": "trpc/trpc",
+   "file": "examples/standalone-server/src/client.ts",
+   "kind": "imports",
+   "targetName": "splitLink",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/client/src/links/splitLink.ts#splitLink",
+   "entry": {
+    "proof": "bundler-entry",
+    "build": "packages/client/package.json",
+    "assumed": true,
+    "config": "packages/client/tsdown.config.ts",
+    "output": "packages/client/dist/index.d.mts",
+    "source": "packages/client/src/index.ts"
+   },
+   "line": 5,
+   "code": "splitLink,"
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/e2e/dts/no-dispose/src/vitest.ts",
+   "kind": "imports",
+   "targetName": "vitest",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vitest/src/public/index.ts#packages/vitest/src/public/index.ts",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 1,
+   "code": "import { vi } from 'vitest'"
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/browser/test/timers.test.ts",
+   "kind": "calls",
+   "targetName": "it",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vitest/src/runtime/runner/suite.ts#it",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 9,
+   "code": "it('only runs a setTimeout callback once (ever)', () => {"
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/e2e/fixtures/vm-cjs-namespace/cjs-namespace.test.js",
+   "kind": "calls",
+   "targetName": "test",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vitest/src/runtime/runner/suite.ts#test",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 28,
+   "code": "test('builtin namespaces do not provide \"module.exports\"', () => {"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/emulation.test.ts",
+   "kind": "calls",
+   "targetName": "page.screenshot",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/Page.ts#Page.screenshot",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/Page.d.ts",
+    "source": "packages/puppeteer-core/src/api/Page.ts"
+   },
+   "line": 620,
+   "code": "const screenshot = await page.screenshot();"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/cdp/webmcp.test.ts",
+   "kind": "calls",
+   "targetName": "page.mainFrame",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/Page.ts#Page.mainFrame",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/Page.d.ts",
+    "source": "packages/puppeteer-core/src/api/Page.ts"
+   },
+   "line": 266,
+   "code": "expect(removedTools[0]!.frame).toBe(page.mainFrame());"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/jshandle.test.ts",
+   "kind": "calls",
+   "targetName": "(expression).toString",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/JSHandle.ts#JSHandle.toString",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/JSHandle.d.ts",
+    "source": "packages/puppeteer-core/src/api/JSHandle.ts"
+   },
+   "line": 326,
+   "code": "expect((await page.evaluateHandle('new Proxy({}, {})')).toString()).toBe("
+  },
+  {
+   "repo": "changesets/changesets",
+   "file": "packages/cli/src/commands/git-tag/index.ts",
+   "kind": "calls",
+   "targetName": "shouldSkipPackage",
+   "convention": "src-twin",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/should-skip-package/src/index.ts#shouldSkipPackage",
+   "entry": {
+    "proof": "src-twin",
+    "build": "packages/should-skip-package/package.json",
+    "assumed": true,
+    "config": "packages/should-skip-package/package.json",
+    "output": "packages/should-skip-package/dist/index.d.mts",
+    "source": "packages/should-skip-package/src/index.ts"
+   },
+   "line": 27,
+   "code": "!shouldSkipPackage(pkg, {"
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/browser/test/cjs-lib.test.ts",
+   "kind": "imports",
+   "targetName": "test",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vitest/src/runtime/runner/suite.ts#test",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 3,
+   "code": "import { expect, test } from 'vitest'"
+  },
+  {
+   "repo": "vitejs/vite",
+   "file": "playground/ssr-wasm/vite.config.ts",
+   "kind": "calls",
+   "targetName": "defineConfig",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vite/src/node/config.ts#defineConfig",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vite/package.json",
+    "assumed": true,
+    "config": "packages/vite/rolldown.dts.config.ts",
+    "output": "packages/vite/dist/node/index.d.ts",
+    "source": "packages/vite/src/node/index.ts"
+   },
+   "line": 2,
+   "code": "export default defineConfig({"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/accessibility.test.ts",
+   "kind": "calls",
+   "targetName": "page.accessibility.snapshot",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/cdp/Accessibility.ts#Accessibility.snapshot",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/cdp/Accessibility.d.ts",
+    "source": "packages/puppeteer-core/src/cdp/Accessibility.ts"
+   },
+   "line": 247,
+   "code": "const snapshot = await page.accessibility.snapshot();"
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/browser/fixtures/expect-dom/toContainHTML.test.ts",
+   "kind": "calls",
+   "targetName": "(expression).toContainHTML",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/browser/jest-dom.d.ts#TestingLibraryMatchers.toContainHTML",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 37,
+   "code": "expect(child).toContainHTML(incorrectStringHtml)"
+  },
+  {
+   "repo": "vitejs/vite",
+   "file": "playground/build-old/vite.config.js",
+   "kind": "calls",
+   "targetName": "defineConfig",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vite/src/node/config.ts#defineConfig",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vite/package.json",
+    "assumed": true,
+    "config": "packages/vite/rolldown.dts.config.ts",
+    "output": "packages/vite/dist/node/index.d.ts",
+    "source": "packages/vite/src/node/index.ts"
+   },
+   "line": 3,
+   "code": "export default defineConfig({"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/navigation.test.ts",
+   "kind": "calls",
+   "targetName": "page.goto",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/Page.ts#Page.goto",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/Frame.d.ts",
+    "source": "packages/puppeteer-core/src/api/Frame.ts"
+   },
+   "line": 354,
+   "code": ".goto(server.PREFIX + '/navigate-on-load.html', {timeout: 10000})"
+  },
+  {
+   "repo": "vitejs/vite",
+   "file": "playground/tsconfig-json/__tests__/tsconfig-json.spec.ts",
+   "kind": "calls",
+   "targetName": "transformWithEsbuild",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vite/src/node/plugins/esbuild.ts#transformWithEsbuild",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vite/package.json",
+    "assumed": true,
+    "config": "packages/vite/rolldown.dts.config.ts",
+    "output": "packages/vite/dist/node/index.d.ts",
+    "source": "packages/vite/src/node/index.ts"
+   },
+   "line": 84,
+   "code": "const result = await transformWithEsbuild(mainContent, main, {"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/navigation.test.ts",
+   "kind": "calls",
+   "targetName": "page.goto",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/Page.ts#Page.goto",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/Frame.d.ts",
+    "source": "packages/puppeteer-core/src/api/Frame.ts"
+   },
+   "line": 618,
+   "code": "await page.goto(server.EMPTY_PAGE);"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/page.test.ts",
+   "kind": "calls",
+   "targetName": "page.evaluate",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/Page.ts#Page.evaluate",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/Page.d.ts",
+    "source": "packages/puppeteer-core/src/api/Page.ts"
+   },
+   "line": 2677,
+   "code": "await page.evaluate(() => {"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/page.test.ts",
+   "kind": "calls",
+   "targetName": "page.evaluate",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/Page.ts#Page.evaluate",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/Page.d.ts",
+    "source": "packages/puppeteer-core/src/api/Page.ts"
+   },
+   "line": 2276,
+   "code": "await page.evaluate("
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/browser/fixtures/expect-dom/toContainHTML.test.ts",
+   "kind": "calls",
+   "targetName": "(expression).toThrow",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/expect/src/types.ts#JestAssertion.toThrow",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 69,
+   "code": "expect(() => expect(child).toContainHTML(nonExistentString)).toThrow()"
+  },
+  {
+   "repo": "honojs/hono",
+   "file": "adapters/bun/src/websocket.ts",
+   "kind": "imports",
+   "targetName": "hono/ws",
+   "convention": "src-twin",
+   "before": "unresolved:workspace-build-output-missing",
+   "target": "src/helper/websocket/index.ts#src/helper/websocket/index.ts",
+   "entry": {
+    "proof": "src-twin",
+    "build": "package.json",
+    "assumed": true,
+    "config": "package.json",
+    "output": "dist/types/helper/websocket/index.d.ts",
+    "source": "src/helper/websocket/index.ts"
+   },
+   "line": 1,
+   "code": "import type { UpgradeWebSocket, WSEvents, WSMessageReceive } from 'hono/ws'"
+  },
+  {
+   "repo": "vitest-dev/vitest",
+   "file": "test/browser/test/timers.test.ts",
+   "kind": "calls",
+   "targetName": "vi.useFakeTimers",
+   "convention": "bundler-entry",
+   "before": "unresolved:workspace-entry-unavailable",
+   "target": "packages/vitest/src/integrations/vi.ts#VitestUtils.useFakeTimers",
+   "entry": {
+    "proof": "bundler-entry",
+    "stripInternal": true,
+    "build": "packages/vitest/package.json",
+    "assumed": true,
+    "config": "packages/vitest/rollup.config.js",
+    "output": "packages/vitest/dist/index.d.ts",
+    "source": "packages/vitest/src/public/index.ts"
+   },
+   "line": 24,
+   "code": "vi.useFakeTimers()"
+  },
+  {
+   "repo": "honojs/hono",
+   "file": "adapters/bun/src/conninfo.test.ts",
+   "kind": "calls",
+   "targetName": "Context",
+   "convention": "src-twin",
+   "before": "unresolved:workspace-build-output-missing",
+   "target": "src/context.ts#Context",
+   "entry": {
+    "proof": "src-twin",
+    "build": "package.json",
+    "assumed": true,
+    "config": "package.json",
+    "output": "dist/types/index.d.ts",
+    "source": "src/index.ts"
+   },
+   "line": 42,
+   "code": "const c = new Context(new Request('http://localhost/'), { env: { server } })"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/elementhandle.test.ts",
+   "kind": "calls",
+   "targetName": "elementHandle.boundingBox",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/ElementHandle.ts#ElementHandle.boundingBox",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/ElementHandle.d.ts",
+    "source": "packages/puppeteer-core/src/api/ElementHandle.ts"
+   },
+   "line": 66,
+   "code": "const box = await elementHandle.boundingBox();"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/keyboard.test.ts",
+   "kind": "calls",
+   "targetName": "keyboard.up",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/Input.ts#Keyboard.up",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/Frame.d.ts",
+    "source": "packages/puppeteer-core/src/api/Frame.ts"
+   },
+   "line": 392,
+   "code": "await keyboard.up(';');"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/network.test.ts",
+   "kind": "references",
+   "targetName": "HTTPRequest",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:workspace-build-output-missing",
+   "target": "packages/puppeteer-core/src/api/HTTPRequest.ts#HTTPRequest",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/HTTPRequest.d.ts",
+    "source": "packages/puppeteer-core/src/api/HTTPRequest.ts"
+   },
+   "line": 36,
+   "code": "const requests: HTTPRequest[] = [];"
+  },
+  {
+   "repo": "puppeteer/puppeteer",
+   "file": "test/src/cdp/screencast.test.ts",
+   "kind": "calls",
+   "targetName": "page.screencast",
+   "convention": "wrapped-compiler-emit",
+   "before": "unresolved:no-symbol",
+   "target": "packages/puppeteer-core/src/api/Page.ts#Page.screencast",
+   "entry": {
+    "proof": "wrapped-compiler-emit",
+    "build": "packages/puppeteer-core/package.json",
+    "assumed": true,
+    "config": "packages/puppeteer-core/tsconfig.json",
+    "output": "packages/puppeteer-core/lib/puppeteer/api/Page.d.ts",
+    "source": "packages/puppeteer-core/src/api/Page.ts"
+   },
+   "line": 115,
+   "code": "page.screencast({crop: {x: 0, y: 0, height: 1, width: 10000}}),"
+  }
+ ]
+}
