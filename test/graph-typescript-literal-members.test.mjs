@@ -1040,8 +1040,10 @@ test("review 3: the walk's work per call is bounded by a count of computed expre
   // result is touched by a cycle, so none is cached and the work doubles
   // per level (reviewer B: 327,679 expressions at 16 levels; tens of
   // millions at 24). The walk stops at the budget, decided by the count.
+  // A module: a script's top-level `let` is not followed at all.
   const file = (k) =>
     [
+      "export {};",
       "declare const pick: boolean;",
       "let l0 = { run() {} };",
       "l0 = l0;",
