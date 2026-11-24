@@ -19,21 +19,24 @@
  },
  "route": {
   "links": 13361,
-  "level2": 7948,
+  "level2": 6136,
   "assumed": 97,
   "proven": 5975,
-  "toolchainDecided": 1876,
+  "toolchainDecided": 64,
   "libraryModuleLinks": 0,
-  "level2Percent": 59.49,
-  "withModuleLinksPercent": 59.49,
-  "toolchainDecidedPercent": 14.04
+  "level2Percent": 45.92,
+  "withModuleLinksPercent": 45.92,
+  "toolchainDecidedPercent": 0.48
  },
  "decided": {
   "definite:definite": 1438,
-  "definite:unresolved": 1876,
-  "withheld:cfg-variant": 7,
-  "withheld:conditional-candidates": 2,
-  "withheld:cfg-link": 38
+  "definite:unresolved": 64,
+  "withheld:selected-receiver": 1390,
+  "withheld:import-namespaces": 3,
+  "withheld:selected-binding": 18,
+  "withheld:cfg-link": 38,
+  "withheld:opaque-shadow": 374,
+  "withheld:dependency-on-trace": 36
  },
  "join": {
   "none:file-not-indexed": 2506,
@@ -59,22 +62,34 @@
   "linksAfter": 13361,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 47,
+  "outcomes": 1859,
   "outcomeDataDiffers": 0
  },
+ "design": {
+  "decided": 64,
+  "path": {
+   "decided": 39,
+   "kept": 3
+  },
+  "receiver": {
+   "decided": 25,
+   "keptNames": 24,
+   "keptTraceable": 18
+  }
+ },
  "analyzerRun": {
-  "wallS": 17.3,
-  "cpuS": 30.1,
-  "peakMiB": 1103
+  "wallS": 17.2,
+  "cpuS": 29.8,
+  "peakMiB": 1099
  },
  "index": {
   "sourceOnly": {
-   "wallS": 12.9,
-   "cpuS": 18.9
+   "wallS": 14.1,
+   "cpuS": 19.7
   },
   "route": {
-   "wallS": 82.8,
-   "cpuS": 20.8
+   "wallS": 52.1,
+   "cpuS": 20.9
   }
  },
  "errors": {
@@ -88,13 +103,16 @@
    "no identity: library item": 2823,
    "gate: trait-method declaration": 250,
    "no identity: generated item": 86,
-   "credited": 1876,
+   "credited": 64,
+   "other: withheld:selected-receiver": 1390,
    "no answer: no-occurrence-at-site": 193,
    "no identity: local binding": 425,
-   "gate: cfg-variant guard": 7,
-   "gate: conditional candidates": 2,
+   "gate: an import of a name bound in several namespaces": 3,
+   "other: withheld:selected-binding": 18,
    "gate: cfg condition other than test": 25,
-   "no answer: no-name-site": 13
+   "no answer: no-name-site": 13,
+   "gate: a name an opaque item may shadow (confirm-only)": 374,
+   "other: withheld:dependency-on-trace": 36
   },
   "libraryPassingCfg": 2721,
   "notIndexed": {

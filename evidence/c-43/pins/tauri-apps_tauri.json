@@ -61,19 +61,31 @@
   "outcomes": 0,
   "outcomeDataDiffers": 0
  },
+ "design": {
+  "decided": 0,
+  "path": {
+   "decided": 0,
+   "kept": 0
+  },
+  "receiver": {
+   "decided": 0,
+   "keptNames": 0,
+   "keptTraceable": 0
+  }
+ },
  "analyzerRun": {
-  "wallS": 146.6,
-  "cpuS": 553.2,
-  "peakMiB": 5190
+  "wallS": 139.1,
+  "cpuS": 596.4,
+  "peakMiB": 5188
  },
  "index": {
   "sourceOnly": {
-   "wallS": 105.9,
-   "cpuS": 118.2
+   "wallS": 89.3,
+   "cpuS": 116.3
   },
   "route": {
-   "wallS": 824.4,
-   "cpuS": 117
+   "wallS": 648.4,
+   "cpuS": 124.8
   }
  },
  "errors": {

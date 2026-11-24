@@ -19,21 +19,24 @@
  },
  "route": {
   "links": 70802,
-  "level2": 29139,
+  "level2": 25051,
   "assumed": 299,
   "proven": 22761,
-  "toolchainDecided": 6079,
+  "toolchainDecided": 1991,
   "libraryModuleLinks": 0,
-  "level2Percent": 41.16,
-  "withModuleLinksPercent": 41.16,
-  "toolchainDecidedPercent": 8.59
+  "level2Percent": 35.38,
+  "withModuleLinksPercent": 35.38,
+  "toolchainDecidedPercent": 2.81
  },
  "decided": {
-  "definite:unresolved": 6079,
-  "withheld:cfg-variant": 6680,
-  "definite:definite": 6554,
-  "withheld:conditional-candidates": 771,
-  "withheld:cfg-link": 5004
+  "withheld:selected-binding": 2872,
+  "definite:definite": 6667,
+  "definite:unresolved": 1991,
+  "withheld:selected-receiver": 2465,
+  "withheld:opaque-shadow": 6068,
+  "withheld:dependency-on-trace": 20,
+  "withheld:cfg-link": 5004,
+  "withheld:trace-incomplete": 1
  },
  "join": {
   "none:file-not-indexed": 159,
@@ -53,7 +56,7 @@
   "filter:collision": 44
  },
  "agreement": {
-  "confirmed": 6554,
+  "confirmed": 6667,
   "differs": 0,
   "percent": 100
  },
@@ -63,22 +66,34 @@
   "linksAfter": 70802,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 12455,
+  "outcomes": 16430,
   "outcomeDataDiffers": 0
  },
+ "design": {
+  "decided": 1991,
+  "path": {
+   "decided": 1951,
+   "kept": 708
+  },
+  "receiver": {
+   "decided": 40,
+   "keptNames": 37,
+   "keptTraceable": 36
+  }
+ },
  "analyzerRun": {
-  "wallS": 149.8,
-  "cpuS": 480.7,
-  "peakMiB": 2367
+  "wallS": 103.5,
+  "cpuS": 477.8,
+  "peakMiB": 2381
  },
  "index": {
   "sourceOnly": {
-   "wallS": 112.5,
-   "cpuS": 139
+   "wallS": 112.7,
+   "cpuS": 145.7
   },
   "route": {
-   "wallS": 378.8,
-   "cpuS": 156.3
+   "wallS": 267.8,
+   "cpuS": 157.4
   }
  },
  "errors": {
@@ -90,19 +105,22 @@
   "buckets": {
    "no answer: file-not-indexed": 134,
    "no identity: library item": 18482,
-   "credited": 6079,
+   "other: withheld:selected-binding": 2872,
    "no answer: no-name-site": 96,
-   "gate: cfg-variant guard": 6567,
    "no identity: declaration without a graph symbol": 2173,
+   "credited": 1991,
+   "other: withheld:selected-receiver": 2465,
    "no identity: generated item": 1263,
-   "gate: conditional candidates": 771,
    "gate: trait-method declaration": 1549,
    "gate: kind/namespace": 176,
+   "gate: a name an opaque item may shadow (confirm-only)": 6068,
    "no identity: local binding": 5166,
+   "other: withheld:dependency-on-trace": 20,
    "no answer: no-occurrence-at-site": 359,
    "gate: cfg condition other than test": 4807,
    "gate: known error classes": 47,
-   "no answer: kind-not-joined": 44
+   "no answer: kind-not-joined": 44,
+   "other: withheld:trace-incomplete": 1
   },
   "libraryPassingCfg": 13605,
   "notIndexed": {

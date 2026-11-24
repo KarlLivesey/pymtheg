@@ -1070,22 +1070,22 @@ no module answer for a `use`, no `extern crate` or crate root, no symbol
 defined more than once, no non-macro item of a proc-macro crate from another
 package, no local binding, no trait-method declaration (dispatch stays open or
 a candidate set). No answer is taken on a link under a cfg condition other
-than `test`, nor for a target that has a cfg variant, nor out of a candidate
-set holding one; a target is gated by its own cfg, and through its module
-chain only when another item can stand at its path in another configuration
-(a level of the chain reached through more than one file, as cfg or
-`cfg_attr(path)` twins) or the chain's conditions cannot be seen (a `mod`
-written only inside a macro such as `cfg_if!`). A link whose source-only
-answer records a name cfg may remove takes only the one target it recorded,
-and a set of several candidates holding one under cfg (its own or a
-module's) or cfg twins is only confirmed, never narrowed. Nor is an answer
-into an item a name defined more than once under cfg selects (`use` items,
-`cfg(test)` doubles included, `type` aliases, or function twins through their
-return types, method twins in one impl, `static` and `const` twins), or a
-member of one, unless it confirms source-only's own target. A link source-only
-left as one an opaque item (such as a `cfg_if!` body) may shadow is
-confirm-only, and an import decides only when the imported name is bound in
-one namespace where it comes from. The answer's graph symbol must be of a kind
+than `test`. Beyond that the route denies by default (design B,
+[C-43](changes/C-43.md)): an answer decides only when no binding on its trace
+is selected. A binding is selected when it, or an enclosing module, impl,
+trait, block or file, is under a cfg (`test` included) that the site's own
+conditions do not syntactically imply, or when a macro whose expansion is not
+read emits it. A path's trace is each segment's binding and the `use` hops a
+segment may pass through; a receiver-typed link's is everything named in the
+enclosing function up to the site, plus any same-named member, trait `use`,
+cfg-gated field or `Deref`/`Index` impl the lookup could meet. An item of a
+crate other than `std`, `core` or `alloc` on the trace, or a trace that
+cannot be completed, leaves the link confirm-only, as does a name an opaque
+item may shadow; an import decides only when the imported name is bound in
+one namespace where it comes from. Each withheld answer records why
+(`withheld:selected-binding`, `selected-receiver`, `trace-incomplete`,
+`dependency-on-trace`, `opaque-shadow`, `import-namespaces`, `cfg-link`).
+The answer's graph symbol must be of a kind
 the SCIP descriptor allows. A trait's associated type or const named in
 generic code (`S::Error`) is answered with the trait's declaration and
 counted apart. A source-only definite target the toolchain disagrees with is

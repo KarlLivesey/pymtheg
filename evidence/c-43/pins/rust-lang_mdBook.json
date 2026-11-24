@@ -19,21 +19,24 @@
  },
  "route": {
   "links": 13866,
-  "level2": 8168,
+  "level2": 7637,
   "assumed": 404,
   "proven": 6859,
-  "toolchainDecided": 905,
+  "toolchainDecided": 374,
   "libraryModuleLinks": 0,
-  "level2Percent": 58.91,
-  "withModuleLinksPercent": 58.91,
-  "toolchainDecidedPercent": 6.53
+  "level2Percent": 55.08,
+  "withModuleLinksPercent": 55.08,
+  "toolchainDecidedPercent": 2.7
  },
  "decided": {
   "definite:definite": 2030,
-  "definite:unresolved": 905,
-  "withheld:conditional-candidates": 12,
-  "withheld:cfg-variant": 2,
-  "withheld:cfg-link": 12
+  "definite:unresolved": 374,
+  "withheld:selected-receiver": 253,
+  "withheld:opaque-shadow": 158,
+  "withheld:dependency-on-trace": 125,
+  "withheld:selected-binding": 8,
+  "withheld:cfg-link": 12,
+  "withheld:trace-incomplete": 1
  },
  "join": {
   "unapplied:library": 7316,
@@ -60,22 +63,34 @@
   "linksAfter": 13866,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 26,
+  "outcomes": 557,
   "outcomeDataDiffers": 0
  },
+ "design": {
+  "decided": 374,
+  "path": {
+   "decided": 78,
+   "kept": 72
+  },
+  "receiver": {
+   "decided": 296,
+   "keptNames": 187,
+   "keptTraceable": 113
+  }
+ },
  "analyzerRun": {
-  "wallS": 30.5,
-  "cpuS": 111.9,
-  "peakMiB": 1899
+  "wallS": 26.1,
+  "cpuS": 104.3,
+  "peakMiB": 1898
  },
  "index": {
   "sourceOnly": {
-   "wallS": 19.9,
-   "cpuS": 32.4
+   "wallS": 20.5,
+   "cpuS": 32.2
   },
   "route": {
-   "wallS": 157.4,
-   "cpuS": 35.3
+   "wallS": 86.2,
+   "cpuS": 33.9
   }
  },
  "errors": {
@@ -89,14 +104,17 @@
    "no identity: library item": 4595,
    "no identity: generated item": 38,
    "no identity: local binding": 495,
-   "credited": 905,
+   "credited": 374,
    "no answer: no-name-site": 43,
+   "other: withheld:selected-receiver": 253,
    "gate: kind/namespace": 6,
-   "gate: conditional candidates": 12,
-   "gate: cfg-variant guard": 2,
+   "gate: a name an opaque item may shadow (confirm-only)": 158,
+   "other: withheld:dependency-on-trace": 125,
+   "other: withheld:selected-binding": 8,
    "no answer: no-occurrence-at-site": 26,
    "gate: known error classes": 3,
    "gate: cfg condition other than test": 4,
+   "other: withheld:trace-incomplete": 1,
    "no answer: file-not-indexed": 95
   },
   "libraryPassingCfg": 4572,

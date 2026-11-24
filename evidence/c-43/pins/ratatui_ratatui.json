@@ -19,20 +19,23 @@
  },
  "route": {
   "links": 60424,
-  "level2": 39351,
+  "level2": 27396,
   "assumed": 1793,
   "proven": 24099,
-  "toolchainDecided": 13459,
+  "toolchainDecided": 1504,
   "libraryModuleLinks": 0,
-  "level2Percent": 65.12,
-  "withModuleLinksPercent": 65.12,
-  "toolchainDecidedPercent": 22.27
+  "level2Percent": 45.34,
+  "withModuleLinksPercent": 45.34,
+  "toolchainDecidedPercent": 2.49
  },
  "decided": {
-  "definite:unresolved": 13459,
+  "withheld:selected-binding": 239,
+  "withheld:opaque-shadow": 6957,
   "definite:definite": 10488,
-  "withheld:conditional-candidates": 314,
-  "withheld:cfg-variant": 9,
+  "withheld:selected-receiver": 4948,
+  "definite:unresolved": 1504,
+  "withheld:trace-incomplete": 4,
+  "withheld:dependency-on-trace": 130,
   "withheld:cfg-link": 418
  },
  "join": {
@@ -62,22 +65,34 @@
   "linksAfter": 60424,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 741,
+  "outcomes": 12696,
   "outcomeDataDiffers": 0
  },
+ "design": {
+  "decided": 1504,
+  "path": {
+   "decided": 459,
+   "kept": 28
+  },
+  "receiver": {
+   "decided": 1045,
+   "keptNames": 254,
+   "keptTraceable": 204
+  }
+ },
  "analyzerRun": {
-  "wallS": 79.9,
-  "cpuS": 278.9,
-  "peakMiB": 2842
+  "wallS": 79.5,
+  "cpuS": 275.6,
+  "peakMiB": 2856
  },
  "index": {
   "sourceOnly": {
-   "wallS": 60.1,
-   "cpuS": 80
+   "wallS": 62.1,
+   "cpuS": 82.7
   },
   "route": {
-   "wallS": 235.5,
-   "cpuS": 90.4
+   "wallS": 259.3,
+   "cpuS": 90.6
   }
  },
  "errors": {
@@ -89,14 +104,17 @@
   "buckets": {
    "no identity: library item": 9794,
    "gate: kind/namespace": 69,
-   "credited": 13459,
+   "other: withheld:selected-binding": 239,
+   "gate: a name an opaque item may shadow (confirm-only)": 6957,
+   "other: withheld:selected-receiver": 4948,
    "no identity: generated item": 1279,
-   "gate: conditional candidates": 314,
    "gate: trait-method declaration": 1400,
+   "credited": 1504,
    "no identity: local binding": 4104,
+   "other: withheld:trace-incomplete": 4,
    "no identity: declaration without a graph symbol": 601,
    "no answer: no-name-site": 141,
-   "gate: cfg-variant guard": 9,
+   "other: withheld:dependency-on-trace": 130,
    "no answer: no-occurrence-at-site": 2292,
    "no answer: file-not-indexed": 530,
    "gate: known error classes": 25,

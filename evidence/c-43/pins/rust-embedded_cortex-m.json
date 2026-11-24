@@ -19,21 +19,23 @@
  },
  "route": {
   "links": 5531,
-  "level2": 3511,
+  "level2": 3389,
   "assumed": 7,
   "proven": 3340,
-  "toolchainDecided": 164,
+  "toolchainDecided": 42,
   "libraryModuleLinks": 0,
-  "level2Percent": 63.48,
-  "withModuleLinksPercent": 63.48,
-  "toolchainDecidedPercent": 2.97
+  "level2Percent": 61.27,
+  "withModuleLinksPercent": 61.27,
+  "toolchainDecidedPercent": 0.76
  },
  "decided": {
-  "withheld:cfg-variant": 76,
-  "definite:unresolved": 164,
-  "definite:definite": 552,
+  "withheld:opaque-shadow": 137,
+  "withheld:import-namespaces": 11,
+  "definite:definite": 581,
+  "withheld:selected-binding": 13,
   "withheld:cfg-link": 192,
-  "withheld:conditional-candidates": 10
+  "withheld:selected-receiver": 18,
+  "definite:unresolved": 42
  },
  "join": {
   "unapplied:library": 1508,
@@ -50,7 +52,7 @@
   "none:file-not-indexed": 837
  },
  "agreement": {
-  "confirmed": 552,
+  "confirmed": 581,
   "differs": 0,
   "percent": 100
  },
@@ -60,22 +62,34 @@
   "linksAfter": 5531,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 278,
+  "outcomes": 371,
   "outcomeDataDiffers": 0
  },
+ "design": {
+  "decided": 42,
+  "path": {
+   "decided": 30,
+   "kept": 6
+  },
+  "receiver": {
+   "decided": 12,
+   "keptNames": 0,
+   "keptTraceable": 0
+  }
+ },
  "analyzerRun": {
-  "wallS": 15.8,
-  "cpuS": 35.6,
-  "peakMiB": 932
+  "wallS": 15.7,
+  "cpuS": 35.2,
+  "peakMiB": 924
  },
  "index": {
   "sourceOnly": {
-   "wallS": 7,
-   "cpuS": 9.7
+   "wallS": 8.2,
+   "cpuS": 10.1
   },
   "route": {
-   "wallS": 56.8,
-   "cpuS": 12.3
+   "wallS": 41.3,
+   "cpuS": 11.9
   }
  },
  "errors": {
@@ -89,14 +103,16 @@
    "gate: kind/namespace": 6,
    "gate: trait-method declaration": 37,
    "gate: known error classes": 51,
-   "gate: cfg-variant guard": 47,
-   "credited": 164,
+   "gate: a name an opaque item may shadow (confirm-only)": 137,
+   "gate: an import of a name bound in several namespaces": 11,
    "no answer: no-occurrence-at-site": 294,
    "no answer: no-name-site": 5,
+   "other: withheld:selected-binding": 13,
    "gate: cfg condition other than test": 49,
    "no identity: local binding": 99,
    "no answer: file-not-indexed": 673,
-   "gate: conditional candidates": 10
+   "other: withheld:selected-receiver": 18,
+   "credited": 42
   },
   "libraryPassingCfg": 635,
   "notIndexed": {
