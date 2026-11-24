@@ -30,7 +30,7 @@ export function taintEstimate(path) {
   try {
     const symbols = [];
     for (const row of db
-      .prepare("SELECT file, kind, body FROM graph_symbols WHERE module='rust'")
+      .prepare("SELECT file, kind, body FROM graph_symbols WHERE file LIKE '%.rs'")
       .iterate()) {
       const body = JSON.parse(row.body);
       symbols.push({
