@@ -1077,7 +1077,11 @@ chain only when another item can stand at its path in another configuration
 written only inside a macro such as `cfg_if!`). A link whose source-only
 answer records a name cfg may remove takes only the one target it recorded,
 and a set of several candidates holding one under cfg (its own or a
-module's) or cfg twins is only confirmed, never narrowed. The answer's graph symbol must be of a kind
+module's) or cfg twins is only confirmed, never narrowed. Nor is an answer
+into an item a name defined more than once under cfg selects (`use` items,
+`cfg(test)` doubles included, `type` aliases, or function twins through their
+return types), or a member of one, unless it confirms source-only's own
+target. The answer's graph symbol must be of a kind
 the SCIP descriptor allows. A trait's associated type or const named in
 generic code (`S::Error`) is answered with the trait's declaration and
 counted apart. A source-only definite target the toolchain disagrees with is

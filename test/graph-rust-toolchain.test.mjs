@@ -1918,3 +1918,286 @@ test(
     });
   },
 );
+
+// Fifth review: names defined more than once under cfg select between items
+// the toolchain sees only one of (aliases, test doubles, function twins).
+const SEL_CRATE = {
+  "Cargo.toml":
+    '[package]\nname = "sel"\nversion = "0.1.0"\nedition = "2021"\n\n[features]\ndefault = ["fast"]\nfast = []\n',
+  "src/lib.rs": [
+    "#![allow(dead_code, unused_imports)]",
+    "",
+    "// B1, feature form: type alias twins over always-compiled types",
+    "pub struct FastB;",
+    "impl FastB {",
+    "    pub fn b_new() -> Self {",
+    "        FastB",
+    "    }",
+    "    pub fn b_run(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct SlowB;",
+    "impl SlowB {",
+    "    pub fn b_new() -> Self {",
+    "        SlowB",
+    "    }",
+    "    pub fn b_run(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    '#[cfg(feature = "fast")]',
+    "pub type Backend = FastB;",
+    '#[cfg(not(feature = "fast"))]',
+    "pub type Backend = SlowB;",
+    "pub fn backend() -> u32 {",
+    "    let b = Backend::b_new();",
+    "    b.b_run()",
+    "}",
+    "",
+    "// B1: a field typed by such an alias",
+    "pub struct Holder {",
+    "    inner: Backend,",
+    "}",
+    "pub fn held(h: &Holder) -> u32 {",
+    "    h.inner.b_run()",
+    "}",
+    "",
+    "// B1, platform form",
+    "pub struct UnixS;",
+    "impl UnixS {",
+    "    pub fn s_open() -> Self {",
+    "        UnixS",
+    "    }",
+    "}",
+    "pub struct OtherS;",
+    "impl OtherS {",
+    "    pub fn s_open() -> Self {",
+    "        OtherS",
+    "    }",
+    "}",
+    "#[cfg(unix)]",
+    "pub type Sys = UnixS;",
+    "#[cfg(not(unix))]",
+    "pub type Sys = OtherS;",
+    "pub fn sys() -> Sys {",
+    "    Sys::s_open()",
+    "}",
+    "",
+    "// F1: a test double selected by cfg(test) on the use",
+    "mod mdb;",
+    "mod rdb;",
+    "#[cfg(test)]",
+    "use mdb::MockDb as Db;",
+    "#[cfg(not(test))]",
+    "use rdb::RealDb as Db;",
+    "pub fn db() -> u32 {",
+    "    Db::get_db()",
+    "}",
+    "",
+    "// F2, feature form: function twins returning different types",
+    "pub struct FastT;",
+    "impl FastT {",
+    "    pub fn run_t(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct SlowT;",
+    "impl SlowT {",
+    "    pub fn run_t(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    '#[cfg(feature = "fast")]',
+    "fn mk() -> FastT {",
+    "    FastT",
+    "}",
+    '#[cfg(not(feature = "fast"))]',
+    "fn mk() -> SlowT {",
+    "    SlowT",
+    "}",
+    "pub fn made() -> u32 {",
+    "    mk().run_t()",
+    "}",
+    "",
+    "// F2, platform form",
+    "pub struct UnixT;",
+    "impl UnixT {",
+    "    pub fn run_u(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct OtherT;",
+    "impl OtherT {",
+    "    pub fn run_u(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    "#[cfg(unix)]",
+    "fn mk2() -> UnixT {",
+    "    UnixT",
+    "}",
+    "#[cfg(not(unix))]",
+    "fn mk2() -> OtherT {",
+    "    OtherT",
+    "}",
+    "pub fn made2() -> u32 {",
+    "    mk2().run_u()",
+    "}",
+    "",
+    "// Control: one definition under cfg(test) selects nothing",
+    "pub struct Plain;",
+    "impl Plain {",
+    "    pub fn p_go() -> u32 {",
+    "        7",
+    "    }",
+    "}",
+    "#[cfg(test)]",
+    "mod tests {",
+    "    use super::Plain;",
+    "    pub fn t_go() -> u32 {",
+    "        Plain::p_go()",
+    "    }",
+    "}",
+    "pub fn plain() -> u32 {",
+    "    Plain::p_go()",
+    "}",
+    "",
+    "mod extra;",
+    "",
+  ].join("\n"),
+  "src/mdb.rs":
+    "pub struct MockDb;\n\nimpl MockDb {\n    pub fn get_db() -> u32 {\n        1\n    }\n}\n",
+  "src/rdb.rs":
+    "pub struct RealDb;\n\nimpl RealDb {\n    pub fn get_db() -> u32 {\n        2\n    }\n}\n",
+  "src/extra.rs": "pub fn extra() -> u32 {\n    crate::plain()\n}\n",
+};
+
+test(
+  "real rust-analyzer, fifth review: a cfg-selected name (alias twins, a cfg(test) double, function twins) is never narrowed; one cfg(test) definition selects nothing",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "sel");
+      writeProject(project, SEL_CRATE);
+      const dump = await index(project, root, { environment: process.env });
+      if (
+        dump.state.state === "unavailable" &&
+        /rust-src/.test(dump.state.reason)
+      )
+        return;
+      assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+      const all = (name) =>
+        dump.links.filter(
+          (l) => l.file === "src/lib.rs" && l.targetName === name,
+        );
+      const wrong = [];
+      for (const name of [
+        "Backend::b_new",
+        "b.b_run",
+        "h.inner.b_run",
+        "Sys::s_open",
+        "Db::get_db",
+        "mk().run_t",
+        "mk2().run_u",
+      ]) {
+        const links = all(name);
+        if (!links.length) wrong.push(`${name}: no link`);
+        for (const l of links)
+          if (
+            l.data?.toolchain !== undefined ||
+            l.resolution === "resolved" ||
+            l.data?.toolchainOutcome !== "withheld:cfg-selected"
+          )
+            wrong.push(
+              `${name}: ${l.resolution} ${l.data?.toolchainOutcome ?? l.data?.toolchain?.origin}`,
+            );
+      }
+      // Every shape is checked before failing, so a run names them all.
+      assert.deepEqual(wrong, []);
+      // The control: the plain call and the one in cfg(test) code are
+      // answered (or confirmed) by the route.
+      for (const l of all("Plain::p_go"))
+        assert.equal(
+          l.resolution,
+          "resolved",
+          `Plain::p_go: ${JSON.stringify(l.data)}`,
+        );
+    });
+  },
+);
+
+test(
+  "real rust-analyzer, fifth review: an incremental re-index stores the same link rows as a cold index, byte for byte",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "sel");
+      writeProject(project, SEL_CRATE);
+      const run = async (path) => {
+        const store = new SqliteGraphStore(path, "tc");
+        try {
+          const report = await indexProject(
+            project,
+            new LanguageRegistry([rust]),
+            store,
+            {
+              toolchainDirectory: join(root, "toolchain"),
+              environment: process.env,
+              toolchains: { rust: true },
+              signal: new AbortController().signal,
+            },
+          );
+          return {
+            state: toolchainState({ rust: true }, report.toolchains).rust,
+            rows: new Map(
+              store
+                .links()
+                .map((l) => [
+                  l.id,
+                  JSON.stringify([
+                    l.file,
+                    l.kind,
+                    l.targetName,
+                    l.range,
+                    l.resolution,
+                    l.targetId,
+                    l.candidates,
+                    l.data,
+                  ]),
+                ]),
+            ),
+          };
+        } finally {
+          store.close();
+        }
+      };
+      const first = await run(join(root, "warm.sqlite"));
+      if (
+        first.state.state === "unavailable" &&
+        /rust-src/.test(first.state.reason)
+      )
+        return;
+      assert.equal(first.state.state, "used", JSON.stringify(first.state));
+      // Edit another file than the one holding the withheld links.
+      writeFileSync(
+        join(project, "src/extra.rs"),
+        SEL_CRATE["src/extra.rs"] +
+          "\npub fn extra_two() -> u32 {\n    crate::plain()\n}\n",
+      );
+      const warm = await run(join(root, "warm.sqlite"));
+      const cold = await run(join(root, "cold.sqlite"));
+      assert.equal(warm.state.state, "used");
+      assert.equal(cold.state.state, "used");
+      assert.ok(
+        [...cold.rows.values()].some((row) =>
+          row.includes("withheld:cfg-selected"),
+        ),
+        "the rows hold recorded outcomes",
+      );
+      assert.equal(warm.rows.size, cold.rows.size);
+      for (const [id, row] of cold.rows)
+        assert.equal(warm.rows.get(id), row, id);
+    });
+  },
+);
