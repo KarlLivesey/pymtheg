@@ -4,7 +4,7 @@
 // leaves a worker or a process running ends with this process (the test
 // kills its process group) instead of hanging the test run. It prints one
 // JSON line per fact the test checks.
-//   node graph-cli-cancel-scenario.mjs <stuck|child|stretch|block> <scratch>
+//   node graph-cli-cancel-scenario.mjs <stuck|child|stretch|block|await-child> <scratch>
 import { createServer } from "node:net";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -26,7 +26,7 @@ const flag = new Int32Array(flags);
 const workerData = { flag: flags };
 let connections = [];
 let server;
-if (scenario === "child") {
+if (scenario === "child" || scenario === "await-child") {
   // The child and the grandchild each connect and say their pid; the
   // scenario aborts once both have, so the test can always clean up.
   workerData.socket = join(scratch, "child.sock");
@@ -51,6 +51,8 @@ if (scenario === "block") {
   await writeFile(join(root, "z.x"), "def stuck\n");
 } else if (scenario === "stretch")
   await writeFile(join(root, "z.x"), "def stretch\n");
+else if (scenario === "await-child")
+  await writeFile(join(root, "z.x"), "def awaitchild\n");
 else await writeFile(join(root, "z.x"), "def stuck\n");
 
 const controller = new AbortController();
@@ -82,7 +84,7 @@ try {
 }
 say({ rejected, entered: Atomics.load(flag, 2) });
 
-if (scenario === "child") {
+if (scenario === "child" || scenario === "await-child") {
   // Both processes end: each connection closes.
   await Promise.all(connections);
   say({ closed: connections.length });

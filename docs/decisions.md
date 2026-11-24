@@ -3212,8 +3212,8 @@ a worker thread. The main thread relays progress and handles SIGINT,
 SIGTERM, SIGHUP and SIGQUIT. A cancel that finds the worker
 inside a language module's synchronous code terminates it; the store is
 left as a killed run leaves it, and the next index repairs it. Anywhere
-else, the cancel is acknowledged at the command's next checkpoint, as
-before. The worker and the coordinator use a cancel flag and a section in
+else, the run's processes are killed at once (as C-48's server does) and
+the cancel is acknowledged at the command's next checkpoint, as before. The worker and the coordinator use a cancel flag and a section in
 shared memory (the shape of C-48), so no clock decides which. The section
 is a module's synchronous call, and any synchronous stretch the module marks
 after an await (`synchronousStretch`; Go marks its link notes and parse);

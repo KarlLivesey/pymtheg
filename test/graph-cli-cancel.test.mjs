@@ -82,6 +82,17 @@ test("an abort inside a module call kills the child processes the worker started
   assert.equal(facts.closed, 2);
 });
 
+// C-50 review, as C-48's server does: an abort that finds the worker
+// awaiting a module's promise kills the run's processes at once and asks
+// the worker to abort. The module here awaits a child it does not pass the
+// signal to, so only that kill ends the wait; the run then stops at its
+// next checkpoint.
+test("an abort while a module awaits a child process kills it, and the run ends", async () => {
+  const facts = await scenario("await-child");
+  assert.equal(facts.rejected, "AbortError");
+  assert.equal(facts.closed, 2);
+});
+
 // C-50 review: synchronous work a module runs after an await, marked with
 // `synchronousStretch` (as Go marks its link notes and parse), is inside
 // the module call, so the abort terminates the worker there.

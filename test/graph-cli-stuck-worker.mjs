@@ -14,7 +14,10 @@
 // - "stretch": an async call that, after an await, spins inside
 //   `synchronousStretch` (a module's synchronous stretch while awaited);
 // - "block": an async call whose continuation blocks until released, in
-//   the awaited section, not inside the call.
+//   the awaited section, not inside the call;
+// - "awaitchild": an async call that awaits a child process (with its
+//   grandchild, as above) and does not pass the abort signal to it, so only
+//   a kill of its process group ends the wait.
 import { workerData } from "node:worker_threads";
 import { runProcess } from "../dist/backends/process.js";
 import { serveGraphRequest } from "../dist/cli/graph-worker.js";
@@ -39,6 +42,21 @@ const base = fixtureModule();
 const stuck = {
   ...base,
   parse(input) {
+    if (input.text.includes("awaitchild"))
+      return (async () => {
+        const child = runProcess(
+          process.execPath,
+          ["-e", CHILD, workerData.socket, CHILD],
+          { cwd: process.cwd(), timeoutMs: 2 ** 31 - 1 },
+        );
+        // After one await the call has returned its promise, so the worker
+        // has announced the awaited section.
+        await null;
+        Atomics.store(flag, 0, 1);
+        Atomics.notify(flag, 0);
+        await child.catch(() => undefined);
+        return base.parse(input);
+      })();
     if (input.text.includes("block"))
       return (async () => {
         await null;

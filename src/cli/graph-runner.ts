@@ -21,6 +21,7 @@
 import { Worker } from "node:worker_threads";
 import {
   jobChildGroups,
+  killChildGroups,
   releaseJobChildGroups,
 } from "../backends/child-groups.js";
 import type {
@@ -84,7 +85,13 @@ export function runGraphInWorker(
         // killed, so nothing it started outlives the answer.
         terminated = true;
         void worker.terminate();
-      } else worker.postMessage({ kind: "cancel" });
+      } else {
+        // As C-48's server does: the run's processes are killed at once,
+        // and the worker is asked to abort. A module awaiting one of them
+        // then goes on, and the command stops at its next checkpoint.
+        worker.postMessage({ kind: "cancel" });
+        killChildGroups(childGroups);
+      }
     };
     signal.addEventListener("abort", onAbort, { once: true });
     worker.on("message", (message: GraphWorkerMessage) => {
