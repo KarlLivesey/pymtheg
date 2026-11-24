@@ -2203,20 +2203,24 @@ export function resolveRust(
         complete: true,
       };
     if (s.kind === "module") {
-      // C-57: only destinations that can apply where the access is; a
-      // module file selected by a predicate the access excludes is never
-      // in reach, nor cited as a failure.
+      // C-57: a failed module file is cited, and searched, only where it
+      // can apply: a file whose predicate the access excludes is never the
+      // module there. Every other destination stays as it was (filtering
+      // readable ones too took proofs away elsewhere: helix-stdx's
+      // faccess.rs lost its std prelude names).
       const destinations = (
         data(s).unit
           ? [roots.get(s.file)!].filter(Boolean)
           : (modulePlaces.get(s.id) ?? [])
-      ).filter((dest) =>
-        possible([
-          ...(dest.conditions ?? []),
-          ...(accessFrom?.crate.root === dest.crate.root
-            ? (accessFrom.conditions ?? [])
-            : []),
-        ]),
+      ).filter(
+        (dest) =>
+          !failedFiles.has(dest.file) ||
+          possible([
+            ...(dest.conditions ?? []),
+            ...(accessFrom?.crate.root === dest.crate.root
+              ? (accessFrom.conditions ?? [])
+              : []),
+          ]),
       );
       const failed = destinations
         .filter((p) => failedFiles.has(p.file) && !p.directoryUnverified)
