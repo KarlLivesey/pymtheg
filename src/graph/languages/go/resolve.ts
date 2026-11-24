@@ -396,11 +396,6 @@ export interface LinkNote {
   };
 }
 
-/**
- * Runs the same resolution over the ids the store will give the symbols (C-56a) to find
- * links whose candidate sets exceed their cap. Used by `analyze`, the only phase
- * that may write link data, so the reason is recorded on the link itself.
- */
 /** The project id the notes pass computes its symbols' ids under. */
 const NOTES_PROJECT = "go-overflow";
 /**
@@ -413,6 +408,12 @@ export function notesSymbols(
 ): GraphSymbol[] {
   return fileFacts(NOTES_PROJECT, file).symbols;
 }
+/**
+ * Runs the same resolution over the symbols' notes ids (`notesSymbols`, C-56a)
+ * to find links whose candidate sets exceed their cap. Used by `analyze`, the
+ * only phase that may write link data, so the reason is recorded on the link
+ * itself.
+ */
 export function linkNotes(
   moduleId: string,
   files: readonly GraphFile[],
@@ -421,10 +422,9 @@ export function linkNotes(
 ): Map<string, Map<number, LinkNote>> {
   const symbols: GraphSymbol[] = [];
   const links: GraphLink[] = [];
-  // C-56a: the symbols get the ids the store will give them (kind, identity
+  // C-56a: the symbols are named as the store names them (kind, identity
   // and ordinal; never a source offset), so a body edit leaves every other
-  // symbol's id as it was, and both builds of the global index name each
-  // declaration alike.
+  // symbol's id as it was. Link sources are keys of the same file's symbols.
   const ids = new Map<string, string>();
   const id = (path: string, key: string) => ids.get(`${path}\u0000${key}`)!;
   for (const file of files) {
