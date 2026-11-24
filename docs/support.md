@@ -890,7 +890,11 @@ and never yields a version pin.
   configuration under a Wireit wrapper or beside a roll-up
   (`ts-unbuilt-entry-is-wrapped-compiler-emit`). Existing output wins; a plain
   `tsc` build, the compiler's own refusals, rewrites and conflicting configs
-  leave the link unresolved. [C-46](changes/C-46.md)
+  leave the link unresolved. A bundler entry that is not data, or a roll-up
+  tool with no readable config, blocks the `src/` twin; `stripInternal` is
+  read from every completely read config covering the source; a package
+  config not read completely (an unread or missing base, a JSON syntax
+  error) gives no route. [C-46](changes/C-46.md)
 - **Unresolved:** outside members whose receiver or declaration is unverified
   (`external`, `external-package`); computed `require` or `import()` specifiers;
   bare test globals with an overlapping unmodelled type request

@@ -3414,12 +3414,23 @@ configuration under a Wireit wrapper or beside a roll-up of another entry
 Level 2, never proven. Existing output and declarations win; a refusal from
 the compiler's own facts, or a build that is plain `tsc`, stands; a rewrite
 of the output, two configs naming different sources, or readable entries
-that list only other outputs give no route. A trimmed roll-up withholds
-`@internal` declarations one by one and refuses `@alpha` and `@beta`
-trimming. Configs are read as syntax or JSON, never executed. **Trade:** a
-convention can name the wrong source where a build does something the
-convention does not see; the two packages built for real agreed on all 788
-links. **Rules out:** executing build configs or scripts to learn their
+that list only other outputs give no route. A bundler entry that is
+present but not data, or a roll-up tool (API Extractor,
+dts-bundle-generator) run with no readable config, blocks the `src/` twin.
+A trimmed roll-up withholds `@internal` declarations one by one and
+refuses `@alpha` and `@beta` trimming; `stripInternal` is read from every
+config read completely that covers the source, the package's own included,
+through package `extends`. A package config that was not read completely
+(a base not installed or missing, a JSON syntax error in it or its base),
+or no config of its own under such a root config, gives no route. Links
+that can see an assumed entry are those importing its source; when a file
+only the route brings into the program declares globals or augments a
+module, every file is checked without the route. Configs are read as
+syntax or JSON, never executed. **Trade:** a convention can name the wrong
+source where a build does something the convention does not see; on the
+two packages built for real, the 545 `@trpc/server` links this head
+follows agreed (`@reduxjs/toolkit`'s 243, which agreed in round 1, are no
+longer followed: its entry is not data). **Rules out:** executing build configs or scripts to learn their
 outputs. See [C-46](changes/C-46.md).
 
 ### C-37 Graph index writes commit in bounded batches

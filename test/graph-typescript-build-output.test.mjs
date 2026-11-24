@@ -615,18 +615,17 @@ test("PR 67 review 4: an entry source that augments a module or declares globals
     const [target, assumes] = got.open;
     assert.equal(target, "packages/p/src/index.ts#open", route);
     assert.equal(assumes.length, 1, route);
-    // Each link that rests on the route carries its assumption.
-    for (const key of ["app2.ts:(expression).extraMethod", "app3.ts:pGlobal"])
-      assert.deepEqual(
-        got[key].slice(0, 2),
-        [
-          key.endsWith("extraMethod")
-            ? "packages/p/src/aug.ts#host.Thing.extraMethod"
-            : "packages/p/src/glob.ts#[global].pGlobal",
-          assumes,
-        ],
-        `${route} ${key}: ${JSON.stringify(got[key])}`,
-      );
+    // The links the route alone supplies (through no entry of their own)
+    // take the outcome without the route: unresolved, as on main. Before,
+    // only app.ts was checked and both were definite with no assumption.
+    assert.deepEqual(
+      {
+        extraMethod: got["app2.ts:(expression).extraMethod"],
+        pGlobal: got["app3.ts:pGlobal"],
+      },
+      { extraMethod: "unresolved:no-symbol", pGlobal: "unresolved:no-symbol" },
+      route,
+    );
   }
   // Cost: the three files, each route.
   assert.equal(extracted, 6);
@@ -649,7 +648,8 @@ test("PR 67 review 4: a package config with a missing base or a syntax error giv
     ...twin("badbase"),
     "packages/badbase/tsconfig.json":
       '{"extends":"./tsconfig.base.json","include":["src"]}',
-    "packages/badbase/tsconfig.base.json": '{"compilerOptions":{"strict":true,}}',
+    // Unterminated (tsconfig JSON allows a trailing comma, so not that).
+    "packages/badbase/tsconfig.base.json": '{"compilerOptions":{"strict":true',
     ...twin("readable"),
     "packages/readable/tsconfig.json":
       '{"extends":"./tsconfig.base.json","include":["src"]}',
@@ -666,18 +666,23 @@ test("PR 67 review 4: a package config with a missing base or a syntax error giv
       "readable();",
     ].join("\n"),
   });
-  const none = "unresolved:workspace-build-output-missing";
+  // No route: the link is unresolved (its reason depends on which reader
+  // met the unread config first), never routed.
+  const none = (outcome) =>
+    typeof outcome === "string" && outcome.startsWith("unresolved:")
+      ? "unresolved"
+      : outcome;
   assert.deepEqual(
     {
-      missingbase: got.missingbase,
-      badjson: got.badjson,
-      badbase: got.badbase,
+      missingbase: none(got.missingbase),
+      badjson: none(got.badjson),
+      badbase: none(got.badbase),
       readable: got.readable,
     },
     {
-      missingbase: none,
-      badjson: none,
-      badbase: none,
+      missingbase: "unresolved",
+      badjson: "unresolved",
+      badbase: "unresolved",
       readable: [
         "packages/readable/src/index.ts#readable",
         ["ts-unbuilt-entry-is-src-twin"],
@@ -698,5 +703,5 @@ test("PR 67 review 4: a package with no config of its own under a root config wi
     "packages/a/src/index.ts": "export function a() {}",
     "app.ts": 'import { a } from "a"; a();',
   });
-  assert.equal(got.a, "unresolved:workspace-build-output-missing");
+  assert.match(got.a, /^unresolved:/);
 });
