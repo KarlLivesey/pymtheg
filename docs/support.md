@@ -830,7 +830,8 @@ and never yields a version pin.
   intersection, `require` of a conditional `module.exports` and written
   types derived from inference, an array mutated through an alias, and a
   member written through `any` keep the checker's reduced answer.
-  A walk stops at 20,000 steps or 200 nested steps (unresolved)
+  A walk stops after 100,000 computed expressions or 200 nested steps
+  (unresolved)
   ([C-41](changes/C-41.md)).
 - **Type-literal members:** members of a written type literal are
   symbols, including nested union, intersection, array, tuple and

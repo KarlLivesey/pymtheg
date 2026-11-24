@@ -3584,6 +3584,6 @@ enumerates the producers: interfaces (`pick ? ia : ib`) and object
 literals (`[csv, tsv][1]`). Where the walk cannot follow the receiver, an
 object- or type-literal member is unresolved, while an interface or class
 member keeps the checker's answer (`[ia, ib].reduce((x, y) => y).run()`
-→ `IA.run`). A walk stops at 20,000 steps (cached results counted at their
-cost) or 200 nested steps, both unresolved, so the outcome never depends on
-the stack or on what was walked before. See [C-41](changes/C-41.md).
+→ `IA.run`). A walk stops after computing 100,000 expressions or at 200
+nested steps (a cached result counted at the depth it reached), both
+unresolved, so the outcome never depends on the stack. See [C-41](changes/C-41.md).
