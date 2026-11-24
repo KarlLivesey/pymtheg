@@ -23,6 +23,8 @@ async function project(t, files) {
 }
 
 const cargo = '[package]\nname="app"\nedition="2021"\n';
+// Turns a CLI that never exits into a failure (C-50 review).
+const HANG_GUARD_MS = 3 * 60_000;
 const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
 
 function graphCli(root, ...args) {
@@ -187,7 +189,17 @@ for (const [phase, signal] of [
       ready = true;
       child.kill(signal);
     });
-    assert.deepEqual(await once(child, "close"), [130, null]);
+    // C-50 review: a CLI that never exits fails here instead of hanging the
+    // run. The bound decides nothing when the test passes.
+    let bounded = false;
+    const bound = setTimeout(() => {
+      bounded = true;
+      child.kill("SIGKILL");
+    }, HANG_GUARD_MS);
+    const closed = await once(child, "close");
+    clearTimeout(bound);
+    assert.equal(bounded, false, "the CLI did not exit after the signal");
+    assert.deepEqual(closed, [130, null]);
     assert.ok(ready);
     assert.equal(JSON.parse(stdout).exitCode, 130);
 

@@ -3216,7 +3216,8 @@ else, the run's processes are killed at once (as C-48's server does) and
 the cancel is acknowledged at the command's next checkpoint, as before. The worker and the coordinator use a cancel flag and a section in
 shared memory (the shape of C-48), so no clock decides which. The section
 is a module's synchronous call, and any synchronous stretch the module marks
-after an await (`synchronousStretch`; Go marks its link notes and parse);
+after an await (`synchronousStretch`; Go marks its link notes and parse,
+Rust its parse);
 an unmarked stretch is cancelled cooperatively, at the module's next await.
 Child process groups go into C-54's registry and are killed when the worker
 exits. **Rules out:** a CLI graph or link run that only SIGKILL can stop; a

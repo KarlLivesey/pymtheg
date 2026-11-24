@@ -4,8 +4,9 @@
 // leaves a worker or a process running ends with this process (the test
 // kills its process group) instead of hanging the test run. It prints one
 // JSON line per fact the test checks.
-//   node graph-cli-cancel-scenario.mjs <stuck|child|stretch|block|await-child> <scratch>
+//   node graph-cli-cancel-scenario.mjs <stuck|child|stretch|block|await-child|cleanup> <scratch>
 import { createServer } from "node:net";
+import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runGraphInWorker } from "../dist/cli/graph-runner.js";
@@ -24,6 +25,8 @@ for (const [path, text] of Object.entries(fixtureFiles(3)))
 const flags = new SharedArrayBuffer(12);
 const flag = new Int32Array(flags);
 const workerData = { flag: flags };
+// "cleanup": the folder the module creates and removes only on its abort.
+if (scenario === "cleanup") workerData.folder = join(scratch, "run-folder");
 let connections = [];
 let server;
 if (scenario === "child" || scenario === "await-child") {
@@ -83,6 +86,7 @@ try {
   rejected = error.name;
 }
 say({ rejected, entered: Atomics.load(flag, 2) });
+if (scenario === "cleanup") say({ folderLeft: existsSync(workerData.folder) });
 
 if (scenario === "child" || scenario === "await-child") {
   // Both processes end: each connection closes.

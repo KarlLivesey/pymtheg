@@ -93,6 +93,20 @@ test("an abort while a module awaits a child process kills it, and the run ends"
   assert.equal(facts.closed, 2);
 });
 
+// C-50 review: the cooperative path itself. A module's async analysis
+// creates a run folder (as the Go toolchain route does) and removes it only
+// when its abort signal fires; it cannot finish otherwise. The abort finds
+// the worker awaiting, so the coordinator asks it to cancel, and the
+// command aborts the module's signal: the folder is gone when the run
+// answers. Terminating the worker instead (on every cancel, or by reading
+// the awaited section as the module's) leaves the folder; a worker that
+// ignores the cancel never answers, and the scenario fails at its bound.
+test("an abort while a module's promise is awaited reaches the module, which cleans up before the run answers", async () => {
+  const facts = await scenario("cleanup");
+  assert.equal(facts.rejected, "AbortError");
+  assert.equal(facts.folderLeft, false);
+});
+
 // C-50 review: synchronous work a module runs after an await, marked with
 // `synchronousStretch` (as Go marks its link notes and parse), is inside
 // the module call, so the abort terminates the worker there.

@@ -470,10 +470,25 @@ let graphRunner: GraphRunner = (request, signal) =>
 export function useGraphRunner(run: GraphRunner): void {
   graphRunner = run;
 }
+/**
+ * One graph request of a link command. A query without a sync (`noSync`)
+ * never indexes, so no language module runs and a worker would make
+ * nothing cancellable: it runs in place, between the command's abort
+ * checks. Only a request that may sync goes to the runner (C-50 review:
+ * `link touched --impact` started one worker per symbol).
+ */
+function runGraph(
+  request: GraphRequest,
+  signal: AbortSignal | undefined,
+): Promise<GraphResponse> {
+  return request.noSync
+    ? executeGraph(request, signal ? { signal } : {})
+    : graphRunner(request, signal);
+}
 async function syncGraph(root: string, options: CodeLinkOptions) {
   // A path query with a fixed name: the answer is unused; only the sync and
   // failure/stale reports are read.
-  const response = await graphRunner(
+  const response = await runGraph(
     {
       command: "file",
       args: ["pymtheg-code-links-sync-probe"],
@@ -970,7 +985,7 @@ export async function createCodeLink(
           ? `“${input.record}” names several planning records; use a record ID. Nothing was linked.`
           : `No planning record “${input.record}”. Create it with “link requirement”. Nothing was linked.`,
       };
-    const response = await graphRunner(
+    const response = await runGraph(
       {
         command: "symbol",
         args: [input.selector],
@@ -1251,7 +1266,7 @@ export async function listCodeLinks(
     }
     let selected: string | null = null;
     if (input.symbol !== undefined) {
-      const response = await graphRunner(
+      const response = await runGraph(
         {
           command: "symbol",
           args: [input.symbol],
@@ -1394,7 +1409,7 @@ export async function requirementsFor(
     );
     const starts: string[] = [];
     if (input.symbol !== undefined) {
-      const response = await graphRunner(
+      const response = await runGraph(
         { command: "symbol", args: [input.symbol], root, noSync: true },
         input.signal,
       );
@@ -1408,7 +1423,7 @@ export async function requirementsFor(
         );
       starts.push(symbol.id);
     } else {
-      const response = await graphRunner(
+      const response = await runGraph(
         {
           command: "file",
           args: [input.file!],
@@ -1442,7 +1457,7 @@ export async function requirementsFor(
     };
     if (input.impact)
       for (const id of starts) {
-        const response = await graphRunner(
+        const response = await runGraph(
           {
             command: "impact",
             args: [id],

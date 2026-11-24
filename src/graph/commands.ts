@@ -150,10 +150,10 @@ export interface GraphExecutionOptions {
    * phase worker, a toolchain's child process) is cancelled through it at
    * its next await. A module that runs long synchronous code between its
    * awaits marks it with `synchronousStretch` (sections.ts; Go marks its
-   * link notes and its parse): it is announced as `true` again, and as
-   * "awaiting" when it ends. Unmarked synchronous code between awaits is
-   * not covered: the abort takes effect at the module's next await or when
-   * it settles. The abort signal is checked after the call is announced,
+   * link notes and its parse, Rust its parse): it is announced as `true`
+   * again, and as "awaiting" when it ends. Unmarked synchronous code between
+   * awaits is not covered: the abort takes effect at the module's next
+   * await or when it settles. The abort signal is checked after the call is announced,
    * so a cancellation set before it is never missed.
    */
   onModuleCall?: (inside: boolean | "awaiting") => void;

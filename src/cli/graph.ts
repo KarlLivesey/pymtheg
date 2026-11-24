@@ -217,7 +217,8 @@ export async function graphCommand(
         throw Error("Unknown graph option " + arg);
       else positional.push(arg);
     }
-    // C-50: the command runs in a worker; an abort terminates it.
+    // C-50: the command runs in a worker. An abort terminates it only inside
+    // a module section; elsewhere the worker is asked to cancel.
     const response = await runGraphInWorker(
       {
         command: positional[0] as GraphCommand,

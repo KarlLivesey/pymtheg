@@ -17,7 +17,12 @@
 //   the awaited section, not inside the call;
 // - "awaitchild": an async call that awaits a child process (with its
 //   grandchild, as above) and does not pass the abort signal to it, so only
-//   a kill of its process group ends the wait.
+//   a kill of its process group ends the wait;
+// - with `workerData.folder` ("cleanup"): the module has an async project
+//   analysis instead, which creates that folder (as the Go toolchain route
+//   creates its run folder), then waits for its abort signal, removes the
+//   folder and rejects. It cannot finish any other way.
+import { mkdirSync, rmSync } from "node:fs";
 import { workerData } from "node:worker_threads";
 import { runProcess } from "../dist/backends/process.js";
 import { serveGraphRequest } from "../dist/cli/graph-worker.js";
@@ -92,9 +97,31 @@ const stuck = {
     return base.parse(input);
   },
 };
+const { parse: _parse, ...analysed } = base;
+const cleanup = {
+  ...analysed,
+  async analyze(context) {
+    mkdirSync(workerData.folder, { recursive: true });
+    // After one await the call has returned its promise: the worker has
+    // announced the awaited section.
+    await null;
+    Atomics.store(flag, 0, 1);
+    Atomics.notify(flag, 0);
+    return new Promise((_resolve, reject) =>
+      context.signal.addEventListener(
+        "abort",
+        () => {
+          rmSync(workerData.folder, { recursive: true, force: true });
+          reject(context.signal.reason);
+        },
+        { once: true },
+      ),
+    );
+  },
+};
 await serveGraphRequest(
   workerData.request,
   workerData.control,
-  { registry: new LanguageRegistry([stuck]) },
+  { registry: new LanguageRegistry([workerData.folder ? cleanup : stuck]) },
   workerData.childGroups,
 );

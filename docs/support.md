@@ -464,9 +464,11 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   not compile, E0583). A glob imports only what its own module can see, so a
   private `use` in a globbed child is never resolved through the parent's
   glob ([C-24](changes/C-24.md)).
-- **Cancellation:** the graph CLI can interrupt Rust analysis and resolution
-  with SIGINT or SIGTERM. Interrupted syncs leave an incomplete index and can
-  be retried. When an import path reaches the resolver's depth boundary, an
+- **Cancellation:** the graph CLI can interrupt analysis and resolution in
+  every language, Rust included, with SIGINT, SIGTERM, SIGHUP or SIGQUIT;
+  the `graph` and `link` commands then exit 130 (see "CLI cancellation"
+  under Graph commands). Interrupted syncs leave an incomplete index and
+  can be retried. When an import path reaches the resolver's depth boundary, an
   unresolved link can report `import-lookup-depth-unverified`.
 - **Definite:** module declarations and file modules; free-function, type, pattern
   and value paths from proven bindings written in the source; imports, including
@@ -1002,6 +1004,21 @@ an unfinished previous run. No answer the resolver caches depends on its
 caller, and the scoped path is used only when the edited file's decisions
 meet no cut. The same file tree therefore produces the same graph after a
 fresh or incremental index. [C-36](changes/C-36.md)
+
+**CLI cancellation (C-50).** `pymtheg graph` and the graph work of
+`pymtheg link` run in a worker thread. SIGINT, SIGTERM, SIGHUP or SIGQUIT
+ends the run with exit code 130 for every language. Inside a language
+module's synchronous code, or a synchronous stretch the module marks after
+an await (Go marks its notes pass and its parse, Rust its parse), the
+worker is terminated;
+the next index repairs the store. Anywhere else the run's processes are
+killed, the module's abort signal fires, and the command stops at its next
+checkpoint with the index incomplete. A module that ignores the signal
+while its promise is awaited holds the run until that promise settles; a
+second signal does nothing more. A link query that does not sync runs in
+place. A graph run that exhausts the worker's heap ends with exit code 3
+and `Graph error: Worker terminated due to reaching memory limit`, leaving
+the store as a killed run does. [C-50](changes/C-50.md)
 
 **Toolchain processes (C-54).** Every child process the graph starts runs
 in its own process group, recorded in memory the server owns. Cancelling a
