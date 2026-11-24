@@ -155,6 +155,8 @@ export async function indexProject(
   const completed = await stage("store.beginRun", () =>
     store.completedAnalysis?.(),
   );
+  const indexedBefore =
+    (await stage("store.beginRun", () => store.indexedBefore?.())) === true;
   // Storage reads are deliberately outside all source/module error catches, before any writes.
   const oldFiles = await stage("index.previous", () => summaries(store));
   const oldFileByPath = new Map(oldFiles.map((file) => [file.path, file]));
@@ -485,13 +487,16 @@ export async function indexProject(
             ...changedContexts.filter((path) => needsContext(module, path)),
             ...checkedInputs.changed,
           ],
-          ...(module.reportsAnalysisPath && {
-            notePath: (note: AnalysisPath) =>
-              (report.analysisPaths ??= []).push({
-                module: module.id,
-                ...note,
-              }),
-          }),
+          firstIndex: !indexedBefore,
+          // A module with no files in this index has no path to report.
+          ...(module.reportsAnalysisPath &&
+            files.length > 0 && {
+              notePath: (note: AnalysisPath) =>
+                (report.analysisPaths ??= []).push({
+                  module: module.id,
+                  ...note,
+                }),
+            }),
         }),
       );
       if ("resolutionFiles" in output) {

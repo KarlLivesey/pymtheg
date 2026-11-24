@@ -398,3 +398,53 @@ test("Go: A analyses with an export removed and pauses; it is restored; B comple
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("Rust: A analyses with a function removed and pauses; it is restored; B completes; A resumes and writes nothing", async () => {
+  // As the Go test above: Rust reuses its analysis (C-36) and holds its
+  // parsed writes until it, so only the run's early claim stops A.
+  const rustFull =
+    "pub fn hello() -> i32 { 1 }\n\npub fn gone() -> i32 { 2 }\n";
+  const base = mkdtempSync(join(tmpdir(), "c38-rust-runs-"));
+  const root = join(base, "tree");
+  const graph = join(base, "graph.sqlite");
+  const write = (path, text) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  };
+  try {
+    write("Cargo.toml", '[package]\nname = "m"\nedition = "2021"\n');
+    write("src/a.rs", rustFull);
+    write(
+      "src/lib.rs",
+      "mod a;\n\npub fn use_it() -> i32 { a::hello() + a::gone() }\n",
+    );
+    const first = new SqliteGraphStore(graph);
+    await indexProject(root, production, first);
+    first.close();
+    const rows = () => storeRows(graph);
+    write("src/a.rs", "pub fn hello() -> i32 { 1 }\n");
+    const held = gate();
+    const storeA = new SqliteGraphStore(graph);
+    const runA = indexProject(root, pausing([held], "rust"), storeA);
+    await held.reached;
+    write("src/a.rs", rustFull);
+    const storeB = new SqliteGraphStore(graph);
+    await indexProject(root, production, storeB);
+    const projectId = storeB.projectId;
+    storeB.close();
+    const afterB = rows();
+    held.open();
+    await assert.rejects(runA, taken);
+    storeA.close();
+    assert.deepEqual(rows(), afterB, "A wrote nothing after B");
+    const again = new SqliteGraphStore(graph);
+    await indexProject(root, production, again);
+    again.close();
+    assert.deepEqual(
+      compareRows(storeRows(graph), await cold(base, root, projectId)),
+      [],
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});

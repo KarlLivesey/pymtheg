@@ -3508,7 +3508,7 @@ A run holding files that main's parse write would have written commits its
 run mark at the end of the parse write, where its first commit used to be,
 so a run started after that point finds it unfinished and takes over
 (files of a module reusing its analysis, C-27 and C-36, were held before
-and claim nothing). **Why:** every Go and Rust file was stored as parsed
+and claim nothing; C-38A later claims for them too). **Why:** every Go and Rust file was stored as parsed
 and then replaced whole as analysed, and every TypeScript file as a
 placeholder and then as analysed; on four pins that was 46-57% of the rows
 a cold index changed. **Trade:** held results stay in memory until
@@ -3545,9 +3545,16 @@ given. See [C-48](changes/C-48.md).
 module holds back edited files' writes, also a module reusing its
 analysis, which C-53 left out. **Why:** without it a run that begins during
 that analysis finds no write since its start, answers without writing, and
-the first run then writes its analysis of the older text (the Go race
-test). The index report also lists, per module that reports one
-(`reportsAnalysisPath`), the path its analysis took (`reused` or `full`
-for TypeScript). **Trade:** a run stopped during a reusing analysis leaves
-its unfinished mark, so a `--no-sync` query reports `incomplete` over the
-previous complete rows. See [C-38A](changes/C-38A.md).
+the first run then writes its analysis of the older text (the Go and
+Rust race tests). The index report also lists, per module that reports
+one (`reportsAnalysisPath`) and has files in the index, the path its
+analysis took (`reused` or `full` for TypeScript); "no previous index"
+comes from the store's record that a run finished completely, kept across
+later runs. **Trade:** a run stopped during a reusing analysis, or taken
+over, leaves its unfinished mark: a `--no-sync` query reports
+`incomplete` over the previous complete rows, and the next index is a full
+analysis (reviewer A, 20 Go packages with one edited: `unchanged=0
+indexed=20` after an interrupted run, `unchanged=19 indexed=1` before).
+**Limit:** a run paused in parse, before its claim, can still write rows
+of a tree that was then reverted; it is reported `incomplete` and the next
+index repairs it. See [C-38A](changes/C-38A.md).

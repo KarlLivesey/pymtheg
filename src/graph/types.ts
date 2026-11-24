@@ -5,12 +5,7 @@ export interface SourceRange {
   end: number;
 }
 export type Json =
-  | null
-  | boolean
-  | number
-  | string
-  | Json[]
-  | { [key: string]: Json };
+  null | boolean | number | string | Json[] | { [key: string]: Json };
 export type ParseStatus = "clean" | "partial" | "failed";
 export interface Diagnostic {
   message: string;
@@ -238,8 +233,13 @@ export interface ProjectAnalysisContext {
   changedContextFiles: readonly string[];
   /** C-45: kept state, as for ResolutionContext.kept. */
   kept?: import("./session.js").KeptState;
-  /** Reports which analysis path ran (C-38A). */
+  /**
+   * Reports which analysis path ran (C-38A). Given only when the module has
+   * files in this index.
+   */
   notePath?: (note: AnalysisPath) => void;
+  /** C-38A: no run finished completely before this one (the store's record). */
+  firstIndex?: boolean;
 }
 /**
  * The analysis path a module took for one index (C-38A), shown in the index
@@ -417,6 +417,12 @@ export interface GraphStorage {
    * any later run from that point on. Proves ownership like any write.
    */
   claimIndexRun?(): StorageResult<void>;
+  /**
+   * C-38A: whether a run finished completely before this one began (kept
+   * across later runs, including a run taken over). Read in the run's
+   * opening snapshot.
+   */
+  indexedBefore?(): StorageResult<boolean>;
   /** Module versions whose completed decisions this run found in its opening snapshot. */
   completedAnalysis?(): StorageResult<ReadonlyMap<string, string>>;
   /** An incomplete run retains its mark. A successful owned run records reusable module decisions. */

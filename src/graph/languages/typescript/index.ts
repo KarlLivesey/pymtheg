@@ -257,8 +257,7 @@ function openSession(
   });
   /** Builds a program and its checker, or says what was thrown. */
   const attempt = ():
-    | { program: ts.Program; checker: ts.TypeChecker }
-    | Thrown => {
+    { program: ts.Program; checker: ts.TypeChecker } | Thrown => {
     try {
       return compile();
     } catch (error) {
@@ -982,13 +981,10 @@ export function typescriptModule(
     reportsAnalysisPath: true,
     analyze(context) {
       const files = context.files.filter(readable);
-      // The report's path (C-38A): no file has a stored analysis yet on a
-      // first index.
-      const firstIndex = files.every(
-        (file) =>
-          (file.result.data as { analyzer?: unknown } | undefined)?.analyzer ===
-          undefined,
-      );
+      // The report's path (C-38A): a first index is one with no complete
+      // run before it, by the store's record (after a takeover every file
+      // record looks new).
+      const firstIndex = context.firstIndex === true;
       const note = (path: AnalysisPath["path"]) =>
         context.notePath?.({
           path,
@@ -1690,8 +1686,7 @@ export function typescriptModule(
                   ...((link.data ?? {}) as { [key: string]: Json }),
                 };
                 const outside = data.libraryFacts as unknown as
-                  | LibraryTarget[]
-                  | undefined;
+                  LibraryTarget[] | undefined;
                 if (
                   data.reason === "invalid-code" ||
                   (outside?.length &&
