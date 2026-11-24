@@ -48,7 +48,8 @@ export class LinkDecider {
       resolution: "unresolved",
     };
     delete next.libraries;
-    if (!decision) return this.explainOpenLink(
+    if (!decision)
+      return this.explainOpenLink(
         this.settleLibraryOffer(this.withdrawToolchain(next)),
       );
     if (decision.library !== undefined) {

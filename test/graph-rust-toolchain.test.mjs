@@ -608,7 +608,11 @@ test("the analysis input drops a previous run's record, outcome and library offe
             data: {
               scope: "g",
               conditions: [],
-              toolchain: { origin: "toolchain", from: "unresolved", target: "x" },
+              toolchain: {
+                origin: "toolchain",
+                from: "unresolved",
+                target: "x",
+              },
               toolchainOutcome: "withheld:cfg-variant",
               toolchainLibrary: {
                 library: { ecosystem: "cargo", unit: "dep", symbol: "f" },
