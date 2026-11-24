@@ -41,7 +41,19 @@ const MUTATIONS = {
       ],
     },
     test: "test/graph-typescript-analysis-path.test.mjs",
-    pattern: "stopped during analysis",
+    pattern: "stopped during analysis|one-file",
+  },
+  "the verified no-edit index reports no path (round 2)": {
+    edits: {
+      "src/graph/commands.ts": [
+        [
+          "...(reportedPaths.length && { analysisPaths: reportedPaths }),",
+          "",
+        ],
+      ],
+    },
+    test: "test/graph-typescript-analysis-path.test.mjs",
+    pattern: "one-file",
   },
 };
 
