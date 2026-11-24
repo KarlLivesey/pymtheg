@@ -1324,8 +1324,8 @@ export function receiverArms(
   function expandArrays(found: Arms): Arms {
     if (!found) return undefined;
     return merge(
-      found.map((arm): Arms =>
-        arm.array || arm.items ? elementsOf([arm]) : [arm],
+      found.map(
+        (arm): Arms => (arm.array || arm.items ? elementsOf([arm]) : [arm]),
       ),
     );
   }
@@ -1810,46 +1810,36 @@ export function receiverArms(
     array: ts.ArrayLiteralExpression,
     index: number | undefined,
   ): Arms {
-      const added = arrayMutations(array);
-      if (!added) return undefined;
-      if (added.length)
-        return merge([
-          ...array.elements.map((item) =>
-            ts.isSpreadElement(item)
-              ? element(
-                  arms(item.expression),
-                  undefined,
-                  item,
-                  item.expression,
-                )
-              : ts.isOmittedExpression(item)
-                ? NO_ARMS
-                : arms(item),
-          ),
-          ...added.map(arms),
-        ]);
-      if (
-        index !== undefined &&
-        index < array.elements.length &&
-        !array.elements.slice(0, index + 1).some(ts.isSpreadElement)
-      ) {
-        const item = array.elements[index]!;
-        return ts.isOmittedExpression(item) ? NO_ARMS : arms(item);
-      }
-      return merge(
-        array.elements.map((item) =>
+    const added = arrayMutations(array);
+    if (!added) return undefined;
+    if (added.length)
+      return merge([
+        ...array.elements.map((item) =>
           ts.isSpreadElement(item)
-            ? element(
-                arms(item.expression),
-                undefined,
-                item,
-                item.expression,
-              )
+            ? element(arms(item.expression), undefined, item, item.expression)
             : ts.isOmittedExpression(item)
               ? NO_ARMS
               : arms(item),
         ),
-      );
+        ...added.map(arms),
+      ]);
+    if (
+      index !== undefined &&
+      index < array.elements.length &&
+      !array.elements.slice(0, index + 1).some(ts.isSpreadElement)
+    ) {
+      const item = array.elements[index]!;
+      return ts.isOmittedExpression(item) ? NO_ARMS : arms(item);
+    }
+    return merge(
+      array.elements.map((item) =>
+        ts.isSpreadElement(item)
+          ? element(arms(item.expression), undefined, item, item.expression)
+          : ts.isOmittedExpression(item)
+            ? NO_ARMS
+            : arms(item),
+      ),
+    );
   }
 
   function element(

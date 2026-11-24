@@ -5,7 +5,8 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 const [dist, root, storePath] = process.argv.slice(2);
 const load = (path) => import(pathToFileURL(resolve(dist, path)).href);
-const { indexProject, LanguageRegistry, SqliteGraphStore } = await load("graph/index.js");
+const { indexProject, LanguageRegistry, SqliteGraphStore } =
+  await load("graph/index.js");
 const ts = await load("graph/languages/typescript/index.js");
 const store = new SqliteGraphStore(storePath);
 const start = process.cpuUsage();

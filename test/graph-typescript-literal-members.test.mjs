@@ -1049,7 +1049,8 @@ test("review 3: the walk's work per call is bounded by a count of computed expre
       "l0 = l0;",
       ...Array.from(
         { length: k },
-        (_, i) => `let l${i + 1} = pick ? l${i} : l${i};\nl${i + 1} = l${i + 1};`,
+        (_, i) =>
+          `let l${i + 1} = pick ? l${i} : l${i};\nl${i + 1} = l${i + 1};`,
       ),
       `l${k}.run();`,
       "",
@@ -1182,7 +1183,9 @@ test("review 3: a value reassigned from a spread of itself is a cycle, not a sta
     );
     const runs = store
       .links()
-      .filter((link) => link.kind === "calls" && /\brun$/.test(link.targetName));
+      .filter(
+        (link) => link.kind === "calls" && /\brun$/.test(link.targetName),
+      );
     assert.equal(runs.length, 2);
     for (const link of runs) {
       assert.notEqual(link.data?.reason, "compiler-limit");
