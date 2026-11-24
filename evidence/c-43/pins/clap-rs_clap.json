@@ -19,22 +19,23 @@
  },
  "route": {
   "links": 60489,
-  "level2": 34002,
+  "level2": 34000,
   "assumed": 41,
   "proven": 20433,
-  "toolchainDecided": 13528,
+  "toolchainDecided": 13526,
   "libraryModuleLinks": 0,
   "level2Percent": 56.21,
   "withModuleLinksPercent": 56.21,
   "toolchainDecidedPercent": 22.36
  },
  "decided": {
-  "definite:unresolved": 13528,
+  "definite:unresolved": 13526,
   "definite:definite": 4485,
   "withheld:cfg-variant": 528,
   "withheld:conditional-candidates": 781,
   "withheld:cfg-link": 3698,
-  "withheld:module-twin": 572
+  "withheld:module-twin": 572,
+  "withheld:cfg-selected": 2
  },
  "join": {
   "answer": 23521,
@@ -62,21 +63,23 @@
   "linksBefore": 60489,
   "linksAfter": 60489,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 5581,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 44.9,
-  "cpuS": 80.9,
-  "peakMiB": 1673
+  "wallS": 45.5,
+  "cpuS": 81.6,
+  "peakMiB": 1674
  },
  "index": {
   "sourceOnly": {
-   "wallS": 50,
-   "cpuS": 65.5
+   "wallS": 50.4,
+   "cpuS": 61.1
   },
   "route": {
-   "wallS": 131.8,
-   "cpuS": 69.8
+   "wallS": 166.6,
+   "cpuS": 67.3
   }
  },
  "errors": {
@@ -86,7 +89,7 @@
  "funnel": {
   "open": 39979,
   "buckets": {
-   "credited": 13528,
+   "credited": 13526,
    "no identity: library item": 12185,
    "no identity: local binding": 2165,
    "gate: known error classes": 454,
@@ -99,7 +102,8 @@
    "no answer: no-occurrence-at-site": 2030,
    "no answer: no-name-site": 50,
    "no answer: file-not-indexed": 2898,
-   "gate: module twin, or module conditions unseen": 572
+   "gate: module twin, or module conditions unseen": 572,
+   "gate: cfg-selected name (use, alias or function twins)": 2
   },
   "libraryPassingCfg": 10654,
   "notIndexed": {

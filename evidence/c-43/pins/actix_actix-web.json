@@ -19,20 +19,21 @@
  },
  "route": {
   "links": 86640,
-  "level2": 46885,
+  "level2": 46840,
   "assumed": 3111,
   "proven": 33116,
-  "toolchainDecided": 10658,
+  "toolchainDecided": 10613,
   "libraryModuleLinks": 0,
-  "level2Percent": 54.11,
-  "withModuleLinksPercent": 54.11,
-  "toolchainDecidedPercent": 12.3
+  "level2Percent": 54.06,
+  "withModuleLinksPercent": 54.06,
+  "toolchainDecidedPercent": 12.25
  },
  "decided": {
-  "definite:unresolved": 10658,
+  "definite:unresolved": 10613,
   "withheld:conditional-candidates": 2677,
   "definite:definite": 10047,
   "withheld:cfg-link": 1951,
+  "withheld:cfg-selected": 45,
   "withheld:cfg-variant": 98
  },
  "join": {
@@ -62,21 +63,23 @@
   "linksBefore": 86640,
   "linksAfter": 86640,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 4771,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 118.9,
-  "cpuS": 319.8,
-  "peakMiB": 3022
+  "wallS": 101.6,
+  "cpuS": 284.8,
+  "peakMiB": 3033
  },
  "index": {
   "sourceOnly": {
-   "wallS": 84,
-   "cpuS": 109.9
+   "wallS": 79.5,
+   "cpuS": 101.1
   },
   "route": {
-   "wallS": 337.7,
-   "cpuS": 119.1
+   "wallS": 320.1,
+   "cpuS": 114
   }
  },
  "errors": {
@@ -86,7 +89,7 @@
  "funnel": {
   "open": 49944,
   "buckets": {
-   "credited": 10658,
+   "credited": 10613,
    "no identity: declaration without a graph symbol": 1241,
    "gate: kind/namespace": 272,
    "no identity: library item": 22834,
@@ -96,6 +99,7 @@
    "gate: trait-method declaration": 1358,
    "no answer: no-name-site": 254,
    "gate: cfg condition other than test": 1285,
+   "gate: cfg-selected name (use, alias or function twins)": 45,
    "no answer: no-occurrence-at-site": 1856,
    "gate: cfg-variant guard": 69,
    "gate: known error classes": 61,

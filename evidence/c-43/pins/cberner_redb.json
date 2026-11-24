@@ -19,21 +19,22 @@
  },
  "route": {
   "links": 73731,
-  "level2": 43936,
+  "level2": 43930,
   "assumed": 110,
   "proven": 35113,
-  "toolchainDecided": 8713,
+  "toolchainDecided": 8707,
   "libraryModuleLinks": 0,
-  "level2Percent": 59.59,
-  "withModuleLinksPercent": 59.59,
-  "toolchainDecidedPercent": 11.82
+  "level2Percent": 59.58,
+  "withModuleLinksPercent": 59.58,
+  "toolchainDecidedPercent": 11.81
  },
  "decided": {
   "definite:definite": 9882,
-  "definite:unresolved": 8713,
+  "definite:unresolved": 8707,
   "withheld:cfg-variant": 660,
   "withheld:cfg-link": 3423,
-  "withheld:conditional-candidates": 182
+  "withheld:conditional-candidates": 156,
+  "withheld:cfg-selected": 32
  },
  "join": {
   "none:kind-not-joined": 5481,
@@ -62,21 +63,23 @@
   "linksBefore": 73731,
   "linksAfter": 73731,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 4271,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 157,
-  "cpuS": 2066.2,
-  "peakMiB": 2054
+  "wallS": 210.4,
+  "cpuS": 1971.4,
+  "peakMiB": 2056
  },
  "index": {
   "sourceOnly": {
-   "wallS": 64.9,
-   "cpuS": 84.9
+   "wallS": 71.6,
+   "cpuS": 79.1
   },
   "route": {
-   "wallS": 297.5,
-   "cpuS": 99.4
+   "wallS": 376.3,
+   "cpuS": 83.9
   }
  },
  "errors": {
@@ -90,7 +93,7 @@
    "no answer: no-name-site": 45,
    "gate: kind/namespace": 54,
    "no identity: local binding": 3416,
-   "credited": 8713,
+   "credited": 8707,
    "no answer: no-occurrence-at-site": 805,
    "gate: trait-method declaration": 1223,
    "gate: cfg-variant guard": 660,
@@ -98,8 +101,9 @@
    "gate: cfg condition other than test": 1627,
    "no identity: generated item": 364,
    "no answer: file-not-indexed": 2022,
-   "gate: conditional candidates": 182,
-   "no identity: declaration without a graph symbol": 10
+   "gate: conditional candidates": 156,
+   "no identity: declaration without a graph symbol": 10,
+   "gate: cfg-selected name (use, alias or function twins)": 32
   },
   "libraryPassingCfg": 15384,
   "notIndexed": {

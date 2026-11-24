@@ -21,8 +21,8 @@
   "links": 34081,
   "level2": 21611,
   "assumed": 0,
-  "proven": 19137,
-  "toolchainDecided": 2474,
+  "proven": 19138,
+  "toolchainDecided": 2473,
   "libraryModuleLinks": 0,
   "level2Percent": 63.41,
   "withModuleLinksPercent": 63.41,
@@ -63,21 +63,23 @@
   "linksBefore": 34081,
   "linksAfter": 34081,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 4743,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 48,
-  "cpuS": 62.3,
-  "peakMiB": 1250
+  "wallS": 42.6,
+  "cpuS": 56.2,
+  "peakMiB": 1252
  },
  "index": {
   "sourceOnly": {
-   "wallS": 35.7,
-   "cpuS": 44.9
+   "wallS": 31.6,
+   "cpuS": 41.5
   },
   "route": {
-   "wallS": 105.6,
-   "cpuS": 48.7
+   "wallS": 100.2,
+   "cpuS": 41.8
   }
  },
  "errors": {

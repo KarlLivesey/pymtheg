@@ -19,10 +19,10 @@
  },
  "route": {
   "links": 90583,
-  "level2": 51733,
+  "level2": 51732,
   "assumed": 2491,
   "proven": 38182,
-  "toolchainDecided": 11060,
+  "toolchainDecided": 11059,
   "libraryModuleLinks": 0,
   "level2Percent": 57.11,
   "withModuleLinksPercent": 57.11,
@@ -30,10 +30,11 @@
  },
  "decided": {
   "definite:definite": 13849,
-  "definite:unresolved": 11060,
+  "definite:unresolved": 11059,
   "withheld:cfg-link": 586,
-  "withheld:conditional-candidates": 320,
-  "withheld:cfg-variant": 141
+  "withheld:conditional-candidates": 319,
+  "withheld:cfg-variant": 141,
+  "withheld:cfg-selected": 2
  },
  "join": {
   "filter:import-names-module": 152,
@@ -62,21 +63,23 @@
   "linksBefore": 90583,
   "linksAfter": 90583,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 1048,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 136.5,
-  "cpuS": 1163.8,
-  "peakMiB": 2458
+  "wallS": 133.6,
+  "cpuS": 1080.4,
+  "peakMiB": 2455
  },
  "index": {
   "sourceOnly": {
-   "wallS": 93.1,
-   "cpuS": 119.6
+   "wallS": 86.2,
+   "cpuS": 108.7
   },
   "route": {
-   "wallS": 382.8,
-   "cpuS": 154.5
+   "wallS": 509.1,
+   "cpuS": 132.3
   }
  },
  "errors": {
@@ -86,20 +89,21 @@
  "funnel": {
   "open": 49651,
   "buckets": {
-   "credited": 11060,
+   "credited": 11059,
    "no identity: library item": 23187,
    "gate: trait-method declaration": 1558,
    "no answer: no-name-site": 220,
    "gate: kind/namespace": 51,
    "no identity: local binding": 7954,
    "no identity: generated item": 505,
-   "gate: conditional candidates": 320,
+   "gate: conditional candidates": 319,
    "no identity: declaration without a graph symbol": 473,
    "gate: known error classes": 40,
    "gate: cfg-variant guard": 66,
    "no answer: no-occurrence-at-site": 843,
    "gate: cfg condition other than test": 80,
-   "no answer: file-not-indexed": 3294
+   "no answer: file-not-indexed": 3294,
+   "gate: cfg-selected name (use, alias or function twins)": 2
   },
   "libraryPassingCfg": 22556,
   "notIndexed": {

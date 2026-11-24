@@ -60,21 +60,23 @@
   "linksBefore": 39819,
   "linksAfter": 39819,
   "lost": 0,
-  "changedLevel2": 0
+  "changedLevel2": 0,
+  "outcomes": 862,
+  "outcomeDataDiffers": 0
  },
  "analyzerRun": {
-  "wallS": 26,
-  "cpuS": 50.8,
-  "peakMiB": 1201
+  "wallS": 28.6,
+  "cpuS": 52.8,
+  "peakMiB": 1203
  },
  "index": {
   "sourceOnly": {
-   "wallS": 38.9,
-   "cpuS": 49
+   "wallS": 33.6,
+   "cpuS": 42.7
   },
   "route": {
-   "wallS": 80.4,
-   "cpuS": 47.9
+   "wallS": 98.8,
+   "cpuS": 44.5
   }
  },
  "errors": {
