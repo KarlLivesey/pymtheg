@@ -599,10 +599,16 @@ test("PR 67 review 4: an entry source that augments a module or declares globals
     twin: await calls(
       variant({ types: "./dist/index.d.ts", scripts: { build: "tsup" } }),
     ),
-    // The compiler's emit (C-25).
+    // The package's compiler emit under a Wireit wrapper (C-46; a plain
+    // `tsc` build is C-25's proof, which the real build confirms, so it
+    // carries no assumption).
     emit: await calls(
       variant(
-        { types: "./dist/index.d.ts", scripts: { build: "tsc" } },
+        {
+          types: "./dist/index.d.ts",
+          scripts: { build: "wireit" },
+          wireit: { build: { command: "tsc" } },
+        },
         {
           "packages/p/tsconfig.json":
             '{"compilerOptions":{"declaration":true,"rootDir":"src","outDir":"dist"},"include":["src"]}',
