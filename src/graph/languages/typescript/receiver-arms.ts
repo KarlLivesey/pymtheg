@@ -62,21 +62,23 @@ type DeclarationArms = Arms | typeof WRITTEN;
 
 const MAX_ARMS = 16;
 /**
- * Nested steps followed before giving up (unresolved). Low enough that the
- * walk's own recursion cannot exhaust the stack at the limit, so the
- * outcome depends on this count, not on how deep the process already is
- * (C-41 review 3). A stack overflow inside the walk is the checker's limit
- * (extract.ts: CheckerLimit, the program is rebuilt), never an answer.
+ * Nested steps followed before giving up (unresolved). A cached result
+ * counts at the depth its computation reached below it, so the limit does
+ * not depend on what earlier walks cached. Low enough that the walk's own
+ * recursion cannot exhaust the stack at the limit, so the outcome depends
+ * on this count, not on how deep the process already is (C-41 review 3). A
+ * stack overflow inside the walk is the checker's limit (extract.ts:
+ * CheckerLimit, the program is rebuilt), never an answer.
  */
 export const MAX_DEPTH = 200;
 /**
- * Expressions a member call's walk may compute, a cached result counted at
- * what it cost when computed, so the count does not depend on what earlier
- * walks cached (C-41 review 3: results touched by a cycle are not cached,
- * so a self-assigned `let` under nested choices grows exponentially). A
- * walk that reaches it leaves the call unresolved.
+ * Expressions one member call's walk may compute before it gives up
+ * (unresolved). It bounds the work: results touched by a cycle are never
+ * cached, so a self-assigned `let` under nested choices is recomputed
+ * exponentially (C-41 review 3). A result an earlier walk cached costs
+ * nothing; the largest count on the 19 pins is far below this (C-41 note).
  */
-export const MAX_STEPS = 1_000_000;
+export const MAX_STEPS = 100_000;
 
 /** Array methods whose callback's first parameter is an element. */
 const ELEMENT_CALLBACKS = new Set([
@@ -186,21 +188,38 @@ export function receiverArms(
   let deepest = 0;
   let overBudget = false;
   let overDepth = false;
-  /** What each cached result cost when computed, in steps. */
-  const valueCosts = new WeakMap<ts.Node, number>();
-  const declaredCosts = new WeakMap<ts.Node, number>();
-  const unreducedCosts = new WeakMap<ts.Node, number>();
-  const costsOf = new WeakMap<object, WeakMap<ts.Node, number>>([
-    [values, valueCosts],
-    [declared, declaredCosts],
+  /**
+   * How deep each cached result's computation reached below it (itself
+   * included), so a cached result counts as deep as computing it would.
+   */
+  const valueHeights = new WeakMap<ts.Node, number>();
+  const declaredHeights = new WeakMap<ts.Node, number>();
+  const unreducedHeights = new WeakMap<ts.Node, number>();
+  const heightsOf = new WeakMap<object, WeakMap<ts.Node, number>>([
+    [values, valueHeights],
+    [declared, declaredHeights],
   ]);
-  /** Charges `cost` steps; false (a cut) once the budget is spent. */
-  const charge = (cost: number) => {
-    steps += cost;
+  /** The deepest level reached since the current computation began. */
+  let reach = 0;
+  /** Counts one computed expression; false (a cut) once the budget is spent. */
+  const step = () => {
+    steps++;
     if (steps <= MAX_STEPS) return true;
     overBudget = true;
     cuts++;
     return false;
+  };
+  /** Whether a cached result of `height` fits under the depth limit here. */
+  const fits = (height: number) => {
+    const level = depth + height;
+    if (level > MAX_DEPTH) {
+      overDepth = true;
+      cuts++;
+      return false;
+    }
+    if (level > reach) reach = level;
+    if (level > deepest) deepest = level;
+    return true;
   };
   /** Enters one nested step; false (a cut) at the depth limit. */
   const enter = () => {
@@ -210,6 +229,7 @@ export function receiverArms(
       return false;
     }
     depth++;
+    if (depth > reach) reach = depth;
     if (depth > deepest) deepest = depth;
     return true;
   };
@@ -279,29 +299,31 @@ export function receiverArms(
     node: ts.Node,
     compute: () => T,
   ): T | undefined {
-    const costs = costsOf.get(cache);
+    const heights = heightsOf.get(cache);
     const known = cache.get(node);
     if (known !== undefined) {
-      if (!charge(costs?.get(node) ?? 0)) return undefined;
+      if (!fits(heights?.get(node) ?? 1)) return undefined;
       return known === null ? undefined : known;
     }
     if (active.has(node)) {
       cuts++;
       return undefined;
     }
-    if (!charge(1) || !enter()) return undefined;
+    if (!step() || !enter()) return undefined;
     active.add(node);
     const before = cuts;
-    const start = steps - 1;
+    const outer = reach;
+    reach = depth;
     try {
       const result = compute();
       if (result !== undefined || cuts === before) {
         cache.set(node, result === undefined ? null : result);
-        costs?.set(node, steps - start);
+        heights?.set(node, reach - depth + 1);
       }
       return result;
     } finally {
       depth--;
+      if (outer > reach) reach = outer;
       active.delete(node);
     }
   }
@@ -1160,15 +1182,17 @@ export function receiverArms(
   function unreduced(expression: ts.Expression): boolean {
     const known = unreducedCache.get(expression);
     if (known !== undefined)
-      return charge(unreducedCosts.get(expression) ?? 0) && known;
+      return fits(unreducedHeights.get(expression) ?? 1) && known;
     if (checking.has(expression)) {
       cuts++;
       return false;
     }
-    if (!charge(1) || !enter()) return false;
+    if (!step() || !enter()) return false;
     checking.add(expression);
     const before = cuts;
-    const start = steps - 1;
+    const outer = reach;
+    reach = depth;
+    let height = 1;
     let result: boolean;
     try {
       const value = skipValue(expression);
@@ -1203,12 +1227,14 @@ export function receiverArms(
         result = !!out && !reducible(out);
       }
     } finally {
+      height = reach - depth + 1;
       depth--;
+      if (outer > reach) reach = outer;
       checking.delete(expression);
     }
     if (result || cuts === before) {
       unreducedCache.set(expression, result);
-      unreducedCosts.set(expression, steps - start);
+      unreducedHeights.set(expression, height);
     }
     return result;
   }
@@ -1835,6 +1861,7 @@ export function receiverArms(
     receiverStatistics.calls++;
     steps = 0;
     deepest = 0;
+    reach = 0;
     overBudget = false;
     overDepth = false;
     let found: Arms;

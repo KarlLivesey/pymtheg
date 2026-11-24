@@ -1035,66 +1035,42 @@ test("review 3: escaping defaults, generic shorthand returns, accessor pairs and
   assert.deepEqual(got, want);
 });
 
-test("review 3: the walk's work per call is bounded by a step count, cached results charged at their cost", async () => {
-  // A chain of choices over the previous name: each level doubles the
-  // expressions the walk would visit without its cache. Cached results are
-  // charged what they cost, so the outcome follows the count alone.
-  const chain = (k) =>
+test("review 3: the walk's work per call is bounded by a count of computed expressions", async () => {
+  // Self-assigned `let`s, each choosing twice from the one before: every
+  // result is touched by a cycle, so none is cached and the work doubles
+  // per level (reviewer B: 327,679 expressions at 16 levels; tens of
+  // millions at 24). The walk stops at the budget, decided by the count.
+  const file = (k) =>
     [
-      "const l0 = { run() {} };",
+      "declare const pick: boolean;",
+      "let l0 = { run() {} };",
+      "l0 = l0;",
       ...Array.from(
         { length: k },
-        (_, i) => `const l${i + 1} = Math.random() > 0.5 ? l${i} : l${i};`,
+        (_, i) => `let l${i + 1} = pick ? l${i} : l${i};\nl${i + 1} = l${i + 1};`,
       ),
       `l${k}.run();`,
       "",
     ].join("\n");
   const seen = [];
-  // Up to the first level the budget cuts, and one more.
-  for (let k = 10; k <= 26 && seen.filter(({ cut }) => cut).length < 2; k++) {
+  for (let k = 10; k <= 24; k += 2) {
     receiverStatistics.maxSteps = 0;
     const cuts = receiverStatistics.budgetCuts;
-    const got = await outcomes({ "src/use.ts": chain(k) }, "src/use.ts");
-    const outcome = got[`l${k}.run();`];
+    const before = receiverStatistics.expressions;
+    const got = await outcomes({ "src/use.ts": file(k) }, "src/use.ts");
+    const spent = receiverStatistics.expressions - before;
     const steps = receiverStatistics.maxSteps;
     const cut = receiverStatistics.budgetCuts > cuts;
-    seen.push({ k, steps, cut, outcome });
-    // Definite below the budget; unresolved once it is reached.
+    seen.push({ k, steps, spent, cut });
+    // Cut exactly when the count passes the budget; never more work.
     assert.equal(cut, steps > MAX_STEPS, JSON.stringify(seen.at(-1)));
-    assert.equal(
-      outcome,
-      cut ? "unresolved:receiver-unverified" : "src/use.ts#l0.run",
-      JSON.stringify(seen.at(-1)),
-    );
+    assert.ok(spent <= MAX_STEPS + 1, JSON.stringify(seen.at(-1)));
+    assert.match(got[`l${k}.run();`], /^unresolved:/);
   }
-  assert.ok(seen.some(({ cut }) => cut) && seen.some(({ cut }) => !cut));
-  // Self-assigned `let`s, each choosing twice from the one before: every
-  // result is touched by a cycle, so none is cached and the work doubles
-  // per level (reviewer B: 327,679 expressions at 16 levels). At 24 levels
-  // it would be tens of millions; the walk stops at the budget.
-  const k = 24;
-  const before = receiverStatistics.expressions;
-  const cuts = receiverStatistics.budgetCuts;
-  const got = await outcomes(
-    {
-      "src/use.ts": [
-        "declare const pick: boolean;",
-        "let l0 = { run() {} };",
-        "l0 = l0;",
-        ...Array.from(
-          { length: k },
-          (_, i) => `let l${i + 1} = pick ? l${i} : l${i};\nl${i + 1} = l${i + 1};`,
-        ),
-        `l${k}.run();`,
-        "",
-      ].join("\n"),
-    },
-    "src/use.ts",
+  assert.ok(
+    seen.some(({ cut }) => cut) && seen.some(({ cut }) => !cut),
+    JSON.stringify(seen),
   );
-  const spent = receiverStatistics.expressions - before;
-  assert.ok(receiverStatistics.budgetCuts > cuts, "the budget was reached");
-  assert.ok(spent <= MAX_STEPS + 1, `expressions computed: ${spent}`);
-  assert.equal(got[`l${k}.run();`], "unresolved:receiver-unverified");
 });
 
 test("review 3: a long alias chain has the same outcome first or last in a process, top-level or nested", async () => {
@@ -1118,6 +1094,27 @@ test("review 3: a long alias chain has the same outcome first or last in a proce
     const [key] = Object.keys(got).filter((site) => site.includes(`a${n}.run`));
     return got[key];
   };
+  // In one file, a shorter chain walked first caches its links: the longer
+  // one still counts them at their depth, so the order does not matter.
+  const both = async (first, second) => {
+    const got = await outcomes(
+      {
+        "src/use.ts": [
+          ...aliases(Math.max(first, second)),
+          `a${first}.run();`,
+          `a${second}.run();`,
+          "",
+        ].join("\n"),
+      },
+      "src/use.ts",
+    );
+    return [first, second].map((n) => got[`a${n}.run();`]);
+  };
+  const [early, late] = await both(60, 150);
+  const [lateFirst, earlyAfter] = await both(150, 60);
+  assert.deepEqual([early, late], [earlyAfter, lateFirst]);
+  assert.equal(early, "src/use.ts#a0.run");
+  assert.equal(late, "unresolved:receiver-unverified");
   const short = 40;
   const long = 520;
   assert.ok(2 * short < MAX_DEPTH && long > MAX_DEPTH);
