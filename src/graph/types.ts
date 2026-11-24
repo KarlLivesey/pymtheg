@@ -5,7 +5,12 @@ export interface SourceRange {
   end: number;
 }
 export type Json =
-  null | boolean | number | string | Json[] | { [key: string]: Json };
+  | null
+  | boolean
+  | number
+  | string
+  | Json[]
+  | { [key: string]: Json };
 export type ParseStatus = "clean" | "partial" | "failed";
 export interface Diagnostic {
   message: string;

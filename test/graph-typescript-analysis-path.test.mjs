@@ -198,7 +198,11 @@ test("a one-file TypeScript project: a first index, a body edit, and a no-edit i
   const got = await bothWays(
     {
       "tsconfig.json": JSON.stringify({
-        compilerOptions: { strict: true, module: "ESNext", moduleResolution: "Bundler" },
+        compilerOptions: {
+          strict: true,
+          module: "ESNext",
+          moduleResolution: "Bundler",
+        },
         include: ["."],
       }),
       "a.ts": a,

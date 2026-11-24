@@ -46,10 +46,7 @@ const MUTATIONS = {
   "the verified no-edit index reports no path (round 2)": {
     edits: {
       "src/graph/commands.ts": [
-        [
-          "...(reportedPaths.length && { analysisPaths: reportedPaths }),",
-          "",
-        ],
+        ["...(reportedPaths.length && { analysisPaths: reportedPaths }),", ""],
       ],
     },
     test: "test/graph-typescript-analysis-path.test.mjs",
