@@ -18,6 +18,8 @@ import { readScip } from "./scip.js";
 import { joinScip } from "./toolchain-join.js";
 import {
   installation,
+  prepareRun,
+  routeKey,
   runAnalyzer,
   sweepStaleRuns,
   type RunControls,
@@ -39,7 +41,10 @@ export const setRunControls = (next: RunControls) => {
 /**
  * The route never makes the source-only result worse (C-43 review): any
  * failure other than cancellation is reported as `unavailable` with its
- * reason, and the source-only rows stand.
+ * reason, and the source-only rows stand. A failure after the route's key
+ * is known records that key (fifth review), so a warm query on an unchanged
+ * checkout finds the index current instead of running the route again; any
+ * change to an input of the key runs it again.
  */
 export async function rustRoute(
   request: ToolchainRequest,
@@ -47,13 +52,15 @@ export async function rustRoute(
   files: readonly GraphFile[],
   contextFiles: readonly ContextFile[],
 ): Promise<RouteAnswers | undefined> {
+  const known: { key?: string } = {};
   try {
-    return await route(request, projectId, files, contextFiles);
+    return await route(request, projectId, files, contextFiles, known);
   } catch (error) {
     if (request.signal?.aborted) throw error;
     request.note({
       status: "unavailable",
       reason: `the toolchain route failed: ${error instanceof Error ? error.message : String(error)}`,
+      ...(known.key === undefined ? {} : { key: known.key }),
     });
     return undefined;
   }
@@ -64,9 +71,15 @@ async function route(
   projectId: string,
   files: readonly GraphFile[],
   contextFiles: readonly ContextFile[],
+  /** The route's key once it is known, for a failure after that point. */
+  known: { key?: string },
 ): Promise<RouteAnswers | undefined> {
   const unavailable = (reason: string) => {
-    request.note({ status: "unavailable", reason });
+    request.note({
+      status: "unavailable",
+      reason,
+      ...(known.key === undefined ? {} : { key: known.key }),
+    });
     return undefined;
   };
   if (!contextFiles.some((file) => file.path === "Cargo.toml"))
@@ -90,15 +103,29 @@ async function route(
   const rust = files.filter(
     (file) => file.module === "rust" && file.path.endsWith(".rs"),
   );
+  const contexts = contextFiles.map((file) => ({
+    path: file.path,
+    text: file.status === "clean" ? file.text : undefined,
+  }));
+  // The cheap checks, as the warm query's key makes them.
+  const prepared = prepareRun(root, install, contexts, workDir);
+  if ("unavailable" in prepared) return unavailable(prepared.unavailable);
+  known.key = await routeKey(
+    root,
+    install,
+    rust.map((file) => ({ path: file.path, hash: file.hash })),
+    contexts,
+    prepared,
+    request.signal,
+  );
   const run = await runAnalyzer(
     root,
     install,
     rust.map((file) => ({ path: file.path, text: file.text, hash: file.hash })),
-    contextFiles.map((file) => ({
-      path: file.path,
-      text: file.status === "clean" ? file.text : undefined,
-    })),
+    contexts,
     workDir,
+    prepared,
+    known.key,
     request.signal,
     controls,
   );

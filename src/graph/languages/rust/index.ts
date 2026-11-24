@@ -536,8 +536,13 @@ function decideToolchain(
         from = "candidates";
       } else from = "unresolved";
       bump(`definite:${from}`);
+      // The open link's data stays until the stored link takes the answer:
+      // the record lists what then goes (`clears`), and the link decider
+      // removes it only then. A link whose source-only answer is kept in
+      // the resolve phase keeps its route-off data exactly (fifth review).
       const decided: Record<string, Json> = { ...rest };
-      if (from !== "definite") for (const key of OPEN_DATA) delete decided[key];
+      const clears =
+        from === "definite" ? [] : OPEN_DATA.filter((key) => key in rest);
       decided.toolchain = {
         origin: "toolchain",
         rustAnalyzer: toolchain.rustAnalyzer,
@@ -545,6 +550,7 @@ function decideToolchain(
         upgrade: "definite",
         from,
         ...(from === "definite" ? {} : { target }),
+        ...(clears.length ? { clears } : {}),
       };
       return { ...l, data: decided };
     });

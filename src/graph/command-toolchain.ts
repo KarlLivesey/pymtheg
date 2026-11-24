@@ -7,6 +7,7 @@ import type { CapturedPath } from "./command-snapshot.js";
 import { installation, runHelper } from "./languages/go/toolchain.js";
 import {
   installation as rustInstallation,
+  prepareRun as rustPrepareRun,
   routeKey as rustRouteKey,
 } from "./languages/rust/toolchain.js";
 import { matchesPattern } from "./registry.js";
@@ -113,11 +114,16 @@ function rustState(
 ): ToolchainModuleState {
   const own = notesOf("rust", notes);
   const unavailable = own.find((note) => note.status === "unavailable");
+  // A failure after the route's key was known records that key (fifth
+  // review): an unchanged checkout is then current, not re-run per query.
   if (unavailable)
     return {
       state: "unavailable",
       reason: String(unavailable.reason),
-      key: `unavailable:${String(unavailable.reason)}`,
+      key:
+        typeof unavailable.key === "string"
+          ? unavailable.key
+          : `unavailable:${String(unavailable.reason)}`,
     };
   const available = own.find((note) => note.status === "available");
   if (!available)
@@ -269,11 +275,16 @@ export async function rustToolchainKey(
       if (file.reason) return null;
       sources.push({ path: file.path, hash: file.hash });
     }
+    const real = await realpath(root);
+    // The run's own cheap checks (a rust-project.json, the build target).
+    const prepared = rustPrepareRun(real, install, contexts, dir);
+    if ("unavailable" in prepared) return `unavailable:${prepared.unavailable}`;
     return await rustRouteKey(
-      await realpath(root),
+      real,
       install,
       sources,
       contexts,
+      prepared,
       signal,
     );
   } catch (error) {
