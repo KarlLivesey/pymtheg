@@ -649,6 +649,12 @@ export interface RunControls {
   limitMs?: number;
   /** The output limit (tests: the over-limit path without 256 MiB). */
   outputLimit?: number;
+  /**
+   * Tests only (design B's oracle): run without the default features, so a
+   * test can compare the answers of two configurations. Never set by the
+   * product, which always runs one recorded configuration.
+   */
+  noDefaultFeatures?: boolean;
 }
 
 /** What a run is prepared from, before anything runs (cheap checks only). */
@@ -1016,7 +1022,16 @@ export async function runAnalyzer(
 ): Promise<AnalyzerRun | Unavailable> {
   await mkdir(workDir, { recursive: true });
   const buildFor = prepared.target;
-  const stem = join(workDir, `scip-${key.slice(0, 32)}`);
+  const config = controls.noDefaultFeatures
+    ? {
+        ...ANALYZER_CONFIG,
+        cargo: { ...ANALYZER_CONFIG.cargo, noDefaultFeatures: true },
+      }
+    : ANALYZER_CONFIG;
+  const stem = join(
+    workDir,
+    `scip-${key.slice(0, 32)}${controls.noDefaultFeatures ? "-nodefault" : ""}`,
+  );
   if (existsSync(`${stem}.json`) && existsSync(`${stem}.scip`)) {
     // Sixth review D: a cached pair that cannot be read (a damaged or
     // foreign file) is discarded and the run goes ahead, once.
@@ -1115,6 +1130,7 @@ export async function runAnalyzer(
             buildFor,
             "-e",
             "normal,build,dev",
+            ...(controls.noDefaultFeatures ? ["--no-default-features"] : []),
             "--prefix",
             "none",
             "--format",
@@ -1139,10 +1155,7 @@ export async function runAnalyzer(
       partial.push(
         `cargo metadata failed offline (dependencies not in the crate cache?): ${firstLine(meta)}`,
       );
-    await writeFile(
-      join(run, "analyzer.json"),
-      JSON.stringify(ANALYZER_CONFIG),
-    );
+    await writeFile(join(run, "analyzer.json"), JSON.stringify(config));
     const output = join(run, "index.scip");
     const started = performance.now();
     const result = await runProcess(

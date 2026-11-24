@@ -7,6 +7,7 @@ import type {
   LinkResolution,
 } from "../../types.js";
 import { crates } from "./cargo.js";
+import { implies } from "./cfg.js";
 import type { AddedLink, GraphLink, GraphSymbol, Json } from "../../types.js";
 import { rustRoute } from "./toolchain-route.js";
 import { parseRust } from "./parse.js";
@@ -28,7 +29,12 @@ type RustAnalysisInput = {
    * C-43: the toolchain route is on and answered. Links carrying `tc` (a
    * checkout symbol id from the strict join) are decided here.
    */
-  toolchain?: { rustAnalyzer: string; configuration: string };
+  toolchain?: {
+    rustAnalyzer: string;
+    configuration: string;
+    /** Design B: each enclosing function's trace (see toolchain-join.ts). */
+    functionTraces?: Record<string, { entries: Json[]; at: number[] }>;
+  };
   /** C-36: annotate only these files; every file still supplies facts. */
   scope?: readonly string[];
 };
@@ -271,23 +277,29 @@ function scopedAnalysis(request: ScopedRequest):
 }
 
 /**
- * C-43: decide each link the strict join answered, against the source-only
- * answer and the cfg conditions this analysis found:
- * - a link under a cfg condition other than `test` takes no answer (the
- *   toolchain sees one configuration);
- * - an answer whose target is under such a condition (its own, or that of
- *   a module it is declared in, or a module no declaration reaches), or
- *   shares its kind and identity with a symbol under such a condition (a cfg
- *   variant: two items of one path can only both exist under cfg), takes no
- *   answer, and a candidate set holding such a symbol stays a candidate set;
- * - a link whose source-only answer records conditional candidates
- *   (`conditional-name-may-be-absent`, or twins among its targets) is only
- *   ever confirmed, never narrowed;
- * - a source-only definite target that differs is kept, and counted;
- * - a source-only library answer is kept;
- * - a candidate set holding the answer, or an unresolved link, becomes
- *   definite. The answer is recorded on the link (`toolchain`), and the
- *   resolve phase applies it where the source-only answer is still open.
+ * C-43: decide each link the strict join answered (design B, deny by
+ * default). The toolchain sees one configuration. A definite answer is wrong
+ * only if the same written site resolves differently in another
+ * configuration where it compiles, and a site's resolution depends only on
+ * the bindings it passes through. So an answer decides only when no binding
+ * on its trace is selected:
+ * - a selected binding is anything written under a cfg attribute (`test`
+ *   included) that the site's own conditions do not imply, itself or through
+ *   an enclosing item, module, impl, trait, block or file; or emitted by a
+ *   macro whose expansion source-only does not read;
+ * - a path's trace is each segment's binding as rust-analyzer resolved it,
+ *   and the `use` hops a segment may pass through;
+ * - a receiver-typed link's trace is everything named in the enclosing
+ *   function up to the site, and also any method or field of that name, trait
+ *   `use`, cfg-gated field or `Deref`/`Index` impl the lookup could meet;
+ * - an item of another crate than `std`, `core` or `alloc` on the trace,
+ *   or a trace that cannot be completed, leaves the link confirm-only.
+ * Also: a link under a cfg other than `test` takes no answer; a name an
+ * opaque item may shadow is confirm-only; an import of a name bound in more
+ * than one namespace takes no answer. Then a source-only definite target that
+ * differs is kept and counted, a source-only library answer is kept, and a
+ * candidate set holding the answer, or an unresolved link, becomes definite,
+ * recorded on the link (`toolchain`) for the resolve phase to apply.
  */
 function decideToolchain(
   updated: readonly { path: string }[],
@@ -297,162 +309,205 @@ function decideToolchain(
   toolchain: NonNullable<RustAnalysisInput["toolchain"]>,
   moduleGated: ReadonlySet<string> = new Set(),
   moduleTwin: ReadonlySet<string> = new Set(),
+  /** Each symbol's module-chain conditions (`test` included). */
+  moduleChain: ReadonlyMap<string, string[]> = new Map(),
 ): ToolchainDecisions {
+  void moduleGated;
+  void moduleTwin;
   const counts: Record<string, number> = {};
   const disagreements: Json[] = [];
   const bump = (key: string) => (counts[key] = (counts[key] ?? 0) + 1);
-  // Final symbol conditions, and how many symbols share each identity.
-  const gated = new Set<string>();
-  /** Symbols under their own cfg (the rest of `gated` is module twins). */
-  const ownGated = new Set<string>();
+  // ---- Design B: the facts the rule reads.
   const identityOf = new Map<string, string>();
-  /** Identities (kind and in-file path) some gated symbol has. */
-  const gatedIdentities = new Set<string>();
-  updated.forEach((f, i) => {
-    const symbols = byPath.get(f.path)?.result.symbols;
-    if (!symbols) return;
-    symbols.forEach((symbol, j) => {
-      const id = facts[i]!.symbols[j]!.id;
-      const data = (symbol.data ?? {}) as Record<string, Json>;
-      const identity = `${symbol.kind}\u0000${symbol.identity}`;
-      identityOf.set(id, identity);
-      // Its own cfg, or a module chain with a twin of its path or with
-      // conditions the source cannot see (review B1:
-      // `#[cfg(unix)] #[path = "sys/unix.rs"] mod imp;` and its twin). A
-      // module merely under cfg (a default feature) has no other item at the
-      // path, so an answer into it stands (second review, narrowed).
-      if (beyondTest(data.conditions as Json[] | undefined)) ownGated.add(id);
-      if (
-        beyondTest(data.conditions as Json[] | undefined) ||
-        moduleTwin.has(id)
-      ) {
-        gated.add(id);
-        gatedIdentities.add(identity);
-      }
-    });
-  });
-  const variant = (id: string) =>
-    gated.has(id) || gatedIdentities.has(identityOf.get(id) ?? "");
-  /** For candidate sets: any cfg on the item or its module chain. */
-  const conditional = (id: string) => variant(id) || moduleGated.has(id);
-  /** Two candidates of one kind and in-file path: cfg twins. */
-  const twins = (ids: readonly string[]) =>
-    new Set(ids.map((c) => identityOf.get(c) ?? c)).size < ids.length;
-  // Fourth and fifth reviews: a name defined more than once under cfg in one
-  // file selects between items the toolchain sees only one of:
-  // - `use` items (`#[cfg(feature = "fast")] pub use z_fmt::ZGrayV08 as
-  //   ZGray;` beside a `not` twin naming ZGrayV09; `#[cfg(test)] use
-  //   mdb::MockDb as Db;` beside `#[cfg(not(test))] use rdb::RealDb as Db;`);
-  // - `type` aliases (`#[cfg(feature = "fast")] pub type Backend = FastB;`
-  //   beside a `not` twin naming SlowB);
-  // - function twins, through their return types (`#[cfg(feature = "fast")]
-  //   fn mk() -> FastT` beside a `not` twin returning SlowT).
-  // `test` counts here: a test double is a real second definition. A name
-  // with one definition (ordinary `#[cfg(test)] mod tests` code) selects
-  // nothing. The items the definitions do not all name are cfg-selected: an
-  // answer into one, or into an item it holds (`Backend::b_new()` and
-  // `h.inner.run2()` reaching `FastB`'s methods), may confirm source-only's
-  // own definite target but never narrows or decides anything else.
-  // Places are file and in-file path, so members are found by prefix.
   const placeOf = new Map<string, string>();
-  updated.forEach((f, i) => {
-    byPath.get(f.path)?.result.symbols.forEach((symbol, j) => {
-      placeOf.set(
-        facts[i]!.symbols[j]!.id,
-        `${f.path}\u0000${symbol.identity}`,
-      );
-    });
-  });
-  const conditioned = (data: Record<string, Json>) =>
-    ((data.conditions ?? []) as Json[]).length > 0;
-  const lastSegment = (name: string) =>
-    name.split("::").at(-1)!.replace(/<.*$/, "");
-  const targetsOf = (linkId: string): string[] => {
-    const r = resolutions.get(linkId);
-    return [
-      ...(r?.targetId ? [r.targetId] : []),
-      ...(r?.candidateIds ?? []),
-    ].flatMap((id) => {
-      const place = placeOf.get(id);
-      return place === undefined ? [] : [place];
-    });
-  };
-  /** Per selecting name (file and in-file path): each definition's items. */
-  const definitions = new Map<string, Set<string>[]>();
-  const define = (key: string, items: readonly string[]) => {
-    const list = definitions.get(key) ?? [];
-    list.push(new Set(items));
-    definitions.set(key, list);
-  };
-  updated.forEach((f, i) => {
-    const result = byPath.get(f.path)?.result;
-    if (!result) return;
-    // The `types` links, for the types aliases and return types name.
-    const typeLinks: {
+  const symbolFact = new Map<
+    string,
+    {
+      file: string;
+      kind: string;
       name: string;
-      id: string;
+      identity: string;
       start: number;
       end: number;
-    }[] = [];
-    result.links.forEach((l, j) => {
-      const link = facts[i]!.links[j]!;
-      const data = (l.data ?? {}) as Record<string, Json>;
-      if (l.kind === "imports" && conditioned(data)) {
-        const name =
-          (typeof data.alias === "string" && data.alias) ||
-          lastSegment(l.targetName);
-        const scope = typeof data.scope === "string" ? data.scope : "";
-        define(
-          `${f.path}\u0000${scope ? `${scope}::` : ""}${name}`,
-          targetsOf(link.id),
-        );
-      }
-      if (l.kind === "types")
-        typeLinks.push({
-          name: lastSegment(l.targetName),
-          id: link.id,
-          start: l.range.start,
-          end: l.range.end,
-        });
-    });
-    result.symbols.forEach((symbol) => {
+      conditions: string[];
+      opaque: boolean;
+      gatedFields: string[];
+    }
+  >();
+  updated.forEach((f, i) => {
+    byPath.get(f.path)?.result.symbols.forEach((symbol, j) => {
+      const id = facts[i]!.symbols[j]!.id;
       const data = (symbol.data ?? {}) as Record<string, Json>;
-      if (!conditioned(data)) return;
-      // Sixth review: method twins inside one impl block (`impl H::c_backend`
-      // under `feature = "fast"` and its `not` twin) select through their
-      // return types like function twins; `static` and `const` twins through
-      // every type their declaration names (no written type is recorded, so
-      // the initializer's types count too: twins only ever over-select).
-      const callable = symbol.kind === "function" || symbol.kind === "method";
-      const written =
-        symbol.kind === "type" && typeof data.aliasType === "string"
-          ? data.aliasType
-          : callable && typeof data.returnType === "string"
-            ? data.returnType
-            : undefined;
-      const anyType = symbol.kind === "static" || symbol.kind === "const";
-      if (!written && !anyType) return;
-      const words = new Set(written?.match(/\w+/g) ?? []);
-      define(
-        `${f.path}\u0000${callable ? "fn " : anyType ? "value " : ""}${symbol.identity}`,
-        typeLinks
-          .filter(
-            (t) =>
-              t.start >= symbol.range.start &&
-              t.end <= symbol.range.end &&
-              (anyType || words.has(t.name)),
-          )
-          .flatMap((t) => targetsOf(t.id)),
-      );
+      identityOf.set(id, `${symbol.kind}\u0000${symbol.identity}`);
+      placeOf.set(id, `${f.path}\u0000${symbol.identity}`);
+      symbolFact.set(id, {
+        file: f.path,
+        kind: symbol.kind,
+        name: symbol.name,
+        identity: symbol.identity,
+        start: symbol.range.start,
+        end: symbol.range.end,
+        conditions: ((data.conditions ?? []) as string[]).map(String),
+        opaque: !!data.underOpaqueAttribute,
+        gatedFields: ((data.gatedFields ?? []) as Json[]).map(String),
+      });
     });
   });
-  const selectedPlaces = new Set<string>();
-  for (const list of definitions.values()) {
-    if (list.length < 2) continue;
-    for (const items of list)
-      for (const place of items)
-        if (!list.every((other) => other.has(place))) selectedPlaces.add(place);
+  const lastSegment = (name: string) =>
+    name.split("::").at(-1)!.replace(/<.*$/, "");
+  /** Conditions the site's own do not imply (`?` markers never are). */
+  const unmet = (conditions: readonly string[], site: readonly string[]) =>
+    conditions.some((c) => !implies(site, c));
+  /** A checkout item is selected for this site (design B, rule a). */
+  const selectedItem = (id: string, site: readonly string[]) => {
+    const fact = symbolFact.get(id);
+    if (!fact) return true;
+    if (fact.opaque) return true;
+    return unmet([...fact.conditions, ...(moduleChain.get(id) ?? [])], site);
+  };
+  // Members (impl and trait items), by name, with their conditions.
+  const members = new Map<string, string[][]>();
+  // Deref, DerefMut, Index and IndexMut impls, by the type they are for.
+  const derefImpls = new Map<string, string[][]>();
+  for (const [id, fact] of symbolFact) {
+    const chain = [...fact.conditions, ...(moduleChain.get(id) ?? [])];
+    const member =
+      fact.identity.startsWith("impl ") ||
+      (fact.identity.includes("::") &&
+        ["function", "method", "const", "type"].includes(fact.kind));
+    if (member) {
+      const list = members.get(fact.name) ?? [];
+      list.push(fact.opaque ? ["?opaque"] : chain);
+      members.set(fact.name, list);
+    }
+    const deref =
+      fact.kind === "impl" &&
+      /^impl\b.*\b(Deref|DerefMut|Index|IndexMut)\b.*\bfor\s+&?\s*(?:mut\s+)?([A-Za-z_][\w]*)/.exec(
+        fact.identity,
+      );
+    if (deref) {
+      const list = derefImpls.get(deref[2]!) ?? [];
+      list.push(fact.opaque ? ["?opaque"] : chain);
+      derefImpls.set(deref[2]!, list);
+    }
   }
+  // Imports, per file: their scope, the name they bind, glob or not, and
+  // their conditions (a selected import is one the site does not imply).
+  const importsByFile = new Map<
+    string,
+    {
+      scope: string;
+      name: string;
+      glob: boolean;
+      conditions: string[];
+      /** Source-only resolved it to an item that is not a trait. */
+      notTrait: boolean;
+    }[]
+  >();
+  const selectedImportNames = new Map<string, string[][]>();
+  updated.forEach((f, i) => {
+    const list: {
+      scope: string;
+      name: string;
+      glob: boolean;
+      conditions: string[];
+      notTrait: boolean;
+    }[] = [];
+    for (const [j, l] of (byPath.get(f.path)?.result.links ?? []).entries()) {
+      if (l.kind !== "imports") continue;
+      const resolved = resolutions.get(facts[i]!.links[j]!.id)?.targetId;
+      const notTrait = !!resolved && symbolFact.get(resolved)?.kind !== "trait";
+      const data = (l.data ?? {}) as Record<string, Json>;
+      const glob = !!data.glob || l.targetName.endsWith("*");
+      const name =
+        (typeof data.alias === "string" && data.alias) ||
+        lastSegment(l.targetName);
+      const conditions = ((data.conditions ?? []) as Json[]).map(String);
+      list.push({
+        scope: typeof data.scope === "string" ? data.scope : "",
+        name,
+        glob,
+        conditions,
+        notTrait: !glob && notTrait,
+      });
+      if (conditions.length && !glob) {
+        const named = selectedImportNames.get(name) ?? [];
+        named.push(conditions);
+        selectedImportNames.set(name, named);
+      }
+    }
+    importsByFile.set(f.path, list);
+  });
+  const inScopeChain = (scope: string, site: string) =>
+    scope === "" || site === scope || site.startsWith(`${scope}::`);
+  // Functions with a cfg-gated statement or item inside them.
+  const gatedFunctions = new Set<string>();
+  const functionsByFile = new Map<
+    string,
+    [string, { start: number; end: number; conditions: string[] }][]
+  >();
+  for (const [id, fact] of symbolFact)
+    if (fact.kind === "function" || fact.kind === "method") {
+      const list = functionsByFile.get(fact.file) ?? [];
+      list.push([id, fact]);
+      functionsByFile.set(fact.file, list);
+    }
+  updated.forEach((f) => {
+    const result = byPath.get(f.path)?.result;
+    if (!result) return;
+    const functions = functionsByFile.get(f.path) ?? [];
+    // Only facts with conditions can be gated statements.
+    const conditioned = [
+      ...result.links.map((l) => ({
+        range: l.range,
+        conditions: (
+          ((l.data ?? {}) as { conditions?: Json[] }).conditions ?? []
+        ).map(String),
+      })),
+      ...result.symbols.map((x) => ({
+        range: x.range,
+        conditions: (
+          ((x.data ?? {}) as { conditions?: Json[] }).conditions ?? []
+        ).map(String),
+      })),
+    ].filter((x) => x.conditions.length);
+    for (const [id, fn] of functions)
+      if (
+        conditioned.some(
+          (x) =>
+            x.range.start > fn.start &&
+            x.range.end <= fn.end &&
+            unmet(x.conditions, fn.conditions),
+        )
+      )
+        gatedFunctions.add(id);
+  });
+  const STANDARD = new Set(["std", "core", "alloc"]);
+  type Entry =
+    | { k: "item"; id: string }
+    | { k: "generated" }
+    | { k: "local"; defined: boolean }
+    | { k: "library"; crate: string };
+  /** Design B: why a trace leaves the answer undecided, or null. */
+  const traceVerdict = (
+    entries: readonly Entry[],
+    site: readonly string[],
+    receiver: boolean,
+  ): string | null => {
+    const selected = receiver
+      ? "withheld:selected-receiver"
+      : "withheld:selected-binding";
+    let dependency = false;
+    for (const entry of entries) {
+      if (entry.k === "item") {
+        if (selectedItem(entry.id, site)) return selected;
+      } else if (entry.k === "generated") return selected;
+      else if (entry.k === "local") {
+        if (!entry.defined) return "withheld:trace-incomplete";
+      } else if (!STANDARD.has(entry.crate)) dependency = true;
+    }
+    return dependency ? "withheld:dependency-on-trace" : null;
+  };
   // Sixth review A: a name a module binds in more than one namespace
   // (cortex-m-rt: `pub use macros::exception;` beside `pub use
   // self::Exception as exception;`) is imported in all of them, while the
@@ -507,31 +562,13 @@ function decideToolchain(
       if ((bindings.get(`${scope}\u0000${name}`) ?? 0) > 1) return true;
     return false;
   };
-  /** An item cfg selects through a name, or an item inside one. */
-  const cfgSelected = (id: string): boolean => {
-    const place = placeOf.get(id);
-    if (place === undefined || selectedPlaces.size === 0) return false;
-    const [file, identity] = place.split("\u0000") as [string, string];
-    // A method's identity is `impl Type::m` or `impl Trait for Type<T>::m`;
-    // the item it is in is `Type`.
-    const owned = identity.startsWith("impl ")
-      ? identity.slice(5).split(" for ").at(-1)!
-      : identity;
-    const segments = owned
-      .split("::")
-      .map((segment) => segment.replace(/<.*$/, ""));
-    for (let n = 1; n <= segments.length; n++)
-      if (selectedPlaces.has(`${file}\u0000${segments.slice(0, n).join("::")}`))
-        return true;
-    return false;
-  };
   updated.forEach((f, i) => {
     const a = byPath.get(f.path);
     if (!a) return;
     a.result.links = a.result.links.map((l, j) => {
       const data = (l.data ?? {}) as Record<string, Json>;
       if (!("tc" in data)) return l;
-      const { tc, ...rest } = data;
+      const { tc, tcTrace, ...rest } = data;
       const target = String(tc);
       const id = facts[i]!.links[j]!.id;
       // Every answer not applied records why on the link
@@ -543,12 +580,6 @@ function decideToolchain(
       if (beyondTest(rest.conditions as Json[] | undefined))
         return kept("withheld:cfg-link");
       if (!identityOf.has(target)) return kept("withheld:no-symbol");
-      if (variant(target))
-        return kept(
-          moduleTwin.has(target) && !ownGated.has(target)
-            ? "withheld:module-twin"
-            : "withheld:cfg-variant",
-        );
       const r = resolutions.get(id);
       // Sixth review A: an import decides only when the imported name is in
       // exactly one namespace where it comes from (as this index sees it).
@@ -558,18 +589,6 @@ function decideToolchain(
         importNamespaces(target, lastSegment(l.targetName))
       )
         return kept("withheld:import-namespaces");
-      // An item cfg selects through a name: confirm only (see above).
-      if (r?.targetId !== target && cfgSelected(target))
-        return kept("withheld:cfg-selected");
-      // Review B1: a link whose source-only answer records conditional
-      // candidates (a name that cfg may remove, or twins under cfg) is never
-      // narrowed by the one configuration the toolchain sees; it may only be
-      // confirmed.
-      // Reasons are joined with "; " when there are several. A name cfg may
-      // remove allows only the one target source-only recorded (taking it
-      // narrows nothing); a set of several candidates holding a conditional
-      // one or cfg twins is never narrowed.
-      const candidates = (rest.targets ?? []) as string[];
       const reasons = uncertaintyReasons(rest.uncertainty);
       // Sixth review: a name an opaque item (a macro such as `cfg_if!`, or
       // one whose expansion is not read) may define or shadow is confirm-only:
@@ -577,16 +596,90 @@ function decideToolchain(
       // recorded no candidates to narrow. The route never decides it.
       if (!r?.targetId && reasons.includes("opaque-item-may-shadow-name"))
         return kept("withheld:opaque-shadow");
-      const single = candidates.length === 1 && candidates[0] === target;
-      const conditionalSet = (ids: readonly string[]) =>
-        ids.length > 1 && (ids.some(conditional) || twins(ids));
-      if (
-        !r?.targetId &&
-        ((reasons.includes("conditional-name-may-be-absent") && !single) ||
-          conditionalSet(candidates) ||
-          conditionalSet(r?.candidateIds ?? []))
-      )
-        return kept("withheld:conditional-candidates");
+      // Design B: the trace. A confirmation (source-only's own definite
+      // target) needs none.
+      if (r?.targetId !== target) {
+        const site = ((rest.conditions ?? []) as Json[]).map(String);
+        const trace = (tcTrace ?? {}) as {
+          receiver?: boolean;
+          enclosing?: string;
+          entries?: Entry[];
+          upTo?: number;
+        };
+        if (!trace.receiver) {
+          // A path: each segment's binding, the `use` hops a segment may
+          // pass through, and any selected source-only candidate.
+          const verdict = traceVerdict(
+            [...(trace.entries ?? []), { k: "item", id: target }],
+            site,
+            false,
+          );
+          if (verdict) return kept(verdict);
+          const segments = String(rest.pathSyntax ?? l.targetName)
+            .replace(/<[^<>]*>/g, "")
+            .split("::")
+            .map((x) => x.trim())
+            .filter(Boolean);
+          const scope = typeof rest.scope === "string" ? rest.scope : "";
+          const keyword = new Set(["crate", "self", "super", "Self", "$crate"]);
+          const first = segments[0];
+          if (first !== undefined && !keyword.has(first)) {
+            for (const use of importsByFile.get(f.path) ?? [])
+              if (
+                inScopeChain(use.scope, scope) &&
+                (use.glob || use.name === first) &&
+                unmet(use.conditions, site)
+              )
+                return kept("withheld:selected-binding");
+          }
+          for (const segment of segments.slice(1))
+            if (
+              (selectedImportNames.get(segment) ?? []).some((cs) =>
+                unmet(cs, site),
+              )
+            )
+              return kept("withheld:selected-binding");
+          const candidates = [
+            ...((rest.targets ?? []) as Json[]).map(String),
+            ...(r?.candidateIds ?? []),
+          ];
+          if (candidates.some((c) => c !== target && selectedItem(c, site)))
+            return kept("withheld:selected-binding");
+        } else {
+          // A receiver: the enclosing function's trace up to the site, and
+          // what method lookup could meet.
+          const fn = trace.enclosing
+            ? toolchain.functionTraces?.[trace.enclosing]
+            : undefined;
+          if (!fn || trace.upTo === undefined)
+            return kept("withheld:trace-incomplete");
+          const entries = fn.entries.slice(0, trace.upTo) as Entry[];
+          const verdict = traceVerdict(entries, site, true);
+          if (verdict) return kept(verdict);
+          if (gatedFunctions.has(trace.enclosing!))
+            return kept("withheld:selected-receiver");
+          const name = lastSegment(l.targetName.split(".").at(-1) ?? "");
+          if ((members.get(name) ?? []).some((cs) => unmet(cs, site)))
+            return kept("withheld:selected-receiver");
+          const scope = typeof rest.scope === "string" ? rest.scope : "";
+          for (const use of importsByFile.get(f.path) ?? [])
+            if (
+              !use.notTrait &&
+              inScopeChain(use.scope, scope) &&
+              unmet(use.conditions, site)
+            )
+              return kept("withheld:selected-receiver");
+          for (const entry of entries) {
+            if (entry.k !== "item") continue;
+            const fact = symbolFact.get(entry.id);
+            if (!fact) continue;
+            if (fact.gatedFields.includes(name))
+              return kept("withheld:selected-receiver");
+            if ((derefImpls.get(fact.name) ?? []).some((cs) => unmet(cs, site)))
+              return kept("withheld:selected-receiver");
+          }
+        }
+      }
       let from: "definite" | "candidates" | "unresolved";
       if (r?.targetId) {
         if (r.targetId !== target) {
@@ -606,8 +699,7 @@ function decideToolchain(
       else if (r?.candidateIds) {
         if (!r.candidateIds.includes(target))
           return kept("kept:outside-candidate-set");
-        if (r.libraries?.length || r.candidateIds.some(variant))
-          return kept("withheld:cfg-variant");
+        if (r.libraries?.length) return kept("kept:library-candidates");
         from = "candidates";
       } else from = "unresolved";
       bump(`definite:${from}`);
@@ -689,6 +781,8 @@ export const rustPhases = {
     // Of those, the ones whose module path has a twin at some level of the
     // chain, or whose module conditions cannot be seen.
     const moduleTwin = new Set<string>();
+    // Design B: every symbol's module-chain conditions (`test` included).
+    const moduleChain = new Map<string, string[]>();
     const decide: RustDecisionScope = inScope ? { files: inScope } : {};
     const resolutions = resolveRust(
       {
@@ -718,6 +812,7 @@ export const rustPhases = {
         presence.set(symbol.id, attributes);
         conditions.set(symbol.id, gates);
         if (beyondTest(modules)) moduleGated.add(symbol.id);
+        if (modules.length) moduleChain.set(symbol.id, modules);
         if (
           modules.includes("?module-twin") ||
           modules.includes("?module-not-declared")
@@ -820,6 +915,7 @@ export const rustPhases = {
               toolchain,
               moduleGated,
               moduleTwin,
+              moduleChain,
             ),
           }
         : {}),
@@ -918,6 +1014,7 @@ const rust: LanguageModule = {
       projectId,
       files: files.map(({ path, module, result }) => {
         const answers = route?.answers.get(path);
+        const traces = route?.traces.get(path);
         return {
           path,
           module,
@@ -931,6 +1028,10 @@ const rust: LanguageModule = {
                         data: {
                           ...((link.data ?? {}) as Record<string, Json>),
                           tc: answers.get(index)!,
+                          // Design B: transient, removed by the decision.
+                          ...(traces?.has(index)
+                            ? { tcTrace: traces.get(index) as unknown as Json }
+                            : {}),
                         },
                       }
                     : link,
@@ -945,6 +1046,9 @@ const rust: LanguageModule = {
             toolchain: {
               rustAnalyzer: route.rustAnalyzer,
               configuration: route.configuration,
+              functionTraces: Object.fromEntries(
+                route.functionTraces,
+              ) as unknown as Record<string, { entries: Json[]; at: number[] }>,
             },
           }
         : {}),

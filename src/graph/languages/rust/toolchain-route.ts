@@ -14,7 +14,7 @@ import type {
   ToolchainRequest,
 } from "../../types.js";
 import { fileFacts } from "../../identity.js";
-import { joinScip } from "./toolchain-join.js";
+import { joinScip, type JoinOutcome } from "./toolchain-join.js";
 import {
   installation,
   prepareRun,
@@ -27,6 +27,9 @@ import {
 export interface RouteAnswers {
   /** Per file, per parsed link index: the checkout symbol id. */
   answers: Map<string, Map<number, string>>;
+  /** Design B: each answered link's trace, and each function's. */
+  traces: JoinOutcome["traces"];
+  functionTraces: JoinOutcome["functionTraces"];
   rustAnalyzer: string;
   configuration: string;
 }
@@ -177,6 +180,8 @@ async function route(
   if (partial.length) return undefined;
   return {
     answers: joined.answers,
+    traces: joined.traces,
+    functionTraces: joined.functionTraces,
     rustAnalyzer: install.analyzerVersion,
     configuration: configurationFor(install, run.target),
   };

@@ -41,6 +41,7 @@ import {
 } from "../dist/graph/languages/rust/toolchain.js";
 import { toolchainState } from "../dist/graph/command-toolchain.js";
 import { decideLink } from "../dist/graph/analysis.js";
+import { generate as generateOracle } from "./rust-cfg-oracle.mjs";
 import { executeGraph } from "../dist/graph/commands.js";
 import { graphConfig, graphToolchains } from "../dist/shared/config.js";
 import { initializeWorkspace } from "../dist/project/workspace.js";
@@ -706,7 +707,8 @@ test("gates: a checkout answer at the link's own name site upgrades an unresolve
   assert.equal(gated.data.toolchain, undefined);
   assert.equal(decided["withheld:cfg-link"], 1);
   // A target with cfg variants (`#[cfg(unix)]` / `#[cfg(windows)]` impls): withheld.
-  assert.equal(decided["withheld:cfg-variant"], 1);
+  // Design B: `o.run()` meets the cfg-gated impls of b::Other.
+  assert.equal(decided["withheld:selected-receiver"], 1);
   assert.ok(counts.answer >= 4);
 });
 
@@ -1594,12 +1596,24 @@ test(
       const named = (file, name) =>
         upgraded.find((l) => l.file === file && l.targetName === name)
           ?.targetSymbol?.identity;
-      assert.equal(named("app/src/lib.rs", "a.radius"), "impl Circle::radius");
-      assert.equal(
-        named("app/src/lib.rs", "c.diameter"),
-        "impl Circle::diameter",
+      // Design B: paths are decided through their bindings.
+      const helper = dump.links.find(
+        (l) => l.file === "app/src/lib.rs" && l.targetName === "util::helper",
       );
-      assert.equal(named("app/src/lib.rs", "square.side"), "impl Square::side");
+      assert.equal(helper?.data?.toolchain?.origin, "toolchain");
+      assert.equal(helper?.targetSymbol?.identity, "helper");
+      // run() calls code a build script generates (`generated()`) and a
+      // derive's method (`Greeter.hello()`): macro output on the function's
+      // trace, so its receiver calls are withheld (the trace is the whole
+      // function up to the site, an over-approximation).
+      for (const name of ["a.radius", "c.diameter", "square.side"])
+        assert.equal(
+          dump.links.find(
+            (l) => l.file === "app/src/lib.rs" && l.targetName === name,
+          )?.data?.toolchainOutcome,
+          "withheld:selected-receiver",
+          name,
+        );
       // Sixth review: source-only records that an opaque item may shadow the
       // derive path, so the route only confirms it now (confirm-only).
       assert.equal(
@@ -1616,7 +1630,10 @@ test(
       assert.notEqual(dispatch.resolution, "resolved");
       // A link to code a build-script cfg turns on is withheld.
       assert.ok(
-        (note(dump.report, "merged").decided["withheld:cfg-variant"] ?? 0) >= 1,
+        (note(dump.report, "merged").decided["withheld:opaque-shadow"] ?? 0) +
+          (note(dump.report, "merged").decided["withheld:selected-binding"] ??
+            0) >=
+          1,
       );
     });
   },
@@ -2015,9 +2032,9 @@ test(
       assert.ok(
         // The fifth review's cfg-selected guard now takes some of these
         // first (the use twins); together they withhold at least three.
-        (decided["withheld:cfg-variant"] ?? 0) +
-          (decided["withheld:conditional-candidates"] ?? 0) +
-          (decided["withheld:cfg-selected"] ?? 0) >=
+        (decided["withheld:selected-binding"] ?? 0) +
+          (decided["withheld:selected-receiver"] ?? 0) +
+          (decided["withheld:opaque-shadow"] ?? 0) >=
           3,
         JSON.stringify(decided),
       );
@@ -2213,7 +2230,9 @@ test(
           if (
             l.data?.toolchain !== undefined ||
             l.resolution === "resolved" ||
-            l.data?.toolchainOutcome !== "withheld:cfg-selected"
+            !/^withheld:selected-(binding|receiver)$/.test(
+              l.data?.toolchainOutcome ?? "",
+            )
           )
             wrong.push(
               `${name}: ${l.resolution} ${l.data?.toolchainOutcome ?? l.data?.toolchain?.origin}`,
@@ -2297,7 +2316,7 @@ test(
       assert.equal(cold.state.state, "used");
       assert.ok(
         [...cold.rows.values()].some((row) =>
-          row.includes("withheld:cfg-selected"),
+          row.includes("withheld:selected-"),
         ),
         "the rows hold recorded outcomes",
       );
@@ -2351,7 +2370,7 @@ test("fifth review: an edit that makes the route partial leaves no earlier outco
     assert.equal(first.state.state, "used");
     assert.ok(
       first.links.some(
-        (l) => l.data?.toolchainOutcome === "withheld:cfg-variant",
+        (l) => l.data?.toolchainOutcome === "withheld:selected-receiver",
       ),
       "the used index records an outcome",
     );
@@ -2867,6 +2886,12 @@ const GLOB_CRATE = {
     "pub fn g2() -> u32 {",
     "    gated_ok::g_fn()",
     "}",
+    "pub fn plain_fn() -> u32 {",
+    "    3",
+    "}",
+    "pub fn g3() -> u32 {",
+    "    crate::plain_fn()",
+    "}",
     "pub fn g1() -> u32 {",
     "    let s = GSys::open();",
     "    g_thing() + s.g_run()",
@@ -2911,9 +2936,18 @@ test(
         )
         .map((l) => `${l.file} ${l.targetName}: ${l.targetSymbol?.file ?? ""}`);
       assert.deepEqual(decided, []);
-      // The positive control: a module under cfg with no twin is answered.
-      const control = dump.links.find(
+      // Design B: a module under any cfg is a selection, twin or not.
+      const gatedModule = dump.links.find(
         (l) => l.file === "src/lib.rs" && l.targetName === "gated_ok::g_fn",
+      );
+      assert.equal(
+        gatedModule?.data?.toolchainOutcome,
+        "withheld:selected-binding",
+        JSON.stringify(gatedModule?.data),
+      );
+      // The positive control: a path through ungated bindings is decided.
+      const control = dump.links.find(
+        (l) => l.file === "src/lib.rs" && l.targetName === "crate::plain_fn",
       );
       assert.equal(
         control?.data?.toolchain?.origin,
@@ -3037,3 +3071,64 @@ test(
     });
   },
 );
+
+// Design B's oracle: crates from the review rounds' selection shapes, the
+// route run with and without default features. No link decided in both may
+// name two different targets; the control is decided in both (not vacuous).
+for (const seed of [4301, 4302])
+  test(
+    `real rust-analyzer, design B oracle (seed ${seed}): no link decided under one setting names a different target under the other`,
+    needsAnalyzer,
+    async () => {
+      await scratch(async (root) => {
+        const project = join(root, "oracle");
+        const { files, ingredients } = generateOracle(seed, 5);
+        writeProject(project, files);
+        const a = await index(project, root, {
+          environment: process.env,
+          store: "a.sqlite",
+          toolchainDirectory: "tc-a",
+        });
+        if (a.state.state === "unavailable" && /rust-src/.test(a.state.reason))
+          return;
+        setRunControls({ noDefaultFeatures: true });
+        let b;
+        try {
+          b = await index(project, root, {
+            environment: process.env,
+            store: "b.sqlite",
+            toolchainDirectory: "tc-b",
+          });
+        } finally {
+          setRunControls({});
+        }
+        assert.equal(a.state.state, "used", JSON.stringify(a.state));
+        assert.equal(b.state.state, "used", JSON.stringify(b.state));
+        const decided = (dump) =>
+          new Map(
+            dump.links
+              .filter((l) => l.data?.toolchain?.target)
+              .map((l) => [l.id, [l.targetName, l.data.toolchain.target]]),
+          );
+        const da = decided(a);
+        const db = decided(b);
+        const conflicts = [...da]
+          .filter(([id, pair]) => db.has(id) && db.get(id)[1] !== pair[1])
+          .map(([, pair]) => pair[0]);
+        assert.deepEqual(conflicts, [], ingredients.join(", "));
+        const control = (dump) =>
+          dump.links.find((l) => l.targetName === "crate::p0_free")?.data
+            ?.toolchain?.origin;
+        assert.equal(
+          control(a),
+          "toolchain",
+          "the control is decided (default)",
+        );
+        assert.equal(
+          control(b),
+          "toolchain",
+          "the control is decided (no default)",
+        );
+      });
+    },
+  );
