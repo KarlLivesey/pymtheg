@@ -3539,12 +3539,15 @@ and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall
 result; the 30 s grace only bounds how long an unanswering worker is
 given. See [C-48](changes/C-48.md).
 
-### C-38A The index report names each module's analysis path
+### C-38A The early claim covers modules reusing their analysis; the report names the analysis path
 
-**Decided (C-38A):** the index result's report lists, per module that
-reports one (`reportsAnalysisPath`, in-process modules only), the path its
-analysis took; TypeScript reports `reused` or `full`, with `no previous
-index` on a first index. The early store claim this chunk first carried is
-C-53's on main; this chunk adds a Go race test for it. **Why:** the scoped
-re-index (C-38) will add a third path, and the report says which one ran
-and why. **Trade:** none in stored rows. See [C-38A](changes/C-38A.md).
+**Decided (C-38A):** the early store claim (C-53) is made whenever any
+module holds back edited files' writes, also a module reusing its
+analysis, which C-53 left out. **Why:** without it a run that begins during
+that analysis finds no write since its start, answers without writing, and
+the first run then writes its analysis of the older text (the Go race
+test). The index report also lists, per module that reports one
+(`reportsAnalysisPath`), the path its analysis took (`reused` or `full`
+for TypeScript). **Trade:** a run stopped during a reusing analysis leaves
+its unfinished mark, so a `--no-sync` query reports `incomplete` over the
+previous complete rows. See [C-38A](changes/C-38A.md).

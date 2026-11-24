@@ -362,15 +362,14 @@ export async function indexProject(
       // A run holding files that its parse write used to write marks the
       // store here, as that write did: from now on any other run finds it
       // unfinished and takes over, so this run cannot later write analysis
-      // of a tree that another run has already found current. Files of a
-      // module reusing its analysis were held before C-53 too (C-27, C-36):
-      // they claim nothing, so a run stopped in that analysis still leaves
-      // the previous complete graph.
-      if (
-        [...deferred].some(
-          ([module, files]) => files.length && !reusing.has(module),
-        )
-      )
+      // of a tree that another run has already found current. This holds for
+      // a module reusing its analysis too (C-27, C-36): without the claim, a
+      // run that begins during that analysis finds no write since its start,
+      // answers without writing, and this run then writes its analysis of
+      // the older text (C-38A; the Go race test). A run stopped in such an
+      // analysis therefore leaves its unfinished mark over the previous
+      // complete rows.
+      if ([...deferred].some(([, files]) => files.length))
         await store.claimIndexRun?.();
     }),
   );
