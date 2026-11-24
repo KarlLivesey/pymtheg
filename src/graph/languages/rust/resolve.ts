@@ -271,6 +271,11 @@ interface Place {
   directoryUnverified?: boolean;
   // A module member path does not restart lookup in the extern prelude.
   libraryModuleMember?: boolean;
+  /**
+   * C-57: the predicate under which this file is the module's file, when
+   * `cfg_attr(…, path = …)` alternatives choose it (also in `conditions`).
+   */
+  pathPredicate?: string[];
 }
 interface Found {
   symbols: GraphSymbol[];
@@ -1286,6 +1291,35 @@ export function resolveRust(
         if (pathTargets.size && [...pathTargets].some((f) => !files.has(f)))
           moduleIncomplete.add(s.id);
         const targets = possible.filter((f) => files.has(f));
+        // C-57: a module file chosen by `cfg_attr(…, path = …)` is the
+        // module only under that predicate; the default file only when none
+        // applies. Everything declared in it is conditional the same way.
+        const alternatives = (data(s).pathAlternatives ?? []) as {
+          path: string;
+          conditions: string[];
+        }[];
+        const all = (cs: readonly string[]) => `all(${cs.join(",")})`;
+        const filePredicate = (file: string): string[] => {
+          if (!alternatives.length || data(s).pathExplicit) return [];
+          const selecting = alternatives.filter(
+            (a) =>
+              p.normalize(
+                p.join(
+                  place.local ? place.directory : p.dirname(place.file),
+                  a.path,
+                ),
+              ) === file,
+          );
+          if (selecting.length)
+            return selecting.length === 1
+              ? [...selecting[0]!.conditions]
+              : [`any(${selecting.map((a) => all(a.conditions)).join(",")})`];
+          if (!path && ordinary.includes(file))
+            return [
+              `not(any(${alternatives.map((a) => all(a.conditions)).join(",")}))`,
+            ];
+          return [];
+        };
         const fileConditions = targets.map((f) =>
           ((data(units.get(f) ?? {}).conditions ?? []) as string[]).filter(
             // A previous phase can mark a file that also has a guessed
@@ -1350,7 +1384,11 @@ export function resolveRust(
                 ...(place.conditions ?? []),
                 ...((data(s).conditions ?? []) as string[]),
                 ...((data(units.get(file) ?? {}).conditions ?? []) as string[]),
+                ...filePredicate(file),
               ],
+              ...(filePredicate(file).length
+                ? { pathPredicate: filePredicate(file) }
+                : {}),
               opaqueAttributes: [
                 ...(place.opaqueAttributes ?? []),
                 ...((data(s).opaqueItemAttributes ?? []) as string[]),
@@ -1623,7 +1661,7 @@ export function resolveRust(
     if (seen.has(m.id)) return [];
     seen = new Set([...seen, m.id]);
     const result: TextMacro[] = [];
-    for (const body of modulePlaces.get(m.id) ?? []) {
+    for (const [bodyIndex, body] of (modulePlaces.get(m.id) ?? []).entries()) {
       const failed = failedFiles.has(body.file);
       const guards = [
         ...((data(m).macroUseConditions ?? []) as string[][]),
@@ -1661,7 +1699,7 @@ export function resolveRust(
               : "failed-file-unseen-declarations",
         });
       for (const entry of entries) {
-        const condition = `all(${[...conditionsFor(m), ...(entry.conditions ?? []), entry.symbol ? str(data(entry.symbol).macroPathCondition) || "all()" : "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`;
+        const condition = `all(${[...conditionsFor(m), ...(body.pathPredicate ?? []), ...(entry.conditions ?? []), entry.symbol ? str(data(entry.symbol).macroPathCondition) || "all()" : "all()", `any(${guards.map((cs) => `all(${cs.join(",")})`).join(",")})`].join(",")})`;
         result.push({
           ...(entry.symbol
             ? {
@@ -1681,7 +1719,9 @@ export function resolveRust(
           file: m.file,
           scope: str(data(m).scope),
           start: m.range.end,
-          order: [m.range.end, ...entry.order],
+          // C-57: entries of different module files are ordered by the
+          // body they come from, never by offsets in different files.
+          order: [m.range.end, bodyIndex, ...entry.order],
         });
       }
     }
@@ -2163,9 +2203,21 @@ export function resolveRust(
         complete: true,
       };
     if (s.kind === "module") {
-      const destinations = data(s).unit
-        ? [roots.get(s.file)!].filter(Boolean)
-        : (modulePlaces.get(s.id) ?? []);
+      // C-57: only destinations that can apply where the access is; a
+      // module file selected by a predicate the access excludes is never
+      // in reach, nor cited as a failure.
+      const destinations = (
+        data(s).unit
+          ? [roots.get(s.file)!].filter(Boolean)
+          : (modulePlaces.get(s.id) ?? [])
+      ).filter((dest) =>
+        possible([
+          ...(dest.conditions ?? []),
+          ...(accessFrom?.crate.root === dest.crate.root
+            ? (accessFrom.conditions ?? [])
+            : []),
+        ]),
+      );
       const failed = destinations
         .filter((p) => failedFiles.has(p.file) && !p.directoryUnverified)
         .map((p) => p.file);
