@@ -40,10 +40,7 @@ for (const command of ["list", "check"])
       "json",
     ]);
     // A changed file, so the sync analyses again.
-    await writeFile(
-      join(root, "src", "more.ts"),
-      "export const more = 1;\n",
-    );
+    await writeFile(join(root, "src", "more.ts"), "export const more = 1;\n");
 
     const child = spawn(
       process.execPath,

@@ -42,8 +42,14 @@ test("every worker entry imports the warning filter before anything else", () =>
   for (const entry of entries) {
     const text = readFileSync(join(root, entry), "utf8");
     const first = text.match(/^import\b[^;]*;/m)?.[0] ?? "";
-    if (!/^import "(?:\.\.?\/)+(?:shared\/|cli\/)?quiet-warnings\.js";$/.test(first))
-      missing.push(`${relative(root, join(root, entry))}: ${first || "no import"}`);
+    if (
+      !/^import "(?:\.\.?\/)+(?:shared\/|cli\/)?quiet-warnings\.js";$/.test(
+        first,
+      )
+    )
+      missing.push(
+        `${relative(root, join(root, entry))}: ${first || "no import"}`,
+      );
   }
   assert.deepEqual(missing, []);
 });
