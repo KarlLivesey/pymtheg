@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 // C-50 review: preloaded into the real CLI (`node --import`). Worker threads
 // inherit the preload, so in the CLI's graph worker (its `workerData` holds
 // the request and the control memory) the TypeScript module's analysis, one
