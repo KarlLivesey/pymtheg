@@ -68,6 +68,11 @@ const MUTATIONS = {
       `return typeAt(node).flags & PRIMITIVE_FLAGS ? leaf(node) : undefined;`,
       `return leaf(node);`,
     ],
+    [
+      `operator === ts.SyntaxKind.QuestionQuestionToken ||
+          operator === ts.SyntaxKind.QuestionQuestionEqualsToken;`,
+      `operator === ts.SyntaxKind.QuestionQuestionToken;`,
+    ],
   ],
 };
 
