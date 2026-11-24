@@ -122,7 +122,7 @@ for (const [id, b] of base) {
   if (
     !c ||
     !["ok", "incomplete"].includes(b.cold?.status) ||
-    b.cold?.status !== c.cold?.status
+    (b.cold?.status !== c.cold?.status && !process.env.COMPARE_ANY_STATUS)
   ) {
     summary.push({ id, skipped: true });
     continue;

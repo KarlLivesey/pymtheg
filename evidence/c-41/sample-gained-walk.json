@@ -45,6 +45,28 @@
   },
   {
     "mechanism": "other",
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/localApi.ts",
+    "line": 141,
+    "code": "rpcClient ? rpcClient.server.getSettings() : Promise.reject(unavailableLocalBackendError()),",
+    "targetName": "rpcClient.server.getSettings",
+    "target": "apps/web/src/rpc/wsRpcClient.ts:127 property getSettings",
+    "targetLine": "readonly getSettings: RpcUnaryNoArgMethod<typeof WS_METHODS.serverGetSettings>;",
+    "binding": null
+  },
+  {
+    "mechanism": "other",
+    "repo": "pingdotgg/t3code",
+    "file": "packages/effect-acp/test/fixtures/acp-mock-peer.ts",
+    "line": 113,
+    "code": "yield* agent.client.extNotification(\"x/typed_notification\", {",
+    "targetName": "agent.client.extNotification",
+    "target": "packages/effect-acp/src/agent.ts:112 property extNotification",
+    "targetLine": "readonly extNotification: (",
+    "binding": null
+  },
+  {
+    "mechanism": "other",
     "repo": "changesets/changesets",
     "file": "scripts/e2e/publish.test.ts",
     "line": 1722,
@@ -250,83 +272,6 @@
     "targetName": "utils.count.invalidate",
     "target": "packages/react-query/src/shared/proxy/utilsProxy.ts:246 method invalidate",
     "targetLine": "invalidate(",
-    "binding": null
-  },
-  {
-    "mechanism": "other",
-    "repo": "vitest-dev/vitest",
-    "file": "test/e2e/test/vm-threads.test.ts",
-    "line": 972,
-    "code": "test.for(['vmThreads', 'vmForks'] as const)(",
-    "targetName": "test.for",
-    "target": "packages/vitest/src/runtime/runner/types.ts:566 property for",
-    "targetLine": "for: TestForFunction<ExtraContext>",
-    "binding": null
-  },
-  {
-    "mechanism": "other",
-    "repo": "reduxjs/redux-toolkit",
-    "file": "packages/toolkit/src/createAsyncThunk.ts",
-    "line": 741,
-    "code": "rejected.match(finalAction) &&",
-    "targetName": "rejected.match",
-    "target": "packages/toolkit/src/createAction.ts:87 property match",
-    "targetLine": "match: (action: unknown) => action is PayloadAction<P, T, M, E>",
-    "binding": null
-  },
-  {
-    "mechanism": "other",
-    "repo": "vitest-dev/vitest",
-    "file": "test/e2e/test/scoped-fixtures.test.ts",
-    "line": 3111,
-    "code": ".override('environment', { scope: 'file' }, 'production')",
-    "targetName": "extendedTest.override",
-    "target": "packages/vitest/src/runtime/runner/types.ts:876 property override",
-    "targetLine": "override: {",
-    "binding": null
-  },
-  {
-    "mechanism": "other",
-    "repo": "react-hook-form/react-hook-form",
-    "file": "src/__tests__/performance.test.tsx",
-    "line": 888,
-    "code": "result.current.watch(watchCallback);",
-    "targetName": "result.current.watch",
-    "target": "src/types/form.ts:1003 property watch",
-    "targetLine": "watch: UseFormWatch<TFieldValues>;",
-    "binding": null
-  },
-  {
-    "mechanism": "other",
-    "repo": "reduxjs/redux-toolkit",
-    "file": "packages/toolkit/src/query/tests/buildInitiate.test.tsx",
-    "line": 359,
-    "code": "sharedApi.util.getRunningQueryThunk('testQuery', 'arg2'),",
-    "targetName": "sharedApi.util.getRunningQueryThunk",
-    "target": "packages/toolkit/src/query/core/module.ts:226 method getRunningQueryThunk",
-    "targetLine": "getRunningQueryThunk<EndpointName extends AllQueryKeys<Definitions>>(",
-    "binding": null
-  },
-  {
-    "mechanism": "other",
-    "repo": "vitest-dev/vitest",
-    "file": "test/e2e/test/scoped-fixtures.test.ts",
-    "line": 2965,
-    "code": "extendedTest.override('level', 'one')",
-    "targetName": "extendedTest.override",
-    "target": "packages/vitest/src/runtime/runner/types.ts:876 property override",
-    "targetLine": "override: {",
-    "binding": null
-  },
-  {
-    "mechanism": "other",
-    "repo": "mermaid-js/mermaid",
-    "file": "packages/mermaid/src/rendering-util/layout-algorithms/elk/render.ts",
-    "line": 3036,
-    "code": "log.debug('PPP cutter2: original points', originalPoints);",
-    "targetName": "log.debug",
-    "target": "packages/mermaid/src/rendering-util/layout-algorithms/elk/render.ts:117 property debug",
-    "targetLine": "debug: (...args: unknown[]) => void;",
     "binding": null
   }
 ]
