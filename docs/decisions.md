@@ -3571,3 +3571,17 @@ below it, so nothing the pass builds could be kept across an edit (C-56).
 pass finds, and Go's module version (32): the draft ids were never stored,
 and a Go body edit already rewrites no other file's stored link data.
 See [C-56a](changes/C-56a.md).
+
+
+### Go's implements pass is a plain value; both index builds use stored ids (C-56b)
+
+**Decided (C-56b):** Go's implements pass returns its decisions as a value
+of symbol ids and flags (complete interfaces, possible implementers,
+implementers with pointer-receiver and signature-identity flags, in the
+order made), and a separate step turns them into the run's dispatch sets
+and `implements` links. The notes pass computes its symbols' ids under the
+store's project id, so both builds of Go's global index name each
+declaration by its stored id. Under the test suite the decisions cross
+JSON before use. **Why:** C-56 can keep a value, not caches that close over
+a resolver. **Unchanged:** every decision, link, note and stored row.
+See [C-56b](changes/C-56b.md).
