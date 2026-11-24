@@ -182,7 +182,9 @@ export function receiverArms(
         if (!found.array && !found.items && nullish(found.type)) continue;
         // A primitive literal is its primitive: no member differs.
         const arm =
-          !found.array && !found.items && found.type.flags & ts.TypeFlags.Literal
+          !found.array &&
+          !found.items &&
+          found.type.flags & ts.TypeFlags.Literal
             ? { type: checker.getBaseTypeOfLiteralType(found.type) }
             : found;
         if (
@@ -194,10 +196,10 @@ export function receiverArms(
                 : arm.literal
                   ? known.literal === arm.literal
                   : !known.array &&
-                  !known.items &&
-                  !known.literal &&
-                  known.type === arm.type &&
-                  known.generic === arm.generic,
+                    !known.items &&
+                    !known.literal &&
+                    known.type === arm.type &&
+                    known.generic === arm.generic,
           )
         )
           continue;
@@ -613,7 +615,10 @@ export function receiverArms(
       let written = checker.getSymbolAtLocation(target);
       if (written && written.flags & ts.SymbolFlags.Alias)
         written = checker.getAliasedSymbol(written);
-      if (written !== own) continue;
+      // The same member: its symbol, or (widened, instantiated) one that
+      // names this declaration.
+      if (written !== own && !written?.declarations?.includes(declaration))
+        continue;
       if (!value) return undefined;
       values.push(value);
     }
@@ -1155,8 +1160,8 @@ export function receiverArms(
   function expandArrays(found: Arms): Arms {
     if (!found) return undefined;
     return merge(
-      found.map((arm): Arms =>
-        arm.array || arm.items ? elementsOf([arm]) : [arm],
+      found.map(
+        (arm): Arms => (arm.array || arm.items ? elementsOf([arm]) : [arm]),
       ),
     );
   }
@@ -1508,7 +1513,8 @@ export function receiverArms(
 
   /** A member of one (non-literal) arm, as `property` reads it. */
   function property_(arm: Arm, name: string, at: ts.Node): Arms {
-    return property([{ ...arm, literal: undefined }], name, at);
+    const { literal: _literal, ...plain } = arm;
+    return property([plain], name, at);
   }
 
   /**
@@ -1549,7 +1555,10 @@ export function receiverArms(
         checker.getSymbolAtLocation(child) === own
       ) {
         const parent = child.parent;
-        if (ts.isPropertyAccessExpression(parent) && parent.expression === child) {
+        if (
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === child
+        ) {
           const call = parent.parent;
           const method = parent.name.text;
           if (ts.isCallExpression(call) && call.expression === parent) {
@@ -1612,7 +1621,12 @@ export function receiverArms(
             return merge([
               ...array.elements.map((item) =>
                 ts.isSpreadElement(item)
-                  ? element(arms(item.expression), undefined, item, item.expression)
+                  ? element(
+                      arms(item.expression),
+                      undefined,
+                      item,
+                      item.expression,
+                    )
                   : ts.isOmittedExpression(item)
                     ? NO_ARMS
                     : arms(item),

@@ -1928,8 +1928,11 @@ test("object-member calls account for every explicit producer and withhold opaqu
       }
       for (const [line, reason] of [
         ["lr.run();", "multiple-object-producers"],
-        ["holder.inner.next();", "object-producer-unverified"],
-        ["this.state.update();", "object-producer-unverified"],
+        // C-41 review 2: the walk counts every write to a member
+        // (`alias.inner = …`, `this.state = …` in another method): two
+        // producers, one of them without an anchor.
+        ["holder.inner.next();", "multiple-object-producers"],
+        ["this.state.update();", "multiple-object-producers"],
         ["list[index]!.item();", "object-producer-unverified"],
         ["list[0]!.item();", "object-producer-unverified"],
       ]) {
