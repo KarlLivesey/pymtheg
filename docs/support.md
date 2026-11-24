@@ -876,8 +876,10 @@ and never yields a version pin.
   - a set that includes a test package (two test frameworks' `describe`,
     two assertion libraries' `expect`);
   - a set whose units include two that the compiler finds in conflict
-    on any shared global (TS2403), such as `@cloudflare/workers-types`
-    and the DOM;
+    on any shared global (TS2403, TS2717, TS2300, TS2451, TS2428 or
+    TS2687, paired by typings package), such as
+    `@cloudflare/workers-types` and the DOM, or `bun-types` and
+    `@types/node`;
   - a set merged by a module augmentation (`declare module "fastify"`), which
     is one symbol but not a global.
 - **Unbuilt checkout packages:** The configured compiler emit can identify

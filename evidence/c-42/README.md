@@ -3,9 +3,9 @@
 [Change note](../../docs/changes/C-42.md)
 
 Measured on the 19 installed TypeScript pins in `pins.json` here (all
-TypeScript pins of `sweep/repos.json` except microsoft/TypeScript), main `5c7750e` against
-the C-42 build (review N1, N1b, N2). Both used the SW-6 runner and policy, in one session on the
-dev server.
+TypeScript pins of `sweep/repos.json` except microsoft/TypeScript), main `e230922` against
+the C-42 build (review round 2). Both used the SW-6 runner and policy, in one session on the
+dev server. `audit.jsonl` was drawn on round 1's list.
 
 ## Files
 
@@ -22,6 +22,9 @@ dev server.
   against the C-42 build, per pin. Level 2 is given without and with the
   proposed rule, along with row counts.
 - `merged-links.jsonl.gz`: every link counted by the rule (D23, narrowed).
+- `conflict-cost.json`: the conflict check's counted work per pin (scans
+  and declarations checked), from the measurement build's log
+  (`PYM_CONFLICT_LOG`).
 - `merged-links-before-narrowing.jsonl.gz`: the same list from the first
   version, before D23 was narrowed, on an older main (kept for the record;
   the split no longer reads it).

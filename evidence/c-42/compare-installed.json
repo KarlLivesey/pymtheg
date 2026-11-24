@@ -440,9 +440,9 @@
   ],
   "level2WithRule": [
    96256,
-   97488
+   97177
   ],
-  "merged": 1232,
+  "merged": 921,
   "changedLinks": 0,
   "onlyMain": 0,
   "onlyHead": 0,
@@ -479,7 +479,7 @@
   "changedLinks": 0,
   "onlyMain": 0,
   "onlyHead": 0,
-  "symbolsOnlyMain": 45051,
+  "symbolsOnlyMain": 0,
   "symbolsOnlyHead": 0,
   "rows": [
    {
@@ -488,9 +488,9 @@
     "libraryRows": 96246
    },
    {
-    "symbols": 14375,
+    "symbols": 59426,
     "links": 53377,
-    "libraryRows": 20652
+    "libraryRows": 96246
    }
   ]
  },
