@@ -1242,41 +1242,42 @@ test("D24: the declaring path of a library symbol is its module path; impl items
   assert.equal(path("rust-analyzer cargo tempfile 3.27.0 crate/"), undefined);
 });
 
-test("D24: an unresolved link answered with a dependency's item becomes a library target keyed by the unit and declaring path, with the lockfile's version and the written path", async () => {
+/** The gate project with `t.go` answered by `answer` and `dep` locked at 1.2.3. */
+async function libraryCase(root, answer) {
+  const project = join(root, "project");
+  writeProject(project, {
+    ...GATES,
+    "Cargo.lock":
+      'version = 4\n\n[[package]]\nname = "gates"\nversion = "0.1.0"\n\n[[package]]\nname = "dep"\nversion = "1.2.3"\n',
+  });
+  const scip = join(root, "answer.scip");
+  writeFileSync(scip, gateScip([answer]));
+  const tools = fakeToolchain(join(root, "tools"), {
+    scip,
+    metadata: metadata(),
+  });
+  const dump = await index(project, root, { environment: environment(tools) });
+  assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+  const [caller, gated] = goLinks(dump).sort(
+    (x, y) => x.range.start - y.range.start,
+  );
+  return { dump, caller, gated };
+}
+
+test("D24: an unresolved link answered with a standard-library item becomes a library target keyed by the unit and declaring path, with the written path", async () => {
   await scratch(async (root) => {
-    const project = join(root, "project");
-    writeProject(project, {
-      ...GATES,
-      "Cargo.lock":
-        'version = 4\n\n[[package]]\nname = "gates"\nversion = "0.1.0"\n\n[[package]]\nname = "dep"\nversion = "1.2.3"\n',
-    });
-    const scip = join(root, "answer.scip");
-    // The t.go call is answered with dep's inherent method Thing::go.
-    writeFileSync(
-      scip,
-      gateScip(["rust-analyzer cargo dep 1.2.3 inner/impl#[Thing]go()."]),
-    );
-    const tools = fakeToolchain(join(root, "tools"), {
-      scip,
-      metadata: metadata(),
-    });
-    const dump = await index(project, root, {
-      environment: environment(tools),
-    });
-    assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
-    const [caller] = goLinks(dump).sort(
-      (x, y) => x.range.start - y.range.start,
+    const { dump, caller, gated } = await libraryCase(
+      root,
+      "rust-analyzer cargo core 1.98.1 mem/swap().",
     );
     assert.equal(caller.resolution, "library");
     assert.deepEqual(
       caller.libraries.map(({ id: _id, ...t }) => t),
       [
         {
-          ecosystem: "cargo",
-          unit: "dep",
-          symbol: "inner::Thing::go",
-          version: "1.2.3",
-          versionSource: "Cargo.lock",
+          ecosystem: "rust-std",
+          unit: "core",
+          symbol: "mem::swap",
           evidence: "toolchain-declaring-path",
         },
       ],
@@ -1287,10 +1288,23 @@ test("D24: an unresolved link answered with a dependency's item becomes a librar
     assert.equal(caller.data.toolchain, undefined);
     assert.ok(dump.state.libraryOffered >= 1, JSON.stringify(dump.state));
     // The gated twin under cfg(feature = "extra") takes no answer.
-    const gated = goLinks(dump).sort(
-      (x, y) => x.range.start - y.range.start,
-    )[1];
     assert.notEqual(gated.resolution, "library");
+  });
+});
+
+test("D24 under design B: an answer in a dependency other than std, core and alloc is confirm-only; its cfg cannot be seen", async () => {
+  await scratch(async (root) => {
+    const { caller } = await libraryCase(
+      root,
+      "rust-analyzer cargo dep 1.2.3 inner/impl#[Thing]go().",
+    );
+    assert.notEqual(caller.resolution, "library");
+    assert.equal(
+      caller.data.toolchainOutcome,
+      "library:withheld:dependency-on-trace",
+      JSON.stringify(caller.data),
+    );
+    assert.equal(caller.data.toolchainLibrary, undefined);
   });
 });
 
