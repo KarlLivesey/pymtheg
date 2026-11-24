@@ -1139,3 +1139,59 @@ test("review 3: a long alias chain has the same outcome first or last in a proce
     ]),
   );
 });
+
+test("review 3: a value reassigned from a spread of itself is a cycle, not a stack overflow", async () => {
+  // Zustand's persist middleware: `options = { ...options, ...newOptions }`;
+  // the array form `list = [...list, two]`. The walk returned to the same
+  // literal through its spread without a guard and overflowed the stack,
+  // leaving the file partial (`compiler-limit`).
+  const scratch = await mkdtemp(join(tmpdir(), "c41-spread-"));
+  const root = join(scratch, "project");
+  const store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "c41");
+  try {
+    for (const [path, text] of Object.entries({
+      "tsconfig.json": tsconfig,
+      "src/use.ts": [
+        "export {};",
+        "const one = { run() {} };",
+        "const two = { run() {} };",
+        "let options = { storage: one, name: 'a' };",
+        "export function setOptions(next: Partial<typeof options>) {",
+        "  options = { ...options, ...next };",
+        "  if (next.storage) options.storage = two;",
+        "}",
+        "export function clear() { options.storage.run(); }",
+        "let list = [one];",
+        "export function add() { list = [...list, two]; }",
+        "export function first() { list[0]!.run(); }",
+        "",
+      ].join("\n"),
+    })) {
+      await mkdir(dirname(join(root, path)), { recursive: true });
+      await writeFile(join(root, path), text);
+    }
+    const report = await indexProject(
+      root,
+      new LanguageRegistry([typescript]),
+      store,
+    );
+    assert.deepEqual(report.analysisErrors, []);
+    assert.deepEqual(report.partial, []);
+    const symbols = new Map(
+      store.findSymbols().map((s) => [s.id, `${s.file}#${s.identity}`]),
+    );
+    const runs = store
+      .links()
+      .filter((link) => link.kind === "calls" && /\brun$/.test(link.targetName));
+    assert.equal(runs.length, 2);
+    for (const link of runs) {
+      assert.notEqual(link.data?.reason, "compiler-limit");
+      // Never one producer's member: both, or unresolved.
+      if (link.resolution === "resolved")
+        assert.fail(`definite ${symbols.get(link.targetId)}`);
+    }
+  } finally {
+    store.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});

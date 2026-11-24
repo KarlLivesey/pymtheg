@@ -175,6 +175,10 @@ export function receiverArms(
   const declared = new WeakMap<ts.Node, DeclarationArms | null>();
   const unreducedCache = new WeakMap<ts.Node, boolean>();
   const active = new Set<ts.Node>();
+  /** Array literals whose elements are being followed (see element). */
+  const arraysActive = new Set<ts.Node>();
+  /** Members of object literals being looked up (see literalMember). */
+  const membersActive = new Map<ts.Node, Set<string>>();
   const returnLists = new WeakMap<ts.Node, readonly ts.Expression[]>();
   const mutationCache = new WeakMap<ts.Node, ts.Expression[] | null>();
   const checking = new Set<ts.Node>();
@@ -1599,7 +1603,35 @@ export function receiverArms(
    * (`{ ...defaultHooks, ...opts }`, `{ ...(pick ? { r: one } : { r: two }) }`).
    * A spread that may lack the member lets an earlier one supply it too.
    */
+  /**
+   * A literal's member, guarded as the walk's other steps are: a lookup of
+   * the same member of the same literal already in progress is a cycle, and
+   * each lookup is one nested step (C-41 review 3: zustand's `options = {
+   * ...options, ...newOptions }` recursed through its spread without
+   * either, and overflowed the stack).
+   */
   function literalMember(
+    node: ts.ObjectLiteralExpression,
+    name: string,
+    at: ts.Node,
+  ): Arms {
+    const names = membersActive.get(node) ?? new Set<string>();
+    if (names.has(name)) {
+      cuts++;
+      return undefined;
+    }
+    if (!enter()) return undefined;
+    names.add(name);
+    membersActive.set(node, names);
+    try {
+      return literalMemberOf(node, name, at);
+    } finally {
+      depth--;
+      names.delete(name);
+    }
+  }
+
+  function literalMemberOf(
     node: ts.ObjectLiteralExpression,
     name: string,
     at: ts.Node,
@@ -1773,6 +1805,53 @@ export function receiverArms(
   }
 
   /** The arms of an element (index `index` if known) of each of `owners`. */
+  /** An element of the array literal `array` (see element). */
+  function arrayElement(
+    array: ts.ArrayLiteralExpression,
+    index: number | undefined,
+  ): Arms {
+      const added = arrayMutations(array);
+      if (!added) return undefined;
+      if (added.length)
+        return merge([
+          ...array.elements.map((item) =>
+            ts.isSpreadElement(item)
+              ? element(
+                  arms(item.expression),
+                  undefined,
+                  item,
+                  item.expression,
+                )
+              : ts.isOmittedExpression(item)
+                ? NO_ARMS
+                : arms(item),
+          ),
+          ...added.map(arms),
+        ]);
+      if (
+        index !== undefined &&
+        index < array.elements.length &&
+        !array.elements.slice(0, index + 1).some(ts.isSpreadElement)
+      ) {
+        const item = array.elements[index]!;
+        return ts.isOmittedExpression(item) ? NO_ARMS : arms(item);
+      }
+      return merge(
+        array.elements.map((item) =>
+          ts.isSpreadElement(item)
+            ? element(
+                arms(item.expression),
+                undefined,
+                item,
+                item.expression,
+              )
+            : ts.isOmittedExpression(item)
+              ? NO_ARMS
+              : arms(item),
+        ),
+      );
+  }
+
   function element(
     owners: Arms,
     index: number | undefined,
@@ -1788,46 +1867,20 @@ export function receiverArms(
         if (arm.items) return merge([arm.items]);
         const array = arm.array;
         if (array) {
-          const added = arrayMutations(array);
-          if (!added) return undefined;
-          if (added.length)
-            return merge([
-              ...array.elements.map((item) =>
-                ts.isSpreadElement(item)
-                  ? element(
-                      arms(item.expression),
-                      undefined,
-                      item,
-                      item.expression,
-                    )
-                  : ts.isOmittedExpression(item)
-                    ? NO_ARMS
-                    : arms(item),
-              ),
-              ...added.map(arms),
-            ]);
-          if (
-            index !== undefined &&
-            index < array.elements.length &&
-            !array.elements.slice(0, index + 1).some(ts.isSpreadElement)
-          ) {
-            const item = array.elements[index]!;
-            return ts.isOmittedExpression(item) ? NO_ARMS : arms(item);
+          // Guarded as the walk's other steps (`list = [...list, two]`
+          // returns to the same literal through its spread).
+          if (arraysActive.has(array)) {
+            cuts++;
+            return undefined;
           }
-          return merge(
-            array.elements.map((item) =>
-              ts.isSpreadElement(item)
-                ? element(
-                    arms(item.expression),
-                    undefined,
-                    item,
-                    item.expression,
-                  )
-                : ts.isOmittedExpression(item)
-                  ? NO_ARMS
-                  : arms(item),
-            ),
-          );
+          if (!enter()) return undefined;
+          arraysActive.add(array);
+          try {
+            return arrayElement(array, index);
+          } finally {
+            depth--;
+            arraysActive.delete(array);
+          }
         }
         // A written array, tuple or iterable: the checker's element type.
         if (checked) return leaf(at);
@@ -1872,6 +1925,8 @@ export function receiverArms(
       // answer: it reaches extract.ts, which rebuilds the program (CheckerLimit).
       active.clear();
       checking.clear();
+      membersActive.clear();
+      arraysActive.clear();
       depth = 0;
       throw error;
     } finally {
