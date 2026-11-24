@@ -8717,3 +8717,100 @@ test("const assertions store no reference link, while real type references in as
     },
   );
 });
+
+// ----- C-60: a union callee's parts are judged each on its own -----
+
+/** A strict project: `use.ts` calls a union of `parts` with `arg`. */
+function unionCallee(parts, broken) {
+  const select = parts
+    .slice(0, -1)
+    .reduceRight(
+      (rest, part, i) => `flag${i} ? ${part} : ${rest}`,
+      parts.at(-1),
+    );
+  return {
+    "tsconfig.json": JSON.stringify({
+      compilerOptions: { strict: true, noEmit: true },
+      include: ["*.ts"],
+    }),
+    "models.ts":
+      'export class Clean { run() { return "clean"; } }\nexport class Other { run() { return 2; } }\n',
+    "broken.ts": broken ? "export const arg = ;\n" : "export const arg = 1;\n",
+    "dep.ts": [
+      'import { Clean, Other } from "./models";',
+      "export function good(x: string | number): Clean { return new Clean(); }",
+      "export function overloaded(x: string): Clean;",
+      "export function overloaded(x: number): Other;",
+      'export function overloaded(x: string | number): Clean | Other { return typeof x === "string" ? new Clean() : new Other(); }',
+      "export function numeric(x: number): Other { return new Other(); }",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { arg } from "./broken";',
+      'import { good, numeric, overloaded } from "./dep";',
+      `export function use(${parts
+        .map((_, i) => `flag${i}: boolean`)
+        .slice(0, -1)
+        .join(", ")}) {`,
+      `  const selected = ${select};`,
+      "  return selected(arg).run();",
+      "}",
+      "",
+    ].join("\n"),
+  };
+}
+const runLink = async (parts, broken) => {
+  const { links } = await indexFiles(unionCallee(parts, broken));
+  const link = linkAt({ links }, "use.ts", "selected(arg).run()", "run");
+  return {
+    resolution: link.resolution,
+    reason: link.reason ?? null,
+    targets: link.targets,
+  };
+};
+
+test("a union callee whose argument comes from a failed file is invalid code in either order", async () => {
+  // `overloaded` picks its signature by the argument, which the failed file
+  // decides; `good` does not. Before C-60 the second part reused the first
+  // part's signature: `good : overloaded` gave a definite Clean.run.
+  for (const parts of [
+    ["good", "overloaded"],
+    ["overloaded", "good"],
+  ]) {
+    const broken = await runLink(parts, true);
+    assert.equal(broken.reason, "invalid-code", parts.join(" : "));
+    assert.deepEqual(broken.targets, [], parts.join(" : "));
+    // Repaired, the call is either class's `run`.
+    const fixed = await runLink(parts, false);
+    assert.equal(fixed.resolution, "ambiguous", parts.join(" : "));
+    assert.deepEqual(
+      fixed.targets,
+      ["models.ts#Clean.run", "models.ts#Other.run"],
+      parts.join(" : "),
+    );
+  }
+});
+
+test("a union callee's link does not depend on the order of its parts", async () => {
+  const permutations = (list) =>
+    list.length <= 1
+      ? [list]
+      : list.flatMap((first, i) =>
+          permutations([...list.slice(0, i), ...list.slice(i + 1)]).map(
+            (rest) => [first, ...rest],
+          ),
+        );
+  for (const broken of [true, false]) {
+    const answers = new Map();
+    for (const parts of permutations(["good", "overloaded", "numeric"]))
+      answers.set(
+        parts.join(" : "),
+        JSON.stringify(await runLink(parts, broken)),
+      );
+    assert.equal(
+      new Set(answers.values()).size,
+      1,
+      `${broken ? "broken" : "repaired"}: ${JSON.stringify(Object.fromEntries(answers))}`,
+    );
+  }
+});

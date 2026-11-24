@@ -401,3 +401,50 @@ test("on a mixed corpus every key is unique in its file and its ~n is the stored
     assert.ok(assertKeysAreOrdinals(tree.store) >= 6, "siblings were numbered");
   });
 });
+
+// C-60: a hashed scope part (`[callback:…]`, `[block:…]`, `[case:…]`) is a
+// hash of the restored text. A locally bound `require`, `module` or
+// `exports` reaches the compiler under a fresh name that depends on every
+// captured file's text, so before C-60 an edit to an unrelated file (one
+// that contains `requirf`, the first fresh name) changed these keys.
+test("an unrelated edit leaves the keys, identities and ids of a renamed file's scoped symbols as they were", async () => {
+  const files = {
+    "tsconfig.json": JSON.stringify({
+      compilerOptions: { allowJs: true, noEmit: true },
+      include: ["**/*"],
+    }),
+    "amd.js": [
+      "define(function (require, exports, module) {",
+      "  function helper() { return 1; }",
+      "  exports.run = function () { return helper(); };",
+      "});",
+      "",
+    ].join("\n"),
+    "lib.cjs": [
+      "function take(v, cb) { return cb(v); }",
+      "function outer(require) { return take(require, () => { function inner() { return 1; } return inner(); }); }",
+      "exports.outer = outer;",
+      "",
+    ].join("\n"),
+    "use.ts": 'import { outer } from "./lib.cjs";\nouter(1);\n',
+    "other.ts": "export const other = 1;\n",
+  };
+  const scoped = (store) =>
+    store
+      .findSymbols()
+      .filter((s) => ["amd.js", "lib.cjs"].includes(s.file))
+      .map((s) => `${s.file} ${s.key} ${s.identity} ${s.id}`)
+      .sort();
+  await withTree(files, async (tree) => {
+    await tree.index();
+    const before = scoped(tree.store);
+    assert.ok(
+      before.some((row) => row.includes("[callback:")),
+      before.join("\n"),
+    );
+    tree.write("other.ts", "export const requirf = 1;\n");
+    await tree.index();
+    assert.deepEqual(scoped(tree.store), before);
+    await tree.equalsCold("after the unrelated edit");
+  });
+});

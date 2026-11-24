@@ -2326,7 +2326,16 @@ export function createJudge(input: JudgeInput): Judge {
         );
       }
       case "union":
-        return join(callee.parts.map((part) => invoke(part, call, construct)));
+        // C-60: the call's memo (`prepare`) is keyed by the call alone, so
+        // each part is judged uncached; caching a part's signature would
+        // give every later part the first part's. The joined answer is the
+        // call's, cached by the outer `prepare`.
+        return join(
+          callee.parts.map((part) => {
+            const one = prepareUncached(part, call, construct);
+            return "decl" in one ? returnOf(one, call, construct) : one;
+          }),
+        );
       default:
         return unhandled(DENY_CALL, "call", callee.k);
     }
