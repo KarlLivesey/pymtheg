@@ -71,29 +71,24 @@ test("Go's overloaded-looking shapes get distinct notes ids, the ones the store 
     await indexProject(root, registry, store);
     for (const file of store.files()) {
       if (file.module !== "go" || file.result.status === "failed") continue;
-      const named = notesSymbols(file);
+      const named = notesSymbols(store.projectId, file);
       const ids = named.map((symbol) => symbol.id);
       assert.equal(new Set(ids).size, ids.length, `distinct in ${file.path}`);
       for (const id of ids) assert.doesNotMatch(id, /^draft:/);
-      // The same naming as the store's: identity and ordinal.
-      const stored = new Map(
+      // C-56b: the ids the store gives the same symbols.
+      assert.deepEqual(
+        [...ids].sort(),
         store
           .findSymbols({ file: file.path })
-          .map((symbol) => [
-            `${symbol.kind}\0${symbol.identity}\0${symbol.ordinal}`,
-            1,
-          ]),
+          .map((symbol) => symbol.id)
+          .sort(),
+        file.path,
       );
-      for (const symbol of named)
-        assert.ok(
-          stored.has(`${symbol.kind}\0${symbol.identity}\0${symbol.ordinal}`),
-          `${symbol.kind} ${symbol.identity} in ${file.path}`,
-        );
     }
     // Each shape as Go's extractor names it. Several init functions share
     // kind and identity: the tie is broken by the ordinal, in source order.
     const named = (path) =>
-      notesSymbols(store.getFile(path)).map(
+      notesSymbols(store.projectId, store.getFile(path)).map(
         (symbol) => `${symbol.kind} ${symbol.identity} ${symbol.ordinal}`,
       );
     const a = named("p/a.go");
@@ -123,7 +118,7 @@ test("Go's overloaded-looking shapes get distinct notes ids, the ones the store 
     // init across files and build-tag twins: one identity, distinct ids,
     // because the file is part of the id.
     const ids = (path, identity) =>
-      notesSymbols(store.getFile(path))
+      notesSymbols(store.projectId, store.getFile(path))
         .filter((symbol) => symbol.identity === identity)
         .map((symbol) => symbol.id);
     const inits = [...ids("p/a.go", "init"), ...ids("p/b.go", "init")];
@@ -145,11 +140,9 @@ test("a body edit above every declaration leaves every notes id as it was", asyn
   const store = new SqliteGraphStore(join(base, "graph.sqlite"));
   try {
     await indexProject(root, registry, store);
-    const before = notesSymbols(store.getFile("p/a.go")).map((symbol) => [
-      symbol.kind,
-      symbol.identity,
-      symbol.id,
-    ]);
+    const before = notesSymbols(store.projectId, store.getFile("p/a.go")).map(
+      (symbol) => [symbol.kind, symbol.identity, symbol.id],
+    );
     // Moves every offset in the file; changes no declaration.
     writeFileSync(
       join(root, "p/a.go"),
@@ -159,11 +152,9 @@ test("a body edit above every declaration leaves every notes id as it was", asyn
       ),
     );
     await indexProject(root, registry, store);
-    const after = notesSymbols(store.getFile("p/a.go")).map((symbol) => [
-      symbol.kind,
-      symbol.identity,
-      symbol.id,
-    ]);
+    const after = notesSymbols(store.projectId, store.getFile("p/a.go")).map(
+      (symbol) => [symbol.kind, symbol.identity, symbol.id],
+    );
     assert.deepEqual(after, before);
   } finally {
     store.close();

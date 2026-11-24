@@ -358,6 +358,7 @@ async function analyze(
   count("analyze.go.decisionFiles", scope?.size ?? files.length);
   const notes = await stage("analyze.go.notes", () =>
     linkNotes(
+      context.projectId,
       ID,
       files.map((file) =>
         next.has(file.path) ? { ...file, result: next.get(file.path)! } : file,

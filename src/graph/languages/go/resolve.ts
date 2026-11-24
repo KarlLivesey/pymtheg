@@ -396,17 +396,18 @@ export interface LinkNote {
   };
 }
 
-/** The project id the notes pass computes its symbols' ids under. */
-const NOTES_PROJECT = "go-overflow";
 /**
  * C-56a: a file's symbols as the notes pass names them: the ids the core
  * gives stored symbols (kind, identity, and the ordinal among symbols that
- * share both, by source order), under the notes pass's own project id.
+ * share both, by source order). C-56b: under the store's project id, so
+ * they are the ids the store gives them, and both builds of the global
+ * index name each declaration alike.
  */
 export function notesSymbols(
+  projectId: string,
   file: Pick<GraphFile, "path" | "module" | "result">,
 ): GraphSymbol[] {
-  return fileFacts(NOTES_PROJECT, file).symbols;
+  return fileFacts(projectId, file).symbols;
 }
 /**
  * Runs the same resolution over the symbols' notes ids (`notesSymbols`, C-56a)
@@ -415,6 +416,7 @@ export function notesSymbols(
  * itself.
  */
 export function linkNotes(
+  projectId: string,
   moduleId: string,
   files: readonly GraphFile[],
   contextFiles: readonly ContextFile[],
@@ -429,7 +431,7 @@ export function linkNotes(
   const id = (path: string, key: string) => ids.get(`${path}\u0000${key}`)!;
   for (const file of files) {
     if (file.module !== moduleId || file.result.status === "failed") continue;
-    for (const symbol of notesSymbols(file)) {
+    for (const symbol of notesSymbols(projectId, file)) {
       ids.set(`${file.path}\u0000${symbol.key}`, symbol.id);
       symbols.push(symbol);
     }
@@ -452,7 +454,7 @@ export function linkNotes(
     );
   }
   const resolver = new GoResolver(moduleId, {
-    projectId: NOTES_PROJECT,
+    projectId,
     files,
     contextFiles,
     symbols,
@@ -497,6 +499,23 @@ class FileMemo<T> {
   set(key: string, value: T): void {
     (this.local ?? this.shared).set(key, value);
   }
+}
+
+/**
+ * C-56b: the implements pass's decisions, by symbol id, in the order made:
+ * interfaces whose implementer list is complete, possible implementers
+ * (type, interface), and implementers (type, interface, pointer receiver,
+ * identity of the method signatures).
+ */
+export interface ImplementsDecisions {
+  complete: string[];
+  possible: [type: string, iface: string][];
+  implementers: [
+    type: string,
+    iface: string,
+    pointerReceiver: boolean,
+    identity: "identical" | "different" | "unknown",
+  ][];
 }
 
 class GoResolver {
@@ -3338,6 +3357,29 @@ class GoResolver {
   }
 
   private implementsLinks(added: AddedLink[]): void {
+    const decisions = this.implementsDecisions();
+    // Under the test suite the decisions cross JSON before they are used, so
+    // every Go test shows they are plain data, as a kept value must be.
+    this.applyImplements(
+      process.env.PYMTHEG_TEST === "1"
+        ? (JSON.parse(JSON.stringify(decisions)) as ImplementsDecisions)
+        : decisions,
+      added,
+    );
+  }
+
+  /**
+   * C-56b: the implements pass as a value: every decision it makes, by
+   * symbol id and in the order it makes them, with nothing that closes over
+   * this resolver. `applyImplements` turns it into this run's dispatch sets
+   * and links.
+   */
+  implementsDecisions(): ImplementsDecisions {
+    const decisions: ImplementsDecisions = {
+      complete: [],
+      possible: [],
+      implementers: [],
+    };
     const interfaces: {
       iface: GraphSymbol;
       methods: Map<string, InterfaceMethod>;
@@ -3372,7 +3414,7 @@ class GoResolver {
             methods,
             firstName: methods.values().next().value!.name,
           });
-          this.complete.add(symbol.id);
+          decisions.complete.push(symbol.id);
         }
       } else if (
         symbol.kind !== "alias" ||
@@ -3449,42 +3491,68 @@ class GoResolver {
         }
         if (refuted) continue;
         // Not refuted: a possible implementer, so dispatch must list its method.
-        push2(this.possible, iface.id, type);
+        decisions.possible.push([type.id, iface.id]);
         // A type whose every interface method is matched by name and count gets
         // an `implements` link, never definite (no-toolchain fallback): it is
         // unresolved with the interface kept in `data.interfaceId`, and the
         // identity comparison only annotates it.
         if (unknown) continue;
-        push2(this.implementers, iface.id, type);
-        if (
-          this.context.resolutionFiles &&
-          !this.context.resolutionFiles.has(type.file)
-        )
-          continue;
-        added.push({
-          key: `implements:${type.key}:${iface.id}`,
-          file: type.file,
-          sourceId: type.id,
-          kind: "implements",
-          targetName: iface.name,
-          range: type.range,
-          data: {
-            pointerReceiver: !byValue,
-            structural: true,
-            unverified: "structural-match-unverified",
-            interfaceId: iface.id,
-            identity:
-              identity === true
-                ? "identical"
-                : identity === false
-                  ? "different"
-                  : "unknown",
-          },
-        });
+        decisions.implementers.push([
+          type.id,
+          iface.id,
+          !byValue,
+          identity === true
+            ? "identical"
+            : identity === false
+              ? "different"
+              : "unknown",
+        ]);
       }
     }
     count("go.typeInterfacePairs", types.length * interfaces.length);
     count("go.typeInterfacePairsSkipped", skipped);
+    return decisions;
+  }
+
+  /** This run's dispatch sets and `implements` links from the decisions. */
+  private applyImplements(
+    decisions: ImplementsDecisions,
+    added: AddedLink[],
+  ): void {
+    const symbol = (id: string) => this.symbolsById.get(id)!;
+    for (const id of decisions.complete) this.complete.add(id);
+    for (const [type, iface] of decisions.possible)
+      push2(this.possible, iface, symbol(type));
+    for (const [
+      typeId,
+      ifaceId,
+      pointerReceiver,
+      identity,
+    ] of decisions.implementers) {
+      const type = symbol(typeId);
+      const iface = symbol(ifaceId);
+      push2(this.implementers, ifaceId, type);
+      if (
+        this.context.resolutionFiles &&
+        !this.context.resolutionFiles.has(type.file)
+      )
+        continue;
+      added.push({
+        key: `implements:${type.key}:${iface.id}`,
+        file: type.file,
+        sourceId: type.id,
+        kind: "implements",
+        targetName: iface.name,
+        range: type.range,
+        data: {
+          pointerReceiver,
+          structural: true,
+          unverified: "structural-match-unverified",
+          interfaceId: iface.id,
+          identity,
+        },
+      });
+    }
   }
 
   private addMember(pkg: Pkg, name: string, symbol: GraphSymbol): void {
