@@ -1649,7 +1649,10 @@ test("stripInternal through a package-extends config, and an unread base", async
       expect: "withheld",
     },
     "workspace base that strips": {
-      config: { extends: "@repo/typescript-config/base.json", include: ["src"] },
+      config: {
+        extends: "@repo/typescript-config/base.json",
+        include: ["src"],
+      },
       files: {
         "packages/typescript-config/package.json": JSON.stringify({
           name: "@repo/typescript-config",
@@ -1671,7 +1674,9 @@ test("stripInternal through a package-extends config, and an unread base", async
       expect: "no route",
     },
   };
-  for (const [variant, { config, files, link, expect }] of Object.entries(cases)) {
+  for (const [variant, { config, files, link, expect }] of Object.entries(
+    cases,
+  )) {
     const { root, request, read, write } = await project();
     await write(
       "package.json",
@@ -1703,7 +1708,10 @@ test("stripInternal through a package-extends config, and an unread base", async
       "packages/p/src/index.ts",
       "export function open() {}\n/** @internal */\nexport function hidden() {}\n",
     );
-    await write("app.ts", 'import { open, hidden } from "p";\nopen();\nhidden();\n');
+    await write(
+      "app.ts",
+      'import { open, hidden } from "p";\nopen();\nhidden();\n',
+    );
     for (const [path, text] of Object.entries(files)) await write(path, text);
     await mkdir(join(root, "node_modules"), { recursive: true });
     await symlink("../packages/p", join(root, "node_modules/p"));
