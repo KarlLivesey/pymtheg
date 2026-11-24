@@ -8981,3 +8981,90 @@ test("the stored explanation of a union callee's invalid code does not depend on
   }
   assert.equal(causes.size, 1, [...causes].join("\n"));
 });
+
+// ----- C-60 review: callees annotated with `typeof` -----
+
+test("a callee annotated typeof a function is judged as a direct call to it, and an overloaded checked type with a failed argument is invalid code", async () => {
+  const files = (broken, use) => ({
+    "tsconfig.json": strict,
+    "models.ts": twoClasses,
+    "broken.ts": broken ? "export const arg = ;\n" : "export const arg = 1;\n",
+    "dep.ts": [
+      'import { Clean, Other } from "./models";',
+      "export function good(x: string | number): Clean { return new Clean(); }",
+      "export function overloaded(x: string): Clean;",
+      "export function overloaded(x: number): Other;",
+      "export function overloaded(x: unknown): Clean | Other { return typeof x === 'string' ? new Clean() : new Other(); }",
+      "export const api = { overloaded };",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { arg } from "./broken";',
+      'import { api, good, overloaded } from "./dep";',
+      ...use,
+      "",
+    ].join("\n"),
+  });
+  const cases = [
+    {
+      name: "typeof overloaded",
+      use: [
+        "export function use() {",
+        "  const s: typeof overloaded = overloaded;",
+        "  return s(arg).run(); // site",
+        "}",
+      ],
+      repaired: ["models.ts#Other.run"],
+    },
+    ...["typeof good | typeof overloaded", "typeof overloaded | typeof good"].map(
+      (annotation) => ({
+        name: annotation,
+        use: [
+          "export function use(flag: boolean) {",
+          `  const s: ${annotation} = flag ? good : overloaded;`,
+          "  return s(arg).run(); // site",
+          "}",
+        ],
+        repaired: ["models.ts#Clean.run", "models.ts#Other.run"],
+      }),
+    ),
+    ...["good", "overloaded"].map((other) => ({
+      name: `(m || ${other}) with m: typeof overloaded | undefined`,
+      use: [
+        "export function use(m: typeof overloaded | undefined) {",
+        `  return (m || ${other})(arg).run(); // site`,
+        "}",
+      ],
+      repaired:
+        other === "good"
+          ? ["models.ts#Clean.run", "models.ts#Other.run"]
+          : ["models.ts#Other.run"],
+    })),
+    {
+      name: "an indexed access to an overloaded member",
+      use: [
+        "export function use() {",
+        '  const s: (typeof api)["overloaded"] = api.overloaded;',
+        "  return s(arg).run(); // site",
+        "}",
+      ],
+      repaired: ["models.ts#Other.run"],
+    },
+  ];
+  for (const { name, use, repaired } of cases) {
+    const broken = linkAt(
+      await indexFiles(files(true, use)),
+      "use.ts",
+      "// site",
+      "run",
+    );
+    assert.equal(broken.reason, "invalid-code", name);
+    const fixed = linkAt(
+      await indexFiles(files(false, use)),
+      "use.ts",
+      "// site",
+      "run",
+    );
+    assert.deepEqual(fixed.targets, repaired, name);
+  }
+});

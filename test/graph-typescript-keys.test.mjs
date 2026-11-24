@@ -458,7 +458,7 @@ test("an unrelated edit leaves the keys, identities and ids of a renamed file's 
 // conditional and a logical member.
 const MULTILINE = [
   "function take(v, cb) { return cb(v); }",
-  "function outer(require, enabled, x) {",
+  "function outer(require, enabled, x, module) {",
   "  if (enabled &&",
   "require) { function branchHelper() { return 1; } branchHelper(); }",
   "  take(1, (v = enabled &&",
@@ -469,6 +469,10 @@ const MULTILINE = [
   'require) ? { conditional() { return "\\n"; } } : {};',
   "  const either = (enabled &&",
   "require) || { logical() { return 3; } };",
+  "  if (typeof module === \"object\" &&",
+  "\t\tmodule.exports) { function umdHelper() { return 4; } umdHelper(); }",
+  "  switch (x) { case x &&",
+  "\t\trequire.main: { function mainHelper() { return 5; } mainHelper(); } }",
   "  return [picked, either];",
   "}",
   "exports.outer = outer;",
@@ -499,6 +503,8 @@ test("multi-line scope text keeps its keys when the fresh name changes, for ever
       "caseHelper",
       "conditional",
       "logical",
+      "umdHelper",
+      "mainHelper",
     ])
       assert.ok(
         before.some((row) => row.includes(name)),
@@ -529,7 +535,7 @@ test("for scope texts with the bound names beside escapes, quotes and unicode, a
     '"é😀"',
     "`a${require}b`",
   ];
-  const operators = [" && ", " +\n", "\n&& ", " + ", " ||\n"];
+  const operators = [" && ", " +\n", "\n&& ", " + ", " ||\n", " &&\n\t\t"];
   for (let round = 0; round < 12; round++) {
     // Always a bound name, then operands with operators between them.
     let expression = "require";

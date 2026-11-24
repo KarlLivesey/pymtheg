@@ -1109,7 +1109,21 @@ export function createJudge(input: JudgeInput): Judge {
     IndexedAccessType: computationHandler,
     InferType: computationHandler,
     TemplateLiteralType: computationHandler,
-    TypeQuery: computationHandler,
+    TypeQuery: (node, context) => {
+      // C-60 review: `typeof f`, with `f` a function, is the function: a
+      // call through it is judged as a direct call to `f` is, signature
+      // choice and all. Otherwise the checker's type stands, as for any
+      // computation over clean inputs.
+      const query = node as ts.TypeQueryNode;
+      if (!query.typeArguments && ts.isIdentifier(query.exprName)) {
+        let symbol = checker.getSymbolAtLocation(query.exprName);
+        if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+          symbol = checker.getAliasedSymbol(symbol);
+        if (symbol && symbol.flags & ts.SymbolFlags.Function)
+          return expression(query.exprName);
+      }
+      return computationHandler(node, context);
+    },
     ImportType: (node, context) => {
       const imported = node as ts.ImportTypeNode;
       const argument = ts.isLiteralTypeNode(imported.argument)
@@ -2294,6 +2308,17 @@ export function createJudge(input: JudgeInput): Judge {
       case "clean":
         return callee;
       case "checked": {
+        // C-60 review: the checker picks among several signatures by the
+        // arguments' types; with a tainted argument that pick is not
+        // trusted.
+        const kinds = construct ? ts.SignatureKind.Construct : ts.SignatureKind.Call;
+        if (
+          checker.getSignaturesOfType(callee.type, kinds).length > 1 &&
+          argumentsOf(call).some((argument) => tainted(expression(argument)))
+        )
+          return failed(
+            "a call through a checked type with several signatures, with a tainted argument",
+          );
         try {
           const signature = checker.getResolvedSignature(
             call as ts.CallLikeExpression,
