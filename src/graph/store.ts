@@ -750,19 +750,21 @@ export class SqliteGraphStore implements GraphStorage {
       .sort((a, b) => compare(a.path, b.path));
   }
   /**
-   * C-55: the paths this connection has passed to `replaceFile` and
-   * `removeFile`, in order. Every file-level fact (record, symbols,
-   * resolver projection) is written only by those two, so a reader that
-   * kept decoded facts knows what to read again. A write rolled back later
-   * is still listed: the list may name a path that need not be re-read,
-   * never miss one that must.
+   * C-55: the paths this connection has passed to `replaceFile`, in order.
+   * Every file-level fact (record, symbols, resolver projection) is written
+   * only by `replaceFile` and `removeFile`, so a reader that kept decoded
+   * facts knows what to read again. Removals are not listed: a reader keeps
+   * facts only for paths the store lists now, and a removed path that comes
+   * back is written by `replaceFile`. A write rolled back later is still
+   * listed: the list may name a path that need not be re-read, never miss
+   * one that must.
    */
   private readonly pathWrites: string[] = [];
   /** A point in this connection's path writes (`pathsWrittenSince`). */
   writeMark(): number {
     return this.pathWrites.length;
   }
-  /** The paths written by `replaceFile` or `removeFile` after `mark`. */
+  /** The paths written by `replaceFile` after `mark`. */
   pathsWrittenSince(mark: number): Set<string> {
     return new Set(this.pathWrites.slice(mark));
   }
@@ -897,7 +899,6 @@ export class SqliteGraphStore implements GraphStorage {
       );
   }
   removeFile(path: string): void {
-    this.pathWrites.push(path);
     count("store.filesRemoved");
     const remove = () =>
       this.db.prepare("DELETE FROM graph_files WHERE path=?").run(path);

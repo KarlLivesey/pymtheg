@@ -3546,9 +3546,12 @@ given. See [C-48](changes/C-48.md).
 inputs of a module that opts in (`keepsInput`, Go): its analysis records,
 every file's resolver projection and every symbol, as session kept state
 under C-45's rules. A run re-reads only the paths the store has written
-since they were read; the store records every path its `replaceFile` and
-`removeFile` calls write, and those are the only writers of file-level
-facts. Each input is given in the order the same read gives without a
+since they were read; the store records every path its `replaceFile`
+calls write. `replaceFile` and `removeFile` are the only writers of
+file-level facts, and inputs are assembled only for paths stored now, so
+removals need no record. The session compares the completion record once,
+at the run's baseline (`confirm`); the comparison C-45 also made when a run
+began could change no outcome and is removed. Each input is given in the order the same read gives without a
 session: records by UTF-16 code units, the resolver projection by UTF-8
 bytes (SQL `ORDER BY path`), symbols by id. The module must not
 change its inputs in place; the test suite freezes them, production does
