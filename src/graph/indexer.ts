@@ -471,8 +471,10 @@ export async function indexProject(
       }
     }
     // A keepsInput module must not change its inputs in place; under the
-    // test suite they are frozen in every run, session or not (C-55).
-    if (module.keepsInput && !keeping) guard(files);
+    // test suite they are frozen in every run, session or not, after this
+    // run's held records are merged in (C-55; review: a session run handed
+    // the held records over unfrozen).
+    if (module.keepsInput) guard(files);
     const reuse = reusing.has(module.id);
     const filesByPath = new Map(files.map((file) => [file.path, file]));
     const oldPaths = new Set(

@@ -19,7 +19,7 @@ import type { GraphFile, GraphSymbol, ResolutionFile } from "./types.js";
 import { count } from "./work.js";
 import { storedSize } from "./store.js";
 
-/** What is kept stops being kept above this many bytes of stored JSON. */
+/** What is kept stops being kept above this many UTF-8 bytes of stored JSON. */
 export const keptInputBytes = 128 * 1024 * 1024;
 /** The name and key a module's kept inputs are stored under. */
 export const KEPT_INPUT = "core:input";
@@ -56,10 +56,26 @@ export function deepFreeze<T>(value: T): T {
   }
   return value;
 }
-// The stored JSON's length when the store recorded it (C-55), else the
-// value encoded again (stores that do not record it).
+// The stored JSON's UTF-8 bytes when the store recorded them (C-55), else
+// the value encoded again (stores that do not record them).
 const size = (value: object) =>
-  storedSize(value) ?? JSON.stringify(value).length;
+  storedSize(value) ?? Buffer.byteLength(JSON.stringify(value));
+/**
+ * SQLite's `ORDER BY path` order: UTF-8 bytes, which is code-point order.
+ * It differs from JavaScript's UTF-16 order (`compare`) only between a path
+ * character above U+FFFF (a surrogate pair) and one in U+E000..U+FFFF.
+ */
+export function storeOrder(a: string, b: string): number {
+  const unit = (code: number) =>
+    code >= 0xe000 ? code - 0x800 : code >= 0xd800 ? code + 0x2000 : code;
+  const length = Math.min(a.length, b.length);
+  for (let index = 0; index < length; index++) {
+    const x = a.charCodeAt(index);
+    const y = b.charCodeAt(index);
+    if (x !== y) return unit(x) - unit(y);
+  }
+  return a.length - b.length;
+}
 
 /**
  * Builds a module's inputs from what was kept plus fresh reads of the
@@ -93,9 +109,11 @@ export class KeptInputs {
       ...this.writtenThisRun(),
     ]);
     const wanted = new Set(paths);
-    const reread = old
-      ? [...wanted].filter((path) => stale.has(path))
-      : [...wanted];
+    // Read what is stale and what was never kept (review: a wanted path
+    // missing from the kept value was left out where a fresh read has it).
+    const reread = [...wanted].filter(
+      (path) => !old?.has(path) || stale.has(path),
+    );
     const fresh = await read(reread);
     const records = new Map<string, GraphFile>();
     if (old)
@@ -186,7 +204,12 @@ export class KeptInputs {
       count("kept.input.projectionReused", rows.size - fresh.size);
       this.projection = rows;
       this.projectionKinds = kindsKey;
-      projection = [...rows.values()];
+      // In the order the store's projection query gives (SQL `ORDER BY
+      // path`), not `allPaths`' order, so a module sees what it would see
+      // without a session.
+      projection = [...rows.values()].sort((a, b) =>
+        storeOrder(a.path, b.path),
+      );
     }
     this.resolverMark = mark;
     return {
