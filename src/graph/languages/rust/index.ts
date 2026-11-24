@@ -417,23 +417,30 @@ function decideToolchain(
     });
     result.symbols.forEach((symbol) => {
       const data = (symbol.data ?? {}) as Record<string, Json>;
-      if (!conditioned(data) || symbol.identity.startsWith("impl ")) return;
+      if (!conditioned(data)) return;
+      // Sixth review: method twins inside one impl block (`impl H::c_backend`
+      // under `feature = "fast"` and its `not` twin) select through their
+      // return types like function twins; `static` and `const` twins through
+      // every type their declaration names (no written type is recorded, so
+      // the initializer's types count too: twins only ever over-select).
+      const callable = symbol.kind === "function" || symbol.kind === "method";
       const written =
         symbol.kind === "type" && typeof data.aliasType === "string"
           ? data.aliasType
-          : symbol.kind === "function" && typeof data.returnType === "string"
+          : callable && typeof data.returnType === "string"
             ? data.returnType
             : undefined;
-      if (!written) return;
-      const words = new Set(written.match(/\w+/g) ?? []);
+      const anyType = symbol.kind === "static" || symbol.kind === "const";
+      if (!written && !anyType) return;
+      const words = new Set(written?.match(/\w+/g) ?? []);
       define(
-        `${f.path}\u0000${symbol.kind === "function" ? "fn " : ""}${symbol.identity}`,
+        `${f.path}\u0000${callable ? "fn " : anyType ? "value " : ""}${symbol.identity}`,
         typeLinks
           .filter(
             (t) =>
               t.start >= symbol.range.start &&
               t.end <= symbol.range.end &&
-              words.has(t.name),
+              (anyType || words.has(t.name)),
           )
           .flatMap((t) => targetsOf(t.id)),
       );
@@ -446,6 +453,60 @@ function decideToolchain(
       for (const place of items)
         if (!list.every((other) => other.has(place))) selectedPlaces.add(place);
   }
+  // Sixth review A: a name a module binds in more than one namespace
+  // (cortex-m-rt: `pub use macros::exception;` beside `pub use
+  // self::Exception as exception;`) is imported in all of them, while the
+  // toolchain names one. Bindings per scope and name: declared items (not
+  // impl members) and named `use` items; and, per answer, the scopes whose
+  // `use` re-exports it.
+  const bindings = new Map<string, number>();
+  const reexportedFrom = new Map<string, Set<string>>();
+  const bind = (key: string) => bindings.set(key, (bindings.get(key) ?? 0) + 1);
+  updated.forEach((f, i) => {
+    const result = byPath.get(f.path)?.result;
+    if (!result) return;
+    for (const symbol of result.symbols) {
+      if (symbol.identity.startsWith("impl ") || symbol.kind === "impl")
+        continue;
+      const segments = symbol.identity.split("::");
+      bind(
+        `${f.path}\u0000${segments.slice(0, -1).join("::")}\u0000${segments.at(-1)}`,
+      );
+    }
+    result.links.forEach((l, j) => {
+      if (l.kind !== "imports") return;
+      const data = (l.data ?? {}) as Record<string, Json>;
+      const name =
+        (typeof data.alias === "string" && data.alias) ||
+        lastSegment(l.targetName);
+      if (name === "*" || name === "self" || data.glob) return;
+      const scope = typeof data.scope === "string" ? data.scope : "";
+      bind(`${f.path}\u0000${scope}\u0000${name}`);
+      const r = resolutions.get(facts[i]!.links[j]!.id);
+      for (const target of [
+        ...(r?.targetId ? [r.targetId] : []),
+        ...(r?.candidateIds ?? []),
+      ]) {
+        const places = reexportedFrom.get(target) ?? new Set<string>();
+        places.add(`${f.path}\u0000${scope}`);
+        reexportedFrom.set(target, places);
+      }
+    });
+  });
+  /** The imported name is bound more than once where it comes from. */
+  const importNamespaces = (target: string, name: string): boolean => {
+    const place = placeOf.get(target);
+    const scopes = new Set(reexportedFrom.get(target) ?? []);
+    if (place !== undefined) {
+      const [file, identity] = place.split("\u0000") as [string, string];
+      scopes.add(
+        `${file}\u0000${identity.split("::").slice(0, -1).join("::")}`,
+      );
+    }
+    for (const scope of scopes)
+      if ((bindings.get(`${scope}\u0000${name}`) ?? 0) > 1) return true;
+    return false;
+  };
   /** An item cfg selects through a name, or an item inside one. */
   const cfgSelected = (id: string): boolean => {
     const place = placeOf.get(id);
@@ -489,6 +550,14 @@ function decideToolchain(
             : "withheld:cfg-variant",
         );
       const r = resolutions.get(id);
+      // Sixth review A: an import decides only when the imported name is in
+      // exactly one namespace where it comes from (as this index sees it).
+      if (
+        l.kind === "imports" &&
+        r?.targetId !== target &&
+        importNamespaces(target, lastSegment(l.targetName))
+      )
+        return kept("withheld:import-namespaces");
       // An item cfg selects through a name: confirm only (see above).
       if (r?.targetId !== target && cfgSelected(target))
         return kept("withheld:cfg-selected");
@@ -502,6 +571,12 @@ function decideToolchain(
       // one or cfg twins is never narrowed.
       const candidates = (rest.targets ?? []) as string[];
       const reasons = uncertaintyReasons(rest.uncertainty);
+      // Sixth review: a name an opaque item (a macro such as `cfg_if!`, or
+      // one whose expansion is not read) may define or shadow is confirm-only:
+      // what the macro emits can differ by configuration, and source-only
+      // recorded no candidates to narrow. The route never decides it.
+      if (!r?.targetId && reasons.includes("opaque-item-may-shadow-name"))
+        return kept("withheld:opaque-shadow");
       const single = candidates.length === 1 && candidates[0] === target;
       const conditionalSet = (ids: readonly string[]) =>
         ids.length > 1 && (ids.some(conditional) || twins(ids));

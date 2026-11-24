@@ -49,6 +49,7 @@ import {
   resolve,
   sep,
 } from "node:path";
+import { readScip, type ScipDocument } from "./scip.js";
 import {
   runProcess,
   type ProcessClock,
@@ -626,6 +627,8 @@ export function procMacroFailures(
 
 export interface AnalyzerRun {
   scip: Uint8Array;
+  /** The index, decoded (sixth review D: only a readable index is cached). */
+  documents: ScipDocument[];
   /** Why the index is partial; empty when it is complete. */
   partial: string[];
   /** Files whose answers are withheld (a proc macro failed there), with why. */
@@ -707,9 +710,48 @@ export function prepareRun(
     install.host,
   );
   if (typeof target !== "string") return target;
+  // Sixth review E: what the run depends on outside the checkout. Every
+  // `path = "…"` and every `[workspace] members` entry the captured
+  // manifests name that resolves outside the root: whether it exists, and
+  // its Cargo.toml (hashed with the rest; never stored or printed).
+  const outsideDependencies: string[] = [];
+  const string = String.raw`"(?:[^"\\\n]|\\.)*"|'[^'\n]*'`;
+  for (const manifest of contexts) {
+    if (!/(^|\/)Cargo\.toml$/.test(manifest.path) || !manifest.text) continue;
+    const base = resolve(root, dirname(manifest.path));
+    const named = [
+      ...[
+        ...manifest.text.matchAll(
+          new RegExp(String.raw`\bpath\s*=\s*(${string})`, "g"),
+        ),
+      ].map((m) => tomlString(m[1]!)),
+      ...[...manifest.text.matchAll(/\bmembers\s*=\s*\[([^\]]*)\]/g)].flatMap(
+        (m) =>
+          [...m[1]!.matchAll(new RegExp(string, "g"))].map((s) =>
+            tomlString(s[0]),
+          ),
+      ),
+    ];
+    for (const value of named) {
+      if (!value) continue;
+      // A glob member stands for its folder.
+      const at = resolve(base, value.replace(/[*?[].*$/, ""));
+      const inside = relative(root, at);
+      if (inside && !inside.startsWith("..") && !isAbsolute(inside)) continue;
+      const cargo = statSync(at, { throwIfNoEntry: false })?.isDirectory()
+        ? read(join(at, "Cargo.toml"))
+        : read(at);
+      outsideDependencies.push(
+        `${at}\u0000${existsSync(at)}\u0000${cargo === undefined ? "\u0000absent" : sha(cargo)}`,
+      );
+    }
+  }
   return {
     target,
-    outside: sha(...[...above, ...user].map((text) => text ?? "\u0000absent")),
+    outside: sha(
+      ...[...above, ...user].map((text) => text ?? "\u0000absent"),
+      ...outsideDependencies.sort(),
+    ),
   };
 }
 
@@ -760,6 +802,29 @@ export async function routeKey(
 }
 
 /**
+ * A TOML string value written on one line (sixth review C): a basic string
+ * (`"…"`, with escapes), a literal string (`'…'`), or either triple-quoted
+ * form closed on the same line; a trailing comment is allowed. Undefined for
+ * anything else (an array, a bare word, a string left open).
+ */
+export function tomlString(text: string): string | undefined {
+  const comment = String.raw`\s*(?:#.*)?$`;
+  const literal =
+    new RegExp(String.raw`^'''([\s\S]*?)'''${comment}`).exec(text)?.[1] ??
+    new RegExp(String.raw`^'([^'\n]*)'${comment}`).exec(text)?.[1];
+  if (literal !== undefined) return literal;
+  const basic =
+    new RegExp(String.raw`^"""([\s\S]*?)"""${comment}`).exec(text)?.[1] ??
+    new RegExp(String.raw`^"((?:[^"\\\n]|\\.)*)"${comment}`).exec(text)?.[1];
+  if (basic === undefined) return undefined;
+  try {
+    return JSON.parse(`"${basic.replace(/\n/g, "\\n")}"`) as string;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The build target the configuration names: `[build] target` in the
  * project's `.cargo/config.toml` (or `.cargo/config`), else the user's
  * cargo configuration, else the host. A list of targets or a target file is
@@ -778,7 +843,7 @@ export function buildTarget(
     const value =
       inline ?? (section && /^\s*target\s*=\s*(.+)$/m.exec(section)?.[1]);
     if (!value) continue;
-    const single = /^"([^"]+)"\s*(#.*)?$/.exec(value.trim())?.[1];
+    const single = tomlString(value.trim());
     if (!single)
       return {
         unavailable: `the Cargo configuration names more than one build target (${value.trim()}); the route uses one configuration`,
@@ -953,22 +1018,31 @@ export async function runAnalyzer(
   const buildFor = prepared.target;
   const stem = join(workDir, `scip-${key.slice(0, 32)}`);
   if (existsSync(`${stem}.json`) && existsSync(`${stem}.scip`)) {
-    const record = JSON.parse(await readFile(`${stem}.json`, "utf8")) as {
-      partial: string[];
-      facts: CargoFacts;
-      withheld?: Record<string, string>;
-      target?: string;
-    };
-    return {
-      scip: await readFile(`${stem}.scip`),
-      partial: record.partial,
-      withheld: record.withheld ?? {},
-      target: record.target ?? buildFor,
-      facts: record.facts,
-      cached: true,
-      key,
-      elapsedMs: 0,
-    };
+    // Sixth review D: a cached pair that cannot be read (a damaged or
+    // foreign file) is discarded and the run goes ahead, once.
+    try {
+      const record = JSON.parse(await readFile(`${stem}.json`, "utf8")) as {
+        partial: string[];
+        facts: CargoFacts;
+        withheld?: Record<string, string>;
+        target?: string;
+      };
+      const scip = await readFile(`${stem}.scip`);
+      return {
+        scip,
+        documents: readScip(scip),
+        partial: record.partial,
+        withheld: record.withheld ?? {},
+        target: record.target ?? buildFor,
+        facts: record.facts,
+        cached: true,
+        key,
+        elapsedMs: 0,
+      };
+    } catch {
+      await rm(`${stem}.json`, { force: true });
+      await rm(`${stem}.scip`, { force: true });
+    }
   }
   const id = randomUUID();
   const run = join(workDir, `run-${id}`);
@@ -1125,6 +1199,16 @@ export async function runAnalyzer(
           .join("; ")}`,
       );
     const elapsedMs = performance.now() - started;
+    // Sixth review D: decoded before anything is cached; an index that
+    // cannot be read is reported and never kept.
+    let documents: ScipDocument[];
+    try {
+      documents = readScip(scip);
+    } catch (error) {
+      return {
+        unavailable: `rust-analyzer's index cannot be read: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
     // Kept only when complete: a partial index or a failed proc macro may
     // come from the environment (a missing system library), which the key
     // does not see, so it is run again next time.
@@ -1141,6 +1225,7 @@ export async function runAnalyzer(
     }
     return {
       scip,
+      documents,
       partial,
       withheld,
       target: buildFor,

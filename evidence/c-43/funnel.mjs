@@ -145,6 +145,8 @@ export async function funnel(load, offPath, onPath, projectId, scipPath, facts) 
           "withheld:module-twin": "gate: module twin, or module conditions unseen",
           "withheld:conditional-candidates": "gate: conditional candidates",
           "withheld:cfg-selected": "gate: cfg-selected name (use, alias or function twins)",
+          "withheld:opaque-shadow": "gate: a name an opaque item may shadow (confirm-only)",
+          "withheld:import-namespaces": "gate: an import of a name bound in several namespaces",
           "kept:source-only-library": "gate: source-only library target kept",
           "kept:source-only": "gate: source-only target kept in the resolve phase",
           "kept:outside-candidate-set": "gate: answer outside the candidate set",

@@ -1052,7 +1052,8 @@ and git databases are symbolic links to the user's own folders, which offline
 cargo only reads; the user's `PATH` follows the toolchain's, since build
 scripts link and may call `cc` or `pkg-config`. Running it runs the
 project's build scripts and proc macros, as building it would; there is no
-sandbox. The run is bounded (one hour, 256 MiB of output, a 1 GiB index) and
+sandbox. Each subprocess of the run is bounded (one hour and 256 MiB of
+output each, not a total for the run; a 1 GiB index) and
 cancellable: in the CLI the index's signal kills the process groups; over MCP
 a cancel asks the job to abort and then terminates its worker, and the server
 kills every process group the job recorded, on cancel and when it exits. A
@@ -1080,8 +1081,11 @@ and a set of several candidates holding one under cfg (its own or a
 module's) or cfg twins is only confirmed, never narrowed. Nor is an answer
 into an item a name defined more than once under cfg selects (`use` items,
 `cfg(test)` doubles included, `type` aliases, or function twins through their
-return types), or a member of one, unless it confirms source-only's own
-target. The answer's graph symbol must be of a kind
+return types, method twins in one impl, `static` and `const` twins), or a
+member of one, unless it confirms source-only's own target. A link source-only
+left as one an opaque item (such as a `cfg_if!` body) may shadow is
+confirm-only, and an import decides only when the imported name is bound in
+one namespace where it comes from. The answer's graph symbol must be of a kind
 the SCIP descriptor allows. A trait's associated type or const named in
 generic code (`S::Error`) is answered with the trait's declaration and
 counted apart. A source-only definite target the toolchain disagrees with is

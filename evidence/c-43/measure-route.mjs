@@ -14,6 +14,7 @@ import { pathToFileURL } from "node:url";
 import { storedReasons } from "../../scripts/sweep/coverage-refresh-data.mjs";
 import { storedLibraryIdentity } from "../../scripts/sweep/coverage-rules.mjs";
 import { c19, funnel } from "./funnel.mjs";
+import { taintEstimate } from "./taint-estimate.mjs";
 import { readdirSync } from "node:fs";
 
 const [dist, pin, out, wrapper, timeLog, work] = process.argv.slice(2);
@@ -130,6 +131,8 @@ const result = {
   agreement: { confirmed, differs, percent: pct(confirmed, confirmed + differs) },
   disagreements: (merged?.disagreements ?? []).slice(0, 10),
   check: { linksBefore: before.size, linksAfter: after.size, lost, changedLevel2: changed, outcomes, outcomeDataDiffers },
+  // Sixth review B: what a deny-by-default cfg rule would keep (an estimate).
+  design: taintEstimate(on.path),
   analyzerRun: existsSync(timeLog) ? parseTime(readFileSync(timeLog, "utf8")) : null,
   index: { sourceOnly: { wallS: Math.round(off.wallS * 10) / 10, cpuS: Math.round(off.cpuS * 10) / 10 },
     route: { wallS: Math.round(on.wallS * 10) / 10, cpuS: Math.round(on.cpuS * 10) / 10 } },

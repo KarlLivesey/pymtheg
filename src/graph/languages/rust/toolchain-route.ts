@@ -14,7 +14,6 @@ import type {
   ToolchainRequest,
 } from "../../types.js";
 import { fileFacts } from "../../identity.js";
-import { readScip } from "./scip.js";
 import { joinScip } from "./toolchain-join.js";
 import {
   installation,
@@ -130,14 +129,8 @@ async function route(
     controls,
   );
   if ("unavailable" in run) return unavailable(run.unavailable);
-  let documents;
-  try {
-    documents = readScip(run.scip);
-  } catch (error) {
-    return unavailable(
-      `rust-analyzer's index cannot be read: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+  // Decoded by the run, before it was cached (sixth review D).
+  const documents = run.documents;
   // A library root rust-analyzer did not index: its files have no answers.
   const indexed = new Set(documents.map((doc) => doc.path));
   const partial = [
