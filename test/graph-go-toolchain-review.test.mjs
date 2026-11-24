@@ -427,7 +427,9 @@ test("G: forged facts: the toolchain's target is preferred, both recorded, a wit
     assert.equal(byLink.get(close.id)?.targetId, write.id);
     assert.equal(byLink.get(open.id), undefined);
     // The notes (what analyze records): both targets, and the withdrawal.
-    const notes = linkNotes("go", files, store.contexts()).get("app/app.go");
+    const notes = linkNotes(store.projectId, "go", files, store.contexts()).get(
+      "app/app.go",
+    );
     const index = (name) =>
       app.result.links.findIndex((l) => l.targetName === name);
     assert.deepEqual(notes.get(index("c.Close")).toolchain, {
