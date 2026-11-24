@@ -672,6 +672,31 @@ test("a session's Go inputs follow added, renamed and rewritten files; each step
           'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.Other }\n\nfunc B() int { return a.Hello() + S{}.Y + 1 }\n',
         ),
     ],
+    [
+      "break a/world.go's syntax",
+      () => write("a/world.go", "package a\n\nfunc Planet( int { return 2 }\n"),
+    ],
+    [
+      "mend it",
+      () =>
+        write("a/world.go", "package a\n\nfunc Planet() int { return 2 }\n"),
+    ],
+    [
+      "embed a.Base in a type local to c's function",
+      () =>
+        write(
+          "c/c.go",
+          'package c\n\nimport "example.com/m/a"\n\nfunc C() int {\n\ttype L struct{ a.Base }\n\treturn a.Planet() + L{}.X\n}\n',
+        ),
+    ],
+    [
+      "change the local type's embedded type",
+      () =>
+        write(
+          "c/c.go",
+          'package c\n\nimport "example.com/m/a"\n\nfunc C() int {\n\ttype L struct{ a.Other }\n\treturn a.Planet() + L{}.Y\n}\n',
+        ),
+    ],
   ];
   try {
     const registry = await discoverLanguages();
@@ -750,4 +775,79 @@ test("kept analysis input reads a wanted path it never kept", async () => {
     input.map((file) => file.path),
     ["a.go", "b.go"],
   );
+});
+
+test("kept inputs re-read this run's writes and paths written after the last read", async () => {
+  // Each rule directly (C-55 review): end to end through Go, a scoped run
+  // proves the edited file's embeds unchanged, and Go writes its records
+  // after its analysis read, so some of these rules change no Go result.
+  const { KeptInputs } = await import("../dist/graph/kept-input.js");
+  let generation = 0;
+  const reads = { records: [], symbols: [], projection: [] };
+  const record = (path) => ({
+    path,
+    module: "go",
+    result: {
+      status: "parsed",
+      symbols: [],
+      links: [],
+      diagnostics: [],
+      data: { generation },
+    },
+  });
+  const io = {
+    records: async (paths) => {
+      reads.records.push([...paths]);
+      return paths.map(record);
+    },
+    resolver: {
+      allPaths: async () => ["a.go", "b.go"],
+      symbols: async (paths) => {
+        reads.symbols.push([...paths]);
+        return new Map(
+          paths.map((path) => [path, [{ id: `${path}:${generation}` }]]),
+        );
+      },
+      projection: async (paths) => {
+        reads.projection.push([...paths]);
+        return paths.map(record);
+      },
+    },
+  };
+  const run = async (previous, writtenThisRun, writtenAfter = new Set()) => {
+    reads.records = [];
+    reads.symbols = [];
+    reads.projection = [];
+    const inputs = new KeptInputs(previous, () => new Set(writtenThisRun));
+    const records = await inputs.analysisInput(["a.go", "b.go"], io.records, 0);
+    const resolver = await inputs.resolverInput(["embeds"], io.resolver, 0);
+    return {
+      records,
+      resolver,
+      kept: inputs.result(() => new Set(writtenAfter)),
+    };
+  };
+  const generations = (list) => list.map((file) => file.result.data.generation);
+  // A first run reads everything; b.go is written after its reads.
+  const first = await run(undefined, [], ["b.go"]);
+  assert.deepEqual(reads.records, [["a.go", "b.go"]]);
+  // This run wrote a.go before its reads; b.go was written after the last
+  // run's reads. Both must be read again, nothing else.
+  generation = 1;
+  const second = await run(first.kept, ["a.go"]);
+  assert.deepEqual(reads.records, [["a.go", "b.go"]], "records: both");
+  assert.deepEqual(reads.symbols, [["a.go", "b.go"]], "symbols: both");
+  assert.deepEqual(reads.projection, [["a.go", "b.go"]], "projection: both");
+  assert.deepEqual(generations(second.records), [1, 1]);
+  assert.deepEqual(generations(second.resolver.projection), [1, 1]);
+  assert.deepEqual(
+    second.resolver.symbols.map((symbol) => symbol.id),
+    ["a.go:1", "b.go:1"],
+  );
+  // Nothing written: everything comes from what was kept.
+  generation = 2;
+  await run(second.kept, []);
+  assert.deepEqual(reads.records, [[]]);
+  assert.deepEqual(reads.symbols, [[]]);
+  assert.deepEqual(reads.projection, [[]]);
 });
