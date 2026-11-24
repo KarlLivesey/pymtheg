@@ -9,6 +9,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
+import { DatabaseSync } from "node:sqlite";
 import {
   indexProject,
   LanguageRegistry,
@@ -34,6 +35,7 @@ async function withTree(files, run) {
     write,
     remove: (path) => rmSync(join(root, path)),
     store,
+    database,
     index: () => indexProject(root, registry, store),
     rows: () => storeRows(database),
     /** A cold index of the tree must equal the incremental store. */
@@ -446,5 +448,142 @@ test("an unrelated edit leaves the keys, identities and ids of a renamed file's 
     await tree.index();
     assert.deepEqual(scoped(tree.store), before);
     await tree.equalsCold("after the unrelated edit");
+  });
+});
+
+// C-60 review: a name next to an escape. Serialised first, `enabled &&\n
+// require` became `enabled &&\\nrequire`, and the restore did not see the
+// fresh name after `\n`. Each text part is restored before it is
+// serialised. Every hashed part kind: a block, a callback, a case, and a
+// conditional and a logical member.
+const MULTILINE = [
+  "function take(v, cb) { return cb(v); }",
+  "function outer(require, enabled, x) {",
+  "  if (enabled &&",
+  "require) { function branchHelper() { return 1; } branchHelper(); }",
+  "  take(1, (v = enabled &&",
+  "require) => { function callbackHelper() { return v; } return callbackHelper(); });",
+  "  switch (x) { case enabled &&",
+  "require: { function caseHelper() { return 2; } caseHelper(); } }",
+  "  const picked = (enabled &&",
+  'require) ? { conditional() { return "\\n"; } } : {};',
+  "  const either = (enabled &&",
+  "require) || { logical() { return 3; } };",
+  "  return [picked, either];",
+  "}",
+  "exports.outer = outer;",
+  "",
+].join("\n");
+const scopedRows = (store, files) =>
+  store
+    .findSymbols()
+    .filter((s) => files.includes(s.file))
+    .map((s) => `${s.file} ${s.key} ${s.identity} ${s.id}`)
+    .sort();
+const renamedTree = (files) => ({
+  "tsconfig.json": JSON.stringify({
+    compilerOptions: { allowJs: true, noEmit: true },
+    include: ["**/*"],
+  }),
+  "other.ts": "export const other = 1;\n",
+  ...files,
+});
+
+test("multi-line scope text keeps its keys when the fresh name changes, for every hashed part kind", async () => {
+  await withTree(renamedTree({ "lib.cjs": MULTILINE }), async (tree) => {
+    await tree.index();
+    const before = scopedRows(tree.store, ["lib.cjs"]);
+    for (const name of [
+      "branchHelper",
+      "callbackHelper",
+      "caseHelper",
+      "conditional",
+      "logical",
+    ])
+      assert.ok(
+        before.some((row) => row.includes(name)),
+        `${name}: ${before.join("\n")}`,
+      );
+    tree.write("other.ts", "export const requirf = 1;\n");
+    await tree.index();
+    assert.deepEqual(scopedRows(tree.store, ["lib.cjs"]), before);
+    await tree.equalsCold("after the unrelated edit");
+  });
+});
+
+test("for scope texts with the bound names beside escapes, quotes and unicode, a changed fresh name changes no key", async () => {
+  // A seeded generator: the same cases on every run.
+  let seed = 60;
+  const next = (n) => {
+    seed = (seed * 1103515245 + 12345) % 2 ** 31;
+    return seed % n;
+  };
+  const operands = [
+    "require",
+    "module",
+    "exports",
+    '"\\n"',
+    "'\\''",
+    '"\\""',
+    '"\\\\"',
+    '"é😀"',
+    "`a${require}b`",
+  ];
+  const operators = [" && ", " +\n", "\n&& ", " + ", " ||\n"];
+  for (let round = 0; round < 12; round++) {
+    // Always a bound name, then operands with operators between them.
+    let expression = "require";
+    for (let i = 0, n = 3 + next(5); i < n; i++)
+      expression +=
+        operators[next(operators.length)] + operands[next(operands.length)];
+    const text = [
+      "function outer(require, module, exports) {",
+      `  if ((${expression})) { function helper() { return 1; } helper(); }`,
+      `  [1].map((v = (${expression})) => { function inner() { return v; } return inner(); });`,
+      "}",
+      "exports.outer = outer;",
+      "",
+    ].join("\n");
+    await withTree(renamedTree({ "lib.cjs": text }), async (tree) => {
+      await tree.index();
+      const before = scopedRows(tree.store, ["lib.cjs"]);
+      assert.ok(
+        before.some((row) => row.includes("[block:")),
+        `${round}: ${text}\n${before.join("\n")}`,
+      );
+      tree.write("other.ts", "export const requirf = 1;\n");
+      await tree.index();
+      assert.deepEqual(
+        scopedRows(tree.store, ["lib.cjs"]),
+        before,
+        `${round}: ${text}`,
+      );
+    });
+  }
+});
+
+// C-60 review: the module version moves with the keys, so a store written
+// by an earlier version is rebuilt, never reused with its old keys. The
+// store here is made to look so: its TypeScript rows carry version 49, and
+// one symbol row differs as main's keys did.
+test("a store written by the previous TypeScript module version is rebuilt and equals a cold index", async () => {
+  await withTree(renamedTree({ "lib.cjs": MULTILINE }), async (tree) => {
+    await tree.index();
+    const db = new DatabaseSync(tree.database);
+    try {
+      const changed = db
+        .prepare(
+          'UPDATE graph_files SET body=replace(body, \'"version":"50+typescript-\', \'"version":"49+typescript-\') WHERE body LIKE \'%"version":"50+typescript-%\'',
+        )
+        .run().changes;
+      assert.ok(changed > 0, "TypeScript rows at version 50");
+      db.prepare(
+        "UPDATE graph_symbols SET body=replace(body, '\"identity\":\"', '\"identity\":\"old.') WHERE rowid=(SELECT min(rowid) FROM graph_symbols WHERE file='lib.cjs')",
+      ).run();
+    } finally {
+      db.close();
+    }
+    await tree.index();
+    await tree.equalsCold("rebuilt");
   });
 });

@@ -479,8 +479,16 @@ function callbackSite(node: ts.FunctionLikeDeclaration): unknown[] {
  */
 const scopeKey = (at: ts.Node, parts: unknown[]) => {
   const restore = keyNames.get(at.getSourceFile()) ?? ((text: string) => text);
+  // Each text part is restored before it is serialised: serialised, a name
+  // can follow an escape (`\n`, `\"`) that the restore does not match.
+  const restored = (part: unknown): unknown =>
+    typeof part === "string"
+      ? restore(part)
+      : Array.isArray(part)
+        ? part.map(restored)
+        : part;
   return createHash("sha256")
-    .update(restore(JSON.stringify(parts)))
+    .update(JSON.stringify(parts.map(restored)))
     .digest("hex")
     .slice(0, 16);
 };

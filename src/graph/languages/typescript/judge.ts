@@ -298,11 +298,17 @@ export function createJudge(input: JudgeInput): Judge {
 
   function join(parts: readonly Judged[]): Judged {
     const flat: Judged[] = [];
+    let failure: (Judged & { k: "failed" }) | undefined;
     for (const part of parts) {
-      if (part.k === "failed") return part;
-      if (part.k === "union") flat.push(...part.parts);
+      // C-60: of several failed parts, the one whose reason sorts first (in
+      // code-point order), so the stored explanation does not depend on the
+      // order of the parts.
+      if (part.k === "failed") {
+        if (!failure || part.why < failure.why) failure = part;
+      } else if (part.k === "union") flat.push(...part.parts);
       else if (part.k !== "clean") flat.push(part);
     }
+    if (failure) return failure;
     if (!flat.length) return CLEAN;
     return flat.length === 1 ? flat[0]! : { k: "union", parts: flat };
   }
@@ -2631,7 +2637,24 @@ export function createJudge(input: JudgeInput): Judge {
     index: number,
   ): Judged {
     const callee = expression(call.expression);
-    const chosen = prepare(callee, call, ts.isNewExpression(call));
+    const construct = ts.isNewExpression(call);
+    // C-60: a union callee gives each part's own parameter type, joined as
+    // the call's return is: the call's memo holds the joined return, never
+    // one part's signature.
+    if (callee.k === "union")
+      return join(
+        callee.parts.map((part) =>
+          parameterFrom(prepareUncached(part, call, construct), call, index),
+        ),
+      );
+    return parameterFrom(prepare(callee, call, construct), call, index);
+  }
+  /** The parameter type a prepared call gives argument `index`. */
+  function parameterFrom(
+    chosen: Prepared | Judged,
+    call: ts.CallExpression | ts.NewExpression,
+    index: number,
+  ): Judged {
     let decl: ts.SignatureDeclaration;
     let env: Env;
     let self: Judged | undefined;
