@@ -123,6 +123,17 @@ function skipValue(expression: ts.Expression): ts.Expression {
 
 const NO_ARMS: readonly Arm[] = [];
 
+/** Primitive types, literals included: no member of theirs differs. */
+const PRIMITIVE_FLAGS =
+  ts.TypeFlags.StringLike |
+  ts.TypeFlags.NumberLike |
+  ts.TypeFlags.BigIntLike |
+  ts.TypeFlags.BooleanLike |
+  ts.TypeFlags.ESSymbolLike |
+  ts.TypeFlags.Void |
+  ts.TypeFlags.Undefined |
+  ts.TypeFlags.Null;
+
 /** Observation counters (C-41 review 2): member calls walked, expressions computed. */
 export const receiverStatistics = { calls: 0, expressions: 0 };
 
@@ -151,6 +162,7 @@ export function receiverArms(
     Map<ts.Symbol, (ts.Expression | undefined)[]>
   >();
   let depth = 0;
+  const options: ts.CompilerOptions = program?.getCompilerOptions() ?? {};
   /**
    * Failures caused by the depth limit or a cycle: a result computed while
    * one happened depends on where the walk started, so it is not cached
@@ -258,16 +270,28 @@ export function receiverArms(
       return merge([arms(node.whenTrue), arms(node.whenFalse)]);
     if (ts.isBinaryExpression(node)) {
       const operator = node.operatorToken.kind;
+      // `x ??= y` and `x ||= y` are `x ?? y` and `x || y` (C-41 review 3).
       if (
         operator === ts.SyntaxKind.QuestionQuestionToken ||
-        operator === ts.SyntaxKind.BarBarToken
+        operator === ts.SyntaxKind.BarBarToken ||
+        operator === ts.SyntaxKind.QuestionQuestionEqualsToken ||
+        operator === ts.SyntaxKind.BarBarEqualsToken
       ) {
         // A left side that is never nullish (`??`) or never falsy (`||`,
         // only objects) is the value.
         const left = checker.getTypeAtLocation(node.left);
         const parts = left.isUnion() ? left.types : [left];
-        const always = parts.every((part) =>
-          operator === ts.SyntaxKind.QuestionQuestionToken
+        // Without strictNullChecks a type never shows `null` or `undefined`,
+        // so neither operator can rule out the right side.
+        const strict = !!(
+          options.strictNullChecks ??
+          (options.strict && options.strictNullChecks !== false)
+        );
+        const nullish =
+          operator === ts.SyntaxKind.QuestionQuestionToken ||
+          operator === ts.SyntaxKind.QuestionQuestionEqualsToken;
+        const always = strict && parts.every((part) =>
+          nullish
             ? !(
                 part.flags &
                 (ts.TypeFlags.Undefined |
@@ -282,14 +306,17 @@ export function receiverArms(
           ? arms(node.left)
           : merge([arms(node.left), arms(node.right)]);
       }
+      // `x &&= y` is `x && y`.
       if (
         operator === ts.SyntaxKind.AmpersandAmpersandToken ||
+        operator === ts.SyntaxKind.AmpersandAmpersandEqualsToken ||
         operator === ts.SyntaxKind.CommaToken ||
         operator === ts.SyntaxKind.EqualsToken
       )
         return arms(node.right);
-      // Arithmetic, comparison, `in`, `instanceof`: a primitive.
-      return leaf(node);
+      // Arithmetic, comparison, `in`, `instanceof`: a primitive. Any other
+      // operator whose value is not a primitive is not followed.
+      return typeAt(node).flags & PRIMITIVE_FLAGS ? leaf(node) : undefined;
     }
     if (ts.isArrayLiteralExpression(node))
       return [{ type: typeAt(node), array: node }];
@@ -387,9 +414,12 @@ export function receiverArms(
   /** Whether `member` is an instantiation, not its declaration's own symbol. */
   function instantiatedMember(member: ts.Symbol): boolean {
     const declaration = member.declarations?.[0];
-    // A shorthand property's name resolves to its value, not the member.
-    if (!declaration || ts.isShorthandPropertyAssignment(declaration))
-      return false;
+    if (!declaration) return false;
+    // A shorthand property's name resolves to its value, not the member: a
+    // transient member is the checker's (instantiated) copy (C-41 review 3,
+    // `return { current }` in a generic helper).
+    if (ts.isShorthandPropertyAssignment(declaration))
+      return !!(member.flags & ts.SymbolFlags.Transient);
     const name = (declaration as ts.NamedDeclaration).name;
     const own = name && checker.getSymbolAtLocation(name);
     return !!own && own !== member;
@@ -451,6 +481,10 @@ export function receiverArms(
         ),
     );
     if (declarations.length === 1) return declarationArms(declarations[0]!);
+    // A getter and a setter: the getter's returns (C-41 review 3).
+    const getter = declarations.find(ts.isGetAccessorDeclaration);
+    if (getter) return declarationArms(getter);
+    if (declarations.some(ts.isSetAccessorDeclaration)) return undefined;
     // Overloads, declaration merging (a class and an interface, a function
     // and a namespace): declared, not computed.
     return declarations.every(
@@ -769,9 +803,26 @@ export function receiverArms(
       if (
         ts.isIdentifier(node) &&
         node !== fn.name &&
-        node.text === fn.name!.text &&
-        checker.getSymbolAtLocation(node) === own
+        node.text === fn.name!.text
       ) {
+        // Every reference counts, through `export { f }` and `{ f }` too; one
+        // the checker cannot place is taken as an escape (C-41 review 3).
+        const parent = node.parent;
+        let symbol = ts.isExportSpecifier(parent)
+          ? checker.getExportSpecifierLocalTargetSymbol(parent)
+          : ts.isShorthandPropertyAssignment(parent) && parent.name === node
+            ? checker.getShorthandAssignmentValueSymbol(parent)
+            : checker.getSymbolAtLocation(node);
+        if (symbol && symbol.flags & ts.SymbolFlags.Alias)
+          symbol = checker.getAliasedSymbol(symbol);
+        if (!symbol) {
+          escapes = true;
+          return;
+        }
+        if (symbol !== own) {
+          ts.forEachChild(node, visit);
+          return;
+        }
         const call = node.parent;
         if (
           !ts.isCallExpression(call) ||
@@ -1485,6 +1536,20 @@ export function receiverArms(
       const key = property.name && staticName(property.name);
       if (key === undefined) return undefined;
       if (key !== name) continue;
+      // A setter's value is what its getter returns (C-41 review 3).
+      if (ts.isSetAccessorDeclaration(property)) {
+        const getter = node.properties.find(
+          (item): item is ts.GetAccessorDeclaration =>
+            ts.isGetAccessorDeclaration(item) &&
+            staticName(item.name) === name,
+        );
+        if (!getter) return undefined;
+        const value = declarationArms(getter);
+        collected.push(
+          value === WRITTEN ? [{ type: typeAt(getter.name) }] : value,
+        );
+        return merge(collected);
+      }
       let own = checker.getSymbolAtLocation(property.name!);
       if (ts.isShorthandPropertyAssignment(property))
         own = checker.getShorthandAssignmentValueSymbol(property) ?? own;
@@ -1731,6 +1796,19 @@ export function receiverArms(
     // assignable to it). A narrowing the walk does not see: its answer stands.
     if (!held.length) return undefined;
     const kept = held;
+    // An open type parameter (from a generic body walked from outside) never
+    // supplies a member, unless it is the checker's own type here (inside
+    // that generic body, where its constraint is the answer).
+    if (
+      kept.some(
+        (arm) =>
+          !arm.generic &&
+          !own.has(arm.type) &&
+          !!(arm.type.flags & (ts.TypeFlags.TypeParameter | ts.TypeFlags.IndexedAccess)) &&
+          !(arm.type as { isThisType?: boolean }).isThisType,
+      )
+    )
+      return "unverified";
     // The checker's own type, part for part: its answer stands.
     if (
       kept.length === own.size &&

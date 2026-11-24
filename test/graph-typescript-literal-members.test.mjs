@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -14,6 +15,7 @@ import {
   SqliteGraphStore,
 } from "../dist/graph/index.js";
 import typescript from "../dist/graph/languages/typescript/index.js";
+import ts from "typescript";
 
 const tsconfig = JSON.stringify({
   compilerOptions: {
@@ -850,4 +852,170 @@ test("an interface or class member keeps its link through a receiver the walk ca
     got["Array.from(stores)[0]!.getState(); @(expression).getState"],
     "src/use.ts#Store.getState",
   );
+});
+
+/**
+ * tsc's own answer for the one `.run` call in `file`: the declarations
+ * `getSymbolAtLocation` gives for its name, each as `<owner>.run`.
+ */
+function tscDeclarations(files, file) {
+  const scratch = mkdtempSync(join(tmpdir(), "c41-tsc-"));
+  try {
+    for (const [path, text] of Object.entries({
+      "tsconfig.json": tsconfig,
+      ...files,
+    })) {
+      mkdirSync(dirname(join(scratch, path)), { recursive: true });
+      writeFileSync(join(scratch, path), text);
+    }
+    const config = ts.getParsedCommandLineOfConfigFile(
+      join(scratch, "tsconfig.json"),
+      {},
+      { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => {} },
+    );
+    const program = ts.createProgram(config.fileNames, config.options);
+    const checker = program.getTypeChecker();
+    const source = program.getSourceFile(join(scratch, file));
+    const found = [];
+    const visit = (node) => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === "run"
+      ) {
+        const symbol = checker.getSymbolAtLocation(node.expression.name);
+        for (const declaration of symbol?.declarations ?? []) {
+          let owner = declaration.parent;
+          while (
+            owner &&
+            !ts.isVariableDeclaration(owner) &&
+            !ts.isClassDeclaration(owner) &&
+            !ts.isInterfaceDeclaration(owner) &&
+            !ts.isTypeLiteralNode(owner)
+          )
+            owner = owner.parent;
+          found.push(
+            `${owner && !ts.isTypeLiteralNode(owner) ? owner.name.text : "{}"}.run`,
+          );
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    return found.sort();
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}
+
+/**
+ * C-41 review 3: four more shapes. `head` is this branch's outcome for the
+ * `.run` call (`set` for a candidate set, `unresolved` for any unresolved
+ * reason), `tsc` the checker's own declaration list for it.
+ */
+const ROUND_3 = {
+  // 1. A defaulted parameter whose function escapes other than by a direct
+  //    call: the default is not the only producer.
+  "default; export specifier": {
+    body: "function report(x = one) { x.run(); }\nreport(two);\nexport { report };",
+    tsc: ["one.run"],
+    head: "unresolved",
+  },
+  "default; export default object": {
+    body: "function report(x = one) { x.run(); }\nreport(two);\nexport default { report };",
+    tsc: ["one.run"],
+    head: "unresolved",
+  },
+  "default; shorthand in a local object": {
+    body: "function report(x = one) { x.run(); }\nreport(two);\nconst api = { report };\napi.report();",
+    tsc: ["one.run"],
+    head: "unresolved",
+  },
+  "default; JavaScript module.exports": {
+    file: "src/use.js",
+    text: "const one = { run() {} };\nconst two = { run() {} };\nfunction report(x = one) { x.run(); }\nreport(two);\nmodule.exports = { report };\n",
+    tsc: ["one.run"],
+    head: "unresolved",
+  },
+  // 2. A generic helper returning a shorthand property: the instantiated
+  //    member, never the type parameter's constraint.
+  "generic shorthand return; interface constraint": {
+    body: "interface Store { run(): void }\nfunction useStore<S extends Store>(store: S) { const current = store; return { current }; }\nuseStore(one).current.run();",
+    tsc: ["one.run"],
+    head: "src/use.ts#one.run",
+  },
+  "generic shorthand return; type-literal constraint": {
+    body: "function useStore<S extends { run(): void }>(store: S) { const current = store; return { current }; }\nuseStore(one).current.run();",
+    tsc: ["one.run"],
+    head: "src/use.ts#one.run",
+  },
+  // 3. An accessor pair: the getter's returns, as for a getter alone.
+  "class getter and setter": {
+    body: "class T { dark = pick; get theme() { return this.dark ? one : two; } set theme(t) {} go() { this.theme.run(); } }",
+    tsc: ["one.run"],
+    head: "set",
+  },
+  "class getter alone": {
+    body: "class T { dark = pick; get theme() { return this.dark ? one : two; } go() { this.theme.run(); } }",
+    tsc: ["one.run"],
+    head: "set",
+  },
+  "object-literal getter and setter": {
+    body: "const o = { get theme() { return pick ? one : two; }, set theme(t) {} };\no.theme.run();",
+    tsc: ["one.run"],
+    head: "set",
+  },
+  // 4. Logical assignment, as its plain form.
+  "??= as a receiver": {
+    body: "declare let current: typeof one | undefined;\n(current ??= two).run();",
+    tsc: ["one.run"],
+    head: "set",
+  },
+  "||= as a receiver": {
+    body: "declare let current: typeof one | undefined;\n(current ||= two).run();",
+    tsc: ["one.run"],
+    head: "set",
+  },
+  "&&= as a receiver (guard: the right side, as `&&`)": {
+    body: "declare let current: typeof one | undefined;\n(current &&= two)!.run();",
+    tsc: ["two.run"],
+    head: "src/use.ts#two.run",
+  },
+};
+
+test("review 3: escaping defaults, generic shorthand returns, accessor pairs and logical assignment", async () => {
+  const header = [
+    "declare const pick: boolean;",
+    "const one = { run() {} };",
+    "const two = { run() {} };",
+    "",
+  ].join("\n");
+  const got = {};
+  const want = {};
+  for (const [kind, { body, file = "src/use.ts", text, tsc, head }] of Object.entries(
+    ROUND_3,
+  )) {
+    const files = {
+      [file]: text ?? header + body + "\n",
+      ...(file.endsWith(".js") && {
+        "tsconfig.json": JSON.stringify({
+          compilerOptions: { allowJs: true, checkJs: true, strict: true },
+          include: ["src"],
+        }),
+      }),
+    };
+    const links = await outcomes(files, file, true);
+    const run = Object.entries(links).filter(([key]) => /@.*\brun$/.test(key));
+    const outcome = run.length === 1 ? run[0][1] : run;
+    got[kind] = {
+      head: Array.isArray(outcome)
+        ? "set"
+        : typeof outcome === "string" && !outcome.startsWith("src/")
+          ? "unresolved"
+          : outcome,
+      tsc: tscDeclarations(files, file),
+    };
+    want[kind] = { head, tsc };
+  }
+  assert.deepEqual(got, want);
 });
