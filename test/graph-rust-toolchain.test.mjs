@@ -703,6 +703,8 @@ test("D24 (PR 70 ruling): an offer the stored link does not take leaves it, and 
       outcome,
     );
   }
+});
+
 test("sixth review C: [build] target is read as a TOML string in every quoting form", () => {
   const host = "x86_64-unknown-linux-gnu";
   const target = (text) => buildTarget([text], host);
