@@ -1,0 +1,136 @@
+// SPDX-License-Identifier: MIT
+// C-56a: Go's analysis notes pass names symbols by the ids the store gives
+// them (kind, identity, ordinal), never by a source offset. A body edit
+// leaves every other symbol's id as it was; Go's overloaded-looking shapes
+// get distinct ids; the stored graph equals a cold index.
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { test } from "node:test";
+import {
+  indexProject,
+  LanguageRegistry,
+  SqliteGraphStore,
+} from "../dist/graph/index.js";
+import go from "../dist/graph/languages/go/index.js";
+import { notesSymbols } from "../dist/graph/languages/go/resolve.js";
+
+const registry = new LanguageRegistry([go]);
+// Every shape the review named: methods of one name on different
+// receivers, several init functions in one file and across files, blank
+// declarations, same-named locals in one function, generic type parameters,
+// fields of anonymous structs, and build-tag twins declaring one name.
+const files = {
+  "go.mod": "module example.com/m\n\ngo 1.22\n",
+  "p/a.go": [
+    "package p",
+    "",
+    "type A struct{}",
+    "type B struct{}",
+    "func (A) Run() int { return 1 }",
+    "func (B) Run() int { return 2 }",
+    "func init() {}",
+    "func init() {}",
+    "var _ = 1",
+    "var _ = 2",
+    "func _() {}",
+    "func Locals() int {",
+    "\tx := 1",
+    "\t{ x := 2; _ = x }",
+    "\tfunc() { x := 3; _ = x }()",
+    "\treturn x",
+    "}",
+    "type Box[T any, U comparable] struct{ v T; u U }",
+    "func Map[T, U any](t T, f func(T) U) U { return f(t) }",
+    "var Anon = struct{ A int; B struct{ A int } }{}",
+    "var Anon2 = struct{ A int }{}",
+    "",
+  ].join("\n"),
+  "p/b.go": "package p\n\nfunc init() {}\nfunc init() {}\n",
+  "p/os_linux.go":
+    "//go:build linux\n\npackage p\n\nfunc Twin() int { return 1 }\n",
+  "p/os_windows.go":
+    "//go:build windows\n\npackage p\n\nfunc Twin() int { return 2 }\n",
+};
+
+function tree() {
+  const base = mkdtempSync(join(tmpdir(), "c56a-"));
+  const root = join(base, "tree");
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
+  return { base, root };
+}
+
+test("Go's overloaded-looking shapes get distinct notes ids, the ones the store gives", async () => {
+  const { base, root } = tree();
+  const store = new SqliteGraphStore(join(base, "graph.sqlite"));
+  try {
+    await indexProject(root, registry, store);
+    for (const file of store.files()) {
+      if (file.module !== "go" || file.result.status === "failed") continue;
+      const named = notesSymbols(file);
+      const ids = named.map((symbol) => symbol.id);
+      assert.equal(new Set(ids).size, ids.length, `distinct in ${file.path}`);
+      for (const id of ids) assert.doesNotMatch(id, /^draft:/);
+      // The same naming as the store's: identity and ordinal.
+      const stored = new Map(
+        store
+          .findSymbols({ file: file.path })
+          .map((symbol) => [
+            `${symbol.kind}\0${symbol.identity}\0${symbol.ordinal}`,
+            1,
+          ]),
+      );
+      for (const symbol of named)
+        assert.ok(
+          stored.has(`${symbol.kind}\0${symbol.identity}\0${symbol.ordinal}`),
+          `${symbol.kind} ${symbol.identity} in ${file.path}`,
+        );
+    }
+    // Several init functions and blank declarations: ties broken by source
+    // order (the ordinal), never shared.
+    const a = store.getFile("p/a.go");
+    const inits = notesSymbols(a).filter((symbol) => symbol.name === "init");
+    assert.deepEqual(
+      inits.map((symbol) => symbol.ordinal),
+      [0, 1],
+    );
+  } finally {
+    store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a body edit above every declaration leaves every notes id as it was", async () => {
+  const { base, root } = tree();
+  const store = new SqliteGraphStore(join(base, "graph.sqlite"));
+  try {
+    await indexProject(root, registry, store);
+    const before = notesSymbols(store.getFile("p/a.go")).map((symbol) => [
+      symbol.kind,
+      symbol.identity,
+      symbol.id,
+    ]);
+    // Moves every offset in the file; changes no declaration.
+    writeFileSync(
+      join(root, "p/a.go"),
+      files["p/a.go"].replace(
+        "package p\n",
+        "package p\n\n// moved\n// moved\n",
+      ),
+    );
+    await indexProject(root, registry, store);
+    const after = notesSymbols(store.getFile("p/a.go")).map((symbol) => [
+      symbol.kind,
+      symbol.identity,
+      symbol.id,
+    ]);
+    assert.deepEqual(after, before);
+  } finally {
+    store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});

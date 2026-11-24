@@ -13,6 +13,7 @@ import type {
   ResolutionResult,
 } from "../../types.js";
 import { count, stageSync } from "../../work.js";
+import { fileFacts } from "../../identity.js";
 import {
   directoryOf,
   directoryOfImport,
@@ -396,10 +397,22 @@ export interface LinkNote {
 }
 
 /**
- * Runs the same resolution over provisional IDs (`draft:<file>\0<key>`) to find
+ * Runs the same resolution over the ids the store will give the symbols (C-56a) to find
  * links whose candidate sets exceed their cap. Used by `analyze`, the only phase
  * that may write link data, so the reason is recorded on the link itself.
  */
+/** The project id the notes pass computes its symbols' ids under. */
+const NOTES_PROJECT = "go-overflow";
+/**
+ * C-56a: a file's symbols as the notes pass names them: the ids the core
+ * gives stored symbols (kind, identity, and the ordinal among symbols that
+ * share both, by source order), under the notes pass's own project id.
+ */
+export function notesSymbols(
+  file: Pick<GraphFile, "path" | "module" | "result">,
+): GraphSymbol[] {
+  return fileFacts(NOTES_PROJECT, file).symbols;
+}
 export function linkNotes(
   moduleId: string,
   files: readonly GraphFile[],
@@ -408,18 +421,18 @@ export function linkNotes(
 ): Map<string, Map<number, LinkNote>> {
   const symbols: GraphSymbol[] = [];
   const links: GraphLink[] = [];
-  const id = (path: string, key: string) => `draft:${path}\u0000${key}`;
+  // C-56a: the symbols get the ids the store will give them (kind, identity
+  // and ordinal; never a source offset), so a body edit leaves every other
+  // symbol's id as it was, and both builds of the global index name each
+  // declaration alike.
+  const ids = new Map<string, string>();
+  const id = (path: string, key: string) => ids.get(`${path}\u0000${key}`)!;
   for (const file of files) {
     if (file.module !== moduleId || file.result.status === "failed") continue;
-    for (const symbol of file.result.symbols)
-      symbols.push({
-        ...symbol,
-        id: id(file.path, symbol.key),
-        ordinal: 0,
-        file: file.path,
-        module: moduleId,
-        status: file.result.status,
-      });
+    for (const symbol of notesSymbols(file)) {
+      ids.set(`${file.path}\u0000${symbol.key}`, symbol.id);
+      symbols.push(symbol);
+    }
     if (resolutionFiles && !resolutionFiles.has(file.path)) continue;
     file.result.links.forEach((link, index) =>
       links.push({
@@ -439,7 +452,7 @@ export function linkNotes(
     );
   }
   const resolver = new GoResolver(moduleId, {
-    projectId: "go-overflow",
+    projectId: NOTES_PROJECT,
     files,
     contextFiles,
     symbols,
