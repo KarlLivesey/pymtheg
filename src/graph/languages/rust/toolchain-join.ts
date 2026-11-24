@@ -116,11 +116,48 @@ export interface JoinFacts {
   procMacroPackages: readonly string[];
 }
 
+/**
+ * C-43 design B: one binding on an answered link's trace, as rust-analyzer
+ * resolved it in its one configuration: a checkout item (its graph id), an
+ * item of the checkout's crates with no declaration the graph has (macro
+ * output), a local binding (and whether its definition is in the index), or
+ * an item of another crate.
+ */
+export type TraceEntry =
+  | { k: "item"; id: string }
+  | { k: "generated" }
+  | { k: "local"; defined: boolean }
+  | { k: "library"; crate: string };
+export interface LinkTrace {
+  /** A method call or field through an inferred type (`x.m`, `a.b().c`). */
+  receiver: boolean;
+  /** Receiver-typed: the graph id of the enclosing function, when known. */
+  enclosing?: string;
+  /** A path's trace. */
+  entries?: TraceEntry[];
+  /** Receiver-typed: how many of the enclosing function's trace come first. */
+  upTo?: number;
+}
+
 export interface JoinOutcome {
   /** Per file, per parsed link index: the checkout symbol the toolchain names. */
   answers: Map<string, Map<number, string>>;
   /** Per file, per parsed link index: the library key the toolchain names (D24). */
   libraryAnswers: Map<string, Map<number, LibraryKey>>;
+  /**
+   * Per file, per answered link index: the bindings its site passes through
+   * (design B). A path's trace is every occurrence inside the written path;
+   * a receiver-typed link's is every occurrence in the enclosing function
+   * from its start to the site (signature, parameters, `let` initialisers
+   * and everything they name): an over-approximation of the receiver trace.
+   */
+  traces: Map<string, Map<number, LinkTrace>>;
+  /**
+   * Per enclosing function (graph id): every binding named in it, in order
+   * of first occurrence, with that position (a receiver link's trace is the
+   * prefix before its site).
+   */
+  functionTraces: Map<string, { entries: TraceEntry[]; at: number[] }>;
   /** With `explain`: every parsed link's join outcome, by file, in link order. */
   reasons?: Map<string, string[]>;
   /** Why links took no answer, and answers not applied (library, generated). */
@@ -332,6 +369,95 @@ export function joinScip(
         best = sym;
     return best ?? undefined;
   };
+  // ---- design B: what one occurrence binds
+  const entryOf = (o: Occurrence): TraceEntry | null => {
+    if (o.symbol.startsWith("local "))
+      return { k: "local", defined: defs.has(o.key) };
+    const p = parseSymbol(o.symbol);
+    // A crate root (`crate::`, `self::` at the root) always exists.
+    if (category(p) === "crate-root") return null;
+    if (!checkoutCrates.has(`${p.crate} ${p.version}`))
+      return { k: "library", crate: p.crate };
+    const def = defs.get(o.key);
+    if (!def) return { k: "generated" };
+    const name = texts.get(def.path)!.slice(def.s, def.e).replace(/^r#/, "");
+    const found = symbolAt(def.path, def.s, name, undefined);
+    return found ? { k: "item", id: found.id } : { k: "generated" };
+  };
+  const traceOf = (path: string, from: number, to: number): TraceEntry[] => {
+    const list = occurrences.get(path) ?? [];
+    const seenKeys = new Set<string>();
+    const out: TraceEntry[] = [];
+    for (const o of list) {
+      if (o.s < from) continue;
+      if (o.s >= to) break;
+      if (o.e > to || seenKeys.has(o.key)) continue;
+      seenKeys.add(o.key);
+      const entry = entryOf(o);
+      if (entry) out.push(entry);
+    }
+    return out;
+  };
+  const traces = new Map<string, Map<number, LinkTrace>>();
+  const functionTraces = new Map<
+    string,
+    { entries: TraceEntry[]; at: number[] }
+  >();
+  const functionTrace = (
+    path: string,
+    fn: { id: string; start: number; end: number },
+  ) => {
+    let found = functionTraces.get(fn.id);
+    if (found) return found;
+    const list = occurrences.get(path) ?? [];
+    const seenKeys = new Set<string>();
+    found = { entries: [], at: [] };
+    for (const o of list) {
+      if (o.s < fn.start) continue;
+      if (o.s >= fn.end) break;
+      if (seenKeys.has(o.key)) continue;
+      seenKeys.add(o.key);
+      const entry = entryOf(o);
+      if (!entry) continue;
+      found.entries.push(entry);
+      found.at.push(o.s);
+    }
+    functionTraces.set(fn.id, found);
+    return found;
+  };
+  /** Design B: the trace of one answered site (checkout or library). */
+  const recordTrace = (
+    f: JoinFile,
+    link: JoinFile["result"]["links"][number],
+    index: number,
+    siteStart: number,
+    e: number,
+  ) => {
+    const t = texts.get(f.path)!;
+    const start = t.byte(link.range.start);
+    const receiver = /\./.test(
+      f.text.slice(link.range.start, siteStart).replace(/\.\.|"[^"]*"/g, ""),
+    );
+    let enclosing: { id: string; start: number; end: number } | undefined;
+    if (receiver)
+      for (const sym of symbolsByFile.get(f.path) ?? [])
+        if (
+          (sym.kind === "function" || sym.kind === "method") &&
+          sym.start <= start &&
+          e <= sym.end &&
+          (!enclosing || sym.start > enclosing.start)
+        )
+          enclosing = sym;
+    let traceGroup = traces.get(f.path);
+    if (!traceGroup) traces.set(f.path, (traceGroup = new Map()));
+    if (enclosing) {
+      const fn = functionTrace(f.path, enclosing);
+      let upTo = 0;
+      while (upTo < fn.at.length && fn.at[upTo]! < e) upTo++;
+      traceGroup.set(index, { receiver, enclosing: enclosing.id, upTo });
+    } else
+      traceGroup.set(index, { receiver, entries: traceOf(f.path, start, e) });
+  };
   // ---- every parsed link
   const answers = new Map<string, Map<number, string>>();
   const libraryAnswers = new Map<string, Map<number, LibraryKey>>();
@@ -416,6 +542,8 @@ export function joinScip(
             symbol,
             scipVersion: p.version,
           });
+          // Design B governs library answers too.
+          recordTrace(f, link, index, site.s, e);
           return "library";
         }
         const name = texts
@@ -427,6 +555,7 @@ export function joinScip(
         let group = answers.get(f.path);
         if (!group) answers.set(f.path, (group = new Map()));
         group.set(index, found.id);
+        recordTrace(f, link, index, site.s, e);
         // C-43 review: an associated type or const named through a trait
         // (`S::Error`, `Self::SIDES` in generic code) is answered with the
         // trait's declaration, which is what the code names; counted apart.
@@ -449,6 +578,8 @@ export function joinScip(
   return {
     answers,
     libraryAnswers,
+    traces,
+    functionTraces,
     counts,
     documents: seen.size,
     ...(reasons ? { reasons } : {}),

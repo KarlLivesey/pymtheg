@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import {
   chmodSync,
   cpSync,
+  createReadStream,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -37,8 +38,13 @@ import {
   nameSite,
 } from "../dist/graph/languages/rust/toolchain-join.js";
 import { setRunControls } from "../dist/graph/languages/rust/toolchain-route.js";
+import {
+  buildTarget,
+  tomlString,
+} from "../dist/graph/languages/rust/toolchain.js";
 import { toolchainState } from "../dist/graph/command-toolchain.js";
 import { decideLink } from "../dist/graph/analysis.js";
+import { generate as generateOracle } from "./rust-cfg-oracle.mjs";
 import { executeGraph } from "../dist/graph/commands.js";
 import { graphConfig, graphToolchains } from "../dist/shared/config.js";
 import { initializeWorkspace } from "../dist/project/workspace.js";
@@ -153,7 +159,7 @@ if (a[0] === "scip") {
   fs.appendFileSync(b.runs, "run\\n");
   fs.writeFileSync(b.seen, JSON.stringify({ cwd: process.cwd(), env: process.env, config: JSON.parse(fs.readFileSync(a[a.indexOf("--config-path") + 1], "utf8")),
     files: fs.readdirSync(process.cwd(), { recursive: true }).map(String).sort(), lib: fs.existsSync("src/lib.rs") ? fs.readFileSync("src/lib.rs", "utf8") : null }));
-  if (b.hang) { fs.writeFileSync(b.ready, String(process.pid)); setInterval(() => {}, 1000); return; }
+  if (b.hang) { if (b.alive) fs.openSync(b.alive, "w"); fs.writeFileSync(b.ready, String(process.pid)); setInterval(() => {}, 1000); return; }
   if (b.noise) process.stdout.write("x".repeat(b.noise));
   if (b.scipExit) { console.error("error: the fake scip failed"); process.exit(b.scipExit); }
   if (b.garbage) { fs.writeFileSync(a[a.indexOf("--output") + 1], "not a scip index"); process.exit(0); }
@@ -697,6 +703,40 @@ test("D24 (PR 70 ruling): an offer the stored link does not take leaves it, and 
       outcome,
     );
   }
+test("sixth review C: [build] target is read as a TOML string in every quoting form", () => {
+  const host = "x86_64-unknown-linux-gnu";
+  const target = (text) => buildTarget([text], host);
+  assert.equal(
+    target("[build]\ntarget = 'aarch64-unknown-linux-gnu'\n"),
+    "aarch64-unknown-linux-gnu",
+  );
+  assert.equal(
+    target('[build]\ntarget = "aarch64-unknown-linux-gnu" # note\n'),
+    "aarch64-unknown-linux-gnu",
+  );
+  assert.equal(
+    target("[build]\ntarget = '''riscv64gc-unknown-linux-gnu'''\n"),
+    "riscv64gc-unknown-linux-gnu",
+  );
+  assert.equal(
+    target('[build]\ntarget = """thumbv7em-none-eabihf"""\n'),
+    "thumbv7em-none-eabihf",
+  );
+  assert.equal(
+    target("build.target = 'wasm32-unknown-unknown'\n"),
+    "wasm32-unknown-unknown",
+  );
+  assert.match(
+    target("[build]\ntarget = ['a', 'b']\n").unavailable,
+    /more than one build target/,
+  );
+  assert.match(
+    target("[build]\ntarget = 'custom.json'\n").unavailable,
+    /target file/,
+  );
+  assert.equal(target("[net]\noffline = true\n"), host);
+  assert.equal(tomlString('"a\\tb"'), "a\tb");
+  assert.equal(tomlString("'unclosed"), undefined);
 });
 
 test("the SCIP reader reads documents, ranges, roles and rust-analyzer symbols; name sites end at the written name", () => {
@@ -776,7 +816,8 @@ test("gates: a checkout answer at the link's own name site upgrades an unresolve
   assert.equal(gated.data.toolchain, undefined);
   assert.equal(decided["withheld:cfg-link"], 1);
   // A target with cfg variants (`#[cfg(unix)]` / `#[cfg(windows)]` impls): withheld.
-  assert.equal(decided["withheld:cfg-variant"], 1);
+  // Design B: `o.run()` meets the cfg-gated impls of b::Other.
+  assert.equal(decided["withheld:selected-receiver"], 1);
   assert.ok(counts.answer >= 4);
 });
 
@@ -1381,10 +1422,21 @@ test("cancellation: aborting the index ends a rust-analyzer that never finishes 
     writeProject(project, GATES);
     const scip = join(root, "answer.scip");
     writeFileSync(scip, gateScip());
+    // Exit handshake: the hanging fake holds the write end of this FIFO
+    // open; when it dies, by any signal, the reader below sees its end.
+    const alive = join(root, "alive.fifo");
+    execFileSync("mkfifo", [alive]);
+    const gone = new Promise((resolve, reject) => {
+      const stream = createReadStream(alive);
+      stream.on("data", () => {});
+      stream.on("end", resolve);
+      stream.on("error", reject);
+    });
     const tools = fakeToolchain(join(root, "tools"), {
       scip,
       metadata: metadata(),
       hang: true,
+      alive,
     });
     const controller = new AbortController();
     const indexing = index(project, root, {
@@ -1393,31 +1445,14 @@ test("cancellation: aborting the index ends a rust-analyzer that never finishes 
     });
     // Readiness handshake: the fake writes its pid once it is running.
     await ready(tools.ready, indexing);
-    const pid = Number(readFileSync(tools.ready, "utf8"));
     controller.abort();
     const dump = await indexing;
     assert.deepEqual(
       dump.report.analysisErrors.map((e) => e.message),
       ["Indexing was cancelled"],
     );
-    // The kill and the reaping are asynchronous: wait until the process is
-    // gone, by turns of the event loop (a count, not a clock, bounds it).
-    const alive = () => {
-      try {
-        process.kill(pid, 0);
-      } catch {
-        return false;
-      }
-      try {
-        return !/^\d+ \(.*\) Z/.test(readFileSync(`/proc/${pid}/stat`, "utf8"));
-      } catch {
-        return false;
-      }
-    };
-    for (let i = 0; alive(); i++) {
-      assert.ok(i < 20_000, "the fake rust-analyzer is still running");
-      await new Promise((resolve) => setTimeout(resolve, 5));
-    }
+    // The kill is asynchronous: the FIFO's end is the process's exit.
+    await gone;
     assert.deepEqual(
       readdirSync(join(root, "toolchain", "rust")).filter((n) =>
         n.startsWith("run-"),
@@ -1755,13 +1790,33 @@ test(
       const named = (file, name) =>
         upgraded.find((l) => l.file === file && l.targetName === name)
           ?.targetSymbol?.identity;
-      assert.equal(named("app/src/lib.rs", "a.radius"), "impl Circle::radius");
-      assert.equal(
-        named("app/src/lib.rs", "c.diameter"),
-        "impl Circle::diameter",
+      // Design B: paths are decided through their bindings.
+      const helper = dump.links.find(
+        (l) => l.file === "app/src/lib.rs" && l.targetName === "util::helper",
       );
-      assert.equal(named("app/src/lib.rs", "square.side"), "impl Square::side");
-      assert.equal(named("app/src/lib.rs", "macros::Hello"), "derive_hello");
+      assert.equal(helper?.data?.toolchain?.origin, "toolchain");
+      assert.equal(helper?.targetSymbol?.identity, "helper");
+      // run() calls code a build script generates (`generated()`) and a
+      // derive's method (`Greeter.hello()`): macro output on the function's
+      // trace, so its receiver calls are withheld (the trace is the whole
+      // function up to the site, an over-approximation).
+      for (const name of ["a.radius", "c.diameter", "square.side"])
+        assert.equal(
+          dump.links.find(
+            (l) => l.file === "app/src/lib.rs" && l.targetName === name,
+          )?.data?.toolchainOutcome,
+          "withheld:selected-receiver",
+          name,
+        );
+      // Sixth review: source-only records that an opaque item may shadow the
+      // derive path, so the route only confirms it now (confirm-only).
+      assert.equal(
+        dump.links.find(
+          (l) =>
+            l.file === "app/src/lib.rs" && l.targetName === "macros::Hello",
+        )?.data?.toolchainOutcome,
+        "withheld:opaque-shadow",
+      );
       // Dispatch on a trait object stays open: the toolchain names the declaration.
       const dispatch = dump.links.find(
         (l) => l.file === "app/src/lib.rs" && l.targetName === "s.area",
@@ -1779,7 +1834,10 @@ test(
       );
       // A link to code a build-script cfg turns on is withheld.
       assert.ok(
-        (note(dump.report, "merged").decided["withheld:cfg-variant"] ?? 0) >= 1,
+        (note(dump.report, "merged").decided["withheld:opaque-shadow"] ?? 0) +
+          (note(dump.report, "merged").decided["withheld:selected-binding"] ??
+            0) >=
+          1,
       );
     });
   },
@@ -2153,11 +2211,13 @@ test(
         ),
         "the cross-module call is a link",
       );
-      // The narrowed guard: a module under cfg with no twin is answered.
+      // The narrowed guard's positive control moved to the glob crate (no
+      // opaque macro): this crate's cfg_if!-style macro makes every name
+      // here one an opaque item may shadow, so the route only confirms.
       const g = link("gated_ok::g_fn");
       assert.equal(
-        g?.data?.toolchain?.origin,
-        "toolchain",
+        g?.data?.toolchainOutcome,
+        "withheld:opaque-shadow",
         JSON.stringify(g?.data),
       );
       // Never the module e_width for the call e_width::e_width().
@@ -2176,9 +2236,9 @@ test(
       assert.ok(
         // The fifth review's cfg-selected guard now takes some of these
         // first (the use twins); together they withhold at least three.
-        (decided["withheld:cfg-variant"] ?? 0) +
-          (decided["withheld:conditional-candidates"] ?? 0) +
-          (decided["withheld:cfg-selected"] ?? 0) >=
+        (decided["withheld:selected-binding"] ?? 0) +
+          (decided["withheld:selected-receiver"] ?? 0) +
+          (decided["withheld:opaque-shadow"] ?? 0) >=
           3,
         JSON.stringify(decided),
       );
@@ -2374,7 +2434,9 @@ test(
           if (
             l.data?.toolchain !== undefined ||
             l.resolution === "resolved" ||
-            l.data?.toolchainOutcome !== "withheld:cfg-selected"
+            !/^withheld:selected-(binding|receiver)$/.test(
+              l.data?.toolchainOutcome ?? "",
+            )
           )
             wrong.push(
               `${name}: ${l.resolution} ${l.data?.toolchainOutcome ?? l.data?.toolchain?.origin}`,
@@ -2458,7 +2520,7 @@ test(
       assert.equal(cold.state.state, "used");
       assert.ok(
         [...cold.rows.values()].some((row) =>
-          row.includes("withheld:cfg-selected"),
+          row.includes("withheld:selected-"),
         ),
         "the rows hold recorded outcomes",
       );
@@ -2512,7 +2574,7 @@ test("fifth review: an edit that makes the route partial leaves no earlier outco
     assert.equal(first.state.state, "used");
     assert.ok(
       first.links.some(
-        (l) => l.data?.toolchainOutcome === "withheld:cfg-variant",
+        (l) => l.data?.toolchainOutcome === "withheld:selected-receiver",
       ),
       "the used index records an outcome",
     );
@@ -2809,3 +2871,468 @@ test("fifth review: the Cargo configuration outside the project is in the key; c
     );
   });
 });
+
+// Sixth review: selections inside `cfg_if!` (opaque to source-only), glob
+// twins of gated modules, method twins in one impl, and static twins.
+const CFG_IF = [
+  "macro_rules! cfg_if {",
+  "    (if #[cfg($m:meta)] { $($i:item)* } else { $($e:item)* }) => {",
+  "        $(#[cfg($m)] $i)*",
+  "        $(#[cfg(not($m))] $e)*",
+  "    };",
+  "}",
+].join("\n");
+const SIXTH_CRATE = {
+  "Cargo.toml":
+    '[package]\nname = "sixth"\nversion = "0.1.0"\nedition = "2021"\n\n[features]\ndefault = ["fast"]\nfast = []\nasm = []\n',
+  "src/lib.rs": [
+    "#![allow(dead_code, unused_imports)]",
+    CFG_IF,
+    "",
+    "// 1. a use twin inside cfg_if!",
+    "mod a_fast;",
+    "mod a_slow;",
+    "cfg_if! {",
+    '    if #[cfg(feature = "fast")] {',
+    "        pub use a_fast::AEngine;",
+    "    } else {",
+    "        pub use a_slow::AEngine;",
+    "    }",
+    "}",
+    "pub fn a1b(e: &AEngine) -> u32 {",
+    "    e.a_go()",
+    "}",
+    "",
+    "// 1. an alias twin inside cfg_if!",
+    "pub struct BFast;",
+    "impl BFast {",
+    "    pub fn b_go(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct BSlow;",
+    "impl BSlow {",
+    "    pub fn b_go(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    "cfg_if! {",
+    '    if #[cfg(feature = "fast")] {',
+    "        pub type BBackend = BFast;",
+    "    } else {",
+    "        pub type BBackend = BSlow;",
+    "    }",
+    "}",
+    "pub fn b1(x: &BBackend) -> u32 {",
+    "    x.b_go()",
+    "}",
+    "",
+    "// 1. rav1e's shape: a glob inside cfg_if! beside an ungated fallback",
+    "pub mod rust {",
+    "    pub fn ft() -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    '#[cfg(feature = "asm")]',
+    "mod asmx {",
+    "    pub fn ft() -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    "cfg_if! {",
+    '    if #[cfg(feature = "asm")] {',
+    "        pub use asmx::*;",
+    "    } else {",
+    "        pub use self::rust::*;",
+    "    }",
+    "}",
+    "pub fn call_ft() -> u32 {",
+    "    ft()",
+    "}",
+    "",
+    "// 2. glob twins of gated modules (the std/mio sys/mod.rs shape)",
+    "#[cfg(unix)]",
+    "mod gu;",
+    "#[cfg(unix)]",
+    "pub use gu::*;",
+    "#[cfg(not(unix))]",
+    "mod gw;",
+    "#[cfg(not(unix))]",
+    "pub use gw::*;",
+    "pub fn g1() -> u32 {",
+    "    g_thing()",
+    "}",
+    "",
+    "// 3. method twins in one impl block",
+    "pub struct CFast;",
+    "impl CFast {",
+    "    pub fn c_go(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct CSlow;",
+    "impl CSlow {",
+    "    pub fn c_go(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    "pub struct H;",
+    "impl H {",
+    '    #[cfg(feature = "fast")]',
+    "    pub fn c_backend(&self) -> CFast {",
+    "        CFast",
+    "    }",
+    '    #[cfg(not(feature = "fast"))]',
+    "    pub fn c_backend(&self) -> CSlow {",
+    "        CSlow",
+    "    }",
+    "}",
+    "pub fn c1(h: &H) -> u32 {",
+    "    h.c_backend().c_go()",
+    "}",
+    "",
+    "// 3. static twins of different types",
+    "pub struct DFast;",
+    "impl DFast {",
+    "    pub fn d_go(&self) -> u32 {",
+    "        1",
+    "    }",
+    "}",
+    "pub struct DSlow;",
+    "impl DSlow {",
+    "    pub fn d_go(&self) -> u32 {",
+    "        2",
+    "    }",
+    "}",
+    '#[cfg(feature = "fast")]',
+    "static D_IMPL: DFast = DFast;",
+    '#[cfg(not(feature = "fast"))]',
+    "static D_IMPL: DSlow = DSlow;",
+    "pub fn d1() -> u32 {",
+    "    D_IMPL.d_go()",
+    "}",
+    "",
+  ].join("\n"),
+  "src/a_fast.rs":
+    "pub struct AEngine;\n\nimpl AEngine {\n    pub fn a_go(&self) -> u32 {\n        1\n    }\n}\n",
+  "src/a_slow.rs":
+    "pub struct AEngine;\n\nimpl AEngine {\n    pub fn a_go(&self) -> u32 {\n        2\n    }\n}\n",
+  "src/gu.rs": "pub fn g_thing() -> u32 {\n    1\n}\n",
+  "src/gw.rs": "pub fn g_thing() -> u32 {\n    2\n}\n",
+};
+
+test(
+  "real rust-analyzer, sixth review: selections inside cfg_if!, glob twins of gated modules, method twins and static twins are never narrowed",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "sixth");
+      writeProject(project, SIXTH_CRATE);
+      const dump = await index(project, root, { environment: process.env });
+      if (
+        dump.state.state === "unavailable" &&
+        /rust-src/.test(dump.state.reason)
+      )
+        return;
+      assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+      const wrong = [];
+      for (const name of [
+        "AEngine",
+        "e.a_go",
+        "BBackend",
+        "x.b_go",
+        "ft",
+        "g_thing",
+        "h.c_backend().c_go",
+        "D_IMPL.d_go",
+      ]) {
+        const links = dump.links.filter(
+          (l) =>
+            l.file === "src/lib.rs" &&
+            l.targetName === name &&
+            l.kind !== "contains",
+        );
+        if (!links.length) wrong.push(`${name}: no link`);
+        for (const l of links)
+          if (l.data?.toolchain !== undefined || l.resolution === "resolved")
+            wrong.push(
+              `${name}: ${l.kind} ${l.resolution} ${l.targetSymbol?.file ?? ""}#${l.targetSymbol?.identity ?? ""} ${l.data?.toolchainOutcome ?? l.data?.toolchain?.origin ?? ""} ${l.data?.uncertainty ?? ""}`,
+            );
+      }
+      // Every shape is checked before failing, so a run names them all.
+      assert.deepEqual(wrong, []);
+    });
+  },
+);
+
+// Sixth review, item 2: glob twins of gated modules with no opaque macro in
+// the crate (the std/mio sys/mod.rs shape). Only the conditional-candidate
+// rule keeps these sets from being narrowed.
+const GLOB_CRATE = {
+  "Cargo.toml":
+    '[package]\nname = "globs"\nversion = "0.1.0"\nedition = "2021"\n',
+  "src/lib.rs": [
+    "#![allow(dead_code, unused_imports)]",
+    "#[cfg(unix)]",
+    "mod gu;",
+    "#[cfg(unix)]",
+    "pub use gu::*;",
+    "#[cfg(not(unix))]",
+    "mod gw;",
+    "#[cfg(not(unix))]",
+    "pub use gw::*;",
+    "mod user;",
+    "// Sixth review A: one name in two namespaces (cortex-m-rt's exception)",
+    "pub mod rtm;",
+    "// The narrowed guard: a module under cfg with no twin is answered",
+    '#[cfg(not(feature = "never"))]',
+    "mod gated_ok;",
+    "pub fn g2() -> u32 {",
+    "    gated_ok::g_fn()",
+    "}",
+    "pub fn plain_fn() -> u32 {",
+    "    3",
+    "}",
+    "pub fn g3() -> u32 {",
+    "    crate::plain_fn()",
+    "}",
+    "pub fn g1() -> u32 {",
+    "    let s = GSys::open();",
+    "    g_thing() + s.g_run()",
+    "}",
+    "",
+  ].join("\n"),
+  "src/gu.rs":
+    "pub fn g_thing() -> u32 {\n    1\n}\n\npub struct GSys;\n\nimpl GSys {\n    pub fn open() -> Self {\n        GSys\n    }\n    pub fn g_run(&self) -> u32 {\n        1\n    }\n}\n",
+  "src/gw.rs":
+    "pub fn g_thing() -> u32 {\n    2\n}\n\npub struct GSys;\n\nimpl GSys {\n    pub fn open() -> Self {\n        GSys\n    }\n    pub fn g_run(&self) -> u32 {\n        2\n    }\n}\n",
+  "src/user.rs":
+    "use crate::*;\nuse crate::rtm::exception;\n\npub fn u() -> u32 {\n    let s = crate::GSys::open();\n    exception();\n    crate::g_thing() + s.g_run()\n}\n",
+  "src/gated_ok.rs": "pub fn g_fn() -> u32 {\n    1\n}\n",
+  "src/rtm.rs":
+    "pub enum Exception {\n    A,\n}\n\npub use self::Exception as exception;\n\npub fn exception() {}\n",
+};
+
+test(
+  "real rust-analyzer, sixth review: glob twins of gated modules (no opaque macro) keep their candidate sets; the route decides none",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "globs");
+      writeProject(project, GLOB_CRATE);
+      const dump = await index(project, root, { environment: process.env });
+      if (
+        dump.state.state === "unavailable" &&
+        /rust-src/.test(dump.state.reason)
+      )
+        return;
+      assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+      const sites = dump.links.filter(
+        (l) =>
+          ["src/lib.rs", "src/user.rs"].includes(l.file) &&
+          /g_thing|GSys|g_run/.test(l.targetName) &&
+          l.kind !== "contains",
+      );
+      assert.ok(sites.length >= 6, `the sites are links: ${sites.length}`);
+      const decided = sites
+        .filter(
+          (l) => l.data?.toolchain && l.data.toolchain.from !== "definite",
+        )
+        .map((l) => `${l.file} ${l.targetName}: ${l.targetSymbol?.file ?? ""}`);
+      assert.deepEqual(decided, []);
+      // Design B: a module under any cfg is a selection, twin or not.
+      const gatedModule = dump.links.find(
+        (l) => l.file === "src/lib.rs" && l.targetName === "gated_ok::g_fn",
+      );
+      assert.equal(
+        gatedModule?.data?.toolchainOutcome,
+        "withheld:selected-binding",
+        JSON.stringify(gatedModule?.data),
+      );
+      // The positive control: a path through ungated bindings is decided.
+      const control = dump.links.find(
+        (l) => l.file === "src/lib.rs" && l.targetName === "crate::plain_fn",
+      );
+      assert.equal(
+        control?.data?.toolchain?.origin,
+        "toolchain",
+        JSON.stringify(control?.data),
+      );
+      // A: the import of a name bound in two namespaces is not decided.
+      const [imported] = dump.links.filter(
+        (l) =>
+          l.file === "src/user.rs" &&
+          l.kind === "imports" &&
+          l.targetName === "crate::rtm::exception",
+      );
+      assert.ok(imported, "the import is a link");
+      assert.ok(
+        !imported.data?.toolchain ||
+          imported.data.toolchain.from === "definite",
+        JSON.stringify(imported.data),
+      );
+    });
+  },
+);
+
+test("sixth review D: only a readable index is cached; a bad index is never kept, and a damaged cached pair is run again once", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, GATES);
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    const dir = join(root, "tools");
+    const tools = fakeToolchain(dir, {
+      scip,
+      metadata: metadata(),
+      garbage: true,
+    });
+    const cached = () =>
+      readdirSync(join(root, "toolchain", "rust")).filter((n) =>
+        /^scip-[0-9a-f]+\.scip$/.test(n),
+      );
+    const bad = await index(project, root, { environment: environment(tools) });
+    assert.equal(bad.state.state, "unavailable");
+    assert.match(bad.state.reason, /index cannot be read/);
+    assert.deepEqual(cached(), [], "a bad index is not cached");
+    // The next explicit index runs again and recovers.
+    fakeToolchain(dir, { scip, metadata: metadata() });
+    const good = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(good.state.state, "used", JSON.stringify(good.state));
+    assert.equal(runs(tools), 2);
+    assert.equal(cached().length, 1);
+    // A cached pair damaged on disk is discarded and run again.
+    writeFileSync(join(root, "toolchain", "rust", cached()[0]), "damaged");
+    const again = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(again.state.state, "used", JSON.stringify(again.state));
+    assert.equal(note(again.report, "available").cached, false);
+    assert.equal(runs(tools), 3);
+  });
+});
+
+test("sixth review E: a path dependency outside the checkout is in the key; restoring it re-runs on the next query without touching the checkout", async () => {
+  await scratch(async (root) => {
+    const outside = join(root, "outside-dep");
+    const { steps } = await failingRoute(
+      root,
+      {},
+      {
+        setup: (project) =>
+          writeFileSync(
+            join(project, "Cargo.toml"),
+            GATES["Cargo.toml"] +
+              `\n[dependencies]\ndep = { path = ${JSON.stringify(outside)} }\n`,
+          ),
+        edit: () => {
+          mkdirSync(join(outside, "src"), { recursive: true });
+          writeFileSync(
+            join(outside, "Cargo.toml"),
+            '[package]\nname = "dep"\nversion = "0.1.0"\nedition = "2021"\n',
+          );
+          writeFileSync(join(outside, "src", "lib.rs"), "pub fn d() {}\n");
+        },
+      },
+    );
+    assert.deepEqual(steps, [
+      ["index", "used", 1],
+      ["unchanged", "used", 1],
+      ["unchanged", "used", 1],
+      ["unchanged", "used", 1],
+      ["updated", "used", 2],
+    ]);
+  });
+});
+
+test(
+  "real rust-analyzer, sixth review G: every link the route did not decide stores its route-off data exactly, apart from its outcome",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "cfgs");
+      writeProject(project, CFG_CRATE);
+      const on = await index(project, root, { environment: process.env });
+      if (on.state.state === "unavailable" && /rust-src/.test(on.state.reason))
+        return;
+      assert.equal(on.state.state, "used", JSON.stringify(on.state));
+      const off = await index(project, root, {
+        environment: process.env,
+        toolchains: null,
+      });
+      const offData = new Map(off.links.map((l) => [l.id, l.data]));
+      const withOutcome = on.links.filter((l) => l.data?.toolchainOutcome);
+      assert.ok(withOutcome.length >= 5, String(withOutcome.length));
+      const differs = [];
+      for (const l of withOutcome) {
+        const { toolchainOutcome: _outcome, ...data } = l.data;
+        if (JSON.stringify(data) !== JSON.stringify(offData.get(l.id)))
+          differs.push(`${l.targetName}: ${JSON.stringify(data)}`);
+      }
+      assert.deepEqual(differs, []);
+    });
+  },
+);
+
+// Design B's oracle: crates from the review rounds' selection shapes, the
+// route run with and without default features. No link decided in both may
+// name two different targets; the control is decided in both (not vacuous).
+for (const seed of [4301, 4302])
+  test(
+    `real rust-analyzer, design B oracle (seed ${seed}): no link decided under one setting names a different target under the other`,
+    needsAnalyzer,
+    async () => {
+      await scratch(async (root) => {
+        const project = join(root, "oracle");
+        const { files, ingredients } = generateOracle(seed, 5);
+        writeProject(project, files);
+        const a = await index(project, root, {
+          environment: process.env,
+          store: "a.sqlite",
+          toolchainDirectory: "tc-a",
+        });
+        if (a.state.state === "unavailable" && /rust-src/.test(a.state.reason))
+          return;
+        setRunControls({ noDefaultFeatures: true });
+        let b;
+        try {
+          b = await index(project, root, {
+            environment: process.env,
+            store: "b.sqlite",
+            toolchainDirectory: "tc-b",
+          });
+        } finally {
+          setRunControls({});
+        }
+        assert.equal(a.state.state, "used", JSON.stringify(a.state));
+        assert.equal(b.state.state, "used", JSON.stringify(b.state));
+        const decided = (dump) =>
+          new Map(
+            dump.links
+              .filter((l) => l.data?.toolchain?.target)
+              .map((l) => [l.id, [l.targetName, l.data.toolchain.target]]),
+          );
+        const da = decided(a);
+        const db = decided(b);
+        const conflicts = [...da]
+          .filter(([id, pair]) => db.has(id) && db.get(id)[1] !== pair[1])
+          .map(([, pair]) => pair[0]);
+        assert.deepEqual(conflicts, [], ingredients.join(", "));
+        const control = (dump) =>
+          dump.links.find((l) => l.targetName === "crate::p0_free")?.data
+            ?.toolchain?.origin;
+        assert.equal(
+          control(a),
+          "toolchain",
+          "the control is decided (default)",
+        );
+        assert.equal(
+          control(b),
+          "toolchain",
+          "the control is decided (no default)",
+        );
+      });
+    },
+  );
