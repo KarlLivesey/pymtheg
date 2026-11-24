@@ -646,7 +646,7 @@
     "ambiguousBefore": 1717,
     "ambiguousChanged": 0,
     "newDefinite": {
-      "other": 516
+      "other": 535
     },
     "rust": {
       "before": 0,

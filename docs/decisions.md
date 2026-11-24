@@ -3568,7 +3568,7 @@ object literals in call arguments get no symbols. **Trade:** a receiver the walk
 type-literal member unresolved (an interface or class member keeps the
 checker's answer); on the 19 pins 14 of main's definite links change (13
 to candidate sets, of which 12 were right on main and are wider now; 1
-lost; none retargeted) against 5,519 gained, a walked choice is not
+lost; none retargeted) against 5,538 gained, a walked choice is not
 narrowed beyond what assignability shows, and a member read that is not
 called keeps the checker's answer. Three shapes keep the checker's
 reduced answer (limits in the note): narrowing to an intersection,

@@ -11,7 +11,7 @@ pmndrs/zustand	7092	5927	0	83.57	0.00
 puppeteer/puppeteer	58189	45429	552	78.07	0.95
 react-hook-form/react-hook-form	48865	38447	0	78.68	0.00
 reduxjs/redux-toolkit	57054	47682	0	83.57	0.00
-trpc/trpc	107126	96772	0	90.33	0.00
+trpc/trpc	107126	96791	0	90.35	0.00
 vercel/turborepo	53385	38005	8709	71.19	16.31
 vitejs/vite	55530	46342	6296	83.45	11.34
 vitest-dev/vitest	116096	96477	37654	83.10	32.43
