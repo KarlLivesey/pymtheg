@@ -245,6 +245,15 @@ function nameAt(node: ts.Node, start: number): ts.Identifier | undefined {
   }
   return undefined;
 }
+/** The declarations the compiler compares with each other: variables,
+ * properties, and classes and interfaces (for their type parameters). */
+function comparedKind(node: ts.Node): string | undefined {
+  if (ts.isVariableDeclaration(node)) return "variable";
+  if (ts.isPropertySignature(node) || ts.isPropertyDeclaration(node))
+    return "property";
+  if (ts.isClassLike(node) || ts.isInterfaceDeclaration(node)) return "type";
+  return undefined;
+}
 /** Whether the compiler finds two declarations' type parameters different
  * (TS2428): names, and constraints and defaults where both have one; a
  * declaration may omit trailing parameters that have defaults. Compared as
@@ -1146,7 +1155,8 @@ export function extractFile(
     let checked = 0;
     // The diagnostics first: whether a declaration was reported decides
     // what its symbol's other declarations are paired with.
-    const diagnosed: { diagnostic: ts.Diagnostic; own: GlobalDeclaration }[] = [];
+    const diagnosed: { diagnostic: ts.Diagnostic; own: GlobalDeclaration }[] =
+      [];
     const reportedAt = new Set<string>();
     for (const [file, entries] of byFile) {
       const statements = [
@@ -1190,20 +1200,28 @@ export function extractFile(
       const others = (diagnostic.relatedInformation ?? []).map((info) =>
         at(info.file, info.start),
       );
-      if (declaration && (diagnostic.code === 2428 || diagnostic.code === 2687)) {
+      // Only the declarations the compiler compares with this one: a
+      // merged symbol also has its interface beside a `var` of one name.
+      const compared = declaration
+        ? declarations.filter(
+            (other) =>
+              other !== declaration &&
+              comparedKind(other) !== undefined &&
+              comparedKind(other) === comparedKind(declaration),
+          )
+        : [];
+      if (diagnostic.code === 2428 || diagnostic.code === 2687) {
         // Reported on declarations with no related location: the ones the
         // compiler's comparison finds different are the other side.
         const differs =
           diagnostic.code === 2428 ? typeParametersDiffer : modifiersDiffer;
-        for (const other of declarations)
-          if (other !== declaration && differs(declaration, other))
-            others.push(enclosing(other));
+        for (const other of compared)
+          if (differs(declaration!, other)) others.push(enclosing(other));
       } else if (diagnostic.code === 2403 || diagnostic.code === 2717)
         // Compared with the first declaration: the declarations not
         // reported agree with it, so they disagree with this one too.
-        for (const other of declarations)
-          if (other !== declaration && !reported(other))
-            others.push(enclosing(other));
+        for (const other of compared)
+          if (!reported(other)) others.push(enclosing(other));
       return others.filter(
         (other): other is GlobalDeclaration =>
           !!other && other.name === own.name,

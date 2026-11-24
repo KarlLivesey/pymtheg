@@ -1819,7 +1819,11 @@ test("a conflict inside a global namespace both units declare is found", async (
     ),
     "src/main.ts": "helper();\nexport {};\n",
   });
-  const conflicting = await globalsCase(files("number"), "src/main.ts", "helper");
+  const conflicting = await globalsCase(
+    files("number"),
+    "src/main.ts",
+    "helper",
+  );
   assert.equal(conflicting.data.mergedGlobal, undefined);
   const agreeing = await globalsCase(files("string"), "src/main.ts", "helper");
   assert.equal(agreeing.data.mergedGlobal, true);
@@ -1960,7 +1964,10 @@ test("two installed versions of @types/node in conflict leave a merged global ma
     "index.d.ts": `declare module "url" { global { var dual: { n: ${n} }; function helper(): void; } }\n`,
   });
   const files = {
-    "tsconfig.json": config({ lib: ["es2022"], types: ["node", "env-pkg", "env-b"] }),
+    "tsconfig.json": config({
+      lib: ["es2022"],
+      types: ["node", "env-pkg", "env-b"],
+    }),
     ...Object.fromEntries(
       Object.entries(nodeTypes("20.0.0", "number")).map(([k, v]) => [
         `node_modules/@types/node/${k}`,
@@ -1992,7 +1999,10 @@ test("the DOM and WebWorker libraries in conflict leave a merged global of the D
         lib: ["es2022", "dom", "webworker"],
         types: ["node"],
       }),
-      "node_modules/@types/node/package.json": manifest("@types/node", "20.0.0"),
+      "node_modules/@types/node/package.json": manifest(
+        "@types/node",
+        "20.0.0",
+      ),
       "node_modules/@types/node/index.d.ts": [
         "export {};",
         "declare global {",
