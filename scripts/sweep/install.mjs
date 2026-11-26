@@ -160,6 +160,11 @@ export async function installation(root, scratch, { legacyPeerDeps = false } = {
     };
   }
   if (manager === "pnpm") {
+    // Dev dependencies whatever the project's configuration says: through
+    // pnpm's configuration environment, since pnpm 12 takes no value for
+    // `--prod` (missingPackages checks the result either way).
+    env.npm_config_production = "false";
+    env.npm_config_dev = "true";
     const version = exact?.[2] ?? (/lockfileVersion:\s*['"]?6/.test(lock) ? "8.15.9" : "10.15.1");
     // The native pnpm 12 CLI uses the installer defaults for its virtual store.
     const legacy = Number.parseInt(version, 10) < 12;
@@ -173,8 +178,6 @@ export async function installation(root, scratch, { legacyPeerDeps = false } = {
       args: [
         ...frozen,
         "--ignore-pnpmfile",
-        // Dev dependencies whatever the project's configuration says.
-        "--production=false",
         ...(legacy ? [
           "--config.manage-package-manager-versions=false",
           "--virtual-store-dir=node_modules/.pnpm",

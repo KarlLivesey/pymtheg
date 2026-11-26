@@ -27,9 +27,10 @@ test("the sweep's installers are told to install dev dependencies", async (t) =>
   assert.ok((await installation(root, root)).args.includes("--include=dev"));
   await rm(join(root, "package-lock.json"));
   await writeFile(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
-  assert.ok(
-    (await installation(root, root)).args.includes("--production=false"),
-  );
+  // pnpm 12 takes no value for `--prod`: through its configuration.
+  const pnpm = await installation(root, root);
+  assert.equal(pnpm.env.npm_config_production, "false");
+  assert.ok(!pnpm.args.some((arg) => arg.startsWith("--prod")));
   await rm(join(root, "pnpm-lock.yaml"));
   await writeFile(join(root, "yarn.lock"), "# yarn lockfile v1\n");
   assert.ok(

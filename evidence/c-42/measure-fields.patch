@@ -1,5 +1,5 @@
 diff --git a/src/graph/languages/typescript/extract.ts b/src/graph/languages/typescript/extract.ts
-index cd24d2a9..d7f1d36b 100644
+index f8677c3d..7a9e5eaa 100644
 --- a/src/graph/languages/typescript/extract.ts
 +++ b/src/graph/languages/typescript/extract.ts
 @@ -1,4 +1,5 @@
@@ -16,7 +16,30 @@ index cd24d2a9..d7f1d36b 100644
    /**
     * Why there is no complete target set: external, local, no-symbol,
     * missing-module, external-package, unresolved-alias, computed-specifier.
-@@ -1123,6 +1125,18 @@ export function extractFile(
+@@ -1090,6 +1092,7 @@ export function extractFile(
+       at(file, start)?.unit ?? (file ? fileUnits.get(file) : undefined);
+     // Statements submitted to the second checker (`typescript.conflictChecks`).
+     let checked = 0;
++    const troubling: unknown[] = [];
+     for (const [file, entries] of byFile) {
+       const statements = [
+         ...new Set(
+@@ -1119,9 +1122,34 @@ export function extractFile(
+         const units = new Set(touched);
+         if (diagnostic.relatedInformation?.length && units.size === 1) continue;
+         for (const unit of units) unitConflicts.troubled.add(unit);
++        if (troubling.length < 40)
++          troubling.push({
++            code: diagnostic.code,
++            file: diagnostic.file?.fileName ?? null,
++            related: (diagnostic.relatedInformation ?? []).map(
++              (info) => info.file?.fileName ?? null,
++            ),
++            units: [...units],
++            message: ts
++              .flattenDiagnosticMessageText(diagnostic.messageText, " ")
++              .slice(0, 160),
++          });
        }
      }
      count("typescript.conflictChecks", checked);
@@ -30,12 +53,13 @@ index cd24d2a9..d7f1d36b 100644
 +          checked,
 +          names: shared.size,
 +          troubled: [...unitConflicts.troubled],
++          troubling,
 +        }) + "\n",
 +      );
      // Cached only once complete: an exception leaves no partial answer.
      unitConflictsByProgram.set(program, unitConflicts);
      return unitConflicts;
-@@ -1177,6 +1191,8 @@ export function extractFile(
+@@ -1176,6 +1204,8 @@ export function extractFile(
      // whether any library fact is synthesised or outside the global scope.
      const librarySymbols = new Set<ts.Symbol | undefined>();
      let unmergedLibrary = false;
@@ -44,7 +68,7 @@ index cd24d2a9..d7f1d36b 100644
      let installedType = false;
      let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
      let verifyObjectProducers = false;
-@@ -1448,6 +1464,7 @@ export function extractFile(
+@@ -1447,6 +1477,7 @@ export function extractFile(
                      if (node) {
                        (libraryFacts ??= new Map()).set(libraryKey(node), node);
                        unmergedLibrary = true;
@@ -52,7 +76,7 @@ index cd24d2a9..d7f1d36b 100644
                      } else missingGlobalTypes = true;
                    }
                  } else if (
-@@ -1458,6 +1475,7 @@ export function extractFile(
+@@ -1457,6 +1488,7 @@ export function extractFile(
                    if (node) {
                      (libraryFacts ??= new Map()).set(libraryKey(node), node);
                      unmergedLibrary = true;
@@ -60,7 +84,7 @@ index cd24d2a9..d7f1d36b 100644
                    } else missingGlobalTypes = true;
                  }
                }
-@@ -1468,9 +1486,10 @@ export function extractFile(
+@@ -1467,9 +1499,10 @@ export function extractFile(
                importer.targetKey(proved),
                proved,
              );
@@ -73,7 +97,7 @@ index cd24d2a9..d7f1d36b 100644
            } else if (inCheckout(declaration)) {
              if (!record(declaration, current)) local++;
            } else external++;
-@@ -1587,6 +1606,28 @@ export function extractFile(
+@@ -1586,6 +1619,28 @@ export function extractFile(
            ({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit),
          ) &&
          !unitsConflict(libraries);
@@ -102,7 +126,7 @@ index cd24d2a9..d7f1d36b 100644
        return {
          targets,
          viaAlias,
-@@ -1594,6 +1635,7 @@ export function extractFile(
+@@ -1593,6 +1648,7 @@ export function extractFile(
          declarations,
          ...(libraries && { libraryFacts: libraries }),
          ...(merged && { mergedGlobal: true }),
@@ -110,7 +134,7 @@ index cd24d2a9..d7f1d36b 100644
          ...(unbuiltEntry && { unbuiltEntry }),
          ...(viaSpecifier && { viaSpecifier }),
        };
-@@ -2591,6 +2633,10 @@ export function extractFile(
+@@ -2590,6 +2646,10 @@ export function extractFile(
            ...target,
          }));
          if (found.mergedGlobal) facts.mergedGlobal = true;
