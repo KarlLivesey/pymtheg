@@ -1390,11 +1390,10 @@ test("D24: an unresolved link answered with a standard-library item becomes a li
     assert.equal(caller.data.toolchainLibrary.selection, "none-seen");
     assert.equal(caller.data.toolchainLibrary.selectionReason, undefined);
     assert.equal(typeof caller.data.toolchainLibrary.routeOff, "object");
-    // The twin under cfg(feature = "extra") is decided for this
-    // configuration, labelled.
-    assert.equal(gated.resolution, "library");
-    assert.equal(gated.data.toolchainLibrary.selection, "seen");
-    assert.equal(gated.data.toolchainLibrary.selectionReason, "cfg-link");
+    // The twin under cfg(feature = "extra") (answered here with the
+    // checkout item) is decided for this configuration, labelled.
+    assert.equal(gated.resolution, "resolved");
+    assert.equal(gated.data.toolchain.selectionReason, "cfg-link");
   });
 });
 
