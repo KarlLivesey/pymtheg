@@ -10,12 +10,14 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { test } from "node:test";
 import {
   discoverLanguages,
   indexProject,
   SqliteGraphStore,
 } from "../dist/graph/index.js";
+import { graphWork, resetGraphWork } from "../dist/graph/work.js";
 import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 
 const source = `package p
@@ -78,6 +80,62 @@ func Nested() int {
 	k := func() int { return 3 }
 	inner := func() int { return k() }
 	return inner()
+}
+
+func Reassigned() int {
+	var f func() int
+	f = Closure
+	return f()
+}
+
+func mk() (int, func()) { return 0, func() {} }
+
+func Multi() {
+	var c func()
+	_, c = mk()
+	c()
+}
+
+type HF func()
+
+func (h *HF) Reset() { *h = nil }
+
+func NamedType() {
+	var h HF = func() {}
+	h.Reset()
+	h()
+}
+
+func NamedTypeWritten() {
+	var w HF
+	w = func() {}
+	w()
+}
+
+func Other() int { return 7 }
+
+func VarNamed() int {
+	var f = Other
+	var g func() int = Other
+	return f() + g()
+}
+
+func Ranged(fs []func()) {
+	var g func()
+	g = func() {}
+	for _, g = range fs {
+	}
+	g()
+}
+
+func Received(ch chan func()) {
+	var f func()
+	f = func() {}
+	select {
+	case f = <-ch:
+	default:
+	}
+	f()
 }
 
 var pkg = func() int { return 1 }
@@ -170,6 +228,52 @@ test("calls through one local func literal target the enclosing function; parame
         [[null, null, null]],
         `${from} ${name}`,
       );
+    // Declared without a value and written once, but not with a func
+    // literal: a named function, or one value of a multi-value call. No
+    // claim; the target is the one main gives.
+    assert.deepEqual(
+      by("Reassigned", "f").map((call) => [call.target, call.localBinding]),
+      [[null, null]],
+    );
+    assert.deepEqual(
+      by("Multi", "c").map((call) => [call.target, call.localBinding]),
+      [[null, null]],
+    );
+    // Declared with a value that is not a func literal: a named function,
+    // with or without a declared func type. Main's targets.
+    assert.deepEqual(
+      [...by("VarNamed", "f"), ...by("VarNamed", "g")].map((call) => [
+        call.name,
+        call.target,
+        call.localBinding,
+      ]),
+      [
+        ["f", "Other", null],
+        ["g", null, null],
+      ],
+    );
+    // A func literal, then a write the extractor cannot follow (a range or
+    // receive `=`): no claim, as main.
+    for (const [from, name] of [
+      ["Ranged", "g"],
+      ["Received", "f"],
+    ])
+      assert.deepEqual(
+        by(from, name).map((call) => [call.target, call.localBinding]),
+        [[null, null]],
+        `${from} ${name}`,
+      );
+    // A binding of a named func type: a method may write it (`h.Reset()`
+    // takes `&h`), so it is never claimed, with a value or written once.
+    for (const [from, name] of [
+      ["NamedType", "h"],
+      ["NamedTypeWritten", "w"],
+    ])
+      assert.deepEqual(
+        by(from, name).map((call) => [call.target, call.localBinding]),
+        [[null, null]],
+        `${from} ${name}`,
+      );
     // A named function value, shadowing included: its own target, as before.
     assert.deepEqual(
       by("Named", "h").map((call) => [call.target, call.localBinding]),
@@ -204,7 +308,7 @@ test("calls through one local func literal target the enclosing function; parame
     // function to target: as before.
     assert.deepEqual(
       calls
-        .filter((call) => call.name === "c")
+        .filter((call) => call.name === "c" && call.from !== "Multi")
         .map((call) => [call.target, call.localBinding, call.reason]),
       [
         [null, null, null],
@@ -253,6 +357,63 @@ test("an edit between one closure and two re-indexes to what a cold index stores
         `step ${step}`,
       );
     }
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a store whose Go records were made by module version 32 is re-parsed and equals a cold index", async () => {
+  const { base, root } = tree(source);
+  const path = join(base, "graph.sqlite");
+  try {
+    const registry = await discoverLanguages();
+    const first = new SqliteGraphStore(path);
+    await indexProject(root, registry, first);
+    const projectId = first.projectId;
+    first.close();
+    // As version 32 left them: no local-call facts, and its version. The
+    // completion record is put back after the rewrite, so the next run
+    // trusts every record whose version is current, and only the version
+    // can make it parse them again.
+    const db = new DatabaseSync(path);
+    const meta = db.prepare("SELECT key, value FROM graph_meta").all();
+    let rewritten = 0;
+    for (const row of db.prepare("SELECT path, body FROM graph_files").all()) {
+      const file = JSON.parse(row.body);
+      if (file.module !== "go") continue;
+      file.version = "32";
+      for (const link of file.result.links ?? [])
+        if (link.data) {
+          delete link.data.localBinding;
+          delete link.data.localParameter;
+          delete link.data.reason;
+        }
+      db.prepare("UPDATE graph_files SET body=? WHERE path=?").run(
+        JSON.stringify(file),
+        row.path,
+      );
+      rewritten++;
+    }
+    for (const { key, value } of meta)
+      db.prepare(
+        "INSERT OR REPLACE INTO graph_meta (key, value) VALUES (?, ?)",
+      ).run(key, value);
+    db.close();
+    assert.ok(rewritten > 0);
+    resetGraphWork();
+    const again = new SqliteGraphStore(path);
+    await indexProject(root, registry, again);
+    again.close();
+    assert.equal(
+      graphWork.counts["parse.go.files"],
+      rewritten,
+      "every Go record is parsed again",
+    );
+    const cold = join(base, "cold.sqlite");
+    const fresh = new SqliteGraphStore(cold, projectId);
+    await indexProject(root, registry, fresh);
+    fresh.close();
+    assert.deepEqual(compareRows(storeRows(path), storeRows(cold)), []);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }

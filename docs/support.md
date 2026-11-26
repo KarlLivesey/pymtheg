@@ -415,10 +415,11 @@ file (its ID can change when files are added or removed).
   selection names it: a field or concrete method gets `Owner.Name` with its
   declaring named type and package, evidence `declaring-owner`;
   third-party interface methods stay dispatch.
-- **Local func values (C-61):** a call through a local binding that provably
+- **Local func values (C-63):** a call through a local binding that provably
   holds exactly one func literal (declared with it and never written, or
   declared without a value and written once with one; no write the source
-  hides, such as an address taken) targets the enclosing function or method,
+  hides, such as an address taken; not of a named func type, whose methods
+  can write it) targets the enclosing function or method,
   with the binding's name and declaration span in `data.localBinding` (the
   Rust and TypeScript form). A call through a parameter, a named result or a
   receiver is unresolved with the reason `local`: its value comes from the

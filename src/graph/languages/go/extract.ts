@@ -236,6 +236,11 @@ interface Binding {
   /** Declared with a value (not a zero value); `literal` when it is a func literal. */
   initialized?: boolean;
   literal?: boolean;
+  /**
+   * Declared with a named type (`var h HF`): its methods can write it
+   * through an implicit `&h` the extractor does not see.
+   */
+  namedType?: boolean;
   /** For each write, whether it assigns a func literal. */
   literalWrites: boolean[];
 }
@@ -245,6 +250,7 @@ interface Declared {
   parameter?: boolean;
   initialized?: boolean;
   literal?: boolean;
+  namedType?: boolean;
 }
 
 /**
@@ -440,6 +446,7 @@ export class GoExtractor {
       ...(declared.parameter ? { parameter: true } : {}),
       ...(declared.initialized ? { initialized: true } : {}),
       ...(declared.literal ? { literal: true } : {}),
+      ...(declared.namedType ? { namedType: true } : {}),
     };
     this.scopes
       .at(-1)!
@@ -1728,6 +1735,7 @@ export class GoExtractor {
               at: name,
               initialized: values.length > 0,
               literal: isFuncLiteral(values, names.length, index),
+              namedType: !!type && unparen(type).type !== "function_type",
             }),
           );
         }
@@ -2042,10 +2050,12 @@ function isFuncLiteral(
  * A binding that can hold only one func literal: declared with it and never
  * written, or declared without a value and written exactly once, with a func
  * literal. A write the extractor cannot see (address taken, op-assignment)
- * proves nothing.
+ * proves nothing, and neither does a binding of a named type, whose methods
+ * can write it.
  */
 function singleLiteral(binding: Binding): boolean {
-  if (binding.opaque) return false;
+  // A named func type has methods, and a method call writes through `&h`.
+  if (binding.opaque || binding.namedType) return false;
   if (binding.initialized)
     return !!binding.literal && binding.writes.length === 0;
   return binding.writes.length === 1 && binding.literalWrites[0] === true;
