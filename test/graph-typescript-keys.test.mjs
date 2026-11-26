@@ -570,7 +570,7 @@ test("for scope texts with the bound names beside escapes, quotes and unicode, a
 
 // C-60 review: the module version moves with the keys, so a store written
 // by an earlier version is rebuilt, never reused with its old keys. The
-// store here is made to look so: its TypeScript rows carry version 49, and
+// store here is made to look so: its TypeScript rows carry version 51, and
 // one symbol row differs as main's keys did.
 test("a store written by the previous TypeScript module version is rebuilt and equals a cold index", async () => {
   await withTree(renamedTree({ "lib.cjs": MULTILINE }), async (tree) => {
@@ -579,10 +579,10 @@ test("a store written by the previous TypeScript module version is rebuilt and e
     try {
       const changed = db
         .prepare(
-          'UPDATE graph_files SET body=replace(body, \'"version":"50+typescript-\', \'"version":"49+typescript-\') WHERE body LIKE \'%"version":"50+typescript-%\'',
+          'UPDATE graph_files SET body=replace(body, \'"version":"52+typescript-\', \'"version":"51+typescript-\') WHERE body LIKE \'%"version":"52+typescript-%\'',
         )
         .run().changes;
-      assert.ok(changed > 0, "TypeScript rows at version 50");
+      assert.ok(changed > 0, "TypeScript rows at version 52");
       db.prepare(
         "UPDATE graph_symbols SET body=replace(body, '\"identity\":\"', '\"identity\":\"old.') WHERE rowid=(SELECT min(rowid) FROM graph_symbols WHERE file='lib.cjs')",
       ).run();
