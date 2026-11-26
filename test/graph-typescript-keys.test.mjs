@@ -579,9 +579,8 @@ test("a store written by the previous TypeScript module version is rebuilt and e
     try {
       // The current version's leading number, and the one before it.
       const current = /"version":"(\d+)\+typescript-/.exec(
-        db
-          .prepare("SELECT body FROM graph_files WHERE path='lib.cjs'")
-          .get().body,
+        db.prepare("SELECT body FROM graph_files WHERE path='lib.cjs'").get()
+          .body,
       )[1];
       const previous = String(Number(current) - 1);
       const changed = db

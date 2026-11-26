@@ -11,7 +11,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { installation, missingPackages } from "../scripts/sweep/install.mjs";
+import {
+  installation,
+  missingPackages,
+  workspacePatterns,
+} from "../scripts/sweep/install.mjs";
 
 const run = promisify(execFile);
 const json = (value) => JSON.stringify(value, null, 2) + "\n";
@@ -121,14 +125,16 @@ test("an `omit=dev` project installs its dev typings, and without that it is cau
 
 test("pnpm workspace lists are read in block and flow style", async (t) => {
   assert.deepEqual(
-    workspacePatterns('packages:\n  - "packages/*"\n  - apps/* # apps\n\n  - \'!**/test\'\nother: 1\n'),
+    workspacePatterns(
+      "packages:\n  - \"packages/*\"\n  - apps/* # apps\n\n  - '!**/test'\nother: 1\n",
+    ),
     ["packages/*", "apps/*", "!**/test"],
   );
   assert.deepEqual(workspacePatterns("packages:\n- tools\n"), ["tools"]);
-  assert.deepEqual(
-    workspacePatterns('packages: ["packages/*", apps/*]\n'),
-    ["packages/*", "apps/*"],
-  );
+  assert.deepEqual(workspacePatterns('packages: ["packages/*", apps/*]\n'), [
+    "packages/*",
+    "apps/*",
+  ]);
   assert.deepEqual(
     workspacePatterns("packages: [\n  'packages/*', # all\n  tools\n]\n"),
     ["packages/*", "tools"],
@@ -138,7 +144,10 @@ test("pnpm workspace lists are read in block and flow style", async (t) => {
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(join(root, "packages", "web"), { recursive: true });
   await writeFile(join(root, "package.json"), json({ name: "root" }));
-  await writeFile(join(root, "pnpm-workspace.yaml"), 'packages: ["packages/*"]\n');
+  await writeFile(
+    join(root, "pnpm-workspace.yaml"),
+    'packages: ["packages/*"]\n',
+  );
   await writeFile(
     join(root, "packages", "web", "package.json"),
     json({ name: "web", dependencies: { kit: "1.0.0" } }),
