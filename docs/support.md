@@ -986,6 +986,17 @@ the project links whose target, or one of whose candidates, is library unit
 It finds only stored library targets: unresolved links may hide more uses. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
 
+**Analysis path (C-38A).** An index reports, per module that reports one
+and has files in the index, the path its analysis took:
+`sync.report.analysisPaths` in the JSON, and an `Analysis MODULE: PATH`
+line in the CLI's text (`Analysis typescript: full (no previous index)`).
+TypeScript reports `full` or `reused`; Go and Rust report none yet. The
+note `no previous index` means no run finished completely before this one
+(the store's `index-completed` record). A TypeScript store written before
+that record existed reports `no previous index` once, on its next index,
+which writes the record (tested whether its last run finished or not).
+[C-38A](changes/C-38A.md)
+
 **Concurrent index runs (C-62).** When two index runs overlap, the one
 another run has overtaken writes nothing and never disturbs the newer run's
 mark. Its baseline is read before it walks the tree, so a commit by any
@@ -995,7 +1006,9 @@ would write), since another run may have found the newer tree current
 without writing. Only the newest run that claimed the store publishes its
 completion. The overtaken run answers taken over, stale or incomplete; the
 newer run's result stands, and the store equals a cold index of the tree
-with no further index. No lease or timeout is involved.
+with no further index. In an index session (the MCP server's worker), an
+overtaken run keeps nothing, and the session drops what it had kept
+(C-55's kept inputs included). No lease or timeout is involved.
 [C-62](changes/C-62.md)
 
 An explicit source-only index can reuse a verified completion checkpoint

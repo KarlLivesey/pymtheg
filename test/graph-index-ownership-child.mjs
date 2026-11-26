@@ -10,8 +10,11 @@
 //   before-finish   the run's finishIndexRun, its mark still held
 //   before-publish  the command's completion record, after its rows
 //   none            no stop
-// <how> is "index" (indexProject, the indexer's walk only) or "command"
-// (executeGraph's `graph index`, which publishes the completion record).
+// <how> is "index" (indexProject, the indexer's walk only), "command"
+// (executeGraph's `graph index`, which publishes the completion record) or
+// "session" (C-55: two `graph index` runs in one IndexSession; the first,
+// ungated, keeps the modules' inputs; the child says so and waits for the
+// parent's "go" before the second, gated run).
 // usage: node graph-index-ownership-child.mjs <root> <how> <gate>
 import fs, { writeSync } from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
@@ -19,6 +22,7 @@ import { executeGraph } from "../dist/graph/commands.js";
 import {
   discoverLanguages,
   indexProject,
+  IndexSession,
   SqliteGraphStore,
 } from "../dist/graph/index.js";
 
@@ -27,8 +31,11 @@ const [root, how, gate] = process.argv.slice(2);
 const languages = await discoverLanguages();
 const proto = SqliteGraphStore.prototype;
 let held = false;
+// In a session, only the second run is gated.
+let armed = how !== "session";
+let walked = false;
 const hold = () => {
-  if (held) return;
+  if (held || !armed) return;
   held = true;
   // Synchronously, from inside the store code: the message on the IPC
   // channel, then the stop; nothing after runs until SIGCONT.
@@ -45,13 +52,15 @@ const before = (name, when = () => true) => {
 };
 if (gate === "after-walk") {
   // The walk is the indexer's only directory read in an `index` run.
-  let walked = false;
   const readdir = fs.promises.readdir;
   fs.promises.readdir = function (...args) {
-    walked = true;
+    // The indexer's walk only: a command's inventory reads directories too.
+    if (new Error().stack?.includes("/graph/indexer.js")) walked = true;
     return readdir.apply(this, args);
   };
   syncBuiltinESMExports();
+  // The first of these after the walk: the baseline where a build reads it
+  // after the walk, else the indexer's read right after the walk.
   for (const name of ["beginIndexRun", "completedAnalysis"])
     before(name, () => walked);
 } else if (gate === "after-parse") before("replaceContexts");
@@ -61,7 +70,18 @@ else if (gate !== "none") throw Error("unknown gate " + gate);
 
 let reply;
 try {
-  if (how === "command") {
+  if (how === "session") {
+    const session = new IndexSession({ registry: languages });
+    const warm = await executeGraph({ command: "index", root }, { session });
+    // What the session keeps after the first run, by module.
+    const kept = [...(session["kept"]?.keys() ?? [])];
+    process.send({ warm: warm.sync.complete, kept });
+    await new Promise((go) => process.once("message", go));
+    walked = false;
+    armed = true;
+    const answer = await executeGraph({ command: "index", root }, { session });
+    reply = { complete: answer.sync.complete };
+  } else if (how === "command") {
     const answer = await executeGraph({ command: "index", root });
     reply = { complete: answer.sync.complete };
   } else {

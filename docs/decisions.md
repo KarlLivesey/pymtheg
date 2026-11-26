@@ -3245,7 +3245,10 @@ writes nothing if not: another run, even one that wrote nothing because it
 found the tree current, may have seen the newer tree. A claim increments a
 run generation; a run publishes its completion, or the interleaved mark,
 only while no newer run has claimed. A run with no edit still reads the
-baseline only, and claims and writes nothing (C-38A). **Why:** three shapes
+baseline only, and claims and writes nothing (C-38A). In an index session
+an overtaken run keeps nothing: a session keeps a run's values only once
+its completion is written, and drops what it had when the store's
+completion record is another run's (C-45, C-55). **Why:** three shapes
 reproduced on C-38A let an overtaken run overwrite a newer run's rows or
 replace its mark. **Rules out:** leases, timeouts or any wall-clock rule;
 trusting a capture that the disk no longer matches. [C-62](changes/C-62.md)

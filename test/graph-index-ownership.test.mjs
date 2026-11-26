@@ -103,15 +103,23 @@ function project(language) {
   assert.equal(cli(root).sync.complete, true);
   return { base, root, write, read };
 }
-/** A run in a child, stopped at `gate`; `resume()` returns its reply. */
-async function stopped(root, how, gate) {
+/**
+ * A run in a child, stopped at `gate`; `resume()` returns its reply. With
+ * `how` "session", the child's first run (ungated) keeps the modules'
+ * inputs; `prepare(warm)` then runs before the gated second run starts.
+ */
+async function stopped(root, how, gate, prepare) {
   const run = fork(child, [root, how, gate], {
     stdio: ["ignore", "ignore", "inherit", "ipc"],
   });
   let reply;
   let stop;
   const at = new Promise((done) => (stop = done));
-  run.on("message", (message) => {
+  run.on("message", async (message) => {
+    if (message.warm !== undefined) {
+      await prepare(message);
+      run.send("go");
+    }
     if (message.stopped) stop(message);
     if (message.reply) reply = message.reply;
   });
@@ -178,11 +186,15 @@ for (const language of Object.keys(LANGUAGES)) {
         write(L.exported, L.removeExport(original));
         const A = await stopped(root, "command", "after-parse");
         write(L.exported, original);
-        // A syncing query: it finds the tree current and writes nothing.
+        // A syncing query, then B, an index: each finds the tree current.
         assert.equal(cli(root, "status").sync.complete, true);
         const query = cli(root, "file", L.exported);
         assert.equal(query.sync.complete, true);
+        assert.equal(cli(root).sync.complete, true);
+        const B = storeRows(graphAt(root));
         overtaken(await A.resume(), "A");
+        // B's store is untouched, row for row.
+        assert.deepEqual(compareRows(B, storeRows(graphAt(root))), [], "B");
         await settled(base, root, "after A");
       } finally {
         rmSync(base, { recursive: true, force: true });
@@ -199,7 +211,10 @@ for (const language of Object.keys(LANGUAGES)) {
         const A = await stopped(root, "index", "after-walk");
         write(...L.added);
         assert.equal(cli(root).sync.complete, true);
+        const B = storeRows(graphAt(root));
         overtaken(await A.resume(), "A");
+        // B's store is untouched, its added file's rows included.
+        assert.deepEqual(compareRows(B, storeRows(graphAt(root))), [], "B");
         await settled(base, root, "after A");
       } finally {
         rmSync(base, { recursive: true, force: true });
@@ -230,6 +245,67 @@ for (const language of Object.keys(LANGUAGES)) {
   );
 }
 
+// The reviewer's two windows again, with A in an IndexSession whose first
+// run kept Go's inputs (C-55; Go is the module that keeps them). A must
+// still be rejected and leave B's store untouched.
+const sessionCase = (what, gate, scenario) =>
+  test(
+    `go in a session with kept inputs: ${what}`,
+    { skip: !proc && "needs /proc to see the child stopped" },
+    async () => {
+      const L = LANGUAGES.go;
+      const { base, root, write, read } = project("go");
+      try {
+        const original = read(L.exported);
+        // An edit for the session's first run to analyse, so it keeps.
+        write(L.exported, L.edit(original));
+        const edited = read(L.exported);
+        await scenario({ root, write, edited, L, gate });
+        await settled(base, root, "after A");
+      } finally {
+        rmSync(base, { recursive: true, force: true });
+      }
+    },
+  );
+const read0 = (root, path) => readFileSync(join(root, path), "utf8");
+const keptGo = (warm) => {
+  assert.equal(warm.warm, true, "the session's first run completed");
+  assert.ok(
+    warm.kept.some((module) => module.startsWith("go\u0000")),
+    `the session keeps Go's inputs: ${JSON.stringify(warm.kept)}`,
+  );
+};
+sessionCase(
+  "A paused after parsing an export's removal, the file restored while B completes",
+  "after-parse",
+  async ({ root, write, edited, L }) => {
+    const A = await stopped(root, "session", "after-parse", (warm) => {
+      keptGo(warm);
+      write(L.exported, L.removeExport(edited));
+    });
+    write(L.exported, edited);
+    assert.equal(cli(root).sync.complete, true);
+    const B = storeRows(graphAt(root));
+    overtaken(await A.resume(), "A");
+    assert.deepEqual(compareRows(B, storeRows(graphAt(root))), [], "B");
+  },
+);
+sessionCase(
+  "A paused after its walk while B adds a file",
+  "after-walk",
+  async ({ root, write, L }) => {
+    const A = await stopped(root, "session", "after-walk", (warm) => {
+      keptGo(warm);
+      // An edit for the gated run, so it walks and analyses.
+      write(L.exported, read0(root, L.exported) + "\n// edited again\n");
+    });
+    write(...L.added);
+    assert.equal(cli(root).sync.complete, true);
+    const B = storeRows(graphAt(root));
+    overtaken(await A.resume(), "A");
+    assert.deepEqual(compareRows(B, storeRows(graphAt(root))), [], "B");
+  },
+);
 // Three runs. A holds an older capture, before its claim; B has claimed for
 // a newer tree and holds its mark; C, a full index, takes over and finishes.
 // In either resume order, A and B write nothing more and disturb nothing:
