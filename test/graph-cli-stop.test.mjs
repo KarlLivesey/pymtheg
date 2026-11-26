@@ -129,7 +129,11 @@ test("link list --no-sync interrupted during its in-place query exits 130", asyn
 // its sync wrote stays complete. Only `graph index` reports its result
 // after a late stop.
 for (const [what, args, init] of [
-  ["graph file", (root) => ["graph", "file", "src/a.ts", "--root", root, "--json"], false],
+  [
+    "graph file",
+    (root) => ["graph", "file", "src/a.ts", "--root", root, "--json"],
+    false,
+  ],
   ["link list", (root) => ["link", "list", "--root", root, "--json"], true],
   ["link check", (root) => ["link", "check", "--root", root, "--json"], true],
 ])
