@@ -2035,6 +2035,134 @@ test("the units in conflict are computed once per program, not once per file", a
     "helper",
   );
   assert.equal(graphWork.counts["typescript.conflictScans"], 1);
+  // The statements submitted to the second checker: one per file here.
+  assert.equal(graphWork.counts["typescript.conflictChecks"], 2);
+});
+
+test("the conflict check counts statements, not declarations", async () => {
+  // `var first, second` is one statement of two declarations.
+  const { graphWork, resetGraphWork } = await import("../dist/graph/work.js");
+  resetGraphWork();
+  await globalsCase(
+    {
+      "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+      ...typesPackage(
+        "env-a",
+        "declare var first: number, second: number;\ndeclare function helper(): void;\n",
+      ),
+      ...typesPackage(
+        "env-b",
+        "declare var first: number;\ndeclare var second: number;\ndeclare function helper(): void;\n",
+      ),
+      "src/main.ts": "helper();\nexport {};\n",
+    },
+    "src/main.ts",
+    "helper",
+  );
+  assert.equal(graphWork.counts["typescript.conflictChecks"], 5);
+});
+
+// C-42 review round 3: deny by default. Any diagnostic the second checker
+// reports in a unit's declaration file, whatever its code, unmarks: one
+// with related locations pairs their units, one without makes its unit
+// conflict with every other.
+test("any diagnostic in a unit's declarations unmarks its sets, whatever its code", async () => {
+  for (const [what, a, b] of [
+    // TS2304, a missing type: no related location.
+    ["a missing type", "declare var thing: number;", "declare var thing: Missing;"],
+    // An optional and a required member of one merged interface.
+    [
+      "optional and required overloads",
+      "interface Probe { resolve(x: string): string }",
+      "interface Probe { resolve?(x: number): string }",
+    ],
+  ]) {
+    const link = await globalsCase(
+      {
+        "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+        ...typesPackage("env-a", `${a}\ndeclare function helper(): void;\n`),
+        ...typesPackage("env-b", `${b}\ndeclare function helper(): void;\n`),
+        "src/main.ts": "helper();\nexport {};\n",
+      },
+      "src/main.ts",
+      "helper",
+    );
+    assert.equal(link.data.mergedGlobal, undefined, what);
+  }
+});
+
+test("a conflict across packages counts when one package declares the global in two files", async () => {
+  // env-a's typings span two files joined by a triple-slash reference, each
+  // declaring `shared`; env-b's differs. Only a pair inside one unit is
+  // dropped; this pair is across two.
+  const link = await globalsCase(
+    {
+      "tsconfig.json": config({ lib: ["es2022"], types: ["env-a", "env-b"] }),
+      "node_modules/env-a/package.json": manifest("env-a", "1.0.0"),
+      "node_modules/env-a/index.d.ts":
+        '/// <reference path="./more.d.ts" />\ndeclare var shared: { n: number };\ndeclare function helper(): void;\n',
+      "node_modules/env-a/more.d.ts": "declare var shared: { n: number };\n",
+      ...typesPackage(
+        "env-b",
+        "declare var shared: { n: string };\ndeclare function helper(): void;\n",
+      ),
+      "src/main.ts": "helper();\nexport {};\n",
+    },
+    "src/main.ts",
+    "helper",
+  );
+  assert.equal(link.data.mergedGlobal, undefined);
+});
+
+test("a file in two programs, one of which unmarks, keeps no mark anywhere in its data", async () => {
+  // The same DOM and @types/node candidates in both programs; the server's
+  // program also reads a file of @types/node that conflicts with the DOM's
+  // `name`, so only there are the two units in conflict.
+  const link = await globalsCase(
+    {
+      "packages/web/tsconfig.json": config(
+        { lib: ["es2022", "dom"], types: ["node"] },
+        ["../shared"],
+      ),
+      "packages/server/tsconfig.json": config(
+        { lib: ["es2022", "dom"], types: ["node"] },
+        ["../shared", "ref.ts"],
+      ),
+      ...typesPackage(
+        "@types/node",
+        "export {};\ndeclare global { interface Console { log(...data: any[]): void } var console: Console; }\n",
+      ),
+      "node_modules/@types/node/extra.d.ts": "declare var name: number;\n",
+      "packages/server/ref.ts":
+        '/// <reference path="../../node_modules/@types/node/extra.d.ts" />\nexport {};\n',
+      "packages/shared/log.ts": 'console.log("x");\nexport {};\n',
+    },
+    "packages/shared/log.ts",
+    "console.log",
+  );
+  assert.equal(JSON.stringify(link.data).includes("mergedGlobal"), false);
+});
+
+test("a set with a Node target the module synthesised is not marked", async () => {
+  // No @types/node: the module adds a Node target for `setTimeout` beside
+  // the DOM's declaration. The set does not name the compiler's
+  // declarations, so it is not marked.
+  const link = await globalsCase(
+    {
+      "tsconfig.json": config({ lib: ["es2022", "dom"], types: [] }),
+      "src/main.ts": "setTimeout(() => {}, 1);\nexport {};\n",
+    },
+    "src/main.ts",
+    "setTimeout",
+  );
+  assert.ok(
+    (link.libraries ?? []).some(
+      ({ ecosystem, evidence }) =>
+        ecosystem === "node" && evidence === "declared-builtin",
+    ),
+    JSON.stringify(link.libraries),
+  );
+  assert.equal(link.data.mergedGlobal, undefined);
 });
 
 test("an ambient module merged across two packages, a checkout augmentation and a file in two programs are not a merged global", async () => {

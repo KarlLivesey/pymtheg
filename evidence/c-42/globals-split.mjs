@@ -5,29 +5,20 @@
 // own symbol:
 //   (a) merged: one global compiler symbol declared in several library units
 //       (`mergedGlobal`);
-//   (b) not marked, split by why:
-//       - a synthesised target present: a Node target the module adds when
-//         a program lacks @types/node (ecosystem node, evidence
-//         declared-builtin), next to a real declaration;
-//       - a test package among the units (narrowed D23);
-//       - one compiler symbol merged by a module augmentation, not a
-//         global (`declare module "fastify" { interface FastifyRequest }`
-//         in a plugin): the module's own `oneSymbolNotGlobal` field, which
-//         only a measurement build records (README);
-//       - two units in conflict on a shared global, by the compiler's TS2403
-//         (narrowed D23): the module's own `unitConflict` field, which only
-//         a measurement build records (README);
-//       - the rest: candidates that are not one compiler symbol (for example
-//         the arms of a union receiver), together with any set no rule
-//         above names;
+//   (b) not marked, split by the reason the measurement build records in
+//       the link's data (`notMarked`, in the order the mark's conditions
+//       are tested): a checkout candidate, a synthesised Node target, a
+//       declaration outside the global scope, distinct symbols (with their
+//       count), a test package, units in conflict;
 //   (c) other: anything else (the site changed outcome or is absent).
 // Also split by the set of declaring units and by name, and the SW-6 group
 // "one name declared by several library typings" (same last name, several
 // units) separately.
-// Check (C-42 review round 2 ruling): no site whose library units are only
-// the DOM, @types/node and the TypeScript library is unmarked by the conflict
-// rule (`unitConflict`); `environmentOnlyConflicts` counts them and must be
-// 0, with up to ten samples.
+// Check (review round 3): every environment-only set on head (its units only
+// the DOM, @types/node and the TypeScript library) is partitioned into
+// marked and those reasons (`environmentOnly`); its remainder, a set with
+// neither, must be 0 on every pin (`ok`). `environmentOnlyConflicts` counts
+// the sets the conflict rule unmarks among them, with samples.
 // HEAD.json is a run of the measurement build (README): its stores equal the
 // candidate's but for the two fields that name why a set is not marked.
 // Usage: node globals-split.mjs SCRATCH MAIN.json HEAD.json BUILD > globals-split.json
@@ -37,9 +28,6 @@ import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
 const [scratch, mainPath, headPath, build] = process.argv.slice(2);
-const { isTestPackage } = await import(
-  pathToFileURL(resolve(build, "dist/graph/languages/typescript/global-types.js"))
-);
 const runs = [mainPath, headPath].map(
   (path) => new Map(JSON.parse(readFileSync(path, "utf8")).repos.map((repo) => [repo.id, repo])),
 );
@@ -75,6 +63,19 @@ const byName = table();
 const byPin = table();
 const ENVIRONMENT = new Set(["dom", "node", "typescript-lib"]);
 const environmentOnlyConflicts = { total: 0, byPin: table(), samples: [] };
+// Review round 3: every environment-only set on head, partitioned into
+// marked and the measurement build's reasons; the remainder (no mark and
+// no reason) must be 0 on every pin.
+const environmentOnly = { total: table(), byPin: table(), reasons: table(), remainder: 0, remainderSamples: [] };
+/** The measurement build's reason, also when it differs per program. */
+function notMarkedOf(data) {
+  if (!data) return undefined;
+  if (data.notMarked) return data.notMarked;
+  const reasons = Object.values(data.byProject ?? {})
+    .map((entry) => entry.notMarked)
+    .filter(Boolean);
+  return reasons.length ? [...new Set(reasons)].sort().join("; ") : undefined;
+}
 for (const [id, mainRepo] of runs[0]) {
   const headRepo = runs[1].get(id);
   if (mainRepo.outcome !== "finished" || headRepo?.outcome !== "finished") continue;
@@ -83,9 +84,24 @@ for (const [id, mainRepo] of runs[0]) {
     db.close();
     return value;
   });
+  for (const link of after.values()) {
+    if (link.resolution !== "ambiguous" || link.checkout) continue;
+    const units = new Set(link.libraries.map(({ ecosystem, unit }) => `${ecosystem}:${unit}`));
+    if (units.size < 2 || !link.libraries.every(({ ecosystem }) => ENVIRONMENT.has(ecosystem))) continue;
+    const reason = notMarkedOf(link.data);
+    const bucket = link.data.mergedGlobal === true ? "marked" : reason ? reason.replace(/ \(.*\)$/, "") : "remainder";
+    add(environmentOnly.total, bucket);
+    add((environmentOnly.byPin[id] ??= table()), bucket);
+    if (reason) add(environmentOnly.reasons, reason);
+    if (bucket === "remainder") {
+      environmentOnly.remainder++;
+      if (environmentOnly.remainderSamples.length < 10)
+        environmentOnly.remainderSamples.push({ pin: id, file: link.file, name: link.name, units: [...units] });
+    }
+  }
   for (const link of after.values())
     if (
-      link.data.unitConflict === true &&
+      notMarkedOf(link.data) === "units in conflict" &&
       link.libraries.length &&
       link.libraries.every(({ ecosystem }) => ENVIRONMENT.has(ecosystem))
     ) {
@@ -105,21 +121,14 @@ for (const [id, mainRepo] of runs[0]) {
     const names = new Set(link.libraries.map(({ symbol }) => last(symbol)));
     const units = [...new Set(link.libraries.map(({ ecosystem, unit }) => `${ecosystem}:${unit}`))].sort().join(" + ");
     const sw6 = names.size === 1 && units.includes(" + ");
-    const synthesised = now?.libraries.some(({ ecosystem, evidence }) => ecosystem === "node" && evidence === "declared-builtin");
-    const testPackage = now?.libraries.some(({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit));
+    const reason = notMarkedOf(now?.data);
     const kind = !now || now.resolution !== "ambiguous" || now.checkout
       ? "(c) other: outcome changed or site absent"
       : now.data.mergedGlobal === true
         ? "(a) one global symbol in several units (merged)"
-        : synthesised
-          ? "(b) not marked: a synthesised Node target present"
-          : testPackage
-            ? "(b) not marked: a test package among the units"
-            : now.data.oneSymbolNotGlobal === true
-              ? "(b) not marked: one symbol merged by a module augmentation, not a global"
-              : now.data.unitConflict === true
-                ? "(b) not marked: two units in conflict on a shared global (TS2403)"
-                : "(b) not marked: not one compiler symbol, or no rule above";
+        : reason
+          ? `(b) not marked: ${reason.replace(/ \(.*\)$/, "")}`
+          : "(b) not marked: no reason recorded";
     add(totals.all, kind);
     if (sw6) add(totals.sw6Group, kind);
     add((byPin[id] ??= table()), kind);
@@ -129,6 +138,7 @@ for (const [id, mainRepo] of runs[0]) {
 }
 const top = (rows, n) => Object.fromEntries(Object.entries(rows).sort((a, b) => b[1] - a[1]).slice(0, n));
 console.log(JSON.stringify({
+  environmentOnly: { ...environmentOnly, ok: environmentOnly.remainder === 0 },
   environmentOnlyConflicts,
   totals,
   byPin,
