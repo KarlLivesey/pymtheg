@@ -151,3 +151,34 @@ test("C-57 (4): a failure is cited only from an alternative file that can apply 
     assert.equal(targetOf(g, call), "src/fast.rs#pick");
   });
 });
+
+test("C-57 (5): a file both alternatives declare keeps std prelude names in its cfg blocks (embassy-nrf usb/vbus_detect.rs)", async () => {
+  await scratch(async (dir) => {
+    // usb is usb/fast.rs or usb/slow.rs; both declare `pub mod detect;`, so
+    // usb/detect.rs is reached under each predicate. A site inside
+    // `#[cfg(feature = "fast")]` exists only under the first.
+    await write(join(dir, "p"), {
+      "Cargo.toml": CARGO,
+      "src/lib.rs":
+        '#![no_std]\n#[cfg_attr(feature = "fast", path = "usb/fast.rs")]\n#[cfg_attr(not(feature = "fast"), path = "usb/slow.rs")]\npub mod usb;\n',
+      "src/usb/fast.rs": "pub mod detect;\n",
+      "src/usb/slow.rs": "pub mod detect;\n",
+      "src/usb/detect.rs":
+        'pub fn ready(on: bool) -> Result<(), ()> {\n    #[cfg(feature = "fast")]\n    {\n        if on {\n            return Ok(());\n        }\n        Err(())\n    }\n    #[cfg(not(feature = "fast"))]\n    {\n        if on {\n            return Ok(());\n        }\n        Err(())\n    }\n}\n',
+    });
+    const g = await indexInto(join(dir, "p"), join(dir, "g.sqlite"));
+    const sites = g.links.filter(
+      (l) =>
+        l.file === "src/usb/detect.rs" &&
+        l.kind === "calls" &&
+        (l.targetName === "Ok" || l.targetName === "Err"),
+    );
+    assert.equal(sites.length, 4);
+    for (const l of sites)
+      assert.equal(
+        l.resolution,
+        "library",
+        `${l.targetName}: ${JSON.stringify(l.data)}`,
+      );
+  });
+});

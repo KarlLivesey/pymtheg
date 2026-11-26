@@ -1473,6 +1473,26 @@ export function resolveRust(
     ownerCache.set(k, result);
     return result;
   };
+  /**
+   * C-57: the places of a file where a site under `conditions` can exist.
+   * A file declared by two module files chosen by opposite `cfg_attr(path)`
+   * predicates (embassy-nrf's `usb/vbus_detect.rs`, declared by both
+   * `usb/mod.rs` and `usb/usbhs.rs`) has a place under each predicate; a
+   * `#[cfg(feature = …)]` site exists in only one of them, so the other is
+   * never looked up for it. With no possible place, all are kept.
+   */
+  const sitePlaces = (
+    file: string,
+    scope: string,
+    conditions: readonly string[],
+  ): Place[] => {
+    const all = ownerPlace(file, scope);
+    if (all.length < 2) return all;
+    const live = all.filter((p) =>
+      possible([...(p.conditions ?? []), ...conditions]),
+    );
+    return live.length ? live : all;
+  };
   attributeContextReady = true;
   // Do not carry an assumed standard test gate through a file module when its
   // attribute head may instead be a macro binding in the enclosing context.
@@ -6820,7 +6840,11 @@ export function resolveRust(
     )
       return;
     const scope = str(d.scope);
-    const targets = ownerPlace(l.file, scope).map((place) =>
+    const targets = sitePlaces(
+      l.file,
+      scope,
+      (d.conditions ?? []) as string[],
+    ).map((place) =>
       libraryAt(
         l,
         d,
@@ -6959,7 +6983,11 @@ export function resolveRust(
     )
       return;
     const scope = str(d.scope);
-    const targets = ownerPlace(l.file, scope).map((place) => {
+    const targets = sitePlaces(
+      l.file,
+      scope,
+      (d.conditions ?? []) as string[],
+    ).map((place) => {
       const conditions = [
         ...(place.conditions ?? []),
         ...((d.conditions ?? []) as string[]),
@@ -7836,153 +7864,159 @@ export function resolveRust(
       !(l.kind === "imports" && d.glob)
     ) {
       found = merge(
-        ownerPlace(l.file, str(d.scope)).map((place) => {
-          const loc = {
-            ...place,
-            conditions: [
-              ...(place.conditions ?? []),
-              ...((d.conditions ?? []) as string[]),
-            ],
-          };
-          let name = compact(l.targetName);
-          const selfPath = name === "Self" || name.startsWith("Self::");
-          const scope = selfPath ? str(d.implScope) : str(d.scope);
-          if (selfPath && d.implType)
-            name = base(str(d.implType)) + name.slice(4);
-          const guard = (r: Found): Found =>
-            !d.macroArguments ||
-            r.failedFiles?.length ||
-            argumentsProven(l, d, loc)
-              ? r
-              : {
-                  ...r,
-                  complete: false,
-                  reason: [
-                    ...new Set(
-                      [
-                        ...(r.reason?.split(/;\s*/) ?? []),
-                        "macro-argument-unverified",
-                      ].filter(Boolean),
-                    ),
-                  ].join("; "),
-                };
-          if (d.method) {
-            const site = { file: l.file, scope: str(d.scope) };
-            if (!str(d.receiverType) && d.receiverExpr) {
-              const t = typing(d.receiverExpr as Data, loc, site);
-              if (isGap(t) || t.future) {
-                note ??= {
-                  receiverTyping: {
-                    gap: isGap(t) ? t.gap : "future-receiver",
-                  },
-                };
-              } else {
-                if (outsideType(t))
-                  note ??= { receiverTyping: { outside: compact(t.text) } };
-                return guard(
-                  methods(
-                    t.text,
-                    str(d.method),
-                    loc,
-                    t.scope,
-                    true,
-                    t.borrow,
-                    t.mutable,
-                    Number(d.argumentCount),
-                    "",
-                    Number(d.argumentMinimum ?? d.argumentCount),
-                    t.generics,
-                    t.syntax,
-                    t.loc,
-                    site,
-                  ),
-                );
-              }
-            }
-            return guard(
-              methods(
-                // C-10: a struct literal can name an imported variant.
-                d.receiverStructLiteral &&
-                  !structLiteralType(str(d.receiverType), loc, str(d.typeScope))
-                  ? ""
-                  : str(d.receiverType),
-                str(d.method),
-                loc,
-                str(d.typeScope),
-                true,
-                str(d.receiverBorrow),
-                d.receiverMutable === true,
-                Number(d.argumentCount),
-                compact(l.targetName).startsWith("self.")
-                  ? `${l.file}|${str(d.implKey)}`
-                  : "",
-                Number(d.argumentMinimum ?? d.argumentCount),
-                str(d.genericBindings),
-                str(d.receiverArgumentSyntax),
-                loc,
-                site,
-              ),
-            );
-          }
-          const ns: Namespace = ["calls", "values"].includes(l.kind)
-            ? "value"
-            : l.kind === "macros"
-              ? "macro"
-              : l.kind === "patterns"
-                ? d.structPattern
-                  ? "importType"
-                  : "value"
-                : l.kind === "types" && d.structLiteral
-                  ? "importType"
-                  : ["types", "implements"].includes(l.kind)
-                    ? "type"
-                    : "import";
-          if (l.kind === "calls") {
-            const call = pathCallTargets(
-              name,
-              selfPath,
-              scope,
-              d,
-              l.targetName,
-              l.file,
-              loc,
-            );
-            associatedFallback ||= call.associatedFallback === true;
-            return guard(call);
-          }
-          let result =
-            l.kind === "imports"
-              ? (() => {
-                  activeMacroImports.push(l);
-                  try {
-                    return findUsePath(
-                      name,
-                      loc,
-                      scope,
-                      ns,
-                      new Set(),
-                      true,
-                      !!d.externCrate,
-                      !name.includes("::") && d.alias === name,
-                    );
-                  } finally {
-                    activeMacroImports.pop();
-                  }
-                })()
-              : l.kind === "macros"
-                ? macroLookup(name, l, loc, scope)
-                : find(name, loc, scope, ns);
-          if (l.kind === "patterns")
-            result = {
-              ...result,
-              symbols: result.symbols.filter((s) =>
-                ["variant", "struct", "type", "const", "static"].includes(
-                  s.kind,
-                ),
-              ),
+        sitePlaces(l.file, str(d.scope), (d.conditions ?? []) as string[]).map(
+          (place) => {
+            const loc = {
+              ...place,
+              conditions: [
+                ...(place.conditions ?? []),
+                ...((d.conditions ?? []) as string[]),
+              ],
             };
-          return guard(result);
-        }),
+            let name = compact(l.targetName);
+            const selfPath = name === "Self" || name.startsWith("Self::");
+            const scope = selfPath ? str(d.implScope) : str(d.scope);
+            if (selfPath && d.implType)
+              name = base(str(d.implType)) + name.slice(4);
+            const guard = (r: Found): Found =>
+              !d.macroArguments ||
+              r.failedFiles?.length ||
+              argumentsProven(l, d, loc)
+                ? r
+                : {
+                    ...r,
+                    complete: false,
+                    reason: [
+                      ...new Set(
+                        [
+                          ...(r.reason?.split(/;\s*/) ?? []),
+                          "macro-argument-unverified",
+                        ].filter(Boolean),
+                      ),
+                    ].join("; "),
+                  };
+            if (d.method) {
+              const site = { file: l.file, scope: str(d.scope) };
+              if (!str(d.receiverType) && d.receiverExpr) {
+                const t = typing(d.receiverExpr as Data, loc, site);
+                if (isGap(t) || t.future) {
+                  note ??= {
+                    receiverTyping: {
+                      gap: isGap(t) ? t.gap : "future-receiver",
+                    },
+                  };
+                } else {
+                  if (outsideType(t))
+                    note ??= { receiverTyping: { outside: compact(t.text) } };
+                  return guard(
+                    methods(
+                      t.text,
+                      str(d.method),
+                      loc,
+                      t.scope,
+                      true,
+                      t.borrow,
+                      t.mutable,
+                      Number(d.argumentCount),
+                      "",
+                      Number(d.argumentMinimum ?? d.argumentCount),
+                      t.generics,
+                      t.syntax,
+                      t.loc,
+                      site,
+                    ),
+                  );
+                }
+              }
+              return guard(
+                methods(
+                  // C-10: a struct literal can name an imported variant.
+                  d.receiverStructLiteral &&
+                    !structLiteralType(
+                      str(d.receiverType),
+                      loc,
+                      str(d.typeScope),
+                    )
+                    ? ""
+                    : str(d.receiverType),
+                  str(d.method),
+                  loc,
+                  str(d.typeScope),
+                  true,
+                  str(d.receiverBorrow),
+                  d.receiverMutable === true,
+                  Number(d.argumentCount),
+                  compact(l.targetName).startsWith("self.")
+                    ? `${l.file}|${str(d.implKey)}`
+                    : "",
+                  Number(d.argumentMinimum ?? d.argumentCount),
+                  str(d.genericBindings),
+                  str(d.receiverArgumentSyntax),
+                  loc,
+                  site,
+                ),
+              );
+            }
+            const ns: Namespace = ["calls", "values"].includes(l.kind)
+              ? "value"
+              : l.kind === "macros"
+                ? "macro"
+                : l.kind === "patterns"
+                  ? d.structPattern
+                    ? "importType"
+                    : "value"
+                  : l.kind === "types" && d.structLiteral
+                    ? "importType"
+                    : ["types", "implements"].includes(l.kind)
+                      ? "type"
+                      : "import";
+            if (l.kind === "calls") {
+              const call = pathCallTargets(
+                name,
+                selfPath,
+                scope,
+                d,
+                l.targetName,
+                l.file,
+                loc,
+              );
+              associatedFallback ||= call.associatedFallback === true;
+              return guard(call);
+            }
+            let result =
+              l.kind === "imports"
+                ? (() => {
+                    activeMacroImports.push(l);
+                    try {
+                      return findUsePath(
+                        name,
+                        loc,
+                        scope,
+                        ns,
+                        new Set(),
+                        true,
+                        !!d.externCrate,
+                        !name.includes("::") && d.alias === name,
+                      );
+                    } finally {
+                      activeMacroImports.pop();
+                    }
+                  })()
+                : l.kind === "macros"
+                  ? macroLookup(name, l, loc, scope)
+                  : find(name, loc, scope, ns);
+            if (l.kind === "patterns")
+              result = {
+                ...result,
+                symbols: result.symbols.filter((s) =>
+                  ["variant", "struct", "type", "const", "static"].includes(
+                    s.kind,
+                  ),
+                ),
+              };
+            return guard(result);
+          },
+        ),
       );
     }
     if (note) annotate?.(l, note);
