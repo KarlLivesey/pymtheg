@@ -2456,7 +2456,7 @@ libraries). Those units ARE alternatives: a file runs under one of them. So
 no set is marked when any of its units is a test framework, or when any of
 its units is in conflict. Deny by default (review round 3): any diagnostic,
 of any code, that a checker of declaration files (whatever `skipLibCheck`
-says) reports in a unit's global declarations, or whose related
+says) reports on a unit's global declaration of a name that two or more units declare (a name only one unit declares is not checked), or whose related
 information lies in that unit's declaration files, makes that unit
 conflict with every other unit (a set whose units are one unit key, only
 `node:*` units, has no other unit to conflict with).

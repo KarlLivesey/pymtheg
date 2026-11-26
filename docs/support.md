@@ -886,10 +886,13 @@ and never yields a version pin.
   - a set of different symbols, such as the arms of a union receiver;
   - a set that includes a test package (two test frameworks' `describe`,
     two assertion libraries' `expect`);
-  - a set any of whose units the compiler reports a diagnostic in, in its
-    global declarations: any diagnostic, of any code, that lies there or whose
-    related information lies in that unit's declaration files (deny by
-    default). A diagnostic with related
+  - a set any of whose units the compiler reports a diagnostic in, on a
+    global declaration of a name that two or more units declare: any
+    diagnostic, of any code, that lies there or whose related information
+    lies in that unit's declaration files (deny by default). A statement
+    whose name only one unit declares is not checked, so a diagnostic
+    there (for example TS2430, an interface that incorrectly extends
+    another) leaves the set marked: a stated limit of C-42. A diagnostic with related
     locations, all in one unit key, is dropped; one with no related
     location always counts against its unit. Units are typings packages, so this covers
     `@cloudflare/workers-types` against the DOM and `bun-types` against
