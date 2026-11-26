@@ -1,0 +1,699 @@
+{
+ "environmentOnly": {
+  "total": {
+   "marked": 11569,
+   "units in conflict": 1025,
+   "a synthesised Node target": 106,
+   "distinct symbols": 165,
+   "a declaration outside the global scope": 72
+  },
+  "byPin": {
+   "changesets/changesets": {
+    "marked": 2
+   },
+   "colinhacks/zod": {
+    "marked": 420,
+    "units in conflict": 193
+   },
+   "dexie/Dexie.js": {
+    "a synthesised Node target": 2,
+    "marked": 376,
+    "distinct symbols": 2,
+    "units in conflict": 218
+   },
+   "excalidraw/excalidraw": {
+    "marked": 633,
+    "distinct symbols": 44
+   },
+   "honojs/hono": {
+    "marked": 1945,
+    "distinct symbols": 5
+   },
+   "mermaid-js/mermaid": {
+    "units in conflict": 5,
+    "a synthesised Node target": 6,
+    "marked": 401,
+    "distinct symbols": 1
+   },
+   "nestjs/nest": {
+    "marked": 436,
+    "distinct symbols": 24,
+    "a declaration outside the global scope": 13,
+    "a synthesised Node target": 14
+   },
+   "oclif/core": {
+    "marked": 136
+   },
+   "pingdotgg/t3code": {
+    "marked": 296,
+    "distinct symbols": 39
+   },
+   "pmndrs/zustand": {
+    "marked": 13
+   },
+   "puppeteer/puppeteer": {
+    "a declaration outside the global scope": 5,
+    "marked": 648,
+    "distinct symbols": 3
+   },
+   "react-hook-form/react-hook-form": {
+    "a synthesised Node target": 22,
+    "marked": 106
+   },
+   "reduxjs/redux-toolkit": {
+    "marked": 286
+   },
+   "trpc/trpc": {
+    "units in conflict": 240,
+    "marked": 635,
+    "a synthesised Node target": 4,
+    "distinct symbols": 10,
+    "a declaration outside the global scope": 16
+   },
+   "vitejs/vite": {
+    "a synthesised Node target": 57,
+    "marked": 176,
+    "a declaration outside the global scope": 18,
+    "distinct symbols": 5
+   },
+   "vitest-dev/vitest": {
+    "marked": 381,
+    "a declaration outside the global scope": 4,
+    "distinct symbols": 2
+   },
+   "withastro/astro": {
+    "marked": 4227,
+    "units in conflict": 156,
+    "distinct symbols": 15,
+    "a declaration outside the global scope": 16
+   },
+   "yargs/yargs": {
+    "marked": 99,
+    "distinct symbols": 4
+   },
+   "vercel/turborepo": {
+    "marked": 353,
+    "distinct symbols": 11,
+    "a synthesised Node target": 1,
+    "units in conflict": 213
+   }
+  },
+  "reasons": {
+   "units in conflict": 1025,
+   "a synthesised Node target": 106,
+   "distinct symbols (2)": 129,
+   "distinct symbols (3)": 33,
+   "a declaration outside the global scope": 72,
+   "distinct symbols (4)": 3
+  },
+  "remainder": 0,
+  "remainderSamples": [],
+  "ok": true
+ },
+ "environmentOnlyConflicts": {
+  "total": 1025,
+  "byPin": {
+   "colinhacks/zod": 193,
+   "dexie/Dexie.js": 218,
+   "mermaid-js/mermaid": 5,
+   "trpc/trpc": 240,
+   "withastro/astro": 156,
+   "vercel/turborepo": 213
+  },
+  "samples": [
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/datetime.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/discriminatedUnion.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/discriminatedUnion.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/index.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/ipv4.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/object.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/object.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/object.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/primitives.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   },
+   {
+    "pin": "colinhacks/zod",
+    "file": "packages/zod/src/v3/benchmarks/primitives.ts",
+    "name": "console.log",
+    "units": [
+     "dom:dom",
+     "node:console"
+    ]
+   }
+  ]
+ },
+ "totals": {
+  "all": {
+   "(a) one global symbol in several units (merged)": 11938,
+   "(b) not marked: units in conflict": 2172,
+   "(b) not marked: no reason recorded": 1336,
+   "(b) not marked: a declaration outside the global scope": 364,
+   "(b) not marked: a synthesised Node target": 112,
+   "(b) not marked: distinct symbols": 180,
+   "(b) not marked: a test package": 5
+  },
+  "sw6Group": {
+   "(a) one global symbol in several units (merged)": 11938,
+   "(b) not marked: units in conflict": 2172,
+   "(b) not marked: a declaration outside the global scope": 364,
+   "(b) not marked: a synthesised Node target": 112,
+   "(b) not marked: distinct symbols": 180,
+   "(b) not marked: a test package": 5,
+   "(b) not marked: no reason recorded": 6
+  }
+ },
+ "byPin": {
+  "changesets/changesets": {
+   "(a) one global symbol in several units (merged)": 2
+  },
+  "colinhacks/zod": {
+   "(a) one global symbol in several units (merged)": 420,
+   "(b) not marked: units in conflict": 193,
+   "(b) not marked: no reason recorded": 461,
+   "(b) not marked: a declaration outside the global scope": 4
+  },
+  "dexie/Dexie.js": {
+   "(b) not marked: a synthesised Node target": 2,
+   "(b) not marked: no reason recorded": 87,
+   "(a) one global symbol in several units (merged)": 382,
+   "(b) not marked: distinct symbols": 2,
+   "(b) not marked: a declaration outside the global scope": 4,
+   "(b) not marked: units in conflict": 218
+  },
+  "excalidraw/excalidraw": {
+   "(a) one global symbol in several units (merged)": 806,
+   "(b) not marked: no reason recorded": 174,
+   "(b) not marked: distinct symbols": 48,
+   "(b) not marked: a declaration outside the global scope": 28,
+   "(b) not marked: a test package": 5
+  },
+  "honojs/hono": {
+   "(a) one global symbol in several units (merged)": 1945,
+   "(b) not marked: units in conflict": 63,
+   "(b) not marked: no reason recorded": 117,
+   "(b) not marked: a declaration outside the global scope": 1,
+   "(b) not marked: distinct symbols": 5
+  },
+  "mermaid-js/mermaid": {
+   "(b) not marked: units in conflict": 5,
+   "(b) not marked: a synthesised Node target": 6,
+   "(a) one global symbol in several units (merged)": 401,
+   "(b) not marked: a declaration outside the global scope": 43,
+   "(b) not marked: no reason recorded": 22,
+   "(b) not marked: distinct symbols": 1
+  },
+  "nestjs/nest": {
+   "(b) not marked: a declaration outside the global scope": 158,
+   "(a) one global symbol in several units (merged)": 436,
+   "(b) not marked: distinct symbols": 24,
+   "(b) not marked: a synthesised Node target": 14,
+   "(b) not marked: no reason recorded": 9
+  },
+  "oclif/core": {
+   "(a) one global symbol in several units (merged)": 136
+  },
+  "pingdotgg/t3code": {
+   "(a) one global symbol in several units (merged)": 340,
+   "(b) not marked: units in conflict": 190,
+   "(b) not marked: no reason recorded": 142,
+   "(b) not marked: a declaration outside the global scope": 2,
+   "(b) not marked: distinct symbols": 39
+  },
+  "pmndrs/zustand": {
+   "(a) one global symbol in several units (merged)": 15,
+   "(b) not marked: no reason recorded": 2
+  },
+  "puppeteer/puppeteer": {
+   "(b) not marked: no reason recorded": 48,
+   "(b) not marked: a declaration outside the global scope": 5,
+   "(a) one global symbol in several units (merged)": 648,
+   "(b) not marked: distinct symbols": 3
+  },
+  "react-hook-form/react-hook-form": {
+   "(b) not marked: a synthesised Node target": 22,
+   "(a) one global symbol in several units (merged)": 106,
+   "(b) not marked: no reason recorded": 1
+  },
+  "reduxjs/redux-toolkit": {
+   "(b) not marked: no reason recorded": 76,
+   "(a) one global symbol in several units (merged)": 286,
+   "(b) not marked: units in conflict": 23
+  },
+  "trpc/trpc": {
+   "(b) not marked: units in conflict": 926,
+   "(b) not marked: a synthesised Node target": 10,
+   "(a) one global symbol in several units (merged)": 668,
+   "(b) not marked: distinct symbols": 21,
+   "(b) not marked: a declaration outside the global scope": 41,
+   "(b) not marked: no reason recorded": 44
+  },
+  "vitejs/vite": {
+   "(b) not marked: a synthesised Node target": 57,
+   "(b) not marked: no reason recorded": 22,
+   "(a) one global symbol in several units (merged)": 176,
+   "(b) not marked: a declaration outside the global scope": 18,
+   "(b) not marked: distinct symbols": 5
+  },
+  "vitest-dev/vitest": {
+   "(a) one global symbol in several units (merged)": 488,
+   "(b) not marked: no reason recorded": 26,
+   "(b) not marked: a declaration outside the global scope": 4,
+   "(b) not marked: distinct symbols": 2
+  },
+  "withastro/astro": {
+   "(a) one global symbol in several units (merged)": 4228,
+   "(b) not marked: units in conflict": 341,
+   "(b) not marked: no reason recorded": 96,
+   "(b) not marked: distinct symbols": 15,
+   "(b) not marked: a declaration outside the global scope": 45
+  },
+  "yargs/yargs": {
+   "(a) one global symbol in several units (merged)": 99,
+   "(b) not marked: no reason recorded": 1,
+   "(b) not marked: distinct symbols": 4
+  },
+  "vercel/turborepo": {
+   "(b) not marked: no reason recorded": 8,
+   "(a) one global symbol in several units (merged)": 356,
+   "(b) not marked: a declaration outside the global scope": 11,
+   "(b) not marked: distinct symbols": 11,
+   "(b) not marked: a synthesised Node target": 1,
+   "(b) not marked: units in conflict": 213
+  }
+ },
+ "byUnits": {
+  "(a) one global symbol in several units (merged)": {
+   "dom:dom + node:globals": 5380,
+   "dom:dom + node:url": 2089,
+   "dom:dom + node:console": 1667,
+   "node:globals + typescript-lib:es": 902,
+   "dom:dom + node:timers": 753,
+   "dom:dom + node:buffer": 288,
+   "dom:dom + node:util": 224,
+   "dom:dom + npm:react": 214,
+   "dom:dom + node:stream/web": 156,
+   "dom:dom + npm:@testing-library/user-event": 95,
+   "dom:dom + node:worker_threads": 45,
+   "dom:dom + typescript-lib:es": 42,
+   "npm:effect + typescript-lib:es": 18,
+   "dom:dom + node:module": 12,
+   "dom:dom + node:stream/web + npm:react-dom": 11,
+   "dom:dom + npm:resize-observer-browser": 10,
+   "dom:dom + node:globals + npm:next": 10,
+   "node:globals + node:process": 5,
+   "dom:dom + node:perf_hooks": 3,
+   "node:process + npm:electron": 3,
+   "dom:dom + node:globals + typescript-lib:es": 3,
+   "dom:dom + npm:@redux-devtools/extension": 2,
+   "npm:vscode + npm:vscode-jsonrpc": 2,
+   "dom:dom + npm:next": 2,
+   "dom:dom + npm:workbox-precaching": 1
+  },
+  "(b) not marked: units in conflict": {
+   "dom:dom + node:globals + npm:@cloudflare/workers-types": 329,
+   "dom:dom + node:url": 294,
+   "node:globals + typescript-lib:es": 233,
+   "dom:dom + node:console": 206,
+   "dom:dom + node:globals + npm:bun-types": 135,
+   "dom:dom + node:globals": 133,
+   "dom:dom + npm:@cloudflare/workers-types": 125,
+   "dom:dom + node:console + npm:bun-types": 109,
+   "node:process + npm:bun-types": 72,
+   "dom:dom + node:timers + npm:bun-types": 58,
+   "dom:dom + node:globals + node:timers": 53,
+   "dom:dom + npm:bun-types": 45,
+   "dom:dom + node:globals + npm:@cloudflare/workers-types + npm:bun-types": 37,
+   "node:globals + npm:bun-types": 35,
+   "dom:dom + node:buffer + node:globals": 32,
+   "node:url + npm:bun-types": 32,
+   "npm:bun-types + typescript-lib:es": 28,
+   "dom:dom + node:buffer": 22,
+   "dom:dom + node:console + npm:@cloudflare/workers-types + npm:bun-types": 22,
+   "dom:dom + node:stream/web": 21,
+   "dom:dom + node:timers + npm:@cloudflare/workers-types + npm:bun-types": 19,
+   "dom:dom + node:timers": 17,
+   "dom:dom + npm:react-native": 16,
+   "npm:bun-types + npm:effect + typescript-lib:es": 15,
+   "dom:dom + npm:react": 12
+  },
+  "(b) not marked: no reason recorded": {
+   "typescript-lib:es": 515,
+   "dom:dom": 483,
+   "node:fs": 105,
+   "node:url": 46,
+   "node:path": 39,
+   "npm:ast-types": 32,
+   "node:buffer": 21,
+   "node:process": 19,
+   "node:child_process": 13,
+   "npm:lexical": 10,
+   "node:v8": 8,
+   "node:vm": 7,
+   "node:os": 7,
+   "node:zlib": 6,
+   "node:crypto": 5,
+   "node:fs/promises + npm:bun-types": 5,
+   "node:console": 4,
+   "node:util": 3,
+   "node:util/types": 3,
+   "npm:@tanstack/query-core": 2,
+   "node:url + npm:url": 1,
+   "npm:cac": 1,
+   "npm:playwright-core": 1
+  },
+  "(b) not marked: a declaration outside the global scope": {
+   "npm:@fastify/multipart + npm:fastify": 60,
+   "npm:d3-selection + npm:d3-transition": 43,
+   "node:stream + npm:@fastify/busboy": 32,
+   "node:http + node:http2": 32,
+   "npm:@fastify/static + npm:@fastify/view + npm:fastify": 27,
+   "npm:vite + npm:vitest": 26,
+   "dom:dom + npm:react": 24,
+   "npm:@fastify/middie + npm:@fastify/multipart + npm:@fastify/view + npm:fastify": 15,
+   "node:http + node:https": 15,
+   "node:http2 + node:stream": 15,
+   "npm:@volar/language-core + npm:@volar/typescript": 14,
+   "npm:@fastify/websocket + npm:fastify": 9,
+   "npm:@radix-ui/react-primitive + npm:react": 7,
+   "npm:@fastify/middie + npm:fastify": 5,
+   "npm:dexie + npm:dexie-cloud-addon": 4,
+   "npm:@vitejs/plugin-react + npm:vite": 4,
+   "node:buffer + node:url + typescript-lib:es": 4,
+   "npm:rolldown + npm:vite": 4,
+   "npm:@volar/typescript + npm:typescript": 4,
+   "node:fs/promises + npm:bun-types": 3,
+   "npm:@fastify/error + npm:fastify": 3,
+   "node:http + node:net": 2,
+   "node:net + node:stream": 2,
+   "npm:hast + npm:mdast-util-mdx-expression + npm:mdast-util-mdx-jsx + npm:mdast-util-mdxjs-esm + npm:mdast-util-to-hast": 2,
+   "npm:next + npm:react": 2
+  },
+  "(b) not marked: a synthesised Node target": {
+   "dom:dom + node:console": 36,
+   "dom:dom + node:timers": 22,
+   "dom:dom + node:globals": 20,
+   "dom:dom + node:worker_threads": 11,
+   "dom:dom + node:url": 8,
+   "dom:dom + node:stream/web": 6,
+   "dom:dom + node:console + npm:@cloudflare/workers-types": 3,
+   "dom:dom + node:perf_hooks": 2,
+   "dom:dom + node:globals + npm:@cloudflare/workers-types": 2,
+   "dom:dom + node:timers + npm:@cloudflare/workers-types": 1,
+   "dom:dom + node:buffer": 1
+  },
+  "(b) not marked: distinct symbols": {
+   "dom:dom + node:timers": 89,
+   "node:buffer + typescript-lib:es": 42,
+   "dom:dom + typescript-lib:es": 27,
+   "dom:dom + npm:bun-types": 11,
+   "dom:dom + node:buffer": 7,
+   "dom:dom + npm:resize-observer-browser": 4
+  },
+  "(b) not marked: a test package": {
+   "npm:@vitest/expect + npm:chai": 4,
+   "npm:chai + typescript-lib:es": 1
+  }
+ },
+ "byName": {
+  "(a) one global symbol in several units (merged)": {
+   "URL": 2202,
+   "Request": 1578,
+   "Response": 1086,
+   "setTimeout": 969,
+   "log": 888,
+   "fetch": 587,
+   "Array": 558,
+   "error": 389,
+   "AbortController": 244,
+   "Uint8Array": 238,
+   "Headers": 212,
+   "File": 197,
+   "clearTimeout": 189,
+   "FormData": 187,
+   "warn": 170,
+   "URLSearchParams": 147,
+   "Event": 138,
+   "ReadableStream": 134,
+   "AbortSignal": 133,
+   "TextDecoder": 132,
+   "TextEncoder": 108,
+   "Blob": 104,
+   "debug": 101,
+   "WebSocket": 89,
+   "Element": 81,
+   "KeyboardEvent": 76,
+   "info": 72,
+   "PointerEvent": 67,
+   "RequestInit": 64,
+   "structuredClone": 45,
+   "Date": 42,
+   "MessageEvent": 42,
+   "Int32Array": 38,
+   "clearInterval": 36,
+   "atob": 36,
+   "EventTarget": 36,
+   "CustomEvent": 34,
+   "setInterval": 28,
+   "TransformStream": 27,
+   "MouseEvent": 26
+  },
+  "(b) not marked: units in conflict": {
+   "URL": 281,
+   "log": 218,
+   "Array": 201,
+   "Request": 170,
+   "Response": 141,
+   "setTimeout": 110,
+   "text": 103,
+   "Headers": 91,
+   "RequestInit": 85,
+   "ProcessEnv": 72,
+   "warn": 65,
+   "fetch": 60,
+   "error": 59,
+   "URLSearchParams": 58,
+   "FormData": 57,
+   "Uint8Array": 42,
+   "Blob": 34,
+   "clearTimeout": 27,
+   "AbortController": 27,
+   "File": 19,
+   "Error": 16,
+   "ReadonlyArray": 13,
+   "btoa": 13,
+   "TextDecoder": 12,
+   "EventTarget": 12,
+   "TextDecoderStream": 12,
+   "cancel": 12,
+   "read": 12,
+   "releaseLock": 12,
+   "json": 12,
+   "get": 10,
+   "TextEncoder": 9,
+   "arrayBuffer": 9,
+   "ReadableStream": 9,
+   "clearInterval": 8,
+   "setInterval": 7,
+   "Event": 7,
+   "structuredClone": 6,
+   "PointerEvent": 6,
+   "atob": 5
+  },
+  "(b) not marked: no reason recorded": {
+   "toString": 471,
+   "addEventListener": 168,
+   "(no name)": 126,
+   "removeEventListener": 85,
+   "requestAnimationFrame": 41,
+   "dispatchEvent": 35,
+   "check": 32,
+   "cancelAnimationFrame": 31,
+   "getComputedStyle": 25,
+   "fileURLToPath": 24,
+   "open": 24,
+   "readFileSync": 16,
+   "exit": 14,
+   "existsSync": 14,
+   "matchMedia": 14,
+   "writeFileSync": 12,
+   "includes": 12,
+   "alert": 12,
+   "from": 9,
+   "readdirSync": 9,
+   "set": 9,
+   "getSelection": 8,
+   "postMessage": 8,
+   "execFileSync": 7,
+   "values": 7,
+   "confirm": 7,
+   "scrollTo": 6,
+   "getNode": 6,
+   "slice": 5,
+   "has": 5,
+   "gzipSync": 4,
+   "scrollBy": 4,
+   "get": 4,
+   "Console": 4,
+   "setFlagsFromString": 3,
+   "runInNewContext": 3,
+   "randomBytes": 3,
+   "forEach": 3,
+   "map": 3,
+   "on": 2
+  },
+  "(b) not marked: a declaration outside the global scope": {
+   "FastifyRequest": 67,
+   "Selection": 43,
+   "Readable": 30,
+   "FastifyReply": 27,
+   "Plugin": 24,
+   "FastifyInstance": 22,
+   "on": 20,
+   "once": 18,
+   "preventDefault": 17,
+   "LanguagePlugin": 14,
+   "stopPropagation": 7,
+   "addListener": 7,
+   "CSSProperties": 7,
+   "setHeader": 6,
+   "end": 5,
+   "off": 5,
+   "UserConfig": 4,
+   "toString": 4,
+   "OutputChunk": 4,
+   "LanguageServiceHost": 4,
+   "node:fs/promises": 3,
+   "FastifyError": 3,
+   "Dexie": 2,
+   "Table": 2,
+   "getHeader": 2,
+   "ResolvedConfig": 2,
+   "write": 2,
+   "RootContentMap": 2,
+   "HTMLAttributes": 2,
+   "PageData": 2,
+   "GraphQLError": 1,
+   "closeAllConnections": 1,
+   "request": 1,
+   "destroy": 1,
+   "prependOnceListener": 1,
+   "prependListener": 1,
+   "emit": 1
+  },
+  "(b) not marked: a synthesised Node target": {
+   "setTimeout": 22,
+   "log": 19,
+   "error": 9,
+   "debug": 9,
+   "URL": 7,
+   "postMessage": 6,
+   "Response": 5,
+   "ReadableStream": 5,
+   "WebSocket": 4,
+   "addEventListener": 4,
+   "now": 2,
+   "fetch": 2,
+   "MessageEvent": 2,
+   "info": 2,
+   "close": 2,
+   "start": 2,
+   "removeEventListener": 2,
+   "AbortController": 1,
+   "enqueue": 1,
+   "Request": 1,
+   "json": 1,
+   "delete": 1,
+   "clearTimeout": 1,
+   "Blob": 1,
+   "stopPropagation": 1
+  },
+  "(b) not marked: distinct symbols": {
+   "toString": 68,
+   "setTimeout": 44,
+   "clearTimeout": 28,
+   "setInterval": 9,
+   "clearInterval": 8,
+   "addEventListener": 6,
+   "removeEventListener": 5,
+   "ResizeObserver": 4,
+   "atob": 4,
+   "btoa": 3,
+   "subarray": 1
+  },
+  "(b) not marked: a test package": {
+   "deepEqual": 4,
+   "Object": 1
+  }
+ }
+}

@@ -514,6 +514,17 @@ export function testGlobalTargets(
 }
 
 export const isTestFramework = (unit: string) => frameworkGlobals.has(unit);
+/**
+ * C-42 (narrowed D23): a unit that is a test framework or a competing test
+ * package (an assertion library, another runner's types), or a scoped part
+ * of one (`@vitest/expect`, `@jest/globals`). Their globals are
+ * alternatives: a file runs under one of them.
+ */
+export const isTestPackage = (unit: string) =>
+  frameworkGlobals.has(unit) ||
+  frameworkTypes.has(unit) ||
+  competingTestTypes.has(unit) ||
+  ["@vitest", "@jest"].some((scope) => unit.startsWith(`${scope}/`));
 
 export function testSetupFramework(specifier: string): string | undefined {
   return specifier === "vitest/globals" || specifier.startsWith("@types/")

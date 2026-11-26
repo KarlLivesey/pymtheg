@@ -650,6 +650,13 @@ export async function executeGraph(
         const partial = files
           .filter((file) => file.status === "partial")
           .map((file) => file.path);
+        const reportedPaths = registry.modules
+          .filter(
+            (module) =>
+              module.reportsAnalysisPath &&
+              files.some((file) => file.module === module.id),
+          )
+          .map((module) => ({ module: module.id, path: "reused" as const }));
         report = {
           ...listing,
           unclaimed: listing.unclaimed.sort(),
@@ -673,6 +680,9 @@ export async function executeGraph(
           errors: [],
           analysisErrors: [],
           resolutionErrors: [],
+          // C-38A: nothing analysed, so each reporting module with files
+          // took its stored results whole.
+          ...(reportedPaths.length && { analysisPaths: reportedPaths }),
         };
         durationMs = 0;
       }
