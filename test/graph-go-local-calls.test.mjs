@@ -138,6 +138,25 @@ func Received(ch chan func()) {
 	f()
 }
 
+func mk2() (func(), error) { return func() {}, nil }
+
+func Redeclared() {
+	f := func() {}
+	g := func() { f() }
+	f, err := mk2()
+	_ = err
+	g()
+}
+
+func Other1() {}
+
+func RedeclaredVar() {
+	var f func()
+	f, n := Other1, 1
+	_ = n
+	f()
+}
+
 var pkg = func() int { return 1 }
 
 var literal = func() int {
@@ -262,6 +281,14 @@ test("calls through one local func literal target the enclosing function; parame
         by(from, name).map((call) => [call.target, call.localBinding]),
         [[null, null]],
         `${from} ${name}`,
+      );
+    // A `:=` that re-declares a name already in scope writes it: a closure
+    // that captured the binding, or a later call, never sees one literal.
+    for (const from of ["Redeclared", "RedeclaredVar"])
+      assert.deepEqual(
+        by(from, "f").map((call) => [call.target, call.localBinding]),
+        [[null, null]],
+        from,
       );
     // A binding of a named func type: a method may write it (`h.Reset()`
     // takes `&h`), so it is never claimed, with a value or written once.
