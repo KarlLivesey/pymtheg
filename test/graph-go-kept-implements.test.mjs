@@ -63,6 +63,10 @@ const files = {
     'package box\n\nimport "example.com/m/shape"\n\ntype Box struct{ W, H int }\n\nfunc (b Box) Area() int { return b.W * b.H }\n\nfunc Use(s shape.Shape) int { return s.Area() }\n\nfunc Make() int { return Use(Box{1, 2}) }\n',
   "dot/dot.go":
     'package dot\n\ntype Dot struct{}\n\nfunc (*Dot) Area() int { return 0 }\n\nfunc (Dot) Name() string { return "dot" }\n',
+  // A struct promoting an embedded type's method: a function named like the
+  // embedded type changes the decisions, and only `surface.functions`.
+  "emb/emb.go":
+    "package emb\n\ntype I interface{ M() }\n\ntype Base struct{}\n\nfunc (Base) M() {}\n\ntype W struct{ Base }\n",
   // Two init functions share an identity: an anonymous struct in the first
   // renumbers the second's (C-56a).
   "dot/init.go":
@@ -93,6 +97,14 @@ test("a session reuses Go's implements decisions across body edits, proven equal
       false,
     ],
     ["another body edit", () => write("box/box.go", files["box/box.go"]), true],
+    [
+      // Invalid Go, but a normal state mid-edit: only `surface.functions`
+      // changes, and the promoted method set with it (review).
+      "a function named like an embedded type (func Base beside type Base)",
+      () => write("emb/emb.go", files["emb/emb.go"] + "\nfunc Base() {}\n"),
+      false,
+    ],
+    ["remove it again", () => write("emb/emb.go", files["emb/emb.go"]), false],
     [
       "an anonymous struct in the first of two init (renumbers the second's)",
       () =>
@@ -276,4 +288,69 @@ test("a wrong value under the right key fails the run; a value under another key
     async () => go.resolve({ ...inputs, kept }),
     /differ from a recomputation/,
   );
+});
+
+const shadowFiles = {
+  "go.mod": "module example.com/m\n\ngo 1.22\n",
+  "api/api.go":
+    "package api\n\ntype R interface{ Read() int }\n\ntype F struct{}\n\nfunc (F) Read() int { return 1 }\n",
+  // A failed file makes its package lossy, so open dispatch sets are
+  // checked again by the shadow resolver (built without lossy packages).
+  "api/broken.go": "package api\n\nfunc Broken( {\n",
+  "use/use.go":
+    'package use\n\nimport "example.com/m/api"\n\nfunc U(r api.R) int { return r.Read() }\n',
+};
+
+test("each build keeps its own decisions: the shadow resolver keeps none and reads none", async () => {
+  const { base, root, write } = tree(shadowFiles);
+  try {
+    const registry = await discoverLanguages();
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    // A body edit of the dispatching file: its open set is decided again,
+    // with the shadow resolver.
+    write(
+      "use/use.go",
+      shadowFiles["use/use.go"].replace(
+        "return r.Read()",
+        "return r.Read() + 0",
+      ),
+    );
+    resetGraphWork();
+    assert.equal((await index(root, session)).sync.complete, true);
+    // Shadows were built in this run; only the two main builds reused.
+    assert.ok((graphWork.counts["go.shadowResolvers"] ?? 0) >= 1);
+    assert.equal(graphWork.counts["go.implementsReused"], 2);
+    assert.equal(graphWork.counts["go.implementsChecked"], 2);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+    // The two builds' values are kept under their own names.
+    const kept = session.kept.get(`go\u0000${go.version}`);
+    assert.ok(kept?.has("go:implements") && kept.has("notes:go:implements"));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("the notes build keeps decisions named by the store's ids (analyze passes the store's project id)", async () => {
+  const { base, root } = tree(files);
+  try {
+    const registry = await discoverLanguages();
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    const kept = session.kept.get(`go\u0000${go.version}`);
+    const notes = kept?.get("notes:go:implements")?.value;
+    assert.ok(notes && notes.complete.length > 0);
+    const db = new SqliteGraphStore(graphAt(root));
+    const ids = new Set(db.findSymbols().map((symbol) => symbol.id));
+    db.close();
+    const named = [
+      ...notes.complete,
+      ...notes.possible.flat(),
+      ...notes.implementers.map(([type, iface]) => [type, iface]).flat(),
+    ];
+    assert.ok(named.length > 0);
+    for (const id of named) assert.ok(ids.has(id), id);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });

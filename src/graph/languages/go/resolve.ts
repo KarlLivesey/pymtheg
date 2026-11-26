@@ -1268,6 +1268,7 @@ class GoResolver {
   /** The project without lossy packages (only to name reasons). */
   private shadow(path: string): GoResolver {
     if (!this.shadowResolver) {
+      count("go.shadowResolvers");
       this.shadowResolver = new GoResolver(this.moduleId, this.context, true);
       this.shadowResolver.indexGlobalFacts([]);
     }
@@ -3425,7 +3426,7 @@ class GoResolver {
 
   /**
    * C-56: what the implements decisions are made from. Every Go file's path,
-   * status and global surface (declarations, method sets, embeds and
+   * status, function surface and global surface (declarations, method sets, embeds and
    * signatures, in source order; C-27), or a digest of its facts when it
    * has none, and its toolchain status; every context file (go.mod, go.work,
    * vendor and dependency stamps); and the ids of the types and interfaces
@@ -3436,12 +3437,17 @@ class GoResolver {
       .filter((file) => file.module === this.moduleId)
       .map((file) => {
         const data = file.result.data as
-          | { surface?: { global?: string }; toolchain?: unknown }
+          | {
+              surface?: { global?: string; functions?: string };
+              toolchain?: unknown;
+            }
           | undefined;
         return [
           file.path,
           file.result.status,
           data?.surface?.global ?? contentHash(JSON.stringify(data ?? null)),
+          // A function named like a type changes method sets (review).
+          data?.surface?.functions ?? null,
           data?.toolchain ?? null,
         ] as const;
       })

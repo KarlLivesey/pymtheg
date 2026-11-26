@@ -3625,9 +3625,10 @@ See [C-56b](changes/C-56b.md).
 
 **Decided (C-56):** each build of Go's global index keeps its implements
 decisions (C-56b's value) in the index session under C-45's rules, keyed
-by every Go file's path, status, global surface (C-27) and toolchain
-status, every context file's path, hash, status and dependency stamp, and
-the ids of the types the decisions name. A different key returns nothing
+by every Go file's path, status, global and function surfaces (C-27; a
+function named like a type changes method sets) and toolchain status, every context file's path, hash, status and dependency stamp, and
+the ids of the types the decisions name; each build keeps its own, and
+the shadow resolver none. A different key returns nothing
 and the decisions are made again; a value naming an id the build does not
 have is not used. Under the test suite, and with `PYMTHEG_CHECK_KEPT=1`, a
 reused value is made again and must be identical, or the run fails. The
