@@ -1071,22 +1071,27 @@ at the link's own name site, the one symbol there, a kind that fits the link,
 no module answer for a `use`, no `extern crate` or crate root, no symbol
 defined more than once, no non-macro item of a proc-macro crate from another
 package, no local binding, no trait-method declaration (dispatch stays open or
-a candidate set). No answer is taken on a link under a cfg condition other
-than `test`. Beyond that the route denies by default (design B,
-[C-43](changes/C-43.md)): an answer decides only when no binding on its trace
-is selected. A binding is selected when it, or an enclosing module, impl,
-trait, block or file, is under a cfg (`test` included) that the site's own
-conditions do not syntactically imply, or when a macro whose expansion is not
-read emits it. A path's trace is each segment's binding and the `use` hops a
-segment may pass through; a receiver-typed link's is everything named in the
-enclosing function up to the site, plus any same-named member, trait `use`,
-cfg-gated field or `Deref`/`Index` impl the lookup could meet. An item of a
-crate other than `std`, `core` or `alloc` on the trace, or a trace that
-cannot be completed, leaves the link confirm-only, as does a name an opaque
-item may shadow; an import decides only when the imported name is bound in
-one namespace where it comes from. Each withheld answer records why
-(`withheld:selected-binding`, `selected-receiver`, `trace-incomplete`,
-`dependency-on-trace`, `opaque-shadow`, `import-namespaces`, `cfg-link`).
+a candidate set). **Links are per configuration** (D17 as clarified, decided
+by the manager): with the Rust toolchain route on, links are those of the
+default-feature build for the recorded target. A link the route decides is
+right for the configuration it records and makes no claim about any other
+feature set, target or cfg; changing one of them re-runs the route, and no
+earlier answer is reused. An import decides only when the imported name is
+bound in one namespace where it comes from (`withheld:import-namespaces`).
+Every decided link carries a label ([C-43](changes/C-43.md)):
+`selection: "seen"` with a `selectionReason` (`cfg-link`, `opaque-shadow`,
+`selected-binding`, `selected-receiver`, `trace-incomplete`,
+`dependency-on-trace`) when the route saw a build-condition selection on the
+way to the site, or `"none-seen"`, which means only that these checks found
+none: it is not a promise that another configuration gives the same answer.
+The checks do not follow getters, associated types, `Deref` targets or
+aliases of aliases, a re-export chosen by cfg and reached through a glob in
+another file, a cfg-chosen trait in a prelude, build-script output or
+`include!` beyond where rust-analyzer names them, or fields at struct-literal
+and pattern sites. An upgraded link also stores `routeOff`, its complete data
+as source-only left it, so the configuration-free view can always be read
+back. Reports give Level 2 source-only, with the route, and with the route
+counting only `"none-seen"` links.
 The answer's graph symbol must be of a kind
 the SCIP descriptor allows. A trait's associated type or const named in
 generic code (`S::Error`) is answered with the trait's declaration and
@@ -1094,7 +1099,8 @@ counted apart. A source-only definite target the toolchain disagrees with is
 kept and counted; a source-only library target is kept. An unresolved link, or
 a candidate set holding the answer, becomes definite and records
 `toolchain: {origin: "toolchain", rustAnalyzer, configuration, upgrade, from,
-target}`; a confirmed source-only link records `from: "definite"`. Answers
+target, selection, selectionReason?, routeOff}`; a confirmed source-only link
+records `from: "definite"` and the label. Answers
 naming another crate are counted (`libraryAnswers`) and never applied: telling
 that the toolchain's declaring path and Pymtheg's written path name one item
 needs an identity rule not built yet. Every answer reports

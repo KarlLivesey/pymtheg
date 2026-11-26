@@ -33,11 +33,16 @@ const pair = (f, s, i) =>
 
 export const INGREDIENTS = {
   control: (i) => ({
-    expect: [[`crate::p${i}_free`, `src/lib.rs#p${i}_free`, `src/lib.rs#p${i}_free`]],
+    expect: [
+      [`crate::p${i}_free`, `src/lib.rs#p${i}_free`, `src/lib.rs#p${i}_free`],
+    ],
     lib: `pub struct P${i};\nimpl P${i} {\n    pub fn go${i}(&self) -> u32 {\n        0\n    }\n}\npub fn p${i}_free() -> u32 {\n    0\n}\npub fn site${i}() -> u32 {\n    P${i}.go${i}() + crate::p${i}_free()\n}\n`,
   }),
   "use-twin": (i) => ({
-    expect: [[`T${i}::mk${i}`, `src/m${i}a.rs#`, `src/m${i}b.rs#`], [`T${i}::mk${i}().go${i}`, `src/m${i}a.rs#`, `src/m${i}b.rs#`]],
+    expect: [
+      [`T${i}::mk${i}`, `src/m${i}a.rs#`, `src/m${i}b.rs#`],
+      [`T${i}::mk${i}().go${i}`, `src/m${i}a.rs#`, `src/m${i}b.rs#`],
+    ],
     lib: `mod m${i}a;\nmod m${i}b;\n${FAST}\nuse m${i}a::T${i};\n${SLOW}\nuse m${i}b::T${i};\npub fn site${i}() -> u32 {\n    T${i}::mk${i}().go${i}()\n}\n`,
     files: {
       [`src/m${i}a.rs`]: pair(`T${i}`, `Unused${i}a`, i),
@@ -45,15 +50,22 @@ export const INGREDIENTS = {
     },
   }),
   "alias-twin": (i) => ({
-    expect: [[`A${i}::mk${i}`, `#impl F${i}::mk${i}`, `#impl S${i}::mk${i}`], [`A${i}::mk${i}().go${i}`, `#impl F${i}::go${i}`, `#impl S${i}::go${i}`]],
+    expect: [
+      [`A${i}::mk${i}`, `#impl F${i}::mk${i}`, `#impl S${i}::mk${i}`],
+      [`A${i}::mk${i}().go${i}`, `#impl F${i}::go${i}`, `#impl S${i}::go${i}`],
+    ],
     lib: `${pair(`F${i}`, `S${i}`, i)}${FAST}\npub type A${i} = F${i};\n${SLOW}\npub type A${i} = S${i};\npub fn site${i}() -> u32 {\n    A${i}::mk${i}().go${i}()\n}\n`,
   }),
   "fn-twin": (i) => ({
-    expect: [[`make${i}().go${i}`, `#impl F${i}::go${i}`, `#impl S${i}::go${i}`]],
+    expect: [
+      [`make${i}().go${i}`, `#impl F${i}::go${i}`, `#impl S${i}::go${i}`],
+    ],
     lib: `${pair(`F${i}`, `S${i}`, i)}${FAST}\nfn make${i}() -> F${i} {\n    F${i}\n}\n${SLOW}\nfn make${i}() -> S${i} {\n    S${i}\n}\npub fn site${i}() -> u32 {\n    make${i}().go${i}()\n}\n`,
   }),
   "impl-member-twin": (i) => ({
-    expect: [[`H${i}.b${i}().go${i}`, `#impl F${i}::go${i}`, `#impl S${i}::go${i}`]],
+    expect: [
+      [`H${i}.b${i}().go${i}`, `#impl F${i}::go${i}`, `#impl S${i}::go${i}`],
+    ],
     lib: `${pair(`F${i}`, `S${i}`, i)}pub struct H${i};\nimpl H${i} {\n    ${FAST}\n    pub fn b${i}(&self) -> F${i} {\n        F${i}\n    }\n    ${SLOW}\n    pub fn b${i}(&self) -> S${i} {\n        S${i}\n    }\n}\npub fn site${i}() -> u32 {\n    H${i}.b${i}().go${i}()\n}\n`,
   }),
   "static-twin": (i) => ({
@@ -61,7 +73,10 @@ export const INGREDIENTS = {
     lib: `${pair(`F${i}`, `S${i}`, i)}${FAST}\nstatic D${i}: F${i} = F${i};\n${SLOW}\nstatic D${i}: S${i} = S${i};\npub fn site${i}() -> u32 {\n    D${i}.go${i}()\n}\n`,
   }),
   "cfg-if": (i) => ({
-    expect: [[`C${i}::mk${i}`, `src/c${i}a.rs#`, `src/c${i}b.rs#`], [`C${i}::mk${i}().go${i}`, `src/c${i}a.rs#`, `src/c${i}b.rs#`]],
+    expect: [
+      [`C${i}::mk${i}`, `src/c${i}a.rs#`, `src/c${i}b.rs#`],
+      [`C${i}::mk${i}().go${i}`, `src/c${i}a.rs#`, `src/c${i}b.rs#`],
+    ],
     cfgIf: true,
     lib: `mod c${i}a;\nmod c${i}b;\ncfg_if! {\n    if #[cfg(feature = "fast")] {\n        use c${i}a::C${i};\n    } else {\n        use c${i}b::C${i};\n    }\n}\npub fn site${i}() -> u32 {\n    C${i}::mk${i}().go${i}()\n}\n`,
     files: {
@@ -82,7 +97,14 @@ export const INGREDIENTS = {
     },
   }),
   "alias-other-file": (i) => ({
-    expect: [[`OA${i}::mk${i}`, `#impl OF${i}::mk${i}`, `#impl OS${i}::mk${i}`], [`OA${i}::mk${i}().go${i}`, `#impl OF${i}::go${i}`, `#impl OS${i}::go${i}`]],
+    expect: [
+      [`OA${i}::mk${i}`, `#impl OF${i}::mk${i}`, `#impl OS${i}::mk${i}`],
+      [
+        `OA${i}::mk${i}().go${i}`,
+        `#impl OF${i}::go${i}`,
+        `#impl OS${i}::go${i}`,
+      ],
+    ],
     lib: `mod o${i};\n${FAST}\ntype OA${i} = o${i}::OF${i};\n${SLOW}\ntype OA${i} = o${i}::OS${i};\npub fn site${i}() -> u32 {\n    OA${i}::mk${i}().go${i}()\n}\n`,
     files: { [`src/o${i}.rs`]: pair(`OF${i}`, `OS${i}`, i) },
   }),
@@ -101,6 +123,19 @@ export const INGREDIENTS = {
       [`src/ca${i}.rs`]: `pub fn cf${i}() -> u32 {\n    1\n}\n`,
       [`src/ca${i}_fast.rs`]: `pub fn cf${i}() -> u32 {\n    2\n}\n`,
     },
+  }),
+  // Seventh review: a renamed re-export of a cfg alias twin, used from
+  // another module.
+  "renamed-reexport": (i) => ({
+    expect: [
+      [`RP${i}::mk${i}`, `::impl RF${i}::mk${i}`, `::impl RS${i}::mk${i}`],
+      [
+        `RP${i}::mk${i}().go${i}`,
+        `::impl RF${i}::go${i}`,
+        `::impl RS${i}::go${i}`,
+      ],
+    ],
+    lib: `mod api${i} {\n${pair(`RF${i}`, `RS${i}`, i)}    ${FAST}\n    pub type Chosen${i} = RF${i};\n    ${SLOW}\n    pub type Chosen${i} = RS${i};\n}\npub use api${i}::Chosen${i} as RP${i};\nmod user${i} {\n    use crate::RP${i};\n    pub fn site${i}() -> u32 {\n        RP${i}::mk${i}().go${i}()\n    }\n}\n`,
   }),
 };
 

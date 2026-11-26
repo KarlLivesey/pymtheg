@@ -582,94 +582,89 @@ function decideToolchain(
     target: string | undefined,
     candidates: readonly string[],
   ): string | null => {
-      const site = ((rest.conditions ?? []) as Json[]).map(String);
-      const trace = (tcTrace ?? {}) as {
-        receiver?: boolean;
-        enclosing?: string;
-        entries?: Entry[];
-        upTo?: number;
-      };
-      if (!trace.receiver) {
-        // A path: each segment's binding, the `use` hops a segment may
-        // pass through, and any selected source-only candidate.
-        const verdict = traceVerdict(
-          [
-            ...(trace.entries ?? []),
-            ...(target ? [{ k: "item" as const, id: target }] : []),
-          ],
-          site,
-          false,
-        );
-        if (verdict) return verdict;
-        const segments = String(rest.pathSyntax ?? l.targetName)
-          .replace(/<[^<>]*>/g, "")
-          .split("::")
-          .map((x) => x.trim())
-          .filter(Boolean);
-        const scope = typeof rest.scope === "string" ? rest.scope : "";
-        const keyword = new Set(["crate", "self", "super", "Self", "$crate"]);
-        const first = segments[0];
-        if (first !== undefined && !keyword.has(first)) {
-          for (const use of importsByFile.get(file) ?? [])
-            if (
-              inScopeChain(use.scope, scope) &&
-              (use.glob || use.name === first) &&
-              unmet(use.conditions, site)
-            )
-              return "selected-binding";
-        }
-        for (const segment of segments.slice(1))
+    const site = ((rest.conditions ?? []) as Json[]).map(String);
+    const trace = (tcTrace ?? {}) as {
+      receiver?: boolean;
+      enclosing?: string;
+      entries?: Entry[];
+      upTo?: number;
+    };
+    if (!trace.receiver) {
+      // A path: each segment's binding, the `use` hops a segment may
+      // pass through, and any selected source-only candidate.
+      const verdict = traceVerdict(
+        [
+          ...(trace.entries ?? []),
+          ...(target ? [{ k: "item" as const, id: target }] : []),
+        ],
+        site,
+        false,
+      );
+      if (verdict) return verdict;
+      const segments = String(rest.pathSyntax ?? l.targetName)
+        .replace(/<[^<>]*>/g, "")
+        .split("::")
+        .map((x) => x.trim())
+        .filter(Boolean);
+      const scope = typeof rest.scope === "string" ? rest.scope : "";
+      const keyword = new Set(["crate", "self", "super", "Self", "$crate"]);
+      const first = segments[0];
+      if (first !== undefined && !keyword.has(first)) {
+        for (const use of importsByFile.get(file) ?? [])
           if (
-            (selectedImportNames.get(segment) ?? []).some((cs) =>
-              unmet(cs, site),
-            )
+            inScopeChain(use.scope, scope) &&
+            (use.glob || use.name === first) &&
+            unmet(use.conditions, site)
           )
             return "selected-binding";
-        if (candidates.some((c) => c !== target && selectedItem(c, site)))
-          return "selected-binding";
-      } else {
-        // A receiver: the enclosing function's trace up to the site, and
-        // what method lookup could meet.
-        const fn = trace.enclosing
-          ? toolchain.functionTraces?.[trace.enclosing]
-          : undefined;
-        if (!fn || trace.upTo === undefined)
-          return "trace-incomplete";
-        const entries = fn.entries.slice(0, trace.upTo) as Entry[];
-        const verdict = traceVerdict(entries, site, true);
-        if (verdict) return verdict;
-        if (gatedFunctions.has(trace.enclosing!))
-          return "selected-receiver";
-        const name = lastSegment(l.targetName.split(".").at(-1) ?? "");
-        if ((members.get(name) ?? []).some((cs) => unmet(cs, site)))
-          return "selected-receiver";
-        const scope = typeof rest.scope === "string" ? rest.scope : "";
-          const traceNames = new Set(
-            entries.flatMap((entry) =>
-              entry.k === "item" && symbolFact.has(entry.id)
-                ? [symbolFact.get(entry.id)!.name]
-                : [],
-            ),
-          );
-          for (const use of importsByFile.get(file) ?? [])
-            if (
-              inScopeChain(use.scope, scope) &&
-              unmet(use.conditions, site) &&
-              // One that may bring a trait, or that binds a name the
-              // receiver's trace uses (it may select the receiver's type).
-              (!use.notTrait || traceNames.has(use.name))
-            )
-              return "selected-receiver";
-        for (const entry of entries) {
-          if (entry.k !== "item") continue;
-          const fact = symbolFact.get(entry.id);
-          if (!fact) continue;
-          if (fact.gatedFields.includes(name))
-            return "selected-receiver";
-          if ((derefImpls.get(fact.name) ?? []).some((cs) => unmet(cs, site)))
-            return "selected-receiver";
-        }
       }
+      for (const segment of segments.slice(1))
+        if (
+          (selectedImportNames.get(segment) ?? []).some((cs) => unmet(cs, site))
+        )
+          return "selected-binding";
+      if (candidates.some((c) => c !== target && selectedItem(c, site)))
+        return "selected-binding";
+    } else {
+      // A receiver: the enclosing function's trace up to the site, and
+      // what method lookup could meet.
+      const fn = trace.enclosing
+        ? toolchain.functionTraces?.[trace.enclosing]
+        : undefined;
+      if (!fn || trace.upTo === undefined) return "trace-incomplete";
+      const entries = fn.entries.slice(0, trace.upTo) as Entry[];
+      const verdict = traceVerdict(entries, site, true);
+      if (verdict) return verdict;
+      if (gatedFunctions.has(trace.enclosing!)) return "selected-receiver";
+      const name = lastSegment(l.targetName.split(".").at(-1) ?? "");
+      if ((members.get(name) ?? []).some((cs) => unmet(cs, site)))
+        return "selected-receiver";
+      const scope = typeof rest.scope === "string" ? rest.scope : "";
+      const traceNames = new Set(
+        entries.flatMap((entry) =>
+          entry.k === "item" && symbolFact.has(entry.id)
+            ? [symbolFact.get(entry.id)!.name]
+            : [],
+        ),
+      );
+      for (const use of importsByFile.get(file) ?? [])
+        if (
+          inScopeChain(use.scope, scope) &&
+          unmet(use.conditions, site) &&
+          // One that may bring a trait, or that binds a name the
+          // receiver's trace uses (it may select the receiver's type).
+          (!use.notTrait || traceNames.has(use.name))
+        )
+          return "selected-receiver";
+      for (const entry of entries) {
+        if (entry.k !== "item") continue;
+        const fact = symbolFact.get(entry.id);
+        if (!fact) continue;
+        if (fact.gatedFields.includes(name)) return "selected-receiver";
+        if ((derefImpls.get(fact.name) ?? []).some((cs) => unmet(cs, site)))
+          return "selected-receiver";
+      }
+    }
     return null;
   };
   updated.forEach((f, i) => {
@@ -699,15 +694,14 @@ function decideToolchain(
         return kept("withheld:import-namespaces");
       const reasons = uncertaintyReasons(rest.uncertainty);
       // The selection label (no gate): what build conditions the trace met.
-      const selection =
-        beyondTest(rest.conditions as Json[] | undefined)
-          ? "cfg-link"
-          : !r?.targetId && reasons.includes("opaque-item-may-shadow-name")
-            ? "opaque-shadow"
-            : designB(f.path, l, rest, tcTrace, target, [
-                ...((rest.targets ?? []) as Json[]).map(String),
-                ...(r?.candidateIds ?? []),
-              ]);
+      const selection = beyondTest(rest.conditions as Json[] | undefined)
+        ? "cfg-link"
+        : !r?.targetId && reasons.includes("opaque-item-may-shadow-name")
+          ? "opaque-shadow"
+          : designB(f.path, l, rest, tcTrace, target, [
+              ...((rest.targets ?? []) as Json[]).map(String),
+              ...(r?.candidateIds ?? []),
+            ]);
       let from: "definite" | "candidates" | "unresolved";
       if (r?.targetId) {
         if (r.targetId !== target) {
@@ -729,7 +723,20 @@ function decideToolchain(
           return kept("kept:outside-candidate-set");
         if (r.libraries?.length) return kept("kept:library-candidates");
         from = "candidates";
-      } else from = "unresolved";
+      } else {
+        // Seventh review (mutation table): an open link whose stored
+        // targets are every definition of a cfg-conditional name (a
+        // complete lookup) narrows only within them; an answer outside
+        // them is the join's error, never this configuration's answer.
+        const listed = ((rest.targets ?? []) as Json[]).map(String);
+        if (
+          listed.length &&
+          reasons.includes("conditional-name-may-be-absent") &&
+          !listed.includes(target)
+        )
+          return kept("kept:outside-candidate-set");
+        from = "unresolved";
+      }
       bump(`definite:${from}`);
       // The open link's data stays until the stored link takes the answer:
       // the record lists what then goes (`clears`), and the link decider
