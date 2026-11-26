@@ -1,0 +1,8 @@
+{
+ "honojs/hono": {
+  "differences": []
+ },
+ "changesets/changesets": {
+  "differences": []
+ }
+}
