@@ -82,6 +82,11 @@ func Nested() int {
 
 var pkg = func() int { return 1 }
 
+var literal = func() int {
+	c := func() int { return 1 }
+	return c()
+}
+
 func Package() int { return pkg() }
 `;
 
@@ -189,6 +194,14 @@ test("calls through one local func literal target the enclosing function; parame
     assert.deepEqual(
       by("Package", "pkg").map((call) => [call.localBinding, call.reason]),
       [[null, null]],
+    );
+    // A closure inside a package-level func literal has no enclosing
+    // function to target: as before.
+    assert.deepEqual(
+      calls
+        .filter((call) => call.name === "c")
+        .map((call) => [call.target, call.localBinding, call.reason]),
+      [[null, null, null]],
     );
   } finally {
     store.close();

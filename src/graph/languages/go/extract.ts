@@ -310,7 +310,13 @@ export class GoExtractor {
       const data = link.data as { [key: string]: Json };
       if (binding.parameter && binding.name)
         data.localParameter = binding.name as unknown as Json;
-      else if (binding.name && singleLiteral(binding))
+      else if (
+        binding.name &&
+        singleLiteral(binding) &&
+        // Inside a function or method: a literal in a package-level
+        // initializer has no enclosing function to target.
+        link.sourceKey !== "file"
+      )
         data.localBinding = binding.name as unknown as Json;
     }
     // Live local bindings become plain JSON only now that every write has been seen.
