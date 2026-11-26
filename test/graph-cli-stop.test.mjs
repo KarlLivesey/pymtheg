@@ -101,7 +101,7 @@ test("a stop before the completion write leaves no completion: exit 130, no comp
   assert.equal(status(root), false);
 });
 
-test("link touched --no-sync interrupted during its in-place query exits 130", async (t) => {
+test("link list --no-sync interrupted during its in-place query exits 130", async (t) => {
   const root = await project(t);
   await promisify(execFile)(process.execPath, [
     cli,
@@ -122,10 +122,10 @@ test("link touched --no-sync interrupted during its in-place query exits 130", a
   t.after(() => rm(go, { force: true }));
   const run = await interrupted(
     [
+      // One in-place query (the sync probe), then only direct store reads:
+      // only the check after the query can stop it.
       "link",
-      "touched",
-      "--file",
-      "src/a.ts",
+      "list",
       "--no-sync",
       "--root",
       root,
