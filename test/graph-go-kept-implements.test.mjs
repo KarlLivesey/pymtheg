@@ -63,6 +63,10 @@ const files = {
     'package box\n\nimport "example.com/m/shape"\n\ntype Box struct{ W, H int }\n\nfunc (b Box) Area() int { return b.W * b.H }\n\nfunc Use(s shape.Shape) int { return s.Area() }\n\nfunc Make() int { return Use(Box{1, 2}) }\n',
   "dot/dot.go":
     'package dot\n\ntype Dot struct{}\n\nfunc (*Dot) Area() int { return 0 }\n\nfunc (Dot) Name() string { return "dot" }\n',
+  // Two init functions share an identity: an anonymous struct in the first
+  // renumbers the second's (C-56a).
+  "dot/init.go":
+    "package dot\n\nfunc init() {}\n\nfunc init() { _ = struct{ A int }{} }\n",
 };
 
 test("a session reuses Go's implements decisions across body edits, proven equal to a recomputation, and recomputes on every other change", async () => {
@@ -89,6 +93,15 @@ test("a session reuses Go's implements decisions across body edits, proven equal
       false,
     ],
     ["another body edit", () => write("box/box.go", files["box/box.go"]), true],
+    [
+      "an anonymous struct in the first of two init (renumbers the second's)",
+      () =>
+        write(
+          "dot/init.go",
+          "package dot\n\nfunc init() { _ = struct{ B int }{} }\n\nfunc init() { _ = struct{ A int }{} }\n",
+        ),
+      false,
+    ],
     [
       "rename that file",
       () => renameSync(join(root, "tri/tri.go"), join(root, "tri/triangle.go")),
