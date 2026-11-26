@@ -1,0 +1,1 @@
+{"tsconfig.json":"{\"compilerOptions\":{\"strict\":true},\"include\":[\"src\"]}","src/a.ts":"export const a = 1;\n","other/x.js":"var y = 2;\n","other/y.ts":"export const z = 3;\n"}

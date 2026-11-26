@@ -78,6 +78,19 @@ const failure = (detail: string): ParseResult => ({
   symbols: [],
   links: [],
 });
+/** The stored result of a file until its module's project analysis answers. */
+const AWAITING_ANALYSIS = "Awaiting project analysis";
+/**
+ * C-52: whether a result is still that placeholder. A module's analysis must
+ * answer each file it was given with a result or a named failure; handing
+ * the placeholder back (its stored input, say) is a defect, never a cause.
+ */
+const placeholder = (result: ParseResult) =>
+  result.status === "failed" &&
+  result.failureKind === undefined &&
+  result.diagnostics.length === 1 &&
+  result.diagnostics[0]!.message === AWAITING_ANALYSIS;
+
 const needsContext = (module: LanguageModule, path: string) =>
   module.contextFiles?.some((pattern) => matchesPattern(path, pattern)) ??
   false;
@@ -285,7 +298,7 @@ export async function indexProject(
     let result: ParseResult;
     if (source.status === "failed")
       result = failure(source.diagnostics[0]!.message);
-    else if (!module.parse) result = failure("Awaiting project analysis");
+    else if (!module.parse) result = failure(AWAITING_ANALYSIS);
     else {
       try {
         count(`parse.${module.id}.files`);
@@ -508,6 +521,26 @@ export async function indexProject(
           throw Error("Project analysis cannot clean an unreadable source");
         validateResult(file.text, item.result);
         seen.add(item.path);
+      }
+      // A file answered with the placeholder fails with a named cause, and
+      // the report says which module did it (C-52).
+      if (results.some((item) => placeholder(item.result))) {
+        const detail = `The ${module.id} module returned no result for this file (a defect in pymtheg, not a problem in this file; it is retried on the next index)`;
+        results = results.map((item) =>
+          placeholder(item.result)
+            ? {
+                path: item.path,
+                result: {
+                  ...failure(detail),
+                  failureKind: "transient" as const,
+                },
+              }
+            : item,
+        );
+        report.analysisErrors.push({
+          module: module.id,
+          message: `returned no result for ${results.filter((item) => item.result.diagnostics[0]?.message === detail).length} files`,
+        });
       }
       if (
         !module.parse &&

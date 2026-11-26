@@ -117,6 +117,8 @@ import {
   syntaxFailure,
   toVirtual,
 } from "./project.js";
+// C-52: the cause of a declaration the taint walk could not read.
+import { UNKNOWN_CAUSE } from "./taint.js";
 
 /**
  * TypeScript and JavaScript through the TypeScript compiler. Analyze-only: one
@@ -567,6 +569,42 @@ function withoutTaint(result: ParseResult): ParseResult {
       return { ...link, data };
     }),
   };
+}
+
+/**
+ * C-52: a link whose failed-file causes include a declaration the taint walk
+ * could not read (UNKNOWN_CAUSE, taint.ts) is unknown when that is its only
+ * cause: unresolved with `taint-budget-exhausted`, no target and no cause.
+ * With real failed files among its causes it stays `invalid-code` with
+ * those.
+ */
+function withoutUnknownCauses(result: ParseResult): ParseResult {
+  if (result.status === "failed") return result;
+  let changed = false;
+  const links = result.links.map((link) => {
+    const data = link.data as { [key: string]: Json } | undefined;
+    const cause = data?.cause as
+      | { file?: string; files?: string[]; via?: string }
+      | undefined;
+    if (!cause) return link;
+    const files = cause.files ?? (cause.file ? [cause.file] : []);
+    if (!files.includes(UNKNOWN_CAUSE)) return link;
+    changed = true;
+    const known = files.filter((file) => file !== UNKNOWN_CAUSE);
+    const next = { ...data };
+    if (!known.length) {
+      delete next.cause;
+      delete next.targets;
+      delete next.libraryFacts;
+      next.reason = "taint-budget-exhausted";
+    } else
+      next.cause = {
+        ...(known.length === 1 ? { file: known[0]! } : { files: known }),
+        ...(cause.via ? { via: cause.via } : {}),
+      };
+    return { ...link, data: next };
+  });
+  return changed ? { ...result, links } : result;
 }
 
 /** Flags the links that rest on the bundler assumption. */
@@ -1411,7 +1449,7 @@ export function typescriptModule(
               exhaustedSessions.add(session);
               return { result: withoutTaint(result) };
             }
-            return { result };
+            return { result: withoutUnknownCauses(result) };
           } catch (error) {
             if (error instanceof CheckerLimit) return { limit: error.key };
             if (isCompilerAssertion(error))

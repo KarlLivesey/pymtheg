@@ -64,7 +64,34 @@ export function setTaintBudget(checker: ts.TypeChecker, steps: number): void {
   budgetFor.set(checker, steps);
 }
 /** Observation counters for evidence and tests: walks, the most steps one took, walks stopped. */
-export const taintStatistics = { walks: 0, maxSteps: 0, exhausted: 0 };
+export const taintStatistics = {
+  walks: 0,
+  maxSteps: 0,
+  exhausted: 0,
+  /** Per walk (C-52 diagnosis): its size and where its steps went. */
+  log: [] as {
+    sources: number;
+    failed: number;
+    declarations: number;
+    edges: number;
+    steps: Record<string, number>;
+    causeSteps: number;
+    tainted: number;
+    weak: number;
+    largestCauses: number;
+    exhausted: boolean;
+    stoppedBy?: string;
+    /** The heap in use when the walk ended (bytes). */
+    heapUsed: number;
+  }[],
+};
+/** Phase counters of the walk in progress (C-52 diagnosis). */
+let phase = "seeds";
+let phaseSteps: Record<string, number> = {};
+let causeSteps = 0;
+let lastDeclarations = 0;
+let lastStop: string | undefined;
+let lastEdges = 0;
 /** Checkers whose taint walk reached the budget. */
 const exhaustedFor = new WeakSet<ts.TypeChecker>();
 /** Whether this checker's taint walk stopped at the budget (its taint is unknown). */
@@ -120,10 +147,21 @@ class DirectCauses extends Map<ts.Symbol, Set<string>> {
  * read.
  */
 const unanswered = (error: unknown): never => {
-  if (error instanceof RangeError) throw BUDGET_REACHED;
+  if (error instanceof RangeError) throw STACK_LIMIT;
   throw error;
 };
 const BUDGET_REACHED = Symbol("taint budget reached");
+/** The compiler ran out of stack answering one question (C-52). */
+const STACK_LIMIT = Symbol("taint stack limit");
+/**
+ * The cause of a declaration whose parts could not be read (the compiler ran
+ * out of stack on one of them, C-52): whether it depends on a failed file is
+ * unknown. It spreads through the fixpoint exactly like a failed file, so
+ * whatever depends on that declaration is unknown too, and nothing else.
+ * A link it reaches is reported `taint-budget-exhausted`, never answered
+ * (index.ts `withoutUnknownCauses`).
+ */
+export const UNKNOWN_CAUSE = "\u0000taint-unknown";
 /** A destructured binding depends on the property it takes. */
 const DESTRUCTURED = true;
 /** A reference inside a type argument taints weakly. */
@@ -446,18 +484,80 @@ export function taintOf(input: TaintInput, failed: boolean): Taint {
   const budget = skipFor.has(input.checker)
     ? 0
     : (budgetFor.get(input.checker) ?? TAINT_BUDGET);
+  let allowed = budget;
   const step = () => {
-    if (++steps > budget) throw BUDGET_REACHED;
+    phaseSteps[phase] = (phaseSteps[phase] ?? 0) + 1;
+    if (++steps > allowed) throw BUDGET_REACHED;
+  };
+  /**
+   * C-52: the walk is linear in the program's dependence graph (every edge
+   * is followed once per growth of its source), so the budget grows with
+   * it: the base, plus EDGE_STEPS per edge. A walk whose cost is linear in
+   * its graph finishes; only superlinear growth of cause sets meets it.
+   */
+  const grow = (edges: number) => {
+    if (allowed) allowed = budget + EDGE_STEPS * edges;
   };
   if (budget) taintStatistics.walks++;
+  phase = "seeds";
+  phaseSteps = {};
+  causeSteps = 0;
+  lastStop = undefined;
+  let result: Taint | undefined;
   try {
-    return computeTaint(input, step);
+    return (result = computeTaint(input, step, grow));
   } finally {
     taintStatistics.maxSteps = Math.max(taintStatistics.maxSteps, steps);
+    if (budget) {
+      const files = input.program
+        .getSourceFiles()
+        .map((source) => fromVirtual(source.fileName))
+        .filter(
+          (path): path is string =>
+            path !== undefined && input.captured.has(path),
+        );
+      let largest = 0;
+      for (const set of result?.all.values() ?? [])
+        largest = Math.max(largest, set.size);
+      taintStatistics.log.push({
+        sources: files.length,
+        failed: files.filter((path) => input.invalid(path)).length,
+        declarations: lastDeclarations,
+        edges: lastEdges,
+        steps: { ...phaseSteps },
+        causeSteps,
+        tainted: result && !unknownTaints.has(result) ? result.all.size : -1,
+        weak: result ? result.weak.size : -1,
+        largestCauses: largest,
+        exhausted: !result || unknownTaints.has(result),
+        ...(lastStop ? { stoppedBy: lastStop } : {}),
+        heapUsed: process.memoryUsage().heapUsed,
+      });
+    }
   }
 }
 
-function computeTaint(input: TaintInput, step: () => void): Taint {
+/** Budget steps allowed per dependence edge, above the base (C-52). */
+export const EDGE_STEPS = 4;
+/**
+ * The most failed files one symbol's causes keep (C-52): the first ones the
+ * walk reaches, in its order, which depends only on the snapshot. A full set
+ * never grows again, so a merge costs at most this many steps, and the
+ * fixpoint stays linear in the program's dependence graph however many
+ * failed files a name can come from (microsoft/TypeScript's test scripts
+ * declare the same names hundreds of times), and a walk that finishes holds
+ * one set per tainted symbol (231,000 there: 64 per set exhausted the default
+ * heap). A link then names at most this
+ * many of its causes. Taint itself (whether a symbol has any cause) is
+ * unchanged.
+ */
+export const CAUSE_CAP = 8;
+
+function computeTaint(
+  input: TaintInput,
+  step: () => void,
+  grow: (edges: number) => void,
+): Taint {
   const { program, checker, captured, resolveModule, invalid, failedNames } =
     input;
   const seeds = new Map<ts.Symbol, Set<string>>();
@@ -476,8 +576,22 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
     symbol: ts.Symbol,
     causes: Iterable<string>,
   ): boolean => {
+    // A full set never grows (CAUSE_CAP).
+    if ((map.get(symbol)?.size ?? 0) >= CAUSE_CAP) return false;
     // Every cause stored or copied is a step: the budget bounds what the
     // walk holds, not only what it visits.
+    const before = phaseSteps[phase] ?? 0;
+    try {
+      return addInner(map, symbol, causes);
+    } finally {
+      causeSteps += (phaseSteps[phase] ?? 0) - before;
+    }
+  };
+  const addInner = (
+    map: Map<ts.Symbol, Set<string>>,
+    symbol: ts.Symbol,
+    causes: Iterable<string>,
+  ): boolean => {
     const set = map.get(symbol);
     if (!set) {
       if (causes instanceof Set && causes.size) {
@@ -488,6 +602,7 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
       }
       const fresh = new Set<string>();
       for (const cause of causes) {
+        if (fresh.size >= CAUSE_CAP) break;
         step();
         fresh.add(cause);
       }
@@ -513,6 +628,7 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
       }
     }
     for (const cause of causes) {
+      if (target.size >= CAUSE_CAP) break;
       step();
       target.add(cause);
     }
@@ -594,14 +710,17 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
     } catch (error) {
       // A stack limit here: not known to bind a failed file, so the link
       // is reported `taint-budget-exhausted` like the rest.
-      if (error === BUDGET_REACHED) return [];
+      if (error === BUDGET_REACHED || error === STACK_LIMIT) return [];
       throw error;
     }
   };
   try {
     return walk();
   } catch (error) {
-    if (error !== BUDGET_REACHED) throw error;
+    // A stack limit outside one declaration's parts (the seeds): the whole
+    // walk is unknown, as at the budget.
+    if (error !== BUDGET_REACHED && error !== STACK_LIMIT) throw error;
+    lastStop = `${error === STACK_LIMIT ? "stack" : "budget"} in ${phase}`;
     // Unknown, not empty: the module turns every link of this program
     // that consults it into `taint-budget-exhausted` (taintExhausted),
     // except a link that binds a failed file directly, which keeps its
@@ -622,7 +741,46 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
     // ----- seeds -----
     const declarations: ts.Node[] = [];
     for (const source of sources) {
-      const visit = (node: ts.Node): void => {
+      // In source order without recursion: a deep expression (the compiler's
+      // own stress tests) cannot exhaust the walk's stack (C-52).
+      const pending: ts.Node[] = [source];
+      while (pending.length) {
+        const node = pending.pop()!;
+        const children: ts.Node[] = [];
+        ts.forEachChild(node, (child) => {
+          children.push(child);
+        });
+        for (let i = children.length - 1; i >= 0; i--)
+          pending.push(children[i]!);
+        visitSeed(node);
+      }
+    }
+    function visitSeed(node: ts.Node): void {
+      try {
+        readSeed(node);
+      } catch (error) {
+        if (!(error === STACK_LIMIT || error instanceof RangeError))
+          throw error;
+        // A stack limit on this node: its binding (if it has one) is
+        // unknown, and it is read again as a declaration, where a limit
+        // makes only its own symbol unknown (C-52).
+        let symbol: ts.Symbol | undefined;
+        try {
+          symbol =
+            aliasDeclared(node, checker) ?? symbolOfDeclaration(node, checker);
+        } catch (inner) {
+          if (inner === STACK_LIMIT || inner instanceof RangeError)
+            throw STACK_LIMIT;
+          throw inner;
+        }
+        if (!symbol) throw STACK_LIMIT;
+        add(seeds, symbol, [UNKNOWN_CAUSE]);
+        add(all, symbol, [UNKNOWN_CAUSE]);
+        declarations.push(node);
+      }
+    }
+    function readSeed(node: ts.Node): void {
+      {
         step();
         const symbol = aliasDeclared(node, checker);
         if (symbol && symbol.flags & ts.SymbolFlags.Alias) {
@@ -676,12 +834,11 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
               tag.typeExpression
             )
               declarations.push(tag);
-        ts.forEachChild(node, visit);
-      };
-      visit(source);
+      }
     }
 
     // ----- closure -----
+    phase = "references";
     /**
      * Whether a node is a type argument (or array element type) that decides
      * only member types, not which members exist: an argument of a class or
@@ -877,8 +1034,29 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
       visit(part, false);
     };
     for (const node of declarations) {
-      const symbol = symbolOfDeclaration(node, checker);
+      let symbol: ts.Symbol | undefined;
+      try {
+        symbol = symbolOfDeclaration(node, checker);
+      } catch (error) {
+        // No symbol to mark: the walk is unknown, as before.
+        if (error === STACK_LIMIT || error instanceof RangeError)
+          throw STACK_LIMIT;
+        throw error;
+      }
       if (!symbol) continue;
+      try {
+        readDeclaration(node, symbol);
+      } catch (error) {
+        // The compiler (or this walk's own recursion) ran out of stack on
+        // one of its parts: this declaration's dependence is unknown, and
+        // only what depends on it (C-52).
+        if (!(error === STACK_LIMIT || error instanceof RangeError))
+          throw error;
+        add(all, symbol, [UNKNOWN_CAUSE]);
+        continue;
+      }
+    }
+    function readDeclaration(node: ts.Node, symbol: ts.Symbol): void {
       for (const parts of Object.values(DEPENDENCIES))
         for (const part of parts(node, checker)) reference(symbol, part);
       // `const { job } = tree`: the destructured property's own taint.
@@ -904,6 +1082,13 @@ function computeTaint(input: TaintInput, step: () => void): Taint {
           });
       }
     }
+    lastDeclarations = declarations.length;
+    lastEdges = [...dependents.values()].reduce(
+      (n, list) => n + list.length,
+      0,
+    );
+    grow(lastEdges);
+    phase = "fixpoint";
     // Nothing reaches a failed file (no binding, import type or global name).
     if (!all.size && !weak.size) {
       memo.set(checker, EMPTY);

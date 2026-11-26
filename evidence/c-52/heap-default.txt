@@ -1,0 +1,42 @@
+# C-52 merged with main 520e3d4 (C-47), microsoft/TypeScript, TypeScript
+# module only (walk-probe.mjs), Node's default heap (4,288 MiB on the server),
+# heap snapshot written near the limit (--heapsnapshot-near-heap-limit=1).
+# Run without the snapshot: out of memory after 4,345 s, peak RSS 5,297,496 KiB.
+# Run with it: out of memory after 5,159 s; snapshot 9.8 GB.
+
+# Self size by node type and name (heapagg.mjs), top 20:
+nodes 33801342, self size 4081 MiB
+  1452.1 MiB    2981342 array "(object elements)"
+   733.3 MiB    1121796 array ""
+   444.0 MiB    3062940 object "NodeObject"
+   189.3 MiB    1459638 object "SymbolObject"
+   187.2 MiB    1635714 object "IdentifierObject"
+   175.2 MiB    3398397 hidden "system / PropertyArray"
+   166.4 MiB    3321163 object "Object"
+   113.6 MiB    3721063 object "Array"
+   104.5 MiB    3425356 concatenated string "(concatenated string)"
+    57.5 MiB     685262 object "TokenObject"
+    29.8 MiB     976533 object "Map"
+    25.5 MiB     411398 object "system / Context"
+    24.7 MiB     539045 object "NodeLinks"
+    22.6 MiB     740161 object "SymbolLinks"
+    18.5 MiB     346634 closure ""
+    18.5 MiB     268709 object "TypeObject"
+    15.9 MiB     520015 sliced string "(sliced string)"
+    15.2 MiB     153449 object "SignatureObject"
+     4.4 MiB     144298 object "Set"
+     4.1 MiB      23535 object "SourceFileObject"
+
+# Arrays by their first named holder (heapown.mjs), top 12:
+  1238.1 MiB   1016940 SymbolObject.declarations.elements
+    59.7 MiB    376778 SymbolObject.exports.table
+    57.9 MiB     23722 Array.elements
+    34.4 MiB     27216 Map.table
+    32.2 MiB    211826 NodeObject.locals.table
+    31.4 MiB     81042 TypeObject.members.table
+    26.7 MiB    152419 SymbolObject.members.table
+    15.2 MiB    104921 SignatureObject.parameters.elements
+    15.0 MiB     23535 SourceFileObject.identifiers.table
+    10.8 MiB     42575 TypeObject.properties.elements
+    10.1 MiB        45 WeakMap.table
+     9.6 MiB     23913 SymbolLinks.resolvedExports.table

@@ -1,0 +1,1 @@
+{"tsconfig.json":"{\"compilerOptions\":{\"strict\":true,\"allowJs\":true}}","broken.js":"export function value() {}\nconst = ;\n","lib.ts":"export function helper() {}\n","use.ts":"import { helper } from \"./lib\";\nhelper();\nimport { value } from \"./broken.js\";\nvalue();\n"}

@@ -22,6 +22,7 @@ import typescript, {
   statistics,
   typescriptModule,
 } from "../dist/graph/languages/typescript/index.js";
+import { taintStatistics } from "../dist/graph/languages/typescript/taint.js";
 import { JUDGE_BOUND_REASON } from "../dist/graph/languages/typescript/judge.js";
 
 /**
@@ -509,6 +510,134 @@ test("a receiver that reaches a failed file at depth is taint-budget-exhausted w
     ["use.ts", "unresolved", "taint-budget-exhausted", null],
     ["nested.ts", "unresolved", "taint-budget-exhausted", null],
   ]);
+});
+
+// C-52: microsoft/TypeScript's programs. The walk is linear in the
+// program's dependence graph; a fixed budget stopped it in the fixpoint.
+const CHAIN = {
+  "broken.ts": "export interface Value { m(): void }\nconst = ;\n",
+  "lib.ts": "export function helper() {}\n",
+  "chain.ts": [
+    'import type { Value } from "./broken";',
+    "export interface I0 extends Value {}",
+    ...Array.from(
+      { length: 299 },
+      (_, i) => `export interface I${i + 1} extends I${i} {}`,
+    ),
+    "",
+  ].join("\n"),
+  "use.ts": [
+    'import { helper } from "./lib";',
+    "helper(); // call-helper",
+    'import type { I299 } from "./chain";',
+    "declare const x: I299;",
+    "x.m(); // chain-call",
+    "",
+  ].join("\n"),
+};
+
+test("the walk's budget grows with its dependence graph: a fixpoint a fixed budget would cut finishes", async () => {
+  const before = taintStatistics.log.length;
+  await indexFiles(CHAIN);
+  const walk = taintStatistics.log.at(-1);
+  assert.ok(taintStatistics.log.length > before && walk && !walk.exhausted);
+  const reading = walk.steps.seeds + walk.steps.references;
+  const total = reading + walk.steps.fixpoint;
+  // A budget that covers reading the program but not the fixpoint: under a
+  // fixed budget the walk stopped there, and every link of the program was
+  // `taint-budget-exhausted`.
+  const steps = reading + Math.floor(walk.steps.fixpoint / 2);
+  assert.ok(steps < total);
+  const result = await indexFiles(CHAIN, {
+    module: typescriptModule({ taintSteps: steps }),
+  });
+  const call = linkOn(result, "use.ts", "// call-helper", "helper");
+  assert.equal(call.target, "lib.ts#helper");
+  const chain = linkOn(result, "use.ts", "// chain-call", "m");
+  assert.equal(chain.reason, "invalid-code");
+  assert.deepEqual(chain.cause?.file ?? chain.cause?.files, "broken.ts");
+});
+
+const inside = (node, name) => {
+  for (let at = node; at; at = at.parent)
+    if (
+      at.name?.text === name &&
+      at.kind !== undefined &&
+      at.parent &&
+      "members" in at
+    )
+      return true;
+  return false;
+};
+
+test("a stack limit on one declaration makes only what depends on it unknown, not the program", async () => {
+  let thrown = 0;
+  const result = await indexFiles(
+    {
+      "broken.ts": "export interface Value { m(): void }\nconst = ;\n",
+      "base.ts": "export interface Base { b(): void }\n",
+      "a.ts":
+        'import type { Base } from "./base";\nexport interface Deep extends Base {}\n',
+      "lib.ts": "export function helper() {}\n",
+      "use.ts": [
+        'import { helper } from "./lib";',
+        "helper(); // call-helper",
+        'import type { Deep } from "./a";',
+        "declare const d: Deep;",
+        "d.b(); // deep-call",
+        'import type { Value } from "./broken";',
+        "declare const v: Value;",
+        "v.m(); // broken-call",
+        "",
+      ].join("\n"),
+    },
+    {
+      module: typescriptModule({
+        checkerFault: (method, node) => {
+          if (
+            method === "getSymbolAtLocation" &&
+            inFile(node, "a.ts") &&
+            inside(node, "Deep") &&
+            fromTaint()
+          ) {
+            thrown++;
+            throw new RangeError("Maximum call stack size exceeded");
+          }
+        },
+      }),
+    },
+  );
+  assert.ok(thrown > 0);
+  assert.deepEqual(Object.keys(failedReasons(result)), ["broken.ts"]);
+  const call = linkOn(result, "use.ts", "// call-helper", "helper");
+  assert.equal(call.target, "lib.ts#helper");
+  const deep = linkOn(result, "use.ts", "// deep-call", "b");
+  assert.equal(deep.resolution, "unresolved");
+  assert.equal(deep.reason, "taint-budget-exhausted");
+  assert.equal(deep.cause, null);
+  const broken = linkOn(result, "use.ts", "// broken-call", "m");
+  assert.equal(broken.reason, "invalid-code");
+});
+
+test("a cause the walk propagates names at most 8 failed files; taint is unchanged", async () => {
+  // microsoft/TypeScript's failed test scripts declare the same global names
+  // hundreds of times; a cause set keeps the first 8 the walk reaches.
+  // Through the walk: holder depends on the unread name, the call on holder.
+  const files = {
+    "lib.ts": "export interface Box extends Shared {}\n",
+    "use.ts":
+      'import type { Box } from "./lib";\ndeclare const box: Box;\nbox.run(); // shared-call\n',
+  };
+  for (let i = 0; i < 12; i++)
+    files[`broken${String(i).padStart(2, "0")}.ts`] =
+      "interface Shared { run(): void }\nconst = ;\n";
+  const result = await indexFiles(files);
+  const call = linkOn(result, "use.ts", "// shared-call", "run");
+  assert.equal(call.reason, "invalid-code");
+  const causes = call.cause.files ?? [call.cause.file];
+  assert.equal(causes.length, 8);
+  assert.equal(new Set(causes).size, 8);
+  for (const cause of causes) assert.match(cause, /^broken\d\d\.ts$/);
 });
 
 test("a program with no failed file needs no walk, whatever the budget", async () => {
