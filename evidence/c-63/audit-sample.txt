@@ -1,0 +1,776 @@
+all 8577, unowned 0
+### sample golang/tools go/analysis/passes/nilness/nilness.go:265 call visit -> runFunc binding line 77
+    	var visit func(b *ssa.BasicBlock, stack []fact)
+    	visit = func(b *ssa.BasicBlock, stack []fact) {
+    		if seen[b.Index] {
+    			return
+    		}
+    		seen[b.Index] = true
+    	…
+    						if extract0, ok := pinstr.(*ssa.Extract); ok &&
+    							extract0.Index == 0 &&
+    							extract0.Tuple == extract1.Tuple {
+    							for _, d := range b.Dominees() {
+    								if len(d.Preds) == 1 && d == fsucc {
+    									visit(d, append(stack, fact{extract0, isnil}))
+### sample golang/tools go/analysis/unitchecker/unitchecker_test.go:224 call substring -> TestIntegration binding line 199
+    	substring := func(t *testing.T, label, output, substr string) {
+    		if !strings.Contains(output, substr) {
+    			t.Fatalf("%s: expected substring %q", label, substr)
+    		}
+    	}
+    
+    	…
+    	// -- scenarios --
+    
+    	t.Run("a", func(t *testing.T) {
+    		code, _, stderr := vet(t, "golang.org/fake/a")
+    		exitcode(t, code, 1)
+    		substring(t, "stderr", stderr, "a/a.go:4:11: call of MyFunc123")
+### sample golang/tools go/packages/visit.go:92 call visit -> Postorder binding line 87
+    		var visit func(*Package) bool
+    		visit = func(pkg *Package) bool {
+    			if !seen[pkg] {
+    				seen[pkg] = true
+    				for _, imp := range moremaps.Sorted(pkg.Imports) { // for determinism
+    					if !visit(imp) {
+### sample golang/tools gopls/internal/filewatcher/filewatcher_test.go:571 call remove -> TestStress binding line 488
+    			remove := func(base string) func() error {
+    				return func() error {
+    					return os.Remove(filepath.Join(root, base))
+    				}
+    			}
+    			rename := func(old, new string) func() error {
+    	…
+    			// watcher starts.
+    			var g errgroup.Group
+    			for id := range parallelism {
+    				ops := []func() error{
+    					write(fmt.Sprintf("file-%d.go", id)),
+    					remove(fmt.Sprintf("delete-file-%d.go", id)),
+### sample golang/tools gopls/internal/golang/hover_test.go:102 call format -> TestFindDeclInfo binding line 95
+    			format := func(n ast.Node) string {
+    				if n == nil || reflect.ValueOf(n).IsNil() {
+    					return "-"
+    				}
+    				return strings.TrimPrefix(fmt.Sprintf("%T", n), "*ast.")
+    			}
+    
+    			got := fmt.Sprintf("%s,%s,%s,%s", format(decl), format(spec), format(field), format(assign))
+### sample golang/tools gopls/internal/golang/implementation.go:507 call matches -> localImplementations binding line 426
+    	matches := func(candidateType types.Type) bool {
+    		// Test the direction of the relation.
+    		// The client may request either direction or both
+    		// (e.g. when the client is References),
+    		// and the Result reports each test independently;
+    		// both tests succeed when comparing identical
+    	…
+    	// Special case: for types that satisfy error,
+    	// report error in builtin.go (see #59527).
+    	//
+    	// (An inconsistency: we always report the type error
+    	// even when the query was for the method error.Error.)
+    	if matches(errorType) {
+### sample golang/tools gopls/internal/golang/implementation.go:728 call uni -> unify binding line 661
+    	var uni func(x, y types.Type) bool
+    	uni = func(x, y types.Type) bool {
+    		// Panic if recursion gets too deep, to detect bugs before
+    		// overflowing the stack.
+    		depth++
+    		defer func() { depth-- }()
+    	…
+    			return x.Kind() == y.Kind()
+    
+    		case *types.Chan:
+    			y := y.(*types.Chan)
+    			return x.Dir() == y.Dir() &&
+    				uni(x.Elem(), y.Elem())
+### sample golang/tools gopls/internal/golang/pkgdoc.go:297 call unexported -> PackageDocHTML binding line 287
+    			unexported   = func(name string) bool { return !token.IsExported(name) }
+    			filterValues = func(slice *[]*doc.Value) {
+    				delValue := func(v *doc.Value) bool {
+    					v.Names = slices.DeleteFunc(v.Names, unexported)
+    					return len(v.Names) == 0
+    				}
+    				*slice = slices.DeleteFunc(*slice, delValue)
+    			}
+    			filterFuncs = func(funcs *[]*doc.Func) {
+    				*funcs = slices.DeleteFunc(*funcs, func(v *doc.Func) bool {
+    					return unexported(v.Name)
+### sample golang/tools gopls/internal/template/parse.go:300 call at -> writeNode binding line 268
+    	at := func(pos parse.Pos) string {
+    		offset := int(pos)
+    		posn, err := wr.p.mapper.OffsetPosition(offset)
+    		if err != nil {
+    			return fmt.Sprintf("<bad pos %d: %v>", pos, err)
+    		}
+    	…
+    	case *parse.DotNode:
+    		fmt.Fprintf(wr.w, "%sDotNode at %s\n", indent, at(x.Pos))
+    	case *parse.FieldNode:
+    		fmt.Fprintf(wr.w, "%sFieldNode at %s, %v\n", indent, at(x.Pos), x.Ident)
+    	case *parse.IdentifierNode:
+    		fmt.Fprintf(wr.w, "%sIdentifierNode at %s, %v\n", indent, at(x.Pos), x.Ident)
+### sample golang/tools gopls/internal/test/marker/marker_test.go:2198 call read -> changedFiles binding line 2149
+    	read := func(uri protocol.DocumentURI) (*protocol.Mapper, error) {
+    		if m, ok := latest[uri]; ok {
+    			if m == nil {
+    				return nil, fmt.Errorf("read: file %s was deleted", uri)
+    			}
+    			return m, nil
+    	…
+    				// TODO(mkalil): This currently only handles renaming the file's
+    				// innermost directory. Need to handle renames of outer directories
+    				// directories when implementing package move refactoring.
+    				for _, file := range env.ListFiles(old.Path()) {
+    					oldFile := protocol.URIFromPath(path.Join(old.Path(), path.Base(file)))
+    					m, err := read(oldFile)
+### sample golang/tools gopls/internal/test/marker/marker_test.go:2447 call substitutePaths -> mcpToolMarker binding line 2438
+    	var substitutePaths func(any) any
+    	substitutePaths = func(v any) any {
+    		switch v := v.(type) {
+    		case string:
+    			return strings.ReplaceAll(v, "$WORKDIR", mark.run.env.Sandbox.Workdir.RootURI().Path())
+    
+    		case []any:
+    			for i, e := range v {
+    				if _, ok := e.(string); ok {
+    					v[i] = substitutePaths(e).(string)
+### sample golang/tools gopls/internal/util/asm/parse_test.go:115 call indexOf -> TestLineEndings binding line 96
+    			indexOf := func(s string) int {
+    				t.Helper()
+    				index := bytes.Index(content, []byte(s))
+    				if index < 0 {
+    					t.Fatalf("%q not found", s)
+    				}
+    	…
+    				if got, want := string(content[id.Offset:id.End()]), wantIdents[i]; got != want {
+    					t.Errorf("identifier %d: content at offset is %q, want %q", i, got, want)
+    				}
+    			}
+    
+    			firstFuncStart := indexOf("TEXT ·foo")
+### sample golang/tools internal/collection/set/set_test.go:195 call check -> TestInPlaceUpdates binding line 162
+    	check := func(t *testing.T, m set.Set[int], want ...int) {
+    		t.Helper()
+    		if w := set.Of(want...); !m.Equal(w) {
+    			t.Errorf("got %v, want %v", m, w)
+    		}
+    	}
+    	…
+    
+    	t.Run("DifferenceWith", func(t *testing.T) {
+    		x := set.Of(1, 2, 3)
+    		y := set.Of(2, 4)
+    		x.DifferenceWith(y)
+    		check(t, x, 1, 3)
+### sample golang/tools internal/flow/forward_test.go:200 call node -> TestFlowOrder binding line 191
+    	node := func(logical int) int {
+    		return int(perm[logical])
+    	}
+    
+    	// Build the edges.
+    	edges := make([][]int, N)
+    	nEdges := 0
+    	addEdge := func(u, v int) {
+    		uID := node(u)
+    		edges[uID] = append(edges[uID], node(v))
+### sample golang/tools internal/refactor/inline/callee.go:163 call visit -> AnalyzeCallee binding line 150
+    	visit := func(n ast.Node, stack []ast.Node) { ast.PreorderStack(n, stack, f) }
+    	f = func(n ast.Node, stack []ast.Node) bool {
+    		switch n := n.(type) {
+    		case *ast.SelectorExpr:
+    			// Check selections of free fields/methods.
+    			if sel, ok := info.Selections[n]; ok &&
+    				!within(sel.Obj().Pos(), decl) &&
+    				!n.Sel.IsExported() {
+    				sym := fmt.Sprintf("(%s).%s", info.TypeOf(n.X), n.Sel.Name)
+    				unexported = append(unexported, sym)
+    			}
+    
+    			// Don't recur into SelectorExpr.Sel.
+    			visit(n.X, stack)
+### sample golang/tools refactor/importgraph/graph_test.go:143 call printNode -> TestBuild binding line 88
+    	printNode := func(direction string, from string) {
+    		key := fmt.Sprintf("%s[%q]", direction, from)
+    		if nodePrinted[key] {
+    			return
+    		}
+    		nodePrinted[key] = true
+    	…
+    		if forward[this][p] {
+    			printNode("forward", this)
+    			t.Errorf("unexpected: forward[%q][%q] found", this, p)
+    		}
+    		if reverse[p][this] {
+    			printNode("reverse", p)
+### sample cli/cli .github/skills/cli-exercise/tool/internal/evidence/session_order_test.go:130 call stamp -> sessionOrderCases binding line 128
+    		stamp := func(offset time.Duration) string { return origin.Add(offset).Format(time.RFC3339Nano) }
+    		interval := func(chapter *sessionChapter, start, finish time.Duration) {
+    			chapter.Evidence.StartedAt, chapter.Evidence.FinishedAt = stamp(start), stamp(finish)
+### sample cli/cli .github/skills/cli-exercise/tool/internal/preflight/check.go:182 call problem -> check binding line 174
+    	problem := func(item, kind, detail string, needsInstall bool) {
+    		remedy := "Select a working existing capability and rerun check; system installation is a separate user decision."
+    		if needsInstall {
+    			remedy = "Propose setup commands using the pinned requirements, ask for approval, then rerun check."
+    		}
+    		result.Issues = append(result.Issues, issue{Item: item, Kind: kind, Detail: detail, NeedsInstall: needsInstall, Remedy: remedy})
+    	}
+    	if !service.managed {
+    		problem("runtime", "unsupported-platform", "Owned terminal process cleanup and private ownership checks are not implemented on this platfo
+### sample cli/cli .github/skills/cli-exercise/tool/internal/preflight/probe.go:82 call observe -> checkTerminal binding line 32
+    	observe := func(ready func() bool) error {
+    		for !ready() {
+    			select {
+    			case <-ctx.Done():
+    				return fmt.Errorf("terminal capability probe timed out: %w", ctx.Err())
+    			case event, open := <-session.Events():
+    	…
+    		return err
+    	}
+    	if err := session.Input(ctx, json.RawMessage(`{"type":"resize","columns":44,"rows":12}`)); err != nil {
+    		return err
+    	}
+    	if err := observe(func() bool { return latest.Columns == 44 && latest.Rows == 12 }); err != nil {
+### sample cli/cli pkg/cmd/issue/artifact/view/view_test.go:354 call version -> TestViewRun binding line 283
+    	version := func(number int, name string, actor *client.Actor, savedAt string, body string) client.Version {
+    		return client.Version{Version: number, Name: name, Body: body, Actor: actor, CreatedAt: at(savedAt)}
+    	}
+    
+    	// Artifact 2 on the spec's issue 142, with its 12 versions. Version 9
+    	// renamed it.
+    	…
+    		CreatedAt:      at("2026-09-23T22:00:00Z"),
+    		UpdatedAt:      at("2026-09-24T21:00:00Z"),
+    		URL:            runbookPage,
+    		Versions: []client.Version{
+    			version(2, "Production OAuth runbook", monalisa, "2026-09-24T21:00:00Z", productionRunbookURL),
+    			version(1, "Staging OAuth runbook", copilot, "2026-09-23T22:00:00Z", runbookURL),
+### sample cli/cli pkg/cmd/issue/artifact/view/view_test.go:825 call jsonExporter -> TestViewRun binding line 405
+    	jsonExporter := func(fields ...string) cmdutil.Exporter {
+    		e := cmdutil.NewJSONExporter()
+    		e.SetFields(fields)
+    		return e
+    	}
+    
+    	…
+    			wantCalls:  []string{"IsPullRequest monalisa/monas-cafe#142", "Get monalisa/monas-cafe#142 artifact 2"},
+    			wantStdout: `{"number":2,"url":"https://github.com/monalisa/monas-cafe/issues/142/artifacts/2"}` + "\n",
+    		},
+    		{
+    			name:      "--json with versions",
+    			opts:      ViewOptions{IssueNumber: 142, ArtifactNumber: 3, Exporter: jsonExporter("versions")},
+### sample cli/cli pkg/cmd/skills/install/install.go:758 call checkCollisions -> selectSkillsWithSelector binding line 698
+    	checkCollisions := func(ss []discovery.Skill) error {
+    		if err := collisionError(ss); err != nil {
+    			fmt.Fprintf(opts.IO.ErrOut, "Hint: install individually using the full name: gh skill install %s namespace/skill-name\n", sel.sourceHint)
+    			return err
+    		}
+    		return nil
+    	…
+    
+    	result, err := matchSelectedSkills(skills, selected)
+    	if err != nil {
+    		return nil, err
+    	}
+    	return result, checkCollisions(result)
+### sample cli/cli script/ghmock/gittransport.go:66 call fail -> serveGitHTTP binding line 55
+    	fail := func(status int, err error) {
+    		entry.Status = status
+    		entry.Git.Error = err.Error()
+    		http.Error(w, "ghmock: "+err.Error(), status)
+    	}
+    	host, repo, err := parseGitRepo(entry.Host + "/" + strings.Join(parts[:2], "/"))
+    	if err != nil {
+    		fail(http.StatusBadRequest, err)
+    		return true
+    	}
+    	if service != "git-upload-pack" && service != "git-receive-pack" {
+    		fail(http.StatusBadRequest, fmt.Errorf("unsupported Git service %q", service))
+### sample cli/cli script/ghmock/run_test.go:491 call read -> TestRunAll binding line 485
+    				read := func(root, path string) string {
+    					t.Helper()
+    					data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(path)))
+    					require.NoError(t, err)
+    					return string(data)
+    				}
+    				assert.Equal(t, fixtureHosts, read(st.dir, "fixture config/hosts.yml"))
+### sample protocolbuffers/protobuf-go internal/cmd/pbdump/pbdump.go:52 call flagVar -> main binding line 36
+    	flagVar := func(value flag.Value, name, usage string) {
+    		flagUsages = append(flagUsages, fmt.Sprintf("  -%-16v  %v", name+" "+value.String(), usage))
+    		flag.Var(value, name, usage)
+    	}
+    	flagBool := func(name, usage string) *bool {
+    		flagUsages = append(flagUsages, fmt.Sprintf("  -%-16v  %v", name, usage))
+    	…
+    	flagVar(fieldsFlag{&fs, protoreflect.Uint64Kind}, "uints", "List of enum, uint32, or uint64 fields")
+    	flagVar(fieldsFlag{&fs, protoreflect.Fixed32Kind}, "uint32s", "List of fixed32 fields")
+    	flagVar(fieldsFlag{&fs, protoreflect.Sfixed32Kind}, "int32s", "List of sfixed32 fields")
+    	flagVar(fieldsFlag{&fs, protoreflect.FloatKind}, "float32s", "List of float fields")
+    	flagVar(fieldsFlag{&fs, protoreflect.Fixed64Kind}, "uint64s", "List of fixed64 fields")
+    	flagVar(fieldsFlag{&fs, protoreflect.Sfixed64Kind}, "int64s", "List of sfixed64 fields")
+### sample protocolbuffers/protobuf-go proto/equal_test.go:150 call makeXY -> TestEqual binding line 111
+    	makeXY := func(x protobuild.Message, y protobuild.Message, messages ...proto.Message) []xy {
+    		xs := makeMessages(x, cloneAll(messages)...)
+    		ys := makeMessages(y, cloneAll(messages)...)
+    		result := make([]xy, len(xs))
+    		for idx := range xs {
+    			result[idx] = xy{
+    	…
+    	tests = append(tests, makeTest(test{desc: "Scalars"}, makeXY(
+    		protobuild.Message{"optional_uint32": 1},
+    		protobuild.Message{"optional_uint32": 2},
+    	))...)
+    
+    	tests = append(tests, makeTest(test{desc: "Scalars"}, makeXY(
+### sample protocolbuffers/protobuf-go proto/equal_test.go:302 call makeXY -> TestEqual binding line 111
+    	makeXY := func(x protobuild.Message, y protobuild.Message, messages ...proto.Message) []xy {
+    		xs := makeMessages(x, cloneAll(messages)...)
+    		ys := makeMessages(y, cloneAll(messages)...)
+    		result := make([]xy, len(xs))
+    		for idx := range xs {
+    			result[idx] = xy{
+    	…
+    	))...)
+    
+    	tests = append(tests, makeTest(test{
+    		desc: "Scalars",
+    		eq:   true,
+    	}, makeXY(
+### sample protocolbuffers/protobuf-go proto/equal_test.go:548 call makeXY -> TestEqual binding line 111
+    	makeXY := func(x protobuild.Message, y protobuild.Message, messages ...proto.Message) []xy {
+    		xs := makeMessages(x, cloneAll(messages)...)
+    		ys := makeMessages(y, cloneAll(messages)...)
+    		result := make([]xy, len(xs))
+    		for idx := range xs {
+    			result[idx] = xy{
+    	…
+    		protobuild.Message{},
+    		protobuild.Message{"default_bool": true},
+    		allTypesNoProto3...,
+    	))...)
+    
+    	tests = append(tests, makeTest(test{desc: "Default"}, makeXY(
+### sample protocolbuffers/protobuf-go proto/equal_test.go:573 call makeTest -> TestEqual binding line 123
+    	makeTest := func(tmpl test, msgs []xy) []test {
+    		result := make([]test, 0, len(msgs))
+    		for _, msg := range msgs {
+    			tmpl.x = msg.X
+    			tmpl.y = msg.Y
+    			result = append(result, tmpl)
+    	…
+    		&testeditionspb.TestAllTypes{},
+    	))...)
+    
+    	// Groups.
+    
+    	tests = append(tests, makeTest(test{desc: "Groups"}, makeXY(
+### sample protocolbuffers/protobuf-go testing/protocmp/xform.go:225 call addrType -> Transform binding line 204
+    	addrType := func(t reflect.Type) reflect.Type {
+    		if k := t.Kind(); k == reflect.Interface || k == reflect.Ptr {
+    			return t
+    		}
+    		return reflect.PtrTo(t)
+    	}
+    	…
+    		if ps.Type().Kind() == reflect.Interface {
+    			vx, vy := ps.Values()
+    			if !vx.IsValid() || vx.IsNil() || !vy.IsValid() || vy.IsNil() {
+    				return false
+    			}
+    			return isMessageType(addrType(vx.Elem().Type())) && isMessageType(addrType(vy.Elem().Type()))
+### sample cockroachdb/pebble compaction_test.go:2974 call key -> TestSharedObjectDeletePacing binding line 2968
+    	key := func(i int) string {
+    		return fmt.Sprintf("k%02d", i)
+    	}
+    	const numKeys = 20
+    	for i := 1; i <= numKeys; i++ {
+    		require.NoError(t, d.Set([]byte(key(i)), randVal(), nil))
+    		require.NoError(t, d.Compact(context.Background(), []byte(key(i)), []byte(key(i)+"1"), false))
+### sample cockroachdb/pebble db_test.go:1109 call manifestFileNumber -> TestRollManifest binding line 1006
+    	manifestFileNumber := func() base.DiskFileNum {
+    		d.mu.Lock()
+    		defer d.mu.Unlock()
+    		return d.mu.versions.manifestFileNum
+    	}
+    	sizeRolloverState := func() (int64, int64) {
+    	…
+    
+    	// Test the logic that uses the future snapshot size to rollover.
+    	// Reminder: we have a snapshot with 8 files and the manifest has 1 edit
+    	// (flush) with 1 file.
+    	// Add 8 more files with a different key.
+    	lastManifestNum = manifestFileNumber()
+### sample cockroachdb/pebble internal/keyspan/keyspanimpl/merging_iter_test.go:199 call must -> testFragmenterEquivalenceOnce binding line 193
+    	must := func(s *keyspan.Span, err error) *keyspan.Span {
+    		require.NoError(t, err)
+    		return s
+    	}
+    	ops := []opKind{
+    		{weight: 2, fn: func() (string, *keyspan.Span, *keyspan.Span) {
+    			return "First()", must(fragmenterIter.First()), must(mergingIter.First())
+### sample cockroachdb/pebble internal/metamorphic/crossversion/crossversion_test.go:447 call add -> run binding line 424
+    	add := func(a ...string) {
+    		args = append(args, a...)
+    		prettyCmdLin.WriteString(" \\\n  ")
+    		prettyCmdLin.WriteString(strings.Join(a, " "))
+    	}
+    
+    	…
+    
+    	// Explicitly specify the location of the _meta directory. In Cockroach
+    	// CI when built using bazel, the subprocesses may be given a different
+    	// current working directory than the one provided below. To ensure we
+    	// can find this run's artifacts, explicitly pass the intended dir.
+    	add("-dir", filepath.Join(r.dir, "_meta"))
+### sample cockroachdb/pebble wal/failover_manager.go:686 call setLogicalLog -> List binding line 672
+    	setLogicalLog := func(llse logicalLogWithSizesEtc) {
+    		segments := make([]segment, len(llse.segments))
+    		for j := range llse.segments {
+    			segments[j] = llse.segments[j].segment
+    		}
+    		wals = append(wals, LogicalLog{
+    	…
+    	}
+    	for _, llse := range wm.mu.closedWALs {
+    		setLogicalLog(llse)
+    	}
+    	if wm.mu.ww != nil {
+    		setLogicalLog(wm.mu.ww.getLog())
+### sample cockroachdb/pebble wal/reader_test.go:53 call getFS -> TestList binding line 35
+    	getFS := func(name string) *vfs.MemFS {
+    		if _, ok := filesystems[name]; !ok {
+    			filesystems[name] = vfs.NewMem()
+    		}
+    		return filesystems[name]
+    	}
+    	…
+    				var dirname string
+    				if len(arg.Vals) > 1 {
+    					dirname = arg.Vals[1]
+    				}
+    				dirs = append(dirs, Dir{
+    					FS:      getFS(arg.Vals[0]),
+### sample gofiber/fiber ctx_test.go:9403 call sequential -> Benchmark_Ctx_IsProxyTrusted binding line 9312
+    	sequential := func(name string, config Config) {
+    		b.Run(name, func(b *testing.B) {
+    			c := apptest.Ctx(b, New(config))
+    			c.Request().SetRequestURI("http://google.com/test")
+    			c.Request().Header.Set(HeaderXForwardedHost, "google1.com")
+    			b.ReportAllocs()
+    	…
+    	})
+    	parallel("WithProxyCheckAllowAllowAllAsSubnets_Parallel", allowAllSubnets)
+    
+    	sequential("WithProxyCheckSubnet", proxies("0.0.0.0/8"))
+    	parallel("WithProxyCheck_ParallelSubnet", proxies("0.0.0.0/8"))
+    	sequential("WithProxyCheckMultipleSubnet", proxies("192.168.0.0/24", "10.0.0.0/16", "0.0.0.0/8"))
+### sample gofiber/fiber ctx_test.go:9742 call codings -> Test_Ctx_Body_With_Compression_TooManyCodings binding line 9729
+    	codings := func(coding string, n int) string { return strings.TrimSuffix(strings.Repeat(coding+",", n), ",") }
+    	plain := []byte("john=doe")
+    	refused := []byte(ErrUnsupportedMediaType.Error())
+    
+    	app := New()
+    	for _, tc := range []struct {
+    		name     string
+    		encoding string
+    		sent     []byte
+    		want     []byte
+    		wantCode int
+    	}{
+    		{
+    			name: "gzip up to the cap", encoding: codings(StrGzip, maxContentCodings),
+### sample gofiber/fiber internal/fieldname/fieldname_test.go:382 call lines -> Test_KeepReceivedOrder binding line 363
+    	lines := func(h *fasthttp.RequestHeader, name string, canonical bool) []string {
+    		return lineValues(Lines(h, name, canonical))
+    	}
+    
+    	for _, canonical := range []bool{true, false} {
+    		t.Run(fmt.Sprintf("canonical=%v", canonical), func(t *testing.T) {
+    	…
+    
+    			Del(h, "X-Junk", canonical)
+    			require.Equal(t, []string{"https", "http"}, lines(h, "X-Forwarded-Proto", canonical))
+    			require.True(t, KeepReceivedOrder(h, h.RawHeaders(), forwarding))
+    			require.Equal(t, []string{"client", "proxy"}, lines(h, "X-Forwarded-For", canonical))
+    			require.Equal(t, []string{"http", "https"}, lines(h, "X-Forwarded-Proto", canonical))
+### sample gofiber/fiber middleware/cache/cache_test.go:1902 call keyedBy -> Test_CacheStoreAndServe binding line 1879
+    	keyedBy := func(suffix string) func(fiber.Ctx) string {
+    		return func(c fiber.Ctx) string { return c.Path() + suffix }
+    	}
+    	expiresIn := func(d time.Duration, layout string) []string {
+    		return []string{fiber.HeaderExpires, time.Now().Add(d).UTC().Format(layout)}
+    	}
+    	…
+    		{name: "no-store", cfg: ConfigDefault, origin: cc("no-store"), steps: notStored},
+    		{name: "no-cache", cfg: ConfigDefault, origin: cc("no-cache"), steps: notStored},
+    		{name: "Vary: *", cfg: Config{KeyGenerator: keyedBy("|vary-star")}, origin: varyStar, steps: notStored},
+    		{
+    			name: "Vary: *, DisableVaryHeaders", origin: varyStar, steps: notStored,
+    			cfg: Config{DisableVaryHeaders: true, KeyGenerator: keyedBy("|vary-star")},
+### sample gofiber/fiber middleware/cache/coverage_test.go:644 call key -> Test_appendVaryKey_RepeatedFieldLines binding line 635
+    	key := func(values ...string) string {
+    		var hdr fasthttp.RequestHeader
+    		for _, v := range values {
+    			hdr.Add("X-Tenant", v)
+    		}
+    		return string(appendVaryKey(nil, []string{"x-tenant"}, &hdr, true))
+    	}
+    
+    	both := key("public", "acme-private")
+    	require.NotEqual(t, both, key("public"), "a dropped field line must change the key")
+### sample gofiber/fiber middleware/cache/coverage_test.go:646 call key -> Test_appendVaryKey_RepeatedFieldLines binding line 635
+    	key := func(values ...string) string {
+    		var hdr fasthttp.RequestHeader
+    		for _, v := range values {
+    			hdr.Add("X-Tenant", v)
+    		}
+    		return string(appendVaryKey(nil, []string{"x-tenant"}, &hdr, true))
+    	}
+    
+    	both := key("public", "acme-private")
+    	require.NotEqual(t, both, key("public"), "a dropped field line must change the key")
+    	require.NotEqual(t, both, key("acme-private"))
+    	require.NotEqual(t, both, key(), "an absent header must not key like a present one")
+### sample gofiber/fiber middleware/session/middleware_test.go:106 call withSession -> Test_Session_Middleware binding line 96
+    	withSession := func(handle func(c fiber.Ctx, sess *Middleware) error) fiber.Handler {
+    		return func(c fiber.Ctx) error {
+    			sess := FromContext(c)
+    			if sess == nil {
+    				return c.SendStatus(fiber.StatusInternalServerError)
+    			}
+    			return handle(c, sess)
+    		}
+    	}
+    
+    	app.Get("/get", withSession(func(c fiber.Ctx, sess *Middleware) error {
+### sample evanw/esbuild internal/js_parser/js_parser_test.go:5463 call check -> TestMangleInlineLocals binding line 5259
+    	check := func(a string, b string) {
+    		t.Helper()
+    		expectPrintedMangle(t, "function wrapper(arg0, arg1) {"+a+"}",
+    			"function wrapper(arg0, arg1) {"+strings.ReplaceAll("\n"+b, "\n", "\n  ")+"\n}\n")
+    	}
+    
+    	…
+    	check("let x = arg0; return arg1`a${x}b`;", "return arg1`a${arg0}b`;")
+    	check("let x = 'x'; return `a${x}b`;", "return `axb`;")
+    
+    	// Check substitutions into import expressions
+    	check("let x = arg0; return import(x);", "return import(arg0);")
+    	check("let x = arg0; return [import(y), x];", "let x = arg0;\nreturn [import(y), x];")
+### sample pocketbase/pocketbase apis/record_crud_otp_test.go:277 call body -> TestRecordCrudOTPCreate binding line 246
+    	body := func() *strings.Reader {
+    		return strings.NewReader(`{
+    			"recordRef":     "4q1xlclmfloku33",
+    			"collectionRef": "_pb_users_auth_",
+    			"password":      "abc"
+    		}`)
+    	…
+    			URL:    "/api/collections/" + core.CollectionNameOTPs + "/records",
+    			Headers: map[string]string{
+    				// users, test@example.com
+    				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoiX3BiX3VzZXJzX2F1dGhfIiwiZ
+    			},
+    			Body: body(),
+### sample pocketbase/pocketbase core/base.go:1567 call runLogsWrite -> initLogger binding line 1509
+    	runLogsWrite := func(logs []*logger.Log) {
+    		if !app.IsBootstrapped() || app.Settings().Logs.MaxDays == 0 {
+    			return
+    		}
+    
+    		// write the accumulated logs
+    	…
+    			// (https://github.com/pocketbase/pocketbase/issues/7836)
+    			shouldBlock, _ := ctx.Value(logger.BlockKey).(bool)
+    			if shouldBlock {
+    				runLogsWrite(logs)
+    			} else {
+    				routine.FireAndForget(func() { runLogsWrite(logs) })
+### sample pocketbase/pocketbase core/record_model_test.go:1864 call expectedAfterModelEventHandlerChecks -> TestRecordModelEventSync binding line 1779
+    	expectedAfterModelEventHandlerChecks := func(t *testing.T, e *core.ModelEvent) {
+    		if e.Type != "test_d" {
+    			t.Fatalf("Expected type %q, got %q", "test_d", e.Type)
+    		}
+    
+    		if v := e.Context.Value("test"); v != 789 {
+    	…
+    			})
+    
+    			_ = e.Next()
+    
+    			t.Run("after model error", func(t *testing.T) {
+    				expectedAfterModelEventHandlerChecks(t, &e.ModelEvent)
+### sample pocketbase/pocketbase tools/security/random_test.go:109 call run -> testRandomString binding line 84
+    		var run func(int)
+    		run = func(attempt int) {
+    			result := randomFunc(length)
+    
+    			if len(result) != length {
+    				t.Fatalf("(%d) Expected the length of the string to be %d, got %d", i, length, len(result))
+    	…
+    			}
+    
+    			generated = append(generated, result)
+    		}
+    
+    		run(1)
+### sample cilium/ebpf ringbuf/reader_test.go:460 call bench -> BenchmarkReadInto binding line 399
+    	bench := func(b *testing.B, batch int, sampleSize int) {
+    		b.Run(fmt.Sprintf("read batch %d sample size %d", batch, sampleSize), func(b *testing.B) {
+    			prog, events := mustOutputSamplesProgN(b, batch, sampleMessage{size: sampleSize})
+    
+    			rd, err := NewReader(events)
+    			if err != nil {
+    	…
+    	bench(b, 10, 32)
+    	bench(b, 100, 32)
+    	bench(b, 1000, 32)
+    
+    	bench(b, 1, 256)
+    	bench(b, 2, 256)
+### sample labstack/echo bind_cache_test.go:29 call bind -> TestBindCachedMetaPreservesFieldNameError binding line 22
+    	bind := func() error {
+    		e := New()
+    		req := httptest.NewRequest(http.MethodGet, "/?number=10a", nil)
+    		var dto DTO
+    		return e.NewContext(req, httptest.NewRecorder()).Bind(&dto)
+    	}
+    
+    	assert.ErrorContains(t, bind(), "number", "cold cache: error must carry field name")
+### sample junegunn/fzf src/tui/light_test.go:96 call assertCharSequence -> TestLightRenderer binding line 36
+    	assertCharSequence := func(sequence string, name string) {
+    		bytes := []byte(sequence)
+    		light_renderer.buffer = bytes
+    		event := light_renderer.GetChar(true)
+    		if event.KeyName() != name {
+    			t.Errorf(
+    	…
+    	// ctrl-h is the same as ctrl-backspace
+    	// ctrl-i is the same as tab
+    	assertCharSequence("\n", "ctrl-j")
+    	assertCharSequence("\x0b", "ctrl-k")
+    	assertCharSequence("\x0c", "ctrl-l")
+    	assertCharSequence("\r", "enter") // enter
+### sample junegunn/fzf src/tui/light_test.go:290 call assertEscSequence -> TestLightRenderer binding line 48
+    	assertEscSequence := func(sequence string, name string) {
+    		bytes := []byte(sequence)
+    		light_renderer.buffer = bytes
+    
+    		sz := 1
+    		event := light_renderer.escSequence(&sz)
+    	…
+    	assertEscSequence("\x1b[6;11~", "alt-page-down")
+    
+    	assertEscSequence("\x1b[1;12A", "alt-shift-up")
+    	assertEscSequence("\x1b[1;12B", "alt-shift-down")
+    	assertEscSequence("\x1b[1;12C", "alt-shift-right")
+    	assertEscSequence("\x1b[1;12D", "alt-shift-left")
+### sample junegunn/fzf src/options.go:1569 call mergeAttr -> parseTheme binding line 1452
+    			mergeAttr := func(cattr *tui.ColorAttr) {
+    				for _, component := range components[1:] {
+    					switch component {
+    					case "regular":
+    						cattr.Attr = tui.AttrRegular
+    					case "bold", "strong":
+    	…
+    			case "hl":
+    				mergeAttr(&theme.Match)
+    			case "current-hl", "hl+":
+    				mergeAttr(&theme.CurrentMatch)
+    			case "selected-hl":
+    				mergeAttr(&theme.SelectedMatch)
+### sample junegunn/fzf src/options.go:1811 call appendAction -> parseActionList binding line 1754
+    	appendAction := func(types ...actionType) {
+    		actions = append(actions, toActions(types...)...)
+    	}
+    	prevSpec := ""
+    	for specIndex, spec := range originalStrings {
+    		spec = prevSpec + spec
+    	…
+    		case "forward-char":
+    			appendAction(actForwardChar)
+    		case "forward-word":
+    			appendAction(actForwardWord)
+    		case "forward-subword":
+    			appendAction(actForwardSubWord)
+### sample junegunn/fzf src/options.go:3201 call nextString -> parseOptions binding line 2578
+    	nextString := func(message string) (string, error) {
+    		defer func() { val = nil }()
+    		if val != nil {
+    			return *val, nil
+    		}
+    		if len(allArgs) > i+1 {
+    	…
+    			hasArg, arg := optionalNextString()
+    			if opts.Preview.border, err = parseBorder(arg, !hasArg); err != nil {
+    				return err
+    			}
+    		case "--preview-wrap-sign":
+    			str, err := nextString("preview wrap sign required")
+### sample junegunn/fzf src/terminal.go:893 call add -> defaultKeymap binding line 867
+    	add := func(e tui.EventType, a actionType) {
+    		keymap[e.AsEvent()] = toActions(a)
+    	}
+    	addEvent := func(e tui.Event, a actionType) {
+    		keymap[e] = toActions(a)
+    	}
+    	…
+    	add(tui.CtrlBackspace, actBackwardDeleteChar)
+    	add(tui.Tab, actToggleDown)
+    	add(tui.ShiftTab, actToggleUp)
+    	add(tui.CtrlJ, actDown)
+    	add(tui.CtrlK, actUp)
+    	add(tui.CtrlL, actClearScreen)
+### sample junegunn/fzf src/terminal.go:8605 call scrollPreviewTo -> Loop binding line 7039
+    		scrollPreviewTo := func(newOffset int) {
+    			if !t.previewer.scrollable {
+    				return
+    			}
+    			numLines := len(t.previewer.lines)
+    			headerLines := t.activePreviewOpts.headerLines
+    	…
+    					checkSeparator()
+    				}
+    
+    				// Adjust scroll offset
+    				if t.hasPreviewWindow() && currentPreviewOpts.scroll != t.activePreviewOpts.scroll {
+    					scrollPreviewTo(t.evaluateScrollOffset())
+### sample junegunn/fzf src/tui/tcell.go:413 call keyfn -> GetChar binding line 343
+    		keyfn := func(r rune) Event {
+    			if alt {
+    				return CtrlAltKey(r)
+    			}
+    			return EventType(CtrlA.Int() - 'a' + int(r)).AsEvent()
+    		}
+    	…
+    		case tcell.KeyCtrlU:
+    			return keyfn('u')
+    		case tcell.KeyCtrlV:
+    			return keyfn('v')
+    		case tcell.KeyCtrlW:
+    			return keyfn('w')
+### sample junegunn/fzf src/tui/tui.go:1368 call o -> InitTheme binding line 1286
+    	o := func(a ColorAttr, b ColorAttr) ColorAttr {
+    		c := a
+    		if b.Color != colUndefined {
+    			c.Color = b.Color
+    		}
+    		if b.Attr != AttrUndefined {
+    	…
+    	theme.Gutter = o(theme.DarkBg, gutter)
+    	theme.AltGutter = o(theme.Gutter, theme.AltGutter)
+    	theme.PreviewFg = o(theme.Fg, theme.PreviewFg)
+    	theme.PreviewBg = o(theme.Bg, theme.PreviewBg)
+    	theme.PreviewLabel = o(theme.BorderLabel, theme.PreviewLabel)
+    	theme.PreviewBorder = o(theme.Border, theme.PreviewBorder)
+### sample charmbracelet/bubbletea cursed_renderer_test.go:180 call render -> TestCursedRenderer_updatesKittyKeyboardFlagsInPlace binding line 171
+    	render := func(v View) {
+    		t.Helper()
+    		r.render(v)
+    		if _, err := r.flush(false); err != nil {
+    			t.Fatal(err)
+    		}
+    	}
+    
+    	view := NewView("hello")
+    	render(view)

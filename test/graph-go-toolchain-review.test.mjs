@@ -33,6 +33,7 @@ import {
 } from "../dist/graph/index.js";
 import go from "../dist/graph/languages/go/index.js";
 import { linkNotes } from "../dist/graph/languages/go/resolve.js";
+import { deepFreeze } from "../dist/graph/kept-input.js";
 import {
   installation,
   runHelper,
@@ -416,13 +417,16 @@ test("G: forged facts: the toolchain's target is preferred, both recorded, a wit
         candidates: [],
         resolution: "unresolved",
       }));
-    const result = await go.resolve({
-      projectId: "tc",
-      files,
-      contextFiles: store.contexts(),
-      symbols,
-      links,
-    });
+    // Frozen, as the indexer hands Go its inputs under the tests (C-55).
+    const result = await go.resolve(
+      deepFreeze({
+        projectId: "tc",
+        files,
+        contextFiles: store.contexts(),
+        symbols,
+        links,
+      }),
+    );
     const byLink = new Map(result.resolutions.map((r) => [r.linkId, r]));
     const close = links.find((l) => l.targetName === "c.Close");
     const open = links.find((l) => l.targetName === "store.Open");

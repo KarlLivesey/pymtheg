@@ -3239,6 +3239,20 @@ measured trees. **Rules out:** treating a repeated declaration as already
 judged, unless what a judgement reads is first made explicit in the code
 rather than argued in a note. [C-47](changes/C-47.md)
 
+### C-60 A judgement or key does not depend on unrelated order or text
+
+**Decided (C-60):** the judge judges each part of a union callee on its
+own; only the call's joined answer is cached by the call. A hashed part of
+a TypeScript key is a hash of the restored source names, never of the
+compiler's fresh spelling. A config base that the compiler drops because
+its root is not an object (TS5092) keeps the `incomplete-config` marker, as
+an unreadable base does. **Why:** each was found with a fixture. The
+second part of a union took the first part's signature, which gave a
+definite link through a failed file in one order only. An unrelated edit
+changed a renamed file's keys. And a dropped base was taken as read.
+**Rules out:** a per-call memo shared by different callees of that call;
+key hashes of text that depends on other files. [C-60](changes/C-60.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000
@@ -3527,7 +3541,7 @@ A run holding files that main's parse write would have written commits its
 run mark at the end of the parse write, where its first commit used to be,
 so a run started after that point finds it unfinished and takes over
 (files of a module reusing its analysis, C-27 and C-36, were held before
-and claim nothing). **Why:** every Go and Rust file was stored as parsed
+and claim nothing; C-38A later claims for them too). **Why:** every Go and Rust file was stored as parsed
 and then replaced whole as analysed, and every TypeScript file as a
 placeholder and then as analysed; on four pins that was 46-57% of the rows
 a cold index changed. **Trade:** held results stay in memory until
@@ -3558,3 +3572,62 @@ and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall
 result; the 30 s grace only bounds how long an unanswering worker is
 given. See [C-48](changes/C-48.md).
 
+### C-38A The early claim covers modules reusing their analysis; the report names the analysis path
+
+**Decided (C-38A):** the early store claim (C-53) is made whenever any
+module holds back edited files' writes, also a module reusing its
+analysis, which C-53 left out. **Why:** without it a run that begins during
+that analysis finds no write since its start, answers without writing, and
+the first run then writes its analysis of the older text (the Go and
+Rust race tests). The index report also lists, per module that reports
+one (`reportsAnalysisPath`) and has files in the index, the path its
+analysis took (`reused` or `full` for TypeScript); "no previous index"
+comes from the store's record that a run finished completely, kept across
+later runs. **Trade:** a run stopped during a reusing analysis, or taken
+over, leaves its unfinished mark: a `--no-sync` query reports
+`incomplete` over the previous complete rows, and the next index is a full
+analysis (reviewer A, 20 Go packages with one edited: `unchanged=0
+indexed=20` after an interrupted run, `unchanged=19 indexed=1` before).
+**Limit:** before its claim a run is unprotected: paused after parsing a
+file that is then restored, it overwrites a completed run's rows; paused
+after its walk, it deletes the row of a file another run added. Both end
+`incomplete` and the next index repairs them; closing the window is the
+next chunk. See [C-38A](changes/C-38A.md).
+
+
+### Go calls through a local func value (C-63)
+
+**Decided (C-63, manager ruling for all three languages):** a Go call through
+a local binding that provably holds exactly one func literal (declared with
+it and never written, or declared without a value and written once with
+one; no write the extractor cannot see; not of a named func type, whose
+methods can write it) targets the enclosing function or
+method, with the binding's name and declaration span in
+`data.localBinding`, Rust's form. A call through a parameter, named result
+or receiver stays unresolved with the reason `local`. Everything else is as
+before. Go's module version is 33. **Why:** both shapes were stored
+unresolved with no reason; one closure is the function's own code, and a
+parameter's value comes from the caller. See [C-63](changes/C-63.md).
+
+### A module may have its decoded inputs kept by the index session (C-55)
+
+**Decided (C-55):** in an index session the indexer keeps the decoded
+inputs of a module that opts in (`keepsInput`, Go): its analysis records,
+every file's resolver projection and every symbol, as session kept state
+under C-45's rules. A run re-reads only the paths the store has written
+since they were read; the store records every path its `replaceFile`
+calls write. `replaceFile` and `removeFile` are the only writers of
+file-level facts, and inputs are assembled only for paths stored now, so
+removals need no record. The session compares the completion record once,
+at the run's baseline (`confirm`); the comparison C-45 also made when a run
+began could change no outcome and is removed. Each input is given in the order the same read gives without a
+session: records by UTF-16 code units, the resolver projection by UTF-8
+bytes (SQL `ORDER BY path`), symbols by id. The module must not
+change its inputs in place; the test suite freezes them, production does
+not (freezing costs about two thirds of decoding). A kept value above
+128 MiB (UTF-8 bytes) of stored JSON is not kept. **Why:** a Go body edit decoded every
+stored record twice per run (about 3.9 s of a cli/cli body edit through
+the MCP worker); kept, those reads take 0.4 s. **Trade:** the worker's
+resting heap grows by the kept value (cli/cli 94 → 247 MiB, under the
+512 MiB bound). **Unchanged:** without a session, every read and every
+stored row as before. See [C-55](changes/C-55.md).

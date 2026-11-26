@@ -4,6 +4,7 @@ import ts from "typescript";
 import { contentHash } from "../../index.js";
 import { validSourceRange } from "../../identity.js";
 import type {
+  AnalysisPath,
   AnalyzedFile,
   Diagnostic,
   GraphFile,
@@ -125,7 +126,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `49+typescript-${ts.version}`;
+const MODULE_VERSION = `50+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -978,8 +979,18 @@ export function typescriptModule(
     extensions: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
     contextFiles: CONTEXT_PATTERNS,
     dependencyInputs: true,
+    reportsAnalysisPath: true,
     analyze(context) {
       const files = context.files.filter(readable);
+      // The report's path (C-38A): a first index is one with no complete
+      // run before it, by the store's record (after a takeover every file
+      // record looks new).
+      const firstIndex = context.firstIndex === true;
+      const note = (path: AnalysisPath["path"]) =>
+        context.notePath?.({
+          path,
+          ...(firstIndex && { note: "no previous index" }),
+        });
       // Unchanged snapshot: stored facts came from a complete analysis of these
       // exact sources and contexts by this module version, so they are reused
       // without building a program. The core retries a failed file whose content
@@ -1023,6 +1034,7 @@ export function typescriptModule(
           .map((file) => [file, syntaxFailure(file.path, file.text)] as const);
         if (again.every(([, failure]) => failure)) {
           statistics.reused++;
+          note("reused");
           return [
             ...kept.map((file) => ({ path: file.path, result: file.result })),
             ...again.map(([file, failure]) => ({
@@ -1036,6 +1048,7 @@ export function typescriptModule(
         }
       }
       if (context.dependencyInputs) context.dependencyInputs.refreshed = true;
+      note("full");
       const model = projectModel(
         files,
         context.contextFiles,

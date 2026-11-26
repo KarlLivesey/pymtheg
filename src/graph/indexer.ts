@@ -11,7 +11,15 @@ import {
 import { matchesPattern, type LanguageRegistry } from "./registry.js";
 import { count, stage } from "./work.js";
 import type { KeptState } from "./session.js";
+import {
+  guard,
+  KEPT_INPUT,
+  KeptInputs,
+  keptInputKey,
+  type KeptInput,
+} from "./kept-input.js";
 import type {
+  AnalysisPath,
   AnalyzedFile,
   ContextFile,
   GraphFile,
@@ -51,6 +59,8 @@ export interface IndexReport {
   resolutionErrors: { module: string; message: string }[];
   /** Notes from opted-in toolchain routes; absent when no module made one. */
   toolchains?: { module: string; note: Json }[];
+  /** Per module that reported one: the analysis path and why (C-38A). */
+  analysisPaths?: ({ module: string } & AnalysisPath)[];
 }
 export interface IndexOptions {
   excludeDirectories?: readonly string[];
@@ -67,6 +77,8 @@ export interface IndexOptions {
   signal?: AbortSignal;
   /** Progress through the captured files when comparing them with storage. */
   onFileCompared?: (path: string) => void;
+  /** C-55: above this many bytes of stored JSON no input is kept (tests). */
+  keptInputBytes?: number;
   /** C-45: each module's kept state, when the index runs in a session. */
   kept?: (module: LanguageModule) => KeptState | undefined;
 }
@@ -93,6 +105,38 @@ export async function indexProject(
     if (!options.kept) return undefined;
     if (!keptFor.has(module.id)) keptFor.set(module.id, options.kept(module));
     return keptFor.get(module.id);
+  };
+  // C-55: a module that opts in has its decoded inputs kept by the session;
+  // this run re-reads only what the store wrote since they were read.
+  const runMark = store.writeMark?.();
+  const keptInputs = new Map<string, KeptInputs>();
+  const keptInput = (module: LanguageModule): KeptInputs | undefined => {
+    const state = kept(module);
+    if (
+      !module.keepsInput ||
+      !state ||
+      runMark === undefined ||
+      !store.pathsWrittenSince ||
+      !store.symbolsOfFiles ||
+      !store.filesAt ||
+      !store.fileSummaries ||
+      !store.resolutionFiles
+    )
+      return undefined;
+    let inputs = keptInputs.get(module.id);
+    if (!inputs) {
+      const previous = state.get(
+        KEPT_INPUT,
+        keptInputKey(module.id, module.version),
+      ) as KeptInput | undefined;
+      inputs = new KeptInputs(
+        previous,
+        () => store.pathsWrittenSince!(runMark),
+        options.keptInputBytes,
+      );
+      keptInputs.set(module.id, inputs);
+    }
+    return inputs;
   };
   const report: IndexReport = {
     discovered: 0,
@@ -152,6 +196,8 @@ export async function indexProject(
   const completed = await stage("store.beginRun", () =>
     store.completedAnalysis?.(),
   );
+  const indexedBefore =
+    (await stage("store.beginRun", () => store.indexedBefore?.())) === true;
   // Storage reads are deliberately outside all source/module error catches, before any writes.
   const oldFiles = await stage("index.previous", () => summaries(store));
   const oldFileByPath = new Map(oldFiles.map((file) => [file.path, file]));
@@ -359,15 +405,14 @@ export async function indexProject(
       // A run holding files that its parse write used to write marks the
       // store here, as that write did: from now on any other run finds it
       // unfinished and takes over, so this run cannot later write analysis
-      // of a tree that another run has already found current. Files of a
-      // module reusing its analysis were held before C-53 too (C-27, C-36):
-      // they claim nothing, so a run stopped in that analysis still leaves
-      // the previous complete graph.
-      if (
-        [...deferred].some(
-          ([module, files]) => files.length && !reusing.has(module),
-        )
-      )
+      // of a tree that another run has already found current. This holds for
+      // a module reusing its analysis too (C-27, C-36): without the claim, a
+      // run that begins during that analysis finds no write since its start,
+      // answers without writing, and this run then writes its analysis of
+      // the older text (C-38A; the Go race test). A run stopped in such an
+      // analysis therefore leaves its unfinished mark over the previous
+      // complete rows.
+      if ([...deferred].some(([, files]) => files.length))
         await store.claimIndexRun?.();
     }),
   );
@@ -392,14 +437,23 @@ export async function indexProject(
   const resolutionScopes = new Map<string, ReadonlySet<string>>();
   const analyzeModule = async (module: LanguageModule): Promise<void> => {
     // Only this module's records are decoded when the store can list them.
+    const keeping = keptInput(module);
     const files = await stage(`analyze.${module.id}.input`, async () =>
-      store.filesAt && store.fileSummaries
-        ? await store.filesAt(
+      keeping
+        ? await keeping.analysisInput(
             [...claims]
               .filter(([, owner]) => owner.id === module.id)
               .map(([path]) => path),
+            async (paths) => await store.filesAt!(paths),
+            store.writeMark!(),
           )
-        : (await store.files()).filter((file) => file.module === module.id),
+        : store.filesAt && store.fileSummaries
+          ? await store.filesAt(
+              [...claims]
+                .filter(([, owner]) => owner.id === module.id)
+                .map(([path]) => path),
+            )
+          : (await store.files()).filter((file) => file.module === module.id),
     );
     count(`analyze.${module.id}.inputFiles`, files.length);
     const heldRecords = deferred.get(module.id);
@@ -420,6 +474,11 @@ export async function indexProject(
         files.sort((a, b) => compare(a.path, b.path));
       }
     }
+    // A keepsInput module must not change its inputs in place; under the
+    // test suite they are frozen in every run, session or not, after this
+    // run's held records are merged in (C-55; review: a session run handed
+    // the held records over unfrozen).
+    if (module.keepsInput) guard(files);
     const reuse = reusing.has(module.id);
     const filesByPath = new Map(files.map((file) => [file.path, file]));
     const oldPaths = new Set(
@@ -483,6 +542,16 @@ export async function indexProject(
             ...changedContexts.filter((path) => needsContext(module, path)),
             ...checkedInputs.changed,
           ],
+          firstIndex: !indexedBefore,
+          // A module with no files in this index has no path to report.
+          ...(module.reportsAnalysisPath &&
+            files.length > 0 && {
+              notePath: (note: AnalysisPath) =>
+                (report.analysisPaths ??= []).push({
+                  module: module.id,
+                  ...note,
+                }),
+            }),
         }),
       );
       if ("resolutionFiles" in output) {
@@ -633,6 +702,7 @@ export async function indexProject(
             options.signal,
             scope,
             kept(module),
+            keptInput(module),
           )
         : [];
       count(
@@ -720,6 +790,18 @@ export async function indexProject(
   const incremental = registry.modules.filter(
     (module) => module.incrementalAnalysis,
   );
+  // C-55: what each module's inputs are now, kept if the run completes.
+  for (const module of registry.modules) {
+    const inputs = keptInputs.get(module.id);
+    if (!inputs) continue;
+    const value = inputs.result((mark) => store.pathsWrittenSince!(mark));
+    if (value)
+      kept(module)!.set(
+        KEPT_INPUT,
+        keptInputKey(module.id, module.version),
+        value,
+      );
+  }
   await stage("store.finishRun", () =>
     store.finishIndexRun?.(
       [...report.analysisErrors, ...report.resolutionErrors].some((error) =>
@@ -837,6 +919,9 @@ async function finishReport(
  * One module's resolve over freshly read input. The input lives only in this
  * frame, so it is released when the module returns.
  */
+/** A keepsInput module's input, frozen under the test suite (C-55). */
+const frozenFor = <T>(module: LanguageModule, value: T): T =>
+  module.keepsInput ? guard(value) : value;
 async function runResolve(
   module: LanguageModule,
   store: GraphStorage,
@@ -844,6 +929,7 @@ async function runResolve(
   signal?: AbortSignal,
   resolutionFiles?: ReadonlySet<string>,
   kept?: KeptState,
+  keptInput?: KeptInputs,
 ): Promise<readonly LinkResolution[] | ResolutionResult> {
   if (!module.resolve) return [];
   // Only a store that declares independent reads is trusted not to share
@@ -858,6 +944,34 @@ async function runResolve(
       count(`resolve.${module.id}.input${what}`, list.length);
       return list;
     });
+  // C-55: the kept resolver input, brought up to date (scoped projection
+  // and symbols); a module without one reads both afresh below.
+  const scopedKinds =
+    resolutionFiles && module.scopedFileLinkKinds && store.resolutionFiles
+      ? module.scopedFileLinkKinds
+      : undefined;
+  const fromKept = keptInput
+    ? await stage(`resolve.${module.id}.input`, async () => {
+        const value = await keptInput.resolverInput(
+          scopedKinds,
+          {
+            allPaths: async () =>
+              (await read(() => store.fileSummaries!())).map(
+                (file) => file.path,
+              ),
+            projection: async (paths) =>
+              await read(() => store.resolutionFiles!(scopedKinds!, paths)),
+            symbols: async (paths) =>
+              await read(() => store.symbolsOfFiles!(paths)),
+          },
+          store.writeMark!(),
+        );
+        count(`resolve.${module.id}.inputSymbols`, value.symbols.length);
+        if (value.projection)
+          count(`resolve.${module.id}.inputFiles`, value.projection.length);
+        return value;
+      })
+    : undefined;
   return (
     (await stage(`resolve.${module.id}.withInput`, async () =>
       module.resolve!({
@@ -870,21 +984,38 @@ async function runResolve(
         files:
           module.resolutionNeedsFiles === false
             ? []
-            : await input("Files", async () =>
-                own(
-                  await read(() =>
-                    resolutionFiles &&
-                    module.scopedFileLinkKinds &&
-                    store.resolutionFiles
-                      ? store.resolutionFiles(module.scopedFileLinkKinds)
-                      : store.files(),
+            : (fromKept?.projection ??
+              (keptInput && !scopedKinds
+                ? await input("Files", async () =>
+                    keptInput.allRecords(
+                      (await read(() => store.fileSummaries!())).map(
+                        (file) => file.path,
+                      ),
+                      async (paths) => await read(() => store.filesAt!(paths)),
+                      (mark) => store.pathsWrittenSince!(mark),
+                    ),
+                  )
+                : undefined) ??
+              (await input("Files", async () =>
+                frozenFor(
+                  module,
+                  own(
+                    await read(() =>
+                      resolutionFiles &&
+                      module.scopedFileLinkKinds &&
+                      store.resolutionFiles
+                        ? store.resolutionFiles(module.scopedFileLinkKinds)
+                        : store.files(),
+                    ),
                   ),
                 ),
-              ),
+              ))),
         contextFiles: structuredClone(contexts),
-        symbols: await input("Symbols", async () =>
-          own(await read(() => store.findSymbols())),
-        ),
+        symbols:
+          fromKept?.symbols ??
+          (await input("Symbols", async () =>
+            frozenFor(module, own(await read(() => store.findSymbols()))),
+          )),
         // Only the parsed link records: their targets are cleared below anyway.
         // Presented unresolved: no target, candidates or library targets
         // from the previous run.
