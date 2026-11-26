@@ -424,16 +424,20 @@ test("a program replaced during an analysis does not stay alive through what is 
       join(root, "tsconfig.json"),
       JSON.stringify({ compilerOptions: { strict: true }, include: ["src"] }),
     );
-    for (let i = 0; i < 4; i++)
+    const REBUILDS = 6;
+    for (let i = 0; i < REBUILDS; i++)
       await writeFile(
         join(root, "src", `m${i}.ts`),
-        `import { f${(i + 1) % 4} } from "./m${(i + 1) % 4}";\n` +
+        `import { f${(i + 1) % REBUILDS} } from "./m${(i + 1) % REBUILDS}";\n` +
           `export function f${i}(): number {\n  return [1, 2].map((x) => x + 1).length;\n}\n` +
-          `export const v${i} = f${(i + 1) % 4};\n`,
+          `export const v${i} = f${(i + 1) % REBUILDS};\n`,
       );
     const Type = ts.objectAllocator.getTypeConstructor();
-    const REBUILDS = 4;
+    // The extraction is deeper than the default ten frames below the hook.
+    const limit = Error.stackTraceLimit;
+    Error.stackTraceLimit = 100;
     let faults = 0;
+    const faulted = new Set();
     let measureNext = false;
     const alive = [];
     const files = new Set();
@@ -445,34 +449,41 @@ test("a program replaced during an analysis does not stay alive through what is 
           measureNext = false;
           alive.push(queryObjects(Type, { format: "count" }));
         }
-        // A stack overflow during extraction (not the warm-up): the
-        // session rebuilds its program and extracts the file again.
+        // One stack overflow during each file's extraction (not the
+        // warm-up): the session rebuilds its program and extracts the file
+        // again.
         if (
           faults < REBUILDS &&
           method === "getSymbolAtLocation" &&
-          source?.fileName.endsWith("/src/m1.ts") &&
+          /\/src\/m\d\.ts$/.test(source?.fileName ?? "") &&
+          !faulted.has(source.fileName) &&
           new Error().stack.includes("extractFile")
         ) {
           faults++;
+          faulted.add(source.fileName);
           measureNext = true;
           throw new RangeError("Maximum call stack size exceeded");
         }
       },
     });
     store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "memory");
-    const report = await indexProject(
-      root,
-      new LanguageRegistry([module]),
-      store,
-    );
+    let report;
+    try {
+      report = await indexProject(root, new LanguageRegistry([module]), store);
+    } finally {
+      Error.stackTraceLimit = limit;
+    }
     assert.equal(report.analysisErrors.length, 0);
     assert.equal(faults, REBUILDS);
     assert.equal(alive.length, REBUILDS);
-    // The same program built again holds the same types: no earlier one
-    // adds its own.
+    // Programs built and replaced do not accumulate: after the first
+    // rebuilds settle (a caller's frame may still hold the one before), the
+    // types alive stay the same however many programs were built. Before
+    // C-64 every replaced checker stayed alive (+97 types each here).
+    const last = alive.slice(-3);
     assert.deepEqual(
-      alive,
-      alive.map(() => alive[0]),
+      last,
+      last.map(() => last[0]),
       `checker types alive after each rebuild: ${alive.join(", ")}`,
     );
     // What is stored beside a file holds only the fresh names' strings.

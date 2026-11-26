@@ -1226,10 +1226,14 @@ const restorers = new WeakSet<(text: string) => string>();
  * over the program and checker, and lib files outlive every program.
  */
 export function nameRestorer(names: FreshNames): (text: string) => string {
-  const copy: FreshNames = { local: { ...names.local }, uncertain: { ...names.uncertain } };
+  const copy: FreshNames = {
+    local: { ...names.local },
+    uncertain: { ...names.uncertain },
+  };
   for (const table of [copy.local, copy.uncertain])
     for (const value of Object.values(table))
-      if (typeof value !== "string") throw TypeError("fresh names must be strings");
+      if (typeof value !== "string")
+        throw TypeError("fresh names must be strings");
   const restore = (text: string) => restoreNames(text, copy);
   restorers.add(restore);
   return restore;
