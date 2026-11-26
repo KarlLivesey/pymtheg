@@ -1,0 +1,1 @@
+{"pin":"restic","steps":60,"equal":60,"noEditRuns":60,"noEditEqual":60,"implementsReused":28,"implementsChecked":28,"kinds":["body","file-add","move","build","add-export","gomod-module","gomod-require","signature","embed","comment","import","break","interface","file-delete","dot"]}

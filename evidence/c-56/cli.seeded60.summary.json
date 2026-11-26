@@ -1,0 +1,1 @@
+{"pin":"cli","steps":60,"equal":60,"noEditRuns":60,"noEditEqual":60,"implementsReused":30,"implementsChecked":30,"kinds":["gomod-module","comment","file-add","move","break","interface","signature","body","embed","file-delete","build","gomod-require","add-export","import","dot"]}

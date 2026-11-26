@@ -1,0 +1,848 @@
+{
+ "id": "cli/cli",
+ "seed": 5622,
+ "expectedSteps": 60,
+ "steps": [
+  {
+   "step": 0,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 46486,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 1,
+   "file": "pkg/cmd/issue/list/http.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8653,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 2,
+   "file": "pkg/cmd/skills/list/c27_random_2_test.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 25501,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 3,
+   "file": "pkg/cmd/repo/autolink/list/http_test.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 25567,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 4,
+   "file": "pkg/cmd/agent-task/view/view.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 37183,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 5,
+   "file": "pkg/cmd/issue/artifact/view/view_test.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31734,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 6,
+   "file": "internal/attachments/client_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30695,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 7,
+   "file": "pkg/cmd/discussion/client/client_test.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11695,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 8,
+   "file": "pkg/cmd/repo/license/license.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8146,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 9,
+   "file": "pkg/cmd/project/shared/queries/resolve.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31298,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 10,
+   "file": "pkg/cmd/org/list/http_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31672,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 11,
+   "file": "pkg/cmd/root/extension_registration_test.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8128,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 12,
+   "file": "pkg/cmd/pr/create/regexp_writer.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31015,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 13,
+   "file": "pkg/cmd/repo/list/http_test.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29364,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 14,
+   "file": "pkg/cmd/skills/list/c27_random_2_test.go",
+   "kind": "file-delete",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27084,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 15,
+   "file": "pkg/cmd/org/list/http_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31278,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 16,
+   "file": "cmd/gh/main.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28689,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 17,
+   "file": "internal/telemetry/fake.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28659,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 18,
+   "file": "pkg/cmd/agent-task/capi/client_test.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7001,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 19,
+   "file": "script/ghmock/graphqlcheck.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30231,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 20,
+   "file": "acceptance/acceptance_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28180,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 21,
+   "file": ".github/skills/cli-exercise/tool/internal/fontutil/font_test.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8446,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 22,
+   "file": "api/queries_comments.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31293,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 23,
+   "file": ".github/codeql/tests/unsanitized-response-to-terminal/vendor/github.com/cli/go-gh/v2/pkg/asciisanitizer/sanitizer.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30081,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 24,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30329,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 25,
+   "file": "pkg/cmd/project/list/list_test.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 31939,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 26,
+   "file": "pkg/cmd/pr/ready/ready_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28021,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 27,
+   "file": "pkg/cmd/attestation/api/mock_client.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9347,
+   "resolvedFiles": 7,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 28,
+   "file": "pkg/cmd/repo/create/http.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 6864,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 29,
+   "file": "internal/config/migration/multi_account.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29474,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 30,
+   "file": "internal/prompter/prompter_mock.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10886,
+   "resolvedFiles": 9,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 31,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 50418,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 32,
+   "file": "pkg/cmd/codespace/codespace_selector_test.go",
+   "kind": "import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 32499,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 33,
+   "file": "internal/codespaces/states.go",
+   "kind": "import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29377,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 34,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28627,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 35,
+   "file": "pkg/cmd/project/item-add/item_add.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11455,
+   "resolvedFiles": 34,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 36,
+   "file": "pkg/cmd/accessibility/accessibility.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10327,
+   "resolvedFiles": 32,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 37,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 47787,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 38,
+   "file": "pkg/cmd/codespace/create_test.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 29741,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 39,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27077,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 40,
+   "file": "pkg/cmd/auth/shared/prompt.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28795,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 41,
+   "file": "pkg/httpmock/c27_random_41.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27036,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 42,
+   "file": "internal/skills/lockfile/lockfile.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7778,
+   "resolvedFiles": 2,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 43,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 43653,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 44,
+   "file": "pkg/cmd/pr/checkout/checkout_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27717,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 45,
+   "file": "internal/codespaces/rpc/codespace/codespace_host_service.v1.proto.mock.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28190,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 46,
+   "file": "pkg/cmd/attestation/test/path.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27777,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 47,
+   "file": "script/ghmock/export.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 30369,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 48,
+   "file": "pkg/cmd/repo/autolink/delete/delete.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27306,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 49,
+   "file": "pkg/cmd/skills/search/search_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26680,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 50,
+   "file": "pkg/cmd/attestation/verify/attestation_integration_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26410,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 51,
+   "file": "pkg/cmd/root/official_extension_stub_test.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11118,
+   "resolvedFiles": 31,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 52,
+   "file": "pkg/cmd/alias/imports/import_test.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7170,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 53,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 27000,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 54,
+   "file": "pkg/iostreams/content_test.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26992,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 55,
+   "file": "pkg/cmd/issue/reopen/reopen.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26435,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 56,
+   "file": "pkg/httpmock/c27_random_41.go",
+   "kind": "file-delete",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 26733,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 57,
+   "file": "pkg/cmd/event/client/client.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28020,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 58,
+   "file": "script/ghmock/gitfixture.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9130,
+   "resolvedFiles": 43,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 59,
+   "file": "pkg/search/result.go",
+   "kind": "import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 28960,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  }
+ ],
+ "equal": true
+}
