@@ -1052,8 +1052,10 @@ and git databases are symbolic links to the user's own folders, which offline
 cargo only reads; the user's `PATH` follows the toolchain's, since build
 scripts link and may call `cc` or `pkg-config`. Running it runs the
 project's build scripts and proc macros, as building it would; there is no
-sandbox. Each subprocess of the run is bounded (one hour and 256 MiB of
-output each, not a total for the run; a 1 GiB index) and
+sandbox. Each subprocess is bounded, not the run as a whole: `cargo metadata`
+and `cargo tree` ten minutes each (past it the index is `partial`),
+`rust-analyzer scip` and `diagnostics` one hour each (past it `unavailable`
+and `partial`), 256 MiB of output each, and a 1 GiB index. The run is
 cancellable: in the CLI the index's signal kills the process groups; over MCP
 a cancel asks the job to abort and then terminates its worker, and the server
 kills every process group the job recorded, on cancel and when it exits. A
@@ -1069,22 +1071,27 @@ at the link's own name site, the one symbol there, a kind that fits the link,
 no module answer for a `use`, no `extern crate` or crate root, no symbol
 defined more than once, no non-macro item of a proc-macro crate from another
 package, no local binding, no trait-method declaration (dispatch stays open or
-a candidate set). No answer is taken on a link under a cfg condition other
-than `test`. Beyond that the route denies by default (design B,
-[C-43](changes/C-43.md)): an answer decides only when no binding on its trace
-is selected. A binding is selected when it, or an enclosing module, impl,
-trait, block or file, is under a cfg (`test` included) that the site's own
-conditions do not syntactically imply, or when a macro whose expansion is not
-read emits it. A path's trace is each segment's binding and the `use` hops a
-segment may pass through; a receiver-typed link's is everything named in the
-enclosing function up to the site, plus any same-named member, trait `use`,
-cfg-gated field or `Deref`/`Index` impl the lookup could meet. An item of a
-crate other than `std`, `core` or `alloc` on the trace, or a trace that
-cannot be completed, leaves the link confirm-only, as does a name an opaque
-item may shadow; an import decides only when the imported name is bound in
-one namespace where it comes from. Each withheld answer records why
-(`withheld:selected-binding`, `selected-receiver`, `trace-incomplete`,
-`dependency-on-trace`, `opaque-shadow`, `import-namespaces`, `cfg-link`).
+a candidate set). **Links are per configuration** (D17 as clarified, decided
+by the manager): with the Rust toolchain route on, links are those of the
+default-feature build for the recorded target. A link the route decides is
+right for the configuration it records and makes no claim about any other
+feature set, target or cfg; changing one of them re-runs the route, and no
+earlier answer is reused. An import decides only when the imported name is
+bound in one namespace where it comes from (`withheld:import-namespaces`).
+Every decided link carries a label ([C-43](changes/C-43.md)):
+`selection: "seen"` with a `selectionReason` (`cfg-link`, `opaque-shadow`,
+`selected-binding`, `selected-receiver`, `trace-incomplete`,
+`dependency-on-trace`) when the route saw a build-condition selection on the
+way to the site, or `"none-seen"`, which means only that these checks found
+none: it is not a promise that another configuration gives the same answer.
+The checks do not follow getters, associated types, `Deref` targets or
+aliases of aliases, a re-export chosen by cfg and reached through a glob in
+another file, a cfg-chosen trait in a prelude, build-script output or
+`include!` beyond where rust-analyzer names them, or fields at struct-literal
+and pattern sites. An upgraded link also stores `routeOff`, its complete data
+as source-only left it, so the configuration-free view can always be read
+back. Reports give Level 2 source-only, with the route, and with the route
+counting only `"none-seen"` links.
 The answer's graph symbol must be of a kind
 the SCIP descriptor allows. A trait's associated type or const named in
 generic code (`S::Error`) is answered with the trait's declaration and
@@ -1092,13 +1099,16 @@ counted apart. A source-only definite target the toolchain disagrees with is
 kept and counted; a source-only library target is kept. An unresolved link, or
 a candidate set holding the answer, becomes definite and records
 `toolchain: {origin: "toolchain", rustAnalyzer, configuration, upgrade, from,
-target}`; a confirmed source-only link records `from: "definite"`. An answer
+target, selection, selectionReason?, routeOff}`; a confirmed source-only link
+records `from: "definite"` and the label. An answer
 naming another crate (D24) takes a library target keyed by the source-only
 unit (`cargo` and the package, or `rust-std` and `std`, `core` or `alloc`)
 and the item's normalised declaring path (`module::Type::item`,
 `<module::Type as Trait>::item`), with evidence `toolchain-declaring-path`,
 the lockfile's version when the root `Cargo.lock` states that exact package
-version, and the written path recorded beside it; a source-only library
+version, and the written path, the label and the route-off data recorded
+beside it (`toolchainLibrary`); a library answer is per configuration like
+a checkout one; a source-only library
 target is kept (an identical key counts as agreement, another as unverified),
 and fields, blanket impls and crate roots take no library answer. Every answer reports
 `toolchain.rust.state`: `used` (upgraded, confirmed, kept-where-different,

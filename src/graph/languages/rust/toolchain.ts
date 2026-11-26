@@ -657,6 +657,36 @@ export interface RunControls {
   noDefaultFeatures?: boolean;
 }
 
+/**
+ * Every `path = "…"` and `[workspace] members` entry a captured manifest
+ * names, with the manifest's folder (relative to the project root).
+ */
+export function pathDependencies(
+  contexts: readonly { path: string; text?: string | undefined }[],
+): { base: string; value: string }[] {
+  const out: { base: string; value: string }[] = [];
+  const string = String.raw`"(?:[^"\\\n]|\\.)*"|'[^'\n]*'`;
+  for (const manifest of contexts) {
+    if (!/(^|\/)Cargo\.toml$/.test(manifest.path) || !manifest.text) continue;
+    const base = dirname(manifest.path);
+    const named = [
+      ...[
+        ...manifest.text.matchAll(
+          new RegExp(String.raw`\bpath\s*=\s*(${string})`, "g"),
+        ),
+      ].map((m) => tomlString(m[1]!)),
+      ...[...manifest.text.matchAll(/\bmembers\s*=\s*\[([^\]]*)\]/g)].flatMap(
+        (m) =>
+          [...m[1]!.matchAll(new RegExp(string, "g"))].map((x) =>
+            tomlString(x[0]),
+          ),
+      ),
+    ];
+    for (const value of named) if (value) out.push({ base, value });
+  }
+  return out;
+}
+
 /** What a run is prepared from, before anything runs (cheap checks only). */
 export interface PreparedRun {
   /** The build target: `[build] target`, or the host. */
@@ -695,23 +725,29 @@ export function prepareRun(
   };
   // Cargo reads `.cargo/config(.toml)` in every folder above the run's copy
   // of the project, nearest first, then its CARGO_HOME (the user's, copied).
+  // Seventh review 5: cargo reads one file per folder: `config` when both
+  // `config` and `config.toml` exist (its documented precedence), nearer
+  // folders first, then CARGO_HOME. Both texts still enter the key's hash.
+  const oneOf = (plain: string | undefined, toml: string | undefined) =>
+    plain ?? toml;
   const above: (string | undefined)[] = [];
+  const read2: (string | undefined)[] = [];
   for (let dir = resolve(workDir); ; dir = dirname(dir)) {
-    for (const name of ["config.toml", "config"])
-      above.push(read(join(dir, ".cargo", name)));
+    const plain = read(join(dir, ".cargo", "config"));
+    const toml = read(join(dir, ".cargo", "config.toml"));
+    above.push(oneOf(plain, toml));
+    read2.push(plain, toml);
     if (dirname(dir) === dir) break;
   }
-  const user = ["config.toml", "config"].map((name) =>
-    read(join(install.cargoHome, name)),
-  );
+  const userPlain = read(join(install.cargoHome, "config"));
+  const userToml = read(join(install.cargoHome, "config.toml"));
   const configText = (path: string) =>
     contexts.find((file) => file.path === path)?.text;
   const target = buildTarget(
     [
-      configText(".cargo/config.toml"),
-      configText(".cargo/config"),
+      oneOf(configText(".cargo/config"), configText(".cargo/config.toml")),
       ...above,
-      ...user,
+      oneOf(userPlain, userToml),
     ],
     install.host,
   );
@@ -721,41 +757,22 @@ export function prepareRun(
   // manifests name that resolves outside the root: whether it exists, and
   // its Cargo.toml (hashed with the rest; never stored or printed).
   const outsideDependencies: string[] = [];
-  const string = String.raw`"(?:[^"\\\n]|\\.)*"|'[^'\n]*'`;
-  for (const manifest of contexts) {
-    if (!/(^|\/)Cargo\.toml$/.test(manifest.path) || !manifest.text) continue;
-    const base = resolve(root, dirname(manifest.path));
-    const named = [
-      ...[
-        ...manifest.text.matchAll(
-          new RegExp(String.raw`\bpath\s*=\s*(${string})`, "g"),
-        ),
-      ].map((m) => tomlString(m[1]!)),
-      ...[...manifest.text.matchAll(/\bmembers\s*=\s*\[([^\]]*)\]/g)].flatMap(
-        (m) =>
-          [...m[1]!.matchAll(new RegExp(string, "g"))].map((s) =>
-            tomlString(s[0]),
-          ),
-      ),
-    ];
-    for (const value of named) {
-      if (!value) continue;
-      // A glob member stands for its folder.
-      const at = resolve(base, value.replace(/[*?[].*$/, ""));
-      const inside = relative(root, at);
-      if (inside && !inside.startsWith("..") && !isAbsolute(inside)) continue;
-      const cargo = statSync(at, { throwIfNoEntry: false })?.isDirectory()
-        ? read(join(at, "Cargo.toml"))
-        : read(at);
-      outsideDependencies.push(
-        `${at}\u0000${existsSync(at)}\u0000${cargo === undefined ? "\u0000absent" : sha(cargo)}`,
-      );
-    }
+  for (const { base, value } of pathDependencies(contexts)) {
+    // A glob member stands for its folder.
+    const at = resolve(root, base, value.replace(/[*?[].*$/, ""));
+    const inside = relative(root, at);
+    if (inside && !inside.startsWith("..") && !isAbsolute(inside)) continue;
+    const cargo = statSync(at, { throwIfNoEntry: false })?.isDirectory()
+      ? read(join(at, "Cargo.toml"))
+      : read(at);
+    outsideDependencies.push(
+      `${at}\u0000${existsSync(at)}\u0000${cargo === undefined ? "\u0000absent" : sha(cargo)}`,
+    );
   }
   return {
     target,
     outside: sha(
-      ...[...above, ...user].map((text) => text ?? "\u0000absent"),
+      ...[...read2, userPlain, userToml].map((text) => text ?? "\u0000absent"),
       ...outsideDependencies.sort(),
     ),
   };
@@ -1084,6 +1101,26 @@ export async function runAnalyzer(
     signal?.throwIfAborted();
     await mkdir(run, { recursive: true, mode: 0o700 });
     await copyProject(root, project, signal);
+    // Seventh review 8: a relative path outside the checkout
+    // (`path = "../outside"`) resolves from the copy as it does from the
+    // checkout: a link beside the copy points at the original folder. One
+    // that would land outside the run's own folder cannot be placed.
+    for (const { base, value } of pathDependencies(contexts)) {
+      if (isAbsolute(value)) continue;
+      const clean = value.replace(/[*?[].*$/, "");
+      const original = resolve(root, base, clean);
+      const fromRoot = relative(root, original);
+      if (!fromRoot.startsWith("..")) continue;
+      const placed = resolve(project, base, clean);
+      const inRun = relative(run, placed);
+      if (!inRun || inRun.startsWith("..") || isAbsolute(inRun))
+        return {
+          unavailable: `the path dependency ${value} (in ${base || "."}/Cargo.toml) is outside the checkout further than the run's copy can reach`,
+        };
+      if (existsSync(placed)) continue;
+      await mkdir(dirname(placed), { recursive: true });
+      if (existsSync(original)) await symlink(original, placed);
+    }
     // The snapshot's Rust files, as the index read them.
     for (const file of sources) {
       const path = join(project, file.path);
@@ -1222,6 +1259,13 @@ export async function runAnalyzer(
         unavailable: `rust-analyzer's index cannot be read: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
+    // Seventh review: validated completely before anything is cached. A
+    // library root the index does not hold makes it partial, so it is
+    // never kept, and an explicit index never reuses it.
+    const indexedPaths = new Set(documents.map((doc) => doc.path));
+    for (const path of facts.libraryRoots)
+      if (!indexedPaths.has(path))
+        partial.push(`crate root ${path} is not in the index`);
     // Kept only when complete: a partial index or a failed proc macro may
     // come from the environment (a missing system library), which the key
     // does not see, so it is run again next time.

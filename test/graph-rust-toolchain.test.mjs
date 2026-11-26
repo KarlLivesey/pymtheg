@@ -40,6 +40,7 @@ import {
 import { setRunControls } from "../dist/graph/languages/rust/toolchain-route.js";
 import {
   buildTarget,
+  prepareRun,
   tomlString,
 } from "../dist/graph/languages/rust/toolchain.js";
 import { toolchainState } from "../dist/graph/command-toolchain.js";
@@ -244,6 +245,17 @@ pub fn gated(things: Vec<a::Thing>) {
 pub fn variant(things: Vec<b::Other>) {
     things.iter().for_each(|o| o.run());
 }
+
+#[cfg(unix)]
+pub fn plat() {}
+#[cfg(windows)]
+pub fn plat() {}
+pub fn talk() {
+    plat();
+}
+pub fn make() -> Vec<u8> {
+    Vec::new()
+}
 `,
   "src/a.rs": `pub struct Thing;
 
@@ -307,7 +319,17 @@ function gateScip(answer = [GO], overrides = {}) {
         false,
       ],
       [...at(lib, "t.go()", "go", 1), GO, false],
-      [...at(lib, "o.run()", "run"), sym("b/impl#[Other]run()."), false],
+      [
+        ...at(lib, "o.run()", "run"),
+        overrides.run ?? sym("b/impl#[Other]run()."),
+        false,
+      ],
+      ...(overrides.say
+        ? [[...at(lib, "plat();", "plat"), overrides.say, false]]
+        : []),
+      ...(overrides.vecNew
+        ? [[...at(lib, "Vec::new()", "new"), overrides.vecNew, false]]
+        : []),
     ],
     "src/a.rs": [
       [...at(a, "pub struct Thing", "Thing"), sym("a/Thing#"), true],
@@ -399,6 +421,11 @@ const environment = (tools, extra = {}) => ({
 });
 
 /** One gate case: the fake answers, then the route's counts and the caller's `t.go` link. */
+let lastGateDump;
+const gateDump = () => lastGateDump;
+/** A link the route decided, by its written name. */
+const decidedLink = (dump, name) =>
+  dump.links.find((l) => l.targetName === name && l.data?.toolchain);
 async function gateCase(answer, overrides = {}, behaviour = {}) {
   return await scratch(async (root) => {
     const project = join(root, "project");
@@ -416,6 +443,7 @@ async function gateCase(answer, overrides = {}, behaviour = {}) {
     const [caller, gated] = goLinks(dump).sort(
       (x, y) => x.range.start - y.range.start,
     );
+    lastGateDump = dump;
     return {
       dump,
       caller,
@@ -705,6 +733,33 @@ test("D24 (PR 70 ruling): an offer the stored link does not take leaves it, and 
   }
 });
 
+test("seventh review 5: with .cargo/config and .cargo/config.toml in one folder, cargo's precedence holds: the plain file is read", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    mkdirSync(project, { recursive: true });
+    const prepared = prepareRun(
+      project,
+      { cargoHome: join(root, "cargo-home"), host: "x86_64-unknown-linux-gnu" },
+      [
+        {
+          path: ".cargo/config",
+          text: '[build]\ntarget = "aarch64-unknown-linux-gnu"\n',
+        },
+        {
+          path: ".cargo/config.toml",
+          text: '[build]\ntarget = ["a", "b"]\n',
+        },
+      ],
+      join(root, "work"),
+    );
+    assert.equal(
+      prepared.target,
+      "aarch64-unknown-linux-gnu",
+      JSON.stringify(prepared),
+    );
+  });
+});
+
 test("sixth review C: [build] target is read as a TOML string in every quoting form", () => {
   const host = "x86_64-unknown-linux-gnu";
   const target = (text) => buildTarget([text], host);
@@ -800,26 +855,28 @@ test("gates: a checkout answer at the link's own name site upgrades an unresolve
   assert.equal(caller.resolution, "resolved");
   assert.equal(caller.targetSymbol.name, "go");
   assert.equal(caller.targetSymbol.file, "src/a.rs");
-  assert.deepEqual(
-    { ...caller.data.toolchain, target: undefined },
-    {
-      origin: "toolchain",
-      rustAnalyzer: "rust-analyzer 1.98.1 (fake 2026-09-01)",
-      configuration:
-        "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
-      upgrade: "definite",
-      from: "unresolved",
-      target: undefined,
-    },
-  );
+  const { routeOff, target: _target, ...record } = caller.data.toolchain;
+  assert.deepEqual(record, {
+    origin: "toolchain",
+    rustAnalyzer: "rust-analyzer 1.98.1 (fake 2026-09-01)",
+    configuration:
+      "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+    upgrade: "definite",
+    from: "unresolved",
+    selection: "none-seen",
+  });
+  // The route-off data is kept whole beside the answer.
+  assert.equal(typeof routeOff, "object");
   assert.equal(caller.data.uncertainty, undefined);
-  // The same answer under a cfg condition other than test: withheld.
-  assert.equal(gated.resolution, "unresolved");
-  assert.equal(gated.data.toolchain, undefined);
-  assert.equal(decided["withheld:cfg-link"], 1);
-  // A target with cfg variants (`#[cfg(unix)]` / `#[cfg(windows)]` impls): withheld.
-  // Design B: `o.run()` meets the cfg-gated impls of b::Other.
-  assert.equal(decided["withheld:selected-receiver"], 1);
+  // D17 clarified: an answer is definite for its configuration. The same
+  // answer under a cfg other than test is decided, labelled.
+  assert.equal(gated.resolution, "resolved");
+  assert.equal(gated.data.toolchain.selection, "seen");
+  assert.equal(gated.data.toolchain.selectionReason, "cfg-link");
+  // `o.run()` meets the cfg-gated impls of b::Other: decided, labelled.
+  const run = decidedLink(gateDump(), "o.run");
+  assert.equal(run.data.toolchain.selectionReason, "selected-receiver");
+  void decided;
   assert.ok(counts.answer >= 4);
 });
 
@@ -898,6 +955,38 @@ for (const [name, answer, overrides, behaviour, why] of [
   });
 }
 
+// Seventh review, mutation table: the two gates that do not depend on the
+// configuration and had no test.
+test("gates: an answer outside the source-only candidate set is kept as the set, and counted", async () => {
+  // `plat()`: source-only holds both cfg twins; the answer names
+  // `a::helper`, which is not one of them.
+  const { dump, decided } = await gateCase([GO], { say: sym("a/helper().") });
+  const say = dump.links.find(
+    (l) =>
+      l.file === "src/lib.rs" && l.kind === "calls" && l.targetName === "plat",
+  );
+  assert.notEqual(say.resolution, "resolved", JSON.stringify(say));
+  assert.equal(say.data.toolchain, undefined);
+  assert.equal(say.data.toolchainOutcome, "kept:outside-candidate-set");
+  assert.equal(decided["kept:outside-candidate-set"], 1);
+});
+
+test("gates: a source-only library target is kept when the toolchain names a checkout symbol", async () => {
+  // `Vec::new()`: source-only names std's `Vec::new`; the answer names a
+  // checkout function.
+  const { dump, decided } = await gateCase([GO], {
+    vecNew: sym("a/helper()."),
+  });
+  const made = dump.links.find(
+    (l) => l.file === "src/lib.rs" && l.targetName === "Vec::new",
+  );
+  assert.equal(made.resolution, "library", JSON.stringify(made));
+  assert.equal(made.data.toolchain, undefined);
+  // The analysis cannot see source-only library targets; the resolve
+  // phase keeps the library target and withdraws the answer.
+  assert.equal(made.data.toolchainOutcome, "kept:source-only");
+});
+
 test("gates: a source-only definite target the toolchain disagrees with is kept, and counted", async () => {
   const { dump, decided } = await gateCase([GO], {
     helper: sym("b/helper()."),
@@ -931,7 +1020,8 @@ test("gates: a confirming answer marks the source-only link without changing it"
   assert.equal(helper.data.toolchain.target, undefined);
   assert.equal(decided["definite:definite"], 1);
   assert.equal(dump.state.state, "used");
-  assert.equal(dump.state.upgradedLinks, 1);
+  // The plain call, the cfg-gated twin and the cfg impl twin are upgraded.
+  assert.equal(dump.state.upgradedLinks, 3);
   assert.equal(dump.state.confirmedLinks, 1);
 });
 
@@ -1207,6 +1297,15 @@ test("a library root rust-analyzer did not index makes the index partial", async
       dump.state.reason,
       "crate root src/lib.rs is not in the index",
     );
+    // Seventh review 3: the incomplete index was not cached; once the
+    // complete one is available, an explicit index uses it.
+    writeFileSync(scip, gateScip());
+    const again = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(again.state.state, "used", JSON.stringify(again.state));
+    assert.equal(note(again.report, "available").cached, false);
+    assert.equal(runs(tools), 2);
   });
 });
 
@@ -1287,24 +1386,32 @@ test("D24: an unresolved link answered with a standard-library item becomes a li
     assert.equal(caller.data.toolchainLibrary.written, "t.go");
     assert.equal(caller.data.toolchain, undefined);
     assert.ok(dump.state.libraryOffered >= 1, JSON.stringify(dump.state));
-    // The gated twin under cfg(feature = "extra") takes no answer.
-    assert.notEqual(gated.resolution, "library");
+    // D17 clarified: the label and the complete route-off data.
+    assert.equal(caller.data.toolchainLibrary.selection, "none-seen");
+    assert.equal(caller.data.toolchainLibrary.selectionReason, undefined);
+    assert.equal(typeof caller.data.toolchainLibrary.routeOff, "object");
+    // The twin under cfg(feature = "extra") is decided for this
+    // configuration, labelled.
+    assert.equal(gated.resolution, "library");
+    assert.equal(gated.data.toolchainLibrary.selection, "seen");
+    assert.equal(gated.data.toolchainLibrary.selectionReason, "cfg-link");
   });
 });
 
-test("D24 under design B: an answer in a dependency other than std, core and alloc is confirm-only; its cfg cannot be seen", async () => {
+test("D24, D17 clarified: an answer in a dependency other than std, core and alloc is decided for this configuration and labelled dependency-on-trace", async () => {
   await scratch(async (root) => {
     const { caller } = await libraryCase(
       root,
       "rust-analyzer cargo dep 1.2.3 inner/impl#[Thing]go().",
     );
-    assert.notEqual(caller.resolution, "library");
+    assert.equal(caller.resolution, "library", JSON.stringify(caller.data));
+    assert.equal(caller.libraries[0].ecosystem, "cargo");
+    assert.equal(caller.libraries[0].unit, "dep");
+    assert.equal(caller.data.toolchainLibrary.selection, "seen");
     assert.equal(
-      caller.data.toolchainOutcome,
-      "library:withheld:dependency-on-trace",
-      JSON.stringify(caller.data),
+      caller.data.toolchainLibrary.selectionReason,
+      "dependency-on-trace",
     );
-    assert.equal(caller.data.toolchainLibrary, undefined);
   });
 });
 
@@ -1816,22 +1923,24 @@ test(
       // derive's method (`Greeter.hello()`): macro output on the function's
       // trace, so its receiver calls are withheld (the trace is the whole
       // function up to the site, an over-approximation).
-      for (const name of ["a.radius", "c.diameter", "square.side"])
-        assert.equal(
-          dump.links.find(
-            (l) => l.file === "app/src/lib.rs" && l.targetName === name,
-          )?.data?.toolchainOutcome,
-          "withheld:selected-receiver",
-          name,
+      for (const [name, identity] of [
+        ["a.radius", "impl Circle::radius"],
+        ["c.diameter", "impl Circle::diameter"],
+        ["square.side", "impl Square::side"],
+      ]) {
+        const l = dump.links.find(
+          (x) => x.file === "app/src/lib.rs" && x.targetName === name,
         );
-      // Sixth review: source-only records that an opaque item may shadow the
-      // derive path, so the route only confirms it now (confirm-only).
+        assert.equal(l?.targetSymbol?.identity, identity, name);
+        assert.equal(l.data.toolchain.selectionReason, "selected-receiver");
+      }
+      // An opaque item may shadow the derive path: decided, labelled.
       assert.equal(
         dump.links.find(
           (l) =>
             l.file === "app/src/lib.rs" && l.targetName === "macros::Hello",
-        )?.data?.toolchainOutcome,
-        "withheld:opaque-shadow",
+        )?.data?.toolchain?.selectionReason,
+        "opaque-shadow",
       );
       // Dispatch on a trait object stays open: the toolchain names the declaration.
       const dispatch = dump.links.find(
@@ -1848,12 +1957,9 @@ test(
           ["rust-std", "cargo"].includes(l.libraries?.[0]?.ecosystem),
         ),
       );
-      // A link to code a build-script cfg turns on is withheld.
+      // Links whose traces meet a selection are labelled.
       assert.ok(
-        (note(dump.report, "merged").decided["withheld:opaque-shadow"] ?? 0) +
-          (note(dump.report, "merged").decided["withheld:selected-binding"] ??
-            0) >=
-          1,
+        dump.links.some((l) => l.data?.toolchain?.selection === "seen"),
       );
     });
   },
@@ -2163,7 +2269,7 @@ const CFG_CRATE = {
 };
 
 test(
-  "real rust-analyzer, second review B1: cfg on whole modules, twins in a cfg_if!-style macro and conditional candidates are never narrowed; a module is never the answer for a function",
+  "real rust-analyzer, second review B1: cfg on whole modules, twins in a cfg_if!-style macro and conditional candidates are decided for this configuration and labelled; a module is never the answer for a function",
   needsAnalyzer,
   async () => {
     await scratch(async (root) => {
@@ -2196,16 +2302,14 @@ test(
       ]) {
         const l = link(name);
         assert.ok(l, name);
-        assert.equal(
-          l.data?.toolchain,
-          undefined,
-          name + ": " + JSON.stringify(l.data?.toolchain),
-        );
-        assert.notEqual(
-          l.resolution,
-          "resolved",
-          name + " stays open as source-only left it",
-        );
+        // D17 clarified: decided for this configuration, or left open; when
+        // decided, the label says a selection was seen.
+        if (l.data?.toolchain && l.data.toolchain.from !== "definite")
+          assert.equal(
+            l.data.toolchain.selection,
+            "seen",
+            name + ": " + JSON.stringify(l.data.toolchain),
+          );
       }
       // Fourth review: every link into the cfg-selected `use` twins stays as
       // source-only left it, including the call from another file.
@@ -2214,12 +2318,12 @@ test(
           (l.file === "src/lib.rs" && /^ZGray(::|$)/.test(l.targetName)) ||
           (l.file === "src/zcall.rs" && /z_compress$/.test(l.targetName)),
       )) {
-        assert.equal(
-          l.data?.toolchain,
-          undefined,
-          `${l.file} ${l.targetName}: ${JSON.stringify(l.data)}`,
-        );
-        assert.notEqual(l.resolution, "resolved", `${l.file} ${l.targetName}`);
+        if (l.data?.toolchain && l.data.toolchain.from !== "definite")
+          assert.equal(
+            l.data.toolchain.selection,
+            "seen",
+            `${l.file} ${l.targetName}: ${JSON.stringify(l.data)}`,
+          );
       }
       assert.ok(
         dump.links.some(
@@ -2232,8 +2336,8 @@ test(
       // here one an opaque item may shadow, so the route only confirms.
       const g = link("gated_ok::g_fn");
       assert.equal(
-        g?.data?.toolchainOutcome,
-        "withheld:opaque-shadow",
+        g?.data?.toolchain?.selectionReason,
+        "opaque-shadow",
         JSON.stringify(g?.data),
       );
       // Never the module e_width for the call e_width::e_width().
@@ -2248,15 +2352,9 @@ test(
         (counts["answer:trait-associated"] ?? 0) >= 1,
         JSON.stringify(counts),
       );
-      const decided = note(dump.report, "merged").decided;
       assert.ok(
-        // The fifth review's cfg-selected guard now takes some of these
-        // first (the use twins); together they withhold at least three.
-        (decided["withheld:selected-binding"] ?? 0) +
-          (decided["withheld:selected-receiver"] ?? 0) +
-          (decided["withheld:opaque-shadow"] ?? 0) >=
-          3,
-        JSON.stringify(decided),
+        dump.links.filter((l) => l.data?.toolchain?.selection === "seen")
+          .length >= 3,
       );
     });
   },
@@ -2417,7 +2515,7 @@ const SEL_CRATE = {
 };
 
 test(
-  "real rust-analyzer, fifth review: a cfg-selected name (alias twins, a cfg(test) double, function twins) is never narrowed; one cfg(test) definition selects nothing",
+  "real rust-analyzer, fifth review: a cfg-selected name (alias twins, a cfg(test) double, function twins) is decided for the active configuration and labelled seen",
   needsAnalyzer,
   async () => {
     await scratch(async (root) => {
@@ -2435,27 +2533,24 @@ test(
           (l) => l.file === "src/lib.rs" && l.targetName === name,
         );
       const wrong = [];
-      for (const name of [
-        "Backend::b_new",
-        "b.b_run",
-        "h.inner.b_run",
-        "Sys::s_open",
-        "Db::get_db",
-        "mk().run_t",
-        "mk2().run_u",
+      for (const [name, want] of [
+        ["Backend::b_new", "impl FastB::b_new"],
+        ["b.b_run", "impl FastB::b_run"],
+        ["h.inner.b_run", "impl FastB::b_run"],
+        ["Sys::s_open", "impl UnixS::s_open"],
+        ["Db::get_db", "impl MockDb::get_db"],
+        ["mk().run_t", "impl FastT::run_t"],
+        ["mk2().run_u", "impl UnixT::run_u"],
       ]) {
         const links = all(name);
         if (!links.length) wrong.push(`${name}: no link`);
         for (const l of links)
           if (
-            l.data?.toolchain !== undefined ||
-            l.resolution === "resolved" ||
-            !/^withheld:selected-(binding|receiver)$/.test(
-              l.data?.toolchainOutcome ?? "",
-            )
+            l.targetSymbol?.identity !== want ||
+            l.data?.toolchain?.selection !== "seen"
           )
             wrong.push(
-              `${name}: ${l.resolution} ${l.data?.toolchainOutcome ?? l.data?.toolchain?.origin}`,
+              `${name}: ${l.targetSymbol?.identity} ${l.data?.toolchain?.selection}`,
             );
       }
       // Every shape is checked before failing, so a run names them all.
@@ -2536,7 +2631,7 @@ test(
       assert.equal(cold.state.state, "used");
       assert.ok(
         [...cold.rows.values()].some((row) =>
-          row.includes("withheld:selected-"),
+          row.includes('"selection":"seen"'),
         ),
         "the rows hold recorded outcomes",
       );
@@ -2589,10 +2684,8 @@ test("fifth review: an edit that makes the route partial leaves no earlier outco
     });
     assert.equal(first.state.state, "used");
     assert.ok(
-      first.links.some(
-        (l) => l.data?.toolchainOutcome === "withheld:selected-receiver",
-      ),
-      "the used index records an outcome",
+      first.links.some((l) => l.data?.toolchain?.selection === "seen"),
+      "the used index records a label",
     );
     // cargo metadata now fails offline (partial), and a Rust file changes.
     fakeToolchain(join(root, "tools"), { scip, metadata: null });
@@ -2611,9 +2704,9 @@ test("fifth review: an edit that makes the route partial leaves no earlier outco
     assert.equal(warm.state.state, "partial");
     assert.equal(cold.state.state, "partial");
     assert.equal(
-      warm.links.some((l) => l.data?.toolchainOutcome),
+      warm.links.some((l) => l.data?.toolchainOutcome || l.data?.toolchain),
       false,
-      "no outcome survives",
+      "no record or outcome survives",
     );
     sameRows(warm, cold);
   });
@@ -2634,7 +2727,7 @@ test("fifth review: turning the route off leaves no outcome or record; the rows 
       store: "warm.sqlite",
     });
     assert.equal(on.state.state, "used");
-    assert.ok(on.links.some((l) => l.data?.toolchainOutcome));
+    assert.ok(on.links.some((l) => l.data?.toolchain));
     const off = await index(project, root, {
       environment: environment(tools),
       store: "warm.sqlite",
@@ -3038,7 +3131,7 @@ const SIXTH_CRATE = {
 };
 
 test(
-  "real rust-analyzer, sixth review: selections inside cfg_if!, glob twins of gated modules, method twins and static twins are never narrowed",
+  "real rust-analyzer, sixth review: selections inside cfg_if!, glob twins of gated modules, method twins and static twins are decided for the active configuration and labelled seen",
   needsAnalyzer,
   async () => {
     await scratch(async (root) => {
@@ -3069,11 +3162,35 @@ test(
             l.kind !== "contains",
         );
         if (!links.length) wrong.push(`${name}: no link`);
+        // D17 clarified: decided for this configuration (fast, unix, no asm),
+        // labelled as having met a selection.
         for (const l of links)
-          if (l.data?.toolchain !== undefined || l.resolution === "resolved")
+          if (
+            l.data?.toolchain &&
+            l.data.toolchain.from !== "definite" &&
+            l.data.toolchain.selection !== "seen"
+          )
             wrong.push(
-              `${name}: ${l.kind} ${l.resolution} ${l.targetSymbol?.file ?? ""}#${l.targetSymbol?.identity ?? ""} ${l.data?.toolchainOutcome ?? l.data?.toolchain?.origin ?? ""} ${l.data?.uncertainty ?? ""}`,
+              `${name}: ${l.targetSymbol?.file ?? ""}#${l.targetSymbol?.identity ?? ""} ${l.data.toolchain.selection}`,
             );
+        const want = {
+          AEngine: "src/a_fast.rs#",
+          "e.a_go": "src/a_fast.rs#",
+          "x.b_go": "#impl BFast::b_go",
+          ft: "#rust::ft",
+          g_thing: "src/gu.rs#",
+          "h.c_backend().c_go": "#impl CFast::c_go",
+          "D_IMPL.d_go": "#impl DFast::d_go",
+        }[name];
+        for (const l of links)
+          if (
+            want &&
+            l.data?.toolchain &&
+            !`${l.targetSymbol?.file}#${l.targetSymbol?.identity}`.includes(
+              want,
+            )
+          )
+            wrong.push(`${name}: wrong for this configuration`);
       }
       // Every shape is checked before failing, so a run names them all.
       assert.deepEqual(wrong, []);
@@ -3130,7 +3247,7 @@ const GLOB_CRATE = {
 };
 
 test(
-  "real rust-analyzer, sixth review: glob twins of gated modules (no opaque macro) keep their candidate sets; the route decides none",
+  "real rust-analyzer, sixth review: glob twins of gated modules (no opaque macro) are decided for the active configuration and labelled; an import of a two-namespace name is withheld",
   needsAnalyzer,
   async () => {
     await scratch(async (root) => {
@@ -3150,19 +3267,23 @@ test(
           l.kind !== "contains",
       );
       assert.ok(sites.length >= 6, `the sites are links: ${sites.length}`);
-      const decided = sites
+      const wrongSites = sites
         .filter(
-          (l) => l.data?.toolchain && l.data.toolchain.from !== "definite",
+          (l) =>
+            l.data?.toolchain &&
+            l.data.toolchain.from !== "definite" &&
+            (l.data.toolchain.selection !== "seen" ||
+              l.targetSymbol?.file !== "src/gu.rs"),
         )
         .map((l) => `${l.file} ${l.targetName}: ${l.targetSymbol?.file ?? ""}`);
-      assert.deepEqual(decided, []);
+      assert.deepEqual(wrongSites, []);
       // Design B: a module under any cfg is a selection, twin or not.
       const gatedModule = dump.links.find(
         (l) => l.file === "src/lib.rs" && l.targetName === "gated_ok::g_fn",
       );
       assert.equal(
-        gatedModule?.data?.toolchainOutcome,
-        "withheld:selected-binding",
+        gatedModule?.data?.toolchain?.selectionReason,
+        "selected-binding",
         JSON.stringify(gatedModule?.data),
       );
       // The positive control: a path through ungated bindings is decided.
@@ -3170,8 +3291,8 @@ test(
         (l) => l.file === "src/lib.rs" && l.targetName === "crate::plain_fn",
       );
       assert.equal(
-        control?.data?.toolchain?.origin,
-        "toolchain",
+        control?.data?.toolchain?.selection,
+        "none-seen",
         JSON.stringify(control?.data),
       );
       // A: the import of a name bound in two namespaces is not decided.
@@ -3182,9 +3303,9 @@ test(
           l.targetName === "crate::rtm::exception",
       );
       assert.ok(imported, "the import is a link");
-      assert.ok(
-        !imported.data?.toolchain ||
-          imported.data.toolchain.from === "definite",
+      assert.equal(
+        imported.data?.toolchainOutcome,
+        "withheld:import-namespaces",
         JSON.stringify(imported.data),
       );
     });
@@ -3264,7 +3385,7 @@ test("sixth review E: a path dependency outside the checkout is in the key; rest
 });
 
 test(
-  "real rust-analyzer, sixth review G: every link the route did not decide stores its route-off data exactly, apart from its outcome",
+  "real rust-analyzer, sixth review G: the route-off data of every link is recoverable from the route-on store byte for byte",
   needsAnalyzer,
   async () => {
     await scratch(async (root) => {
@@ -3279,76 +3400,162 @@ test(
         toolchains: null,
       });
       const offData = new Map(off.links.map((l) => [l.id, l.data]));
-      const withOutcome = on.links.filter((l) => l.data?.toolchainOutcome);
-      assert.ok(withOutcome.length >= 5, String(withOutcome.length));
+      // D17 clarified: every link's route-off data can be read back from
+      // the route-on store byte for byte: an upgrade's record holds it whole;
+      // otherwise it is the data without the route's own fields.
+      const recovered = (data) =>
+        data?.toolchain?.routeOff ??
+        Object.fromEntries(
+          Object.entries(data ?? {}).filter(
+            ([key]) => key !== "toolchain" && key !== "toolchainOutcome",
+          ),
+        );
+      assert.ok(on.links.some((l) => l.data?.toolchain?.routeOff));
       const differs = [];
-      for (const l of withOutcome) {
-        const { toolchainOutcome: _outcome, ...data } = l.data;
-        if (JSON.stringify(data) !== JSON.stringify(offData.get(l.id)))
-          differs.push(`${l.targetName}: ${JSON.stringify(data)}`);
-      }
+      for (const l of on.links)
+        if (
+          JSON.stringify(recovered(l.data)) !==
+          JSON.stringify(offData.get(l.id) ?? {})
+        )
+          differs.push(`${l.targetName}: ${JSON.stringify(l.data)}`);
       assert.deepEqual(differs, []);
     });
   },
 );
 
-// Design B's oracle: crates from the review rounds' selection shapes, the
-// route run with and without default features. No link decided in both may
-// name two different targets; the control is decided in both (not vacuous).
-for (const seed of [4301, 4302])
+// The oracle (D17 clarified): crates from the review rounds' selection
+// shapes. Every answer the route decides must be what that configuration
+// resolves, under default features and without them, and a change of the
+// configuration (here the crate's default features, part of the key) must
+// re-answer, never reuse.
+// Seeds 62072 and 62074–62076 are the seventh review's label misses.
+for (const seed of [4301, 4302, 62072, 62074, 62075, 62076])
   test(
-    `real rust-analyzer, design B oracle (seed ${seed}): no link decided under one setting names a different target under the other`,
+    `real rust-analyzer, oracle (seed ${seed}): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers`,
     needsAnalyzer,
     async () => {
       await scratch(async (root) => {
         const project = join(root, "oracle");
-        const { files, ingredients } = generateOracle(seed, 5);
+        const { files, ingredients, expectations } = generateOracle(seed, 5);
         writeProject(project, files);
-        const a = await index(project, root, {
-          environment: process.env,
-          store: "a.sqlite",
-          toolchainDirectory: "tc-a",
-        });
-        if (a.state.state === "unavailable" && /rust-src/.test(a.state.reason))
+        const run = async (store, noDefault) => {
+          if (noDefault) setRunControls({ noDefaultFeatures: true });
+          try {
+            return await index(project, root, {
+              environment: process.env,
+              store,
+              toolchainDirectory: `tc-${store}`,
+            });
+          } finally {
+            if (noDefault) setRunControls({});
+          }
+        };
+        const fast = await run("a.sqlite", false);
+        if (
+          fast.state.state === "unavailable" &&
+          /rust-src/.test(fast.state.reason)
+        )
           return;
-        setRunControls({ noDefaultFeatures: true });
-        let b;
-        try {
-          b = await index(project, root, {
-            environment: process.env,
-            store: "b.sqlite",
-            toolchainDirectory: "tc-b",
-          });
-        } finally {
-          setRunControls({});
-        }
-        assert.equal(a.state.state, "used", JSON.stringify(a.state));
-        assert.equal(b.state.state, "used", JSON.stringify(b.state));
-        const decided = (dump) =>
-          new Map(
-            dump.links
-              .filter((l) => l.data?.toolchain?.target)
-              .map((l) => [l.id, [l.targetName, l.data.toolchain.target]]),
+        const slow = await run("b.sqlite", true);
+        assert.equal(fast.state.state, "used", JSON.stringify(fast.state));
+        assert.equal(slow.state.state, "used", JSON.stringify(slow.state));
+        const wrong = (dump, setting) => {
+          const out = [];
+          for (const [name, onFast, onSlow] of expectations)
+            for (const l of dump.links.filter((l) => l.targetName === name)) {
+              if (!l.data?.toolchain || !l.targetSymbol) continue;
+              const at = `${l.targetSymbol.file}#${l.targetSymbol.identity}`;
+              const want = setting === "fast" ? onFast : onSlow;
+              if (!at.includes(want))
+                out.push(`${setting} ${name}: ${at}, want ${want}`);
+            }
+          return out;
+        };
+        assert.deepEqual(
+          [...wrong(fast, "fast"), ...wrong(slow, "slow")],
+          [],
+          ingredients.join(", "),
+        );
+        // The control is decided under both settings (not vacuous).
+        for (const dump of [fast, slow])
+          assert.equal(
+            dump.links.find((l) => l.targetName === "crate::p0_free")?.data
+              ?.toolchain?.origin,
+            "toolchain",
           );
-        const da = decided(a);
-        const db = decided(b);
-        const conflicts = [...da]
-          .filter(([id, pair]) => db.has(id) && db.get(id)[1] !== pair[1])
-          .map(([, pair]) => pair[0]);
-        assert.deepEqual(conflicts, [], ingredients.join(", "));
-        const control = (dump) =>
-          dump.links.find((l) => l.targetName === "crate::p0_free")?.data
-            ?.toolchain?.origin;
-        assert.equal(
-          control(a),
-          "toolchain",
-          "the control is decided (default)",
+        // A changed configuration re-answers: the same store, the crate's
+        // default features now empty (fast off), must answer as `slow` did.
+        writeFileSync(
+          join(project, "Cargo.toml"),
+          files["Cargo.toml"].replace('default = ["fast"]', "default = []"),
         );
+        const switched = await run("a.sqlite", false);
         assert.equal(
-          control(b),
-          "toolchain",
-          "the control is decided (no default)",
+          switched.state.state,
+          "used",
+          JSON.stringify(switched.state),
         );
+        assert.deepEqual(wrong(switched, "slow"), [], "after the switch");
+        // The label: a site both settings decide differently is labelled
+        // `seen` under both.
+        const at = (l) => `${l.targetSymbol?.file}#${l.targetSymbol?.identity}`;
+        const slowById = new Map(slow.links.map((l) => [l.id, l]));
+        const unlabelled = [];
+        for (const l of fast.links) {
+          const other = slowById.get(l.id);
+          if (!l.data?.toolchain || !other?.data?.toolchain) continue;
+          if (at(l) === at(other)) continue;
+          for (const [setting, x] of [
+            ["fast", l],
+            ["slow", other],
+          ])
+            if (x.data.toolchain.selection !== "seen")
+              unlabelled.push(`${setting} ${x.file} ${x.targetName}`);
+        }
+        assert.deepEqual(unlabelled, [], ingredients.join(", "));
       });
     },
   );
+
+test(
+  "real rust-analyzer, seventh review 8: a relative path dependency outside the checkout resolves from the run's copy; restoring it makes the route used",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "app");
+      writeProject(project, {
+        "Cargo.toml":
+          '[package]\nname = "app"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\ndep = { path = "../dep" }\n',
+        "src/lib.rs": "pub fn a() -> u32 {\n    dep::d()\n}\n",
+      });
+      const missing = await index(project, root, {
+        environment: process.env,
+        store: "g.sqlite",
+      });
+      if (
+        missing.state.state === "unavailable" &&
+        /rust-src/.test(missing.state.reason)
+      )
+        return;
+      assert.notEqual(
+        missing.state.state,
+        "used",
+        JSON.stringify(missing.state),
+      );
+      writeProject(join(root, "dep"), {
+        "Cargo.toml":
+          '[package]\nname = "dep"\nversion = "0.1.0"\nedition = "2021"\n',
+        "src/lib.rs": "pub fn d() -> u32 {\n    1\n}\n",
+      });
+      const restored = await index(project, root, {
+        environment: process.env,
+        store: "g.sqlite",
+      });
+      assert.equal(
+        restored.state.state,
+        "used",
+        JSON.stringify(restored.state),
+      );
+    });
+  },
+);

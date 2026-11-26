@@ -2,8 +2,9 @@
 // C-43: with the toolchain route off, a cold index with this branch stores
 // the same rows as main. Each build indexes the pristine pin in a fresh
 // process (scripts/reindex/cold-once.mjs, same project id); every row of
-// every table is compared. The only allowed difference is the Rust module
-// version (47 on main since C-36, 48 here), mapped before comparing.
+// every table is compared. The allowed differences are the Rust module
+// version (47 on main since C-36, 48 here), mapped before comparing, and the
+// parse fact `gatedFields` (design B), removed before comparing.
 //   node off-identical.mjs <out.json> <main dist> <branch dist> <store dir> <pin dir>...
 import { spawnSync } from "node:child_process";
 import { existsSync, rmSync, writeFileSync } from "node:fs";
@@ -28,10 +29,18 @@ const mapVersion = (rows) =>
           if (row.module === "rust" && row.version === BRANCH) row.version = MAIN;
           if (typeof row.body === "string" && row.body.startsWith("{")) {
             const body = JSON.parse(row.body);
-            if (body.module === "rust" && body.version === BRANCH) {
-              body.version = MAIN;
-              row.body = JSON.stringify(body);
-            }
+            if (body.module === "rust" && body.version === BRANCH) body.version = MAIN;
+            // Design B: `gatedFields` is a new parse fact (covered by the
+            // module version); the one allowed difference besides it.
+            const strip = (value) => {
+              if (Array.isArray(value)) value.forEach(strip);
+              else if (value && typeof value === "object") {
+                delete value.gatedFields;
+                Object.values(value).forEach(strip);
+              }
+            };
+            strip(body);
+            row.body = JSON.stringify(body);
           }
         }
         return JSON.stringify(row);

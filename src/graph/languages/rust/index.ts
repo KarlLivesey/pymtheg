@@ -283,29 +283,15 @@ function scopedAnalysis(request: ScopedRequest):
 }
 
 /**
- * C-43: decide each link the strict join answered (design B, deny by
- * default). The toolchain sees one configuration. A definite answer is wrong
- * only if the same written site resolves differently in another
- * configuration where it compiles, and a site's resolution depends only on
- * the bindings it passes through. So an answer decides only when no binding
- * on its trace is selected:
- * - a selected binding is anything written under a cfg attribute (`test`
- *   included) that the site's own conditions do not imply, itself or through
- *   an enclosing item, module, impl, trait, block or file; or emitted by a
- *   macro whose expansion source-only does not read;
- * - a path's trace is each segment's binding as rust-analyzer resolved it,
- *   and the `use` hops a segment may pass through;
- * - a receiver-typed link's trace is everything named in the enclosing
- *   function up to the site, and also any method or field of that name, trait
- *   `use`, cfg-gated field or `Deref`/`Index` impl the lookup could meet;
- * - an item of another crate than `std`, `core` or `alloc` on the trace,
- *   or a trace that cannot be completed, leaves the link confirm-only.
- * Also: a link under a cfg other than `test` takes no answer; a name an
- * opaque item may shadow is confirm-only; an import of a name bound in more
- * than one namespace takes no answer. Then a source-only definite target that
- * differs is kept and counted, a source-only library answer is kept, and a
- * candidate set holding the answer, or an unresolved link, becomes definite,
- * recorded on the link (`toolchain`) for the resolve phase to apply.
+ * C-43: decide each link the strict join answered. An answer is definite for
+ * the configuration it records (D17, clarified): it decides every link that
+ * passes the gates that do not depend on the configuration (a graph symbol
+ * for the answer, an import whose name is bound in one namespace where it
+ * comes from, agreement with a source-only definite target, a source-only
+ * library target kept, an answer inside source-only's candidate set). Each
+ * decided link records the selection label (design B, kept as a label) and
+ * its complete route-off data. Library answers (D24) are offered here with
+ * the same label and decided in the resolve phase.
  */
 function decideToolchain(
   updated: readonly { path: string }[],
@@ -337,34 +323,25 @@ function decideToolchain(
     file: string,
   ) => {
     const { tcl, tcTrace, ...rest } = data;
-    const withheld = (why: string) => {
-      bump(`library:${why}`);
-      return {
-        ...l,
-        data: { ...rest, toolchainOutcome: `library:${why}` },
-      };
-    };
-    if (beyondTest(rest.conditions as Json[] | undefined))
-      return withheld("withheld:cfg-link");
-    // Design B governs library answers too: a name an opaque item may
-    // shadow is confirm-only, and the trace must hold no selected binding;
-    // a crate other than std, core and alloc on it (the answer's own crate
-    // included) leaves the link confirm-only.
-    if (
-      uncertaintyReasons(rest.uncertainty).includes(
-        "opaque-item-may-shadow-name",
-      )
-    )
-      return withheld("withheld:opaque-shadow");
-    const verdict = designB(
-      file,
-      l,
-      rest,
-      tcTrace,
-      undefined,
-      ((rest.targets ?? []) as Json[]).map(String),
-    );
-    if (verdict) return withheld(verdict);
+    // D17 clarified: a library answer is definite for the configuration it
+    // records, like a checkout answer. The selection label says whether the
+    // route saw a build-condition selection on the way to the site (a crate
+    // other than std, core and alloc on the trace, the answer's own crate
+    // included, is `dependency-on-trace`); it gates nothing.
+    const selection = beyondTest(rest.conditions as Json[] | undefined)
+      ? "cfg-link"
+      : uncertaintyReasons(rest.uncertainty).includes(
+            "opaque-item-may-shadow-name",
+          )
+        ? "opaque-shadow"
+        : designB(
+            file,
+            l,
+            rest,
+            tcTrace,
+            undefined,
+            ((rest.targets ?? []) as Json[]).map(String),
+          );
     bump("library:offered");
     return {
       ...l,
@@ -376,6 +353,10 @@ function decideToolchain(
           written: l.targetName,
           rustAnalyzer: toolchain.rustAnalyzer,
           configuration: toolchain.configuration,
+          selection: selection ? "seen" : "none-seen",
+          ...(selection ? { selectionReason: selection } : {}),
+          // The complete route-off data (D17 clarified).
+          routeOff: { ...rest },
         },
       } as Record<string, Json>,
     };
@@ -485,7 +466,15 @@ function decideToolchain(
       const name =
         (typeof data.alias === "string" && data.alias) ||
         lastSegment(l.targetName);
-      const conditions = ((data.conditions ?? []) as Json[]).map(String);
+      const own = ((data.conditions ?? []) as Json[]).map(String);
+      // Seventh review: a `use` whose target source-only resolved to a
+      // selected item (`pub use api::Chosen as Public` with `Chosen` a cfg
+      // alias twin) selects the name it binds; a marker no site implies.
+      const reexportsSelected =
+        !!resolved && !glob && selectedItem(resolved, own);
+      const conditions = reexportsSelected
+        ? [...own, "?reexport-of-selected"]
+        : own;
       list.push({
         scope: typeof data.scope === "string" ? data.scope : "",
         name,
@@ -557,19 +546,17 @@ function decideToolchain(
     site: readonly string[],
     receiver: boolean,
   ): string | null => {
-    const selected = receiver
-      ? "withheld:selected-receiver"
-      : "withheld:selected-binding";
+    const selected = receiver ? "selected-receiver" : "selected-binding";
     let dependency = false;
     for (const entry of entries) {
       if (entry.k === "item") {
         if (selectedItem(entry.id, site)) return selected;
       } else if (entry.k === "generated") return selected;
       else if (entry.k === "local") {
-        if (!entry.defined) return "withheld:trace-incomplete";
+        if (!entry.defined) return "trace-incomplete";
       } else if (!STANDARD.has(entry.crate)) dependency = true;
     }
-    return dependency ? "withheld:dependency-on-trace" : null;
+    return dependency ? "dependency-on-trace" : null;
   };
   // Sixth review A: a name a module binds in more than one namespace
   // (cortex-m-rt: `pub use macros::exception;` beside `pub use
@@ -626,9 +613,10 @@ function decideToolchain(
     return false;
   };
   /**
-   * Design B: why an answer at this site may not decide, or null. `target`
-   * is the checkout answer (none for a library answer, whose own item is on
-   * the trace); `candidates` are source-only's.
+   * The selection label (design B, kept as a label): why the route saw a
+   * build-condition selection on this site's trace, or null when the checks
+   * below found none. Not a claim of configuration-independence: an answer
+   * is definite for the configuration it records (D17, clarified).
    */
   const designB = (
     file: string,
@@ -672,46 +660,53 @@ function decideToolchain(
             (use.glob || use.name === first) &&
             unmet(use.conditions, site)
           )
-            return "withheld:selected-binding";
+            return "selected-binding";
       }
       for (const segment of segments.slice(1))
         if (
           (selectedImportNames.get(segment) ?? []).some((cs) => unmet(cs, site))
         )
-          return "withheld:selected-binding";
+          return "selected-binding";
       if (candidates.some((c) => c !== target && selectedItem(c, site)))
-        return "withheld:selected-binding";
+        return "selected-binding";
     } else {
       // A receiver: the enclosing function's trace up to the site, and
       // what method lookup could meet.
       const fn = trace.enclosing
         ? toolchain.functionTraces?.[trace.enclosing]
         : undefined;
-      if (!fn || trace.upTo === undefined) return "withheld:trace-incomplete";
+      if (!fn || trace.upTo === undefined) return "trace-incomplete";
       const entries = fn.entries.slice(0, trace.upTo) as Entry[];
       const verdict = traceVerdict(entries, site, true);
       if (verdict) return verdict;
-      if (gatedFunctions.has(trace.enclosing!))
-        return "withheld:selected-receiver";
+      if (gatedFunctions.has(trace.enclosing!)) return "selected-receiver";
       const name = lastSegment(l.targetName.split(".").at(-1) ?? "");
       if ((members.get(name) ?? []).some((cs) => unmet(cs, site)))
-        return "withheld:selected-receiver";
+        return "selected-receiver";
       const scope = typeof rest.scope === "string" ? rest.scope : "";
+      const traceNames = new Set(
+        entries.flatMap((entry) =>
+          entry.k === "item" && symbolFact.has(entry.id)
+            ? [symbolFact.get(entry.id)!.name]
+            : [],
+        ),
+      );
       for (const use of importsByFile.get(file) ?? [])
         if (
-          !use.notTrait &&
           inScopeChain(use.scope, scope) &&
-          unmet(use.conditions, site)
+          unmet(use.conditions, site) &&
+          // One that may bring a trait, or that binds a name the
+          // receiver's trace uses (it may select the receiver's type).
+          (!use.notTrait || traceNames.has(use.name))
         )
-          return "withheld:selected-receiver";
+          return "selected-receiver";
       for (const entry of entries) {
         if (entry.k !== "item") continue;
         const fact = symbolFact.get(entry.id);
         if (!fact) continue;
-        if (fact.gatedFields.includes(name))
-          return "withheld:selected-receiver";
+        if (fact.gatedFields.includes(name)) return "selected-receiver";
         if ((derefImpls.get(fact.name) ?? []).some((cs) => unmet(cs, site)))
-          return "withheld:selected-receiver";
+          return "selected-receiver";
       }
     }
     return null;
@@ -732,8 +727,6 @@ function decideToolchain(
         bump(why);
         return { ...l, data: { ...rest, toolchainOutcome: why } };
       };
-      if (beyondTest(rest.conditions as Json[] | undefined))
-        return kept("withheld:cfg-link");
       if (!identityOf.has(target)) return kept("withheld:no-symbol");
       const r = resolutions.get(id);
       // Sixth review A: an import decides only when the imported name is in
@@ -745,21 +738,15 @@ function decideToolchain(
       )
         return kept("withheld:import-namespaces");
       const reasons = uncertaintyReasons(rest.uncertainty);
-      // Sixth review: a name an opaque item (a macro such as `cfg_if!`, or
-      // one whose expansion is not read) may define or shadow is confirm-only:
-      // what the macro emits can differ by configuration, and source-only
-      // recorded no candidates to narrow. The route never decides it.
-      if (!r?.targetId && reasons.includes("opaque-item-may-shadow-name"))
-        return kept("withheld:opaque-shadow");
-      // Design B: the trace. A confirmation (source-only's own definite
-      // target) needs none.
-      if (r?.targetId !== target) {
-        const verdict = designB(f.path, l, rest, tcTrace, target, [
-          ...((rest.targets ?? []) as Json[]).map(String),
-          ...(r?.candidateIds ?? []),
-        ]);
-        if (verdict) return kept(verdict);
-      }
+      // The selection label (no gate): what build conditions the trace met.
+      const selection = beyondTest(rest.conditions as Json[] | undefined)
+        ? "cfg-link"
+        : !r?.targetId && reasons.includes("opaque-item-may-shadow-name")
+          ? "opaque-shadow"
+          : designB(f.path, l, rest, tcTrace, target, [
+              ...((rest.targets ?? []) as Json[]).map(String),
+              ...(r?.candidateIds ?? []),
+            ]);
       let from: "definite" | "candidates" | "unresolved";
       if (r?.targetId) {
         if (r.targetId !== target) {
@@ -781,7 +768,20 @@ function decideToolchain(
           return kept("kept:outside-candidate-set");
         if (r.libraries?.length) return kept("kept:library-candidates");
         from = "candidates";
-      } else from = "unresolved";
+      } else {
+        // Seventh review (mutation table): an open link whose stored
+        // targets are every definition of a cfg-conditional name (a
+        // complete lookup) narrows only within them; an answer outside
+        // them is the join's error, never this configuration's answer.
+        const listed = ((rest.targets ?? []) as Json[]).map(String);
+        if (
+          listed.length &&
+          reasons.includes("conditional-name-may-be-absent") &&
+          !listed.includes(target)
+        )
+          return kept("kept:outside-candidate-set");
+        from = "unresolved";
+      }
       bump(`definite:${from}`);
       // The open link's data stays until the stored link takes the answer:
       // the record lists what then goes (`clears`), and the link decider
@@ -798,6 +798,12 @@ function decideToolchain(
         from,
         ...(from === "definite" ? {} : { target }),
         ...(clears.length ? { clears } : {}),
+        // Whether the route saw a build-condition selection on the trace.
+        selection: selection ? "seen" : "none-seen",
+        ...(selection ? { selectionReason: selection } : {}),
+        // The complete route-off data, so the configuration-free view can
+        // always be read back (an upgrade clears open-link data).
+        ...(from === "definite" ? {} : { routeOff: { ...rest } }),
       };
       return { ...l, data: decided };
     });
