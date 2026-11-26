@@ -15,6 +15,8 @@ import {
 } from "../dist/graph/index.js";
 import go from "../dist/graph/languages/go/index.js";
 import { notesSymbols } from "../dist/graph/languages/go/resolve.js";
+import { graphWork, resetGraphWork } from "../dist/graph/work.js";
+import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 
 const registry = new LanguageRegistry([go]);
 // Every shape the review named: methods of one name on different
@@ -210,6 +212,77 @@ test("the ordinal follows source order, not key order", async () => {
     );
   } finally {
     store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("the live notes pass, called by analyze, names every symbol by its stored id", async () => {
+  const { notesProbe } = await import("../dist/graph/languages/go/resolve.js");
+  const { base, root } = tree();
+  const store = new SqliteGraphStore(join(base, "graph.sqlite"));
+  const seen = [];
+  notesProbe.symbols = (symbols) => seen.push(...symbols);
+  try {
+    await indexProject(root, registry, store);
+    notesProbe.symbols = undefined;
+    assert.ok(seen.length > 0);
+    const stored = new Map(
+      store
+        .findSymbols()
+        .map((symbol) => [`${symbol.file}\0${symbol.key}`, symbol.id]),
+    );
+    const wrong = seen.filter(
+      (symbol) => stored.get(`${symbol.file}\0${symbol.key}`) !== symbol.id,
+    );
+    assert.deepEqual(
+      wrong.map((symbol) => symbol.key),
+      [],
+    );
+  } finally {
+    notesProbe.symbols = undefined;
+    store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a scoped run writes its file's implements links again and keeps every other file's", async () => {
+  const base = mkdtempSync(join(tmpdir(), "c56b-scoped-"));
+  const root = join(base, "tree");
+  const files = {
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "i/i.go": "package i\n\ntype I interface{ M() int }\n",
+    "a/a.go": "package a\n\ntype A struct{}\n\nfunc (A) M() int { return 1 }\n",
+    "b/b.go": "package b\n\ntype B struct{}\n\nfunc (B) M() int { return 1 }\n",
+  };
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
+  const path = join(base, "graph.sqlite");
+  try {
+    const first = new SqliteGraphStore(path);
+    await indexProject(root, registry, first);
+    const projectId = first.projectId;
+    first.close();
+    // Only a receiver method's body changes: the run is scoped to a/a.go.
+    writeFileSync(join(root, "a/a.go"), files["a/a.go"].replace("1", "2"));
+    const again = new SqliteGraphStore(path);
+    resetGraphWork();
+    await indexProject(root, registry, again);
+    const implementers = again
+      .links()
+      .filter((link) => link.kind === "implements")
+      .map((link) => link.file)
+      .sort();
+    again.close();
+    assert.equal(graphWork.counts["resolve.go.decisionFiles"], 1, "scoped");
+    assert.deepEqual(implementers, ["a/a.go", "b/b.go"]);
+    const cold = join(base, "cold.sqlite");
+    const fresh = new SqliteGraphStore(cold, projectId);
+    await indexProject(root, registry, fresh);
+    fresh.close();
+    assert.deepEqual(compareRows(storeRows(path), storeRows(cold)), []);
+  } finally {
     rmSync(base, { recursive: true, force: true });
   }
 });

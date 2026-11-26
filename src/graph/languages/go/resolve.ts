@@ -418,6 +418,14 @@ export function notesSymbols(
  * only phase that may write link data, so the reason is recorded on the link
  * itself.
  */
+/**
+ * Test seam (C-56b review): when set, receives the symbols each notes pass
+ * names, so a test can check through `analyze` that they carry the stored
+ * ids. Unset in production.
+ */
+export const notesProbe: {
+  symbols?: (symbols: readonly GraphSymbol[]) => void;
+} = {};
 export function linkNotes(
   projectId: string,
   moduleId: string,
@@ -461,6 +469,7 @@ export function linkNotes(
       }),
     );
   }
+  notesProbe.symbols?.(symbols);
   const resolver = new GoResolver(moduleId, {
     projectId,
     files,
