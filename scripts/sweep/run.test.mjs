@@ -72,9 +72,9 @@ test("C-43: the opt-in Rust mode runs on Rust pins and records the route state w
   const redact = (value) => value.replaceAll("/home/someone", "<home>");
   assert.deepEqual(rustToolchainRecord({ state: "partial", reason: "build script of app did not finish", version: "rust-analyzer 1.98.1",
     configuration: "host", partial: ["build script of app did not finish", "proc macro m was not built"], rustAnalyzer: "/home/someone/.cargo/bin/rust-analyzer",
-    upgradedLinks: 0, confirmedLinks: 0, disagreements: 0, libraryAnswers: 3 }, redact), {
+    upgradedLinks: 0, upgradedSeen: 0, upgradedNoneSeen: 0, confirmedLinks: 0, disagreements: 0, libraryAnswers: 3 }, redact), {
     state: "partial", reason: "build script of app did not finish", version: "rust-analyzer 1.98.1", configuration: "host",
-    partialCount: 2, upgradedLinks: 0, confirmedLinks: 0, disagreements: 0, withheld: undefined, libraryAnswers: 3 });
+    partialCount: 2, upgradedLinks: 0, upgradedSeen: 0, upgradedNoneSeen: 0, confirmedLinks: 0, disagreements: 0, withheld: undefined, libraryAnswers: 3 });
   const used = rustToolchainRecord({ state: "unavailable", reason: "/home/someone/bin/rust-analyzer does not exist" }, redact);
   assert.equal(used.reason, "<home>/bin/rust-analyzer does not exist");
   assert.equal(JSON.stringify(used).includes("rustAnalyzer"), false);

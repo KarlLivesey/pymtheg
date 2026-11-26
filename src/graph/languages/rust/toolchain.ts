@@ -22,7 +22,14 @@
  * No sandbox.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  statSync,
+} from "node:fs";
 import {
   chmod,
   copyFile,
@@ -658,6 +665,124 @@ export interface RunControls {
 }
 
 /**
+ * The `--cfg` flags of the rustflags cargo applies for `target`: those of
+ * `[target.<target>] rustflags` when any configuration file sets them, else
+ * `[build] rustflags`; arrays from several files are joined, nearest first.
+ * `RUSTFLAGS` is not passed to the run. `[target.'cfg(…)']` sections are
+ * not read (they need a cfg evaluation).
+ */
+export function rustflagsCfg(
+  configs: readonly (string | undefined)[],
+  target: string,
+): string[] {
+  const flagsIn = (text: string, table: string): string[] | undefined => {
+    let section = "";
+    let found: string[] | undefined;
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!.replace(/#.*$/, "").trim();
+      const header = /^\[([^\]]+)\]$/.exec(line);
+      if (header) {
+        section = header[1]!.trim().replace(/["']/g, "");
+        continue;
+      }
+      const key = /^([A-Za-z0-9_.'"-]+)\s*=\s*(.*)$/.exec(line);
+      if (!key) continue;
+      const name = [section, key[1]!.replace(/["']/g, "")]
+        .filter(Boolean)
+        .join(".");
+      if (name !== `${table}.rustflags`) continue;
+      let value = key[2]!;
+      while (
+        value.startsWith("[") &&
+        !value.includes("]") &&
+        i + 1 < lines.length
+      )
+        value += " " + lines[++i]!.replace(/#.*$/, "");
+      const strings = [...value.matchAll(/"((?:[^"\\]|\\.)*)"|'([^']*)'/g)].map(
+        (m) => m[1] ?? m[2] ?? "",
+      );
+      found = value.trim().startsWith("[")
+        ? strings
+        : (strings[0] ?? "").split(/\s+/).filter(Boolean);
+    }
+    return found;
+  };
+  const collect = (table: string) => {
+    let any = false;
+    const flags: string[] = [];
+    for (const text of configs) {
+      const found = text === undefined ? undefined : flagsIn(text, table);
+      if (found) {
+        any = true;
+        flags.push(...found);
+      }
+    }
+    return any ? flags : undefined;
+  };
+  const flags = collect(`target.${target}`) ?? collect("build") ?? [];
+  const cfg: string[] = [];
+  for (let i = 0; i < flags.length; i++) {
+    const flag = flags[i]!;
+    if (flag === "--cfg" && i + 1 < flags.length) cfg.push(flags[++i]!);
+    else if (flag.startsWith("--cfg=")) cfg.push(flag.slice(6));
+  }
+  return cfg;
+}
+
+/**
+ * A folder outside the checkout as the key sees it: every file’s path,
+ * size and time, and the content hash of its Rust and Cargo files, as the
+ * checkout’s own files enter the key. `target/` and `.git` are skipped; a
+ * symbolic link is recorded by where it points, never followed.
+ */
+function folderListing(root: string): string {
+  const hash = createHash("sha256");
+  const walk = (dir: string, rel: string): void => {
+    let names: string[];
+    try {
+      names = readdirSync(dir).sort();
+    } catch {
+      hash.update(`${rel}\u0000unreadable\n`);
+      return;
+    }
+    for (const name of names) {
+      const path = join(dir, name);
+      const at = rel ? `${rel}/${name}` : name;
+      const info = lstatSync(path, { throwIfNoEntry: false });
+      if (!info) continue;
+      if (info.isSymbolicLink()) {
+        let to = "";
+        try {
+          to = readlinkSync(path);
+        } catch {
+          to = "unreadable";
+        }
+        hash.update(`${at}\u0000link\u0000${to}\n`);
+      } else if (info.isDirectory()) {
+        if (name === "target" || name === ".git") continue;
+        walk(path, at);
+      } else if (info.isFile()) {
+        let content = "";
+        if (/\.(rs|toml|lock)$/.test(name))
+          try {
+            content = createHash("sha256")
+              .update(readFileSync(path))
+              .digest("hex");
+          } catch {
+            content = "unreadable";
+          }
+        hash.update(
+          `${at}\u0000${info.size}\u0000${info.mtimeMs}\u0000${content}\n`,
+        );
+      }
+    }
+  };
+  walk(root, "");
+  return hash.digest("hex");
+}
+
+/**
  * Every `path = "…"` and `[workspace] members` entry a captured manifest
  * names, with the manifest's folder (relative to the project root).
  */
@@ -691,6 +816,12 @@ export function pathDependencies(
 export interface PreparedRun {
   /** The build target: `[build] target`, or the host. */
   target: string;
+  /**
+   * The `--cfg` flags the Cargo configuration's rustflags add, as cargo
+   * applies them (recorded in the configuration string; review of
+   * 90c66e77, item 9).
+   */
+  cfgFlags: string[];
   /**
    * A hash of the Cargo configuration outside the project that the run
    * reads: the user's (copied into the run's crate cache) and any
@@ -743,34 +874,45 @@ export function prepareRun(
   const userToml = read(join(install.cargoHome, "config.toml"));
   const configText = (path: string) =>
     contexts.find((file) => file.path === path)?.text;
-  const target = buildTarget(
-    [
-      oneOf(configText(".cargo/config"), configText(".cargo/config.toml")),
-      ...above,
-      oneOf(userPlain, userToml),
-    ],
-    install.host,
-  );
+  const configs = [
+    oneOf(configText(".cargo/config"), configText(".cargo/config.toml")),
+    ...above,
+    oneOf(userPlain, userToml),
+  ];
+  const target = buildTarget(configs, install.host);
   if (typeof target !== "string") return target;
   // Sixth review E: what the run depends on outside the checkout. Every
   // `path = "…"` and every `[workspace] members` entry the captured
   // manifests name that resolves outside the root: whether it exists, and
-  // its Cargo.toml (hashed with the rest; never stored or printed).
+  // every file in it (hashed with the rest; never stored or printed).
+  // Manager’s review of 90c66e77, item 7: an edit to such a dependency’s
+  // sources changes the key, as an edit in the checkout does; a dependency
+  // it names outside the root in turn is followed too.
   const outsideDependencies: string[] = [];
-  for (const { base, value } of pathDependencies(contexts)) {
-    // A glob member stands for its folder.
-    const at = resolve(root, base, value.replace(/[*?[].*$/, ""));
+  const queue = pathDependencies(contexts).map(({ base, value }) =>
+    resolve(root, base, value.replace(/[*?[].*$/, "")),
+  );
+  const visited = new Set<string>();
+  while (queue.length) {
+    const at = queue.shift()!;
     const inside = relative(root, at);
     if (inside && !inside.startsWith("..") && !isAbsolute(inside)) continue;
-    const cargo = statSync(at, { throwIfNoEntry: false })?.isDirectory()
-      ? read(join(at, "Cargo.toml"))
-      : read(at);
+    if (visited.has(at)) continue;
+    visited.add(at);
+    const folder = statSync(at, { throwIfNoEntry: false })?.isDirectory();
+    const cargo = folder ? read(join(at, "Cargo.toml")) : read(at);
     outsideDependencies.push(
-      `${at}\u0000${existsSync(at)}\u0000${cargo === undefined ? "\u0000absent" : sha(cargo)}`,
+      `${at}\u0000${existsSync(at)}\u0000${cargo === undefined ? "\u0000absent" : sha(cargo)}\u0000${folder ? folderListing(at) : ""}`,
     );
+    if (folder && cargo !== undefined)
+      for (const { value } of pathDependencies([
+        { path: "Cargo.toml", text: cargo },
+      ]))
+        queue.push(resolve(at, value.replace(/[*?[].*$/, "")));
   }
   return {
     target,
+    cfgFlags: rustflagsCfg(configs, target),
     outside: sha(
       ...[...read2, userPlain, userToml].map((text) => text ?? "\u0000absent"),
       ...outsideDependencies.sort(),

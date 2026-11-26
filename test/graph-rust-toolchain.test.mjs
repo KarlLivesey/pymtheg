@@ -38,11 +38,15 @@ import { setRunControls } from "../dist/graph/languages/rust/toolchain-route.js"
 import {
   buildTarget,
   prepareRun,
+  rustflagsCfg,
   tomlString,
 } from "../dist/graph/languages/rust/toolchain.js";
 import { toolchainState } from "../dist/graph/command-toolchain.js";
 import { decideLink } from "../dist/graph/analysis.js";
-import { generate as generateOracle } from "./rust-cfg-oracle.mjs";
+import {
+  generate as generateOracle,
+  REVIEW_SHAPES,
+} from "./rust-cfg-oracle.mjs";
 import { executeGraph } from "../dist/graph/commands.js";
 import { graphConfig, graphToolchains } from "../dist/shared/config.js";
 import { initializeWorkspace } from "../dist/project/workspace.js";
@@ -910,6 +914,10 @@ test("gates: a confirming answer marks the source-only link without changing it"
   assert.equal(dump.state.state, "used");
   // The plain call, the cfg-gated twin and the cfg impl twin are upgraded.
   assert.equal(dump.state.upgradedLinks, 3);
+  // D17 clarified: the state gives the upgrades by label, so every report can
+  // give Level 2 counting only none-seen links.
+  assert.equal(dump.state.upgradedSeen, 2);
+  assert.equal(dump.state.upgradedNoneSeen, 1);
   assert.equal(dump.state.confirmedLinks, 1);
 });
 
@@ -1575,6 +1583,63 @@ test("review B2: run folders of runs that are no longer live are swept; a live r
     writeFileSync(join(project, "notes.txt"), "changed");
     await index(project, root, { environment: environment(tools) });
     assert.deepEqual(runFolders(root), []);
+  });
+});
+
+test("review of 90c66e77 item 9: the recorded configuration names the --cfg flags the Cargo configuration's rustflags add", async () => {
+  const host = "x86_64-unknown-linux-gnu";
+  assert.deepEqual(
+    rustflagsCfg(['[build]\nrustflags = ["--cfg", "tokio_unstable"]\n'], host),
+    ["tokio_unstable"],
+  );
+  assert.deepEqual(
+    rustflagsCfg(
+      ['[build]\nrustflags = "--cfg tokio_unstable -C opt-level=1"\n'],
+      host,
+    ),
+    ["tokio_unstable"],
+  );
+  // Target rustflags win over build rustflags; arrays from files are joined.
+  assert.deepEqual(
+    rustflagsCfg(
+      [
+        `[target.${host}]\nrustflags = ["--cfg=nearer"]\n[build]\nrustflags = ["--cfg", "ignored"]\n`,
+        `[target.${host}]\nrustflags = [\n  "--cfg",\n  "further",\n]\n`,
+      ],
+      host,
+    ),
+    ["nearer", "further"],
+  );
+  assert.deepEqual(
+    rustflagsCfg(["build.rustflags = ['--cfg', 'dotted']\n"], host),
+    ["dotted"],
+  );
+  assert.deepEqual(
+    rustflagsCfg([undefined, "[net]\noffline = true\n"], host),
+    [],
+  );
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    writeProject(project, {
+      ...GATES,
+      ".cargo/config.toml":
+        '[build]\nrustflags = ["--cfg", "tokio_unstable"]\n',
+    });
+    const scip = join(root, "answer.scip");
+    writeFileSync(scip, gateScip());
+    const tools = fakeToolchain(join(root, "tools"), {
+      scip,
+      metadata: metadata(),
+    });
+    const dump = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+    assert.match(dump.state.configuration, /, rustflags --cfg tokio_unstable$/);
+    const caller = goLinks(dump).sort(
+      (x, y) => x.range.start - y.range.start,
+    )[0];
+    assert.match(caller.data.toolchain.configuration, /--cfg tokio_unstable/);
   });
 });
 
@@ -3201,14 +3266,28 @@ test(
 // configuration (here the crate's default features, part of the key) must
 // re-answer, never reuse.
 // Seeds 62072 and 62074–62076 are the seventh review's label misses.
-for (const seed of [4301, 4302, 62072, 62074, 62075, 62076])
+// The last case holds every shape of the manager’s review of 90c66e77
+// (items 1, 2 and 5), each labelled seen by one rule only.
+for (const [seed, named] of [
+  [4301],
+  [4302],
+  [62072],
+  [62074],
+  [62075],
+  [62076],
+  [9001, REVIEW_SHAPES],
+])
   test(
-    `real rust-analyzer, oracle (seed ${seed}): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers`,
+    `real rust-analyzer, oracle (seed ${seed}${named ? ", the review shapes" : ""}): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers`,
     needsAnalyzer,
     async () => {
       await scratch(async (root) => {
         const project = join(root, "oracle");
-        const { files, ingredients, expectations } = generateOracle(seed, 5);
+        const { files, ingredients, expectations } = generateOracle(
+          seed,
+          5,
+          named,
+        );
         writeProject(project, files);
         const run = async (store, noDefault) => {
           if (noDefault) setRunControls({ noDefaultFeatures: true });
@@ -3248,13 +3327,26 @@ for (const seed of [4301, 4302, 62072, 62074, 62075, 62076])
           [],
           ingredients.join(", "),
         );
-        // The control is decided under both settings (not vacuous).
-        for (const dump of [fast, slow])
+        // The control is decided under both settings (not vacuous). In the
+        // review-shape crate, whose lib.rs has no cfg-gated import that may
+        // bring a trait, a field read with no cfg on the way is labelled
+        // none-seen (item 6).
+        for (const dump of [fast, slow]) {
           assert.equal(
             dump.links.find((l) => l.targetName === "crate::p0_free")?.data
               ?.toolchain?.origin,
             "toolchain",
           );
+          if (!named) continue;
+          const read = dump.links.find(
+            (l) => l.targetName === "c.inner.go0" && l.data?.toolchain,
+          );
+          assert.equal(
+            read?.data.toolchain.selection,
+            "none-seen",
+            JSON.stringify(read?.data.toolchain),
+          );
+        }
         // A changed configuration re-answers: the same store, the crate's
         // default features now empty (fast off), must answer as `slow` did.
         writeFileSync(
@@ -3331,3 +3423,76 @@ test(
     });
   },
 );
+
+// Manager's review of 90c66e77, item 7: an edit to the sources of a path
+// dependency outside the checkout re-runs the route; the earlier answer is
+// never served.
+for (const [name, before, after, site, app] of [
+  [
+    "an inherent method added beside a blanket impl",
+    "pub struct Item;\n",
+    "pub struct Item;\nimpl Item {\n    pub fn describe(&self) -> u32 {\n        1\n    }\n}\n",
+    "item.describe",
+    "pub trait Describe {\n    fn describe(&self) -> u32;\n}\nimpl<T> Describe for T {\n    fn describe(&self) -> u32 {\n        0\n    }\n}\npub fn show(item: &common::Item) -> u32 {\n    item.describe()\n}\n",
+  ],
+  [
+    "a generic function whose return type changes",
+    "pub struct A<T>(pub T);\npub struct B<T>(pub T);\npub fn wrap<T>(t: T) -> A<T> {\n    A(t)\n}\n",
+    "pub struct A<T>(pub T);\npub struct B<T>(pub T);\npub fn wrap<T>(t: T) -> B<T> {\n    B(t)\n}\n",
+    "common::wrap(1u8).go",
+    "pub trait Go {\n    fn go(&self) -> u32;\n}\nimpl<T> Go for common::A<T> {\n    fn go(&self) -> u32 {\n        1\n    }\n}\nimpl<T> Go for common::B<T> {\n    fn go(&self) -> u32 {\n        2\n    }\n}\npub fn show() -> u32 {\n    common::wrap(1u8).go()\n}\n",
+  ],
+])
+  test(
+    `real rust-analyzer, review of 90c66e77 item 7: ${name} in a path dependency outside the checkout re-runs the route and re-answers`,
+    needsAnalyzer,
+    async () => {
+      await scratch(async (root) => {
+        const project = join(root, "app");
+        writeProject(project, {
+          "Cargo.toml":
+            '[package]\nname = "app"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\ncommon = { path = "../common" }\n',
+          "src/lib.rs": app,
+        });
+        const common = {
+          "Cargo.toml":
+            '[package]\nname = "common"\nversion = "0.1.0"\nedition = "2021"\n',
+        };
+        writeProject(join(root, "common"), {
+          ...common,
+          "src/lib.rs": before,
+        });
+        const first = await index(project, root, {
+          environment: process.env,
+          store: "g.sqlite",
+        });
+        if (
+          first.state.state === "unavailable" &&
+          /rust-src/.test(first.state.reason)
+        )
+          return;
+        assert.equal(first.state.state, "used", JSON.stringify(first.state));
+        const target = (dump) => {
+          const l = dump.links.find(
+            (x) => x.file === "src/lib.rs" && x.targetName === site,
+          );
+          return l?.data?.toolchain
+            ? `${l.resolution} ${l.targetSymbol?.identity ?? ""}`
+            : `${l?.resolution} (no answer)`;
+        };
+        const was = target(first);
+        assert.match(was, /^resolved /, was);
+        writeProject(join(root, "common"), {
+          ...common,
+          "src/lib.rs": after,
+        });
+        const second = await index(project, root, {
+          environment: process.env,
+          store: "g.sqlite",
+        });
+        assert.equal(second.state.state, "used", JSON.stringify(second.state));
+        assert.notEqual(second.state.cached, true, "the route ran again");
+        assert.notEqual(target(second), was, "the answer is not the old one");
+      });
+    },
+  );

@@ -80,7 +80,8 @@ test("C-43: an opted-in Rust sweep adds its row beside source only; partial and 
   const rustPins = archive.modes.bare.repos.filter((repo) => repo.language === "rust");
   const finishedRust = rustPins.filter((repo) => repo.counts);
   const [first, second] = finishedRust;
-  const upgraded = (repo, n) => ({ ...repo, toolchain: { state: "used", upgradedLinks: n },
+  // D17 clarified: 30 of every 100 upgrades are labelled seen.
+  const upgraded = (repo, n) => ({ ...repo, toolchain: { state: "used", upgradedLinks: n, upgradedSeen: (3 * n) / 10, upgradedNoneSeen: (7 * n) / 10 },
     counts: { ...repo.counts, rust: { ...repo.counts.rust, level2: repo.counts.rust.level2 + n } },
     inventory: shrink(repo.inventory, n) });
   const shrink = (inventory, n) => inventory.map((row) => {
@@ -100,6 +101,13 @@ test("C-43: an opted-in Rust sweep adds its row beside source only; partial and 
   const source = table.findIndex((line) => line.startsWith("| Rust | Source only |"));
   assert.match(table[source + 1], /^\| Rust \| Opt-in offline toolchain \| /);
   assert.ok(table[source + 1].includes((score(archive.modes.bare.repos, "rust").level2 + 100).toLocaleString("en-US")));
+  // The third figure: the used record has 100 upgrades, 30 labelled seen (the
+  // partial record carries no label counts).
+  assert.ok(
+    table[source + 1].includes(`${(score(paired, "rust").level2 - 30).toLocaleString("en-US")} (`) &&
+      table[source + 1].includes("counting only none-seen upgrades"),
+    table[source + 1],
+  );
   assert.match(runTables(modes), /## rust-toolchain/);
   const unmeasured = rustPins.map((repo) => ({ ...repo, toolchain: { state: "unavailable" } }));
   assert.match(scoreTable({ ...modes, "rust-toolchain": { ...modes["rust-toolchain"], repos: unmeasured } }, base),
