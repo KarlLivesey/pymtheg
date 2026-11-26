@@ -1,6 +1,6 @@
 # C-56a evidence
 
-Pins: restic 74f00280, cli/cli 42d52b4c (`sweep/repos.json`). Main is 54cd0e6f; head is this branch.
+Pins: restic 74f00280, cli/cli 42d52b4c (`sweep/repos.json`). Measured with this chunk on its first base: main is 54cd0e6f (C-55 before its reviews) and head is this chunk on it (c258b4b5). The branch has since merged the new main; the suite on the pushed tree is in `suite.txt` below.
 
 - `<pin>.same-cold.json`: a cold index of the pin by main and by head into stores with one project id, compared row for row (`scripts/reindex/same-cold.mjs`). Both: no difference. The server path of the checkout is replaced by the pin.
 - `<pin>.seeded.json` (head) and `<pin>.seeded.main.json` (main): 35 seeded edits each through the MCP worker (`random-edits.mjs --mcp --more-go`, seeds 5501 restic and 5502 cli/cli), each compared with a cold index. All 140 equal.

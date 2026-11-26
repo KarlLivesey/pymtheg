@@ -161,3 +161,50 @@ test("a body edit above every declaration leaves every notes id as it was", asyn
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+test("the ordinal follows source order, not key order", async () => {
+  // One init at a two-digit offset from 20 on and one at a three-digit
+  // offset under 200: their keys (`function:<start>:init`) sort the other
+  // way round as strings (`function:1…` before `function:7…`).
+  const text =
+    "package p\n\n// a comment so the first declaration starts past offset 40\n" +
+    "func init() {}\n" +
+    "// padding so the second declaration starts past offset 100\n" +
+    "func init() {}\n";
+  const second = text.lastIndexOf("func init");
+  const first = text.indexOf("func init");
+  // Two digits from 2 on, then three from 1: string order reverses them.
+  assert.ok(first >= 20 && first < 100 && second >= 100 && second < 200);
+  const base = mkdtempSync(join(tmpdir(), "c56a-order-"));
+  const root = join(base, "tree");
+  mkdirSync(join(root, "p"), { recursive: true });
+  writeFileSync(join(root, "go.mod"), "module example.com/m\n\ngo 1.22\n");
+  writeFileSync(join(root, "p/o.go"), text);
+  const store = new SqliteGraphStore(join(base, "graph.sqlite"));
+  try {
+    await indexProject(root, registry, store);
+    const inits = (symbols) =>
+      symbols
+        .filter((symbol) => symbol.name === "init")
+        .map((symbol) => [symbol.range.start, symbol.ordinal])
+        .sort((a, b) => a[0] - b[0]);
+    const keys = notesSymbols(store.projectId, store.getFile("p/o.go"))
+      .filter((symbol) => symbol.name === "init")
+      .map((symbol) => symbol.key)
+      .sort();
+    assert.ok(keys[0].includes(`:${second}:`), "key order differs");
+    assert.deepEqual(
+      inits(notesSymbols(store.projectId, store.getFile("p/o.go"))).map(
+        ([, n]) => n,
+      ),
+      [0, 1],
+    );
+    assert.deepEqual(
+      inits(store.findSymbols({ file: "p/o.go" })).map(([, n]) => n),
+      [0, 1],
+    );
+  } finally {
+    store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
