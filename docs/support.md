@@ -912,8 +912,10 @@ and never yields a version pin.
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).
 - **`partial` files** have complete but qualified facts, never syntax errors: an
-  `extends` base that was not captured (`incomplete-config`; a package preset
-  such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler
+  `extends` base that was not captured, or a base the compiler drops
+  because it is unreadable, has syntax errors or a root that is not an object
+  (`incomplete-config`; a package preset such as `@tsconfig/node20` leaves
+  most cross-file links unresolved; [C-60](changes/C-60.md)), compiler
   stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
   be decided statically.
 - **Files the compiler or memory cannot take (C-13):** a file the TypeScript

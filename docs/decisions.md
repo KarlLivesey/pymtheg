@@ -3255,6 +3255,24 @@ measured trees. **Rules out:** treating a repeated declaration as already
 judged, unless what a judgement reads is first made explicit in the code
 rather than argued in a note. [C-47](changes/C-47.md)
 
+### C-60 A judgement or key does not depend on unrelated order or text
+
+**Decided (C-60):** the judge judges each part of a union callee on its
+own; only the call's joined answer is cached by the call. A hashed part of
+a TypeScript key is a hash of the restored source names, never of the
+compiler's fresh spelling. A config base that the compiler drops because
+its root is not an object (TS5092) keeps the `incomplete-config` marker, as
+an unreadable base does. A callee annotated `typeof f`, with `f` a
+function (or a union of them, also with `undefined` or `null`), is judged
+exactly as a direct call to `f`; any other callee of a checker type with
+more than one signature and a tainted argument is invalid code. **Why:**
+each was found with a fixture. The
+second part of a union took the first part's signature, which gave a
+definite link through a failed file in one order only. An unrelated edit
+changed a renamed file's keys. And a dropped base was taken as read.
+**Rules out:** a per-call memo shared by different callees of that call;
+key hashes of text that depends on other files. [C-60](changes/C-60.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000
