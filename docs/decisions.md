@@ -3415,6 +3415,38 @@ without a source rejects a module's whole output, so a namespace that is
 no symbol passes its members to the next container out. **Rules out:**
 time limits where a deterministic property exists. See [C-26](changes/C-26.md).
 
+### C-46 Conventions for missing workspace build output
+
+**Decided (C-46).** Where C-25 has no compiler proof for a missing workspace
+entry, the module follows it to the one source a stated convention names,
+each under its own assumption: the package's bundler config entry list read
+as data (`ts-unbuilt-entry-is-bundler-entry`), an API Extractor roll-up's
+main entry (`ts-unbuilt-entry-is-rollup-entry`), the `src/` twin of the
+output path (`ts-unbuilt-entry-is-src-twin`), or the package's own compiler
+configuration under a Wireit wrapper or beside a roll-up of another entry
+(`ts-unbuilt-entry-is-wrapped-compiler-emit`). The links are assumption-marked
+Level 2, never proven. Existing output and declarations win; a refusal from
+the compiler's own facts, or a build that is plain `tsc`, stands; a rewrite
+of the output, two configs naming different sources, or readable entries
+that list only other outputs give no route. A bundler entry that is
+present but not data, or a roll-up tool (API Extractor,
+dts-bundle-generator) run with no readable config, blocks the `src/` twin.
+A trimmed roll-up withholds `@internal` declarations one by one and
+refuses `@alpha` and `@beta` trimming; `stripInternal` is read from every
+config read completely that covers the source, the package's own included,
+through package `extends`. A package config that was not read completely
+(a base not installed or missing, a JSON syntax error in it or its base),
+or no config of its own under such a root config, gives no route. Links
+that can see an assumed entry are those importing its source; when a file
+only the route brings into the program declares globals or augments a
+module, every file is checked without the route. Configs are read as
+syntax or JSON, never executed. **Trade:** a convention can name the wrong
+source where a build does something the convention does not see; on the
+two packages built for real, 788 links agreed in round 1: 545 on
+`@trpc/server`, still followed, and 243 on `@reduxjs/toolkit`, no longer
+followed (its entry is not data). **Rules out:** executing build configs or scripts to learn their
+outputs. See [C-46](changes/C-46.md).
+
 ### C-37 Graph index writes commit in bounded batches
 
 **Decided (C-37):** under the write-ahead log, an index run's writes (parse

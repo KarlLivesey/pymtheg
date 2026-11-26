@@ -788,6 +788,9 @@ export function projectModel(
   // Reference redirects reuse the parsed snapshot config across programs.
   const parsedConfigs = new Map<string, ts.ParsedCommandLine>();
   const emitConfigs = new Map<string, ts.ParsedCommandLine>();
+  /** Configs whose settings are incomplete or unknown: a base that was not
+   * read, or a config that failed (C-46 review 4). */
+  const incompleteConfigs = new Set<string>();
   const claimed = new Map<string, ProjectGroup[]>();
   const claim = (path: string, group: ProjectGroup) => {
     const list = claimed.get(path) ?? [];
@@ -1008,7 +1011,7 @@ export function projectModel(
         if (!group.limitations.length) {
           parsedConfigs.set(toVirtual(config.path), parsed);
           if (emitPathsScoped) emitConfigs.set(toVirtual(config.path), parsed);
-        }
+        } else incompleteConfigs.add(toVirtual(config.path));
         group.notes.push(
           ...parsed.errors
             // 18003: "No inputs were found" is a normal state for solution-style configs.
@@ -1048,6 +1051,9 @@ export function projectModel(
           if (path !== undefined) claim(path, group);
         }
     }
+    // A config that failed (a missing relative base, a JSON syntax error in
+    // it or a base) has unknown settings too (C-46 review 4).
+    if (group.failure) incompleteConfigs.add(toVirtual(config.path));
     // Its own file selection cannot be read: it could own anything below its
     // directory (decided after every config, see below).
     if (group.failure && selectionUnreadable) unreadable.push(group);
@@ -1288,7 +1294,14 @@ export function projectModel(
   const syntaxFailures = new Map<string, SyntaxFailure>();
   const caches = new WeakMap<ts.CompilerHost, Map<string, ts.SourceFile>>();
   const asked = new WeakMap<ts.CompilerHost, Set<string>>();
-  const entries = workspaceEntries(manifests, emitConfigs, fs.files, originals);
+  const entries = workspaceEntries(
+    manifests,
+    emitConfigs,
+    fs.files,
+    originals,
+    parsedConfigs,
+    incompleteConfigs,
+  );
   const redirects = new WeakMap<
     ts.CompilerHost,
     Map<ts.ResolvedModuleFull, UnbuiltEntry>
@@ -1625,8 +1638,25 @@ export function projectModel(
           // Expose missing explicit entries to the retry even when we have no
           // source for them. A later condition cannot displace the selected
           // declaration entry merely because the latter has no proof.
+          // A source-extension probe (`.ts`, `.tsx`) of a proven declaration
+          // candidate's own stem is the compiler trying extensions on one
+          // pattern target (`./dist/*` with `api/Page.js`), not another
+          // entry (C-46): it must not take that candidate's place.
+          const stem = (path: string) =>
+            path.replace(/\.(?:d\.)?[cm]?[jt]sx?$/, "");
+          const proven = new Set(
+            [...candidates]
+              .filter(([, proof]) => typeof proof === "object")
+              .map(([lookup]) => stem(lookup)),
+          );
           for (const lookup of lookups ?? []) {
             if (candidates.has(lookup)) continue;
+            if (
+              proven.has(stem(lookup)) &&
+              /\.[cm]?tsx?$/.test(lookup) &&
+              !/\.d\.[cm]?ts$/.test(lookup)
+            )
+              continue;
             const output = missingOutput(lookup);
             if (output && entries.explicitEntry(route.target, output))
               candidates.set(lookup, false);

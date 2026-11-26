@@ -29,6 +29,120 @@ import { setJudgeBudget, setJudgeProgramBudget } from "./judge.js";
 import { neutralizeAssumed } from "./untrusted.js";
 import { entryProvenance } from "./workspace-entries.js";
 import { unbuiltEntryAssumption } from "./entry-build.js";
+import { type Convention, conventionAssumptions } from "./entry-convention.js";
+
+/** Every assumption an unbuilt workspace entry can rest on (C-25, C-46). */
+const unbuiltAssumptions = new Set([
+  unbuiltEntryAssumption,
+  ...Object.values(conventionAssumptions),
+]);
+/** The assumption a projected entry rests on: its convention, or C-25's. */
+const entryAssumption = (entry: { proof?: string } | undefined) =>
+  conventionAssumptions[entry?.proof as Convention] ?? unbuiltEntryAssumption;
+
+/**
+ * The checkout files that can see an assumed workspace entry (C-25, C-46):
+ * the entries' sources and every file that imports one of them, directly
+ * or through other files, by the program's module resolution. Undefined
+ * (every file) when one of them declares globals or augments a module,
+ * which reaches files that do not import it, and so too when a file only
+ * the route brings into the program does (C-46 review 5: an entry's source
+ * importing a plugin's `declare module "host"`).
+ */
+function assumedDependents(
+  program: ts.Program,
+  entries: ReadonlyMap<ts.ResolvedModuleFull, { assumed?: true }>,
+): Set<string> | undefined {
+  const seeds = new Set<string>();
+  for (const [resolved, entry] of entries)
+    if (entry.assumed) seeds.add(resolved.resolvedFileName);
+  const checker = program.getTypeChecker();
+  const importers = new Map<string, Set<string>>();
+  const imported = new Map<string, Set<string>>();
+  for (const file of program.getSourceFiles()) {
+    const imports =
+      (file as ts.SourceFile & { imports?: readonly ts.StringLiteralLike[] })
+        .imports ?? [];
+    for (const specifier of imports) {
+      const target = checker
+        .getSymbolAtLocation(specifier)
+        ?.declarations?.find(ts.isSourceFile);
+      if (!target) continue;
+      const list = importers.get(target.fileName) ?? new Set();
+      list.add(file.fileName);
+      importers.set(target.fileName, list);
+      const out = imported.get(file.fileName) ?? new Set();
+      out.add(target.fileName);
+      imported.set(file.fileName, out);
+    }
+    for (const reference of file.referencedFiles) {
+      const target = program.getSourceFile(
+        posix.resolve(posix.dirname(file.fileName), reference.fileName),
+      );
+      if (!target) continue;
+      const out = imported.get(file.fileName) ?? new Set();
+      out.add(target.fileName);
+      imported.set(file.fileName, out);
+    }
+  }
+  const declaresBeyondItself = (file: string) => {
+    const source = program.getSourceFile(file);
+    return (
+      !!source &&
+      (!ts.isExternalModule(source) ||
+        source.statements.some(
+          (statement) =>
+            ts.isModuleDeclaration(statement) &&
+            (ts.isStringLiteral(statement.name) ||
+              statement.flags & ts.NodeFlags.GlobalAugmentation),
+        ))
+    );
+  };
+  // What the route brings in: files reached from the entries' sources that
+  // the program does not reach otherwise (from a file nothing imports, not
+  // through an entry's source). The neutral program lacks them.
+  const closure = (starts: Iterable<string>, stop: Set<string>) => {
+    const found = new Set<string>();
+    const stack = [...starts].filter((file) => !stop.has(file));
+    while (stack.length) {
+      const file = stack.pop()!;
+      if (found.has(file)) continue;
+      found.add(file);
+      for (const next of imported.get(file) ?? [])
+        if (!stop.has(next) && !found.has(next)) stack.push(next);
+    }
+    return found;
+  };
+  const elsewhere = closure(
+    program
+      .getSourceFiles()
+      .map((file) => file.fileName)
+      .filter((file) => !importers.has(file)),
+    seeds,
+  );
+  for (const file of closure(
+    [...seeds].flatMap((seed) => [...(imported.get(seed) ?? [])]),
+    new Set(),
+  ))
+    if (!seeds.has(file) && !elsewhere.has(file) && declaresBeyondItself(file))
+      return undefined;
+  const reached = new Set(seeds);
+  const queue = [...seeds];
+  while (queue.length) {
+    const file = queue.pop()!;
+    if (declaresBeyondItself(file)) return undefined;
+    for (const importer of importers.get(file) ?? [])
+      if (!reached.has(importer)) {
+        reached.add(importer);
+        queue.push(importer);
+      }
+  }
+  return new Set(
+    [...reached]
+      .map((file) => fromVirtual(file))
+      .filter((path): path is string => path !== undefined),
+  );
+}
 
 /** Program rebuilds per file after checker stack overflows before giving up. */
 const MAX_LIMIT_RETRIES = 25;
@@ -125,7 +239,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `50+typescript-${ts.version}`;
+const MODULE_VERSION = `52+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -622,7 +736,9 @@ function withWorkspaceAssumptions(
       if (link.kind === "contains") return link;
       const previous = existing.get(key(link));
       const data = { ...((link.data ?? {}) as { [key: string]: Json }) };
-      const entry = data.unbuiltEntry as { assumed?: true } | undefined;
+      const entry = data.unbuiltEntry as
+        | { assumed?: true; proof?: string }
+        | undefined;
       const changed = !previous || outcomeOf(previous) !== outcomeOf(link);
       const before = previous?.data as
         | {
@@ -648,7 +764,7 @@ function withWorkspaceAssumptions(
           data.reason = "workspace-build-output-missing";
           return { ...link, data };
         }
-        assume(data, unbuiltEntryAssumption);
+        assume(data, entryAssumption(entry));
         return { ...link, data };
       }
       return link;
@@ -910,12 +1026,12 @@ export function mergeTied(
       ),
     );
     const assumptions = merged.assumes as string[] | undefined;
-    if (assumptions?.includes(unbuiltEntryAssumption)) {
+    if (assumptions?.some((name) => unbuiltAssumptions.has(name))) {
       const entries = new Map(
         datas
           .filter((data) =>
-            (data.assumes as string[] | undefined)?.includes(
-              unbuiltEntryAssumption,
+            (data.assumes as string[] | undefined)?.some((name) =>
+              unbuiltAssumptions.has(name),
             ),
           )
           .map((data) => [
@@ -931,7 +1047,7 @@ export function mergeTied(
         delete merged.libraryFacts;
         merged.reason = "ambiguous-project";
         merged.assumes = assumptions.filter(
-          (name) => name !== unbuiltEntryAssumption,
+          (name) => !unbuiltAssumptions.has(name),
         );
       }
     }
@@ -1591,6 +1707,12 @@ export function typescriptModule(
         const workspaceAssumed =
           projectedEntries &&
           [...projectedEntries.values()].some((entry) => entry.assumed);
+        // Only files that can see an assumed entry differ without it: those
+        // that import its source, directly or through other checkout files
+        // (C-46 review: the neutral pass extracted every file).
+        const dependents = workspaceAssumed
+          ? assumedDependents(normal.program, projectedEntries!)
+          : undefined;
         normal = undefined;
         const differential = (
           texts: ReadonlyMap<string, string>,
@@ -1640,19 +1762,23 @@ export function typescriptModule(
               : labelled(result, differing(result, withoutBundler(path))),
           ]);
         }
-        if (workspaceAssumed) {
+        if (workspaceAssumed && dependents?.size !== 0) {
           const withoutWorkspace = differential(new Map(), true);
           let plain: [string, ParseResult][] = analysed.map(
             ([path, result]) => [
               path,
-              result.status === "failed" ? result : withoutWorkspace(path),
+              result.status === "failed" ||
+              (dependents !== undefined && !dependents.has(path))
+                ? result
+                : withoutWorkspace(path),
             ],
           );
           if (assumedTexts.size) {
             const withoutEither = differential(assumedTexts, true);
             plain = plain.map(([path, result]) => [
               path,
-              result.status === "failed"
+              result.status === "failed" ||
+              (dependents !== undefined && !dependents.has(path))
                 ? result
                 : labelled(result, differing(result, withoutEither(path))),
             ]);

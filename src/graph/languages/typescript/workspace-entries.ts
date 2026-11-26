@@ -2,10 +2,15 @@
 import { posix } from "node:path";
 import ts from "typescript";
 import { entryBuildGuards } from "./entry-build.js";
+import {
+  type Convention,
+  entryConventions,
+  namedConfigs,
+} from "./entry-convention.js";
 import type { Manifest } from "./workspace.js";
 
 export interface UnbuiltEntry {
-  proof: "tsconfig-emit" | "project-reference";
+  proof: "tsconfig-emit" | "project-reference" | Convention;
   build: string;
   assumed?: true;
   stripInternal?: true;
@@ -102,6 +107,15 @@ export function workspaceEntries(
   parsedConfigs: ReadonlyMap<string, ts.ParsedCommandLine>,
   files: ReadonlyMap<string, string>,
   captured: ReadonlyMap<string, string>,
+  /**
+   * Every config read completely, also those whose `extends` names a
+   * package (left out of `parsedConfigs`, which only holds configs whose
+   * emit paths are scoped): their `stripInternal` counts (C-46 review).
+   */
+  allConfigs: ReadonlyMap<string, ts.ParsedCommandLine> = parsedConfigs,
+  /** Configs whose settings are incomplete or unknown: a base that was not
+   * read, or a config that failed to read (C-46 review 4). */
+  incompleteConfigs: ReadonlySet<string> = new Set(),
 ) {
   const packages = new Map(
     manifests.map((manifest) => [posix.dirname("/" + manifest.path), manifest]),
@@ -190,6 +204,39 @@ export function workspaceEntries(
     configs.set(root, list);
   }
   const excluded = entryBuildGuards(files, packageOf);
+  const conventions = entryConventions(
+    files,
+    captured,
+    packageOf,
+    new Map(
+      [...packages].map(([root, manifest]) => [
+        root,
+        namedConfigs(root, scriptsOf(manifest)),
+      ]),
+    ),
+    (root) => {
+      const name = packages.get(root)?.json.name;
+      return typeof name === "string" ? name : undefined;
+    },
+    (root) => {
+      const manifest = packages.get(root);
+      if (!manifest) return false;
+      const named =
+        JSON.stringify(scriptsOf(manifest) ?? {}) +
+        JSON.stringify(manifest.json.wireit ?? {});
+      return /\b(?:api-extractor|dts-bundle-generator)\b/.test(named);
+    },
+  );
+  /** Outputs whose tsc mapping a build guard refused for another producer,
+   * with the guard. */
+  const refusedFor = new Map<string, string>();
+  const otherProducer = new Set([
+    "declaration-rollup",
+    "wireit-wrapper",
+    "bundler-config-unverified",
+    "bundler-config-entry",
+    "different-entry",
+  ]);
   const explicitTargets = new Map<
     string,
     { paths: Set<string>; patterns: string[][] }
@@ -206,7 +253,8 @@ export function workspaceEntries(
       .map((file) => posix.basename(file).replace(declaration, "")),
   );
   return {
-    available: configs.size > 0,
+    // C-46: a convention can route a package with no emitting config.
+    available: configs.size > 0 || packages.size > 0,
     explicitEntry,
     proof(root: string, output: string, plainOnly: boolean) {
       // A missing JavaScript entry cannot be checked with the options and
@@ -214,7 +262,17 @@ export function workspaceEntries(
       if (!declaration.test(output) || files.has(output)) return undefined;
       const key = `${root}\0${output}\0${plainOnly}`;
       if (cache.has(key)) return cache.get(key) ?? undefined;
-      const match = find(root, output, plainOnly);
+      let match = find(root, output, plainOnly);
+      // C-46: no compiler config emits here, or one does but another
+      // producer (a roll-up, a bundler, a wrapper) writes the output: a
+      // stated convention may name the source. A refusal from the
+      // compiler's own facts stands.
+      if (
+        !plainOnly &&
+        (match === undefined ||
+          (match === false && refusedFor.has(`${root}\0${output}`)))
+      )
+        match = convention(root, output) ?? match;
       cache.set(key, match ?? null);
       return match;
     },
@@ -312,6 +370,12 @@ export function workspaceEntries(
     return true;
   }
 
+  function tagged(root: string, tag: string) {
+    for (const [path, text] of captured)
+      if (below("/" + path, root) && text.includes(tag)) return true;
+    return false;
+  }
+
   function mayStrip(root: string) {
     let present = internalSources.get(root);
     if (present === undefined) {
@@ -326,10 +390,138 @@ export function workspaceEntries(
     return present;
   }
 
+  /**
+   * Whether the compiler is the package's build, so that its own facts
+   * decide and no convention applies: a literal tsc build of the package or,
+   * for a package without its own build, of an ancestor; or a package config
+   * that emits JavaScript without declarations into the output's folder while
+   * the package names no bundler (its build leaves no declarations there).
+   */
+  function compilerDecides(root: string, manifest: Manifest, output: string) {
+    if (plainPackages.has(root)) return true;
+    const scripts = scriptsOf(manifest);
+    if (
+      !scripts?.build &&
+      [...plainPackages, ...invalidBuildTrees].some((parent) =>
+        below(root, parent),
+      )
+    )
+      return true;
+    const named =
+      JSON.stringify(scripts ?? {}) +
+      JSON.stringify(manifest.json.wireit ?? {});
+    const bundler =
+      conventions.hasConfig(root) ||
+      /\b(?:tsup|tsdown|unbuild|rollup|rolldown|vite|esbuild|webpack|api-extractor|dts-bundle-generator|zshy)\b/.test(
+        named,
+      );
+    if (bundler) return false;
+    for (const [path, parsed] of parsedConfigs) {
+      if (packageOf(path) !== root || parsed.options.noEmit) continue;
+      const folder = parsed.options.declarationDir ?? parsed.options.outDir;
+      if (
+        folder &&
+        below(output, folder) &&
+        !parsed.options.declaration &&
+        !parsed.options.composite
+      )
+        return true;
+    }
+    return false;
+  }
+
+  /** An assumption-marked route by convention (entry-convention.ts). */
+  function convention(root: string, output: string): UnbuiltEntry | undefined {
+    const manifest = packages.get(root);
+    if (!manifest) return undefined;
+    if (compilerDecides(root, manifest, output)) return undefined;
+    let route = conventions(root, output, "/" + manifest.path);
+    // The package's own compiler configuration under a Wireit wrapper, or
+    // beside a declaration roll-up of other entries (the roll-up reads these
+    // per-file outputs; this one is not a roll-up output, or the roll-up
+    // route above would have answered): that configuration's mapping,
+    // under its own assumption.
+    if (
+      !route &&
+      ["wireit-wrapper", "declaration-rollup"].includes(
+        refusedFor.get(`${root}\0${output}`) ?? "",
+      )
+    ) {
+      const emitted = find(root, output, false, true);
+      if (emitted && typeof emitted === "object")
+        route = {
+          convention: "wrapped-compiler-emit",
+          source: "/" + emitted.source,
+          config: "/" + emitted.config,
+        };
+    }
+    if (!route || route === "conflicting") return undefined;
+    let source = route.source;
+    if (route.convention === "rollup-entry") {
+      // The main entry of the roll-up is itself an output: map it by the
+      // compiler configuration (its build guards aside: the roll-up is the
+      // build) or by the twin and bundler conventions.
+      const entry = route.entry!;
+      if (files.has(entry)) return undefined;
+      const emitted = find(root, entry, false, true);
+      if (emitted && typeof emitted === "object") source = "/" + emitted.source;
+      else {
+        const next = conventions(root, entry, "/" + manifest.path);
+        if (!next || next === "conflicting" || !next.source) return undefined;
+        source = next.source;
+      }
+    }
+    if (!source) return undefined;
+    // A build script that writes this very output replaces it.
+    if (excluded(root, manifest, source, output, true)) return undefined;
+    // A trimmed roll-up drops declarations by release tag. `@internal` ones
+    // are withheld one by one (stripInternal, as for C-25); `@alpha` and
+    // `@beta` ones cannot be, so a source tree using them gets no route.
+    const trims = route.trims ?? [];
+    for (const tag of ["alpha", "beta"] as const)
+      if (trims.includes(tag) && tagged(root, "@" + tag)) return undefined;
+    // Every compiler configuration that governs the source (its files
+    // include it: the package's own, a build config elsewhere, a root
+    // config), not only the package's: one with stripInternal withholds.
+    // A config of this package whose base was not read: whether it strips
+    // internals is unknown, so no convention route (C-46 review).
+    if ([...incompleteConfigs].some((path) => packageOf(path) === root))
+      return undefined;
+    // A package with no config of its own, under an unread config (a root
+    // config whose base was not read) that may cover it: unknown too.
+    if (
+      ![...allConfigs.keys()].some((path) => packageOf(path) === root) &&
+      [...incompleteConfigs].some((path) =>
+        (root + "/").startsWith(posix.dirname(path).replace(/\/?$/, "/")),
+      )
+    )
+      return undefined;
+    const compilerStrips =
+      (configs.get(root) ?? []).some(
+        ({ parsed }) => parsed.options.stripInternal,
+      ) ||
+      [...allConfigs.values()].some(
+        (parsed) =>
+          parsed.options.stripInternal && parsed.fileNames.includes(source),
+      );
+    const stripInternal =
+      (trims.includes("internal") || compilerStrips) && mayStrip(root);
+    return {
+      proof: route.convention,
+      ...(stripInternal && { stripInternal: true as const }),
+      build: manifest.path,
+      assumed: true,
+      config: route.config.slice(1),
+      output: output.slice(1),
+      source: source.slice(1),
+    };
+  }
+
   function find(
     root: string,
     output: string,
     plainOnly: boolean,
+    withoutGuards = false,
   ): OutputProof | undefined {
     const manifest = packages.get(root);
     if (!manifest || packageOf(output) !== root) return undefined;
@@ -371,9 +563,20 @@ export function workspaceEntries(
           ? (options.rootDir ??
             (options.composite ? posix.dirname(config.path) : "/"))
           : "/";
-        if (options.stripInternal && mayStrip(sourceRoot)) return false;
-        if (config.assumed && excluded(root, manifest, file, output))
+        // Without the build guards (a convention route), stripped declarations
+        // are withheld one by one instead (stripInternal on the entry).
+        if (options.stripInternal && mayStrip(sourceRoot) && !withoutGuards)
           return false;
+        const guard =
+          config.assumed && !withoutGuards
+            ? excluded(root, manifest, file, output)
+            : undefined;
+        if (guard) {
+          // C-46: another producer than tsc writes this output.
+          if (otherProducer.has(guard))
+            refusedFor.set(`${root}\0${output}`, guard);
+          return false;
+        }
         matches.push({
           proof: "tsconfig-emit",
           build: config.build,

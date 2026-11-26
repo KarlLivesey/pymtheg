@@ -26,7 +26,7 @@ const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
   process.argv.slice(2);
 if (!outArg)
   throw Error(
-    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--scoped-mix] [--more-go] [--gomod-meaning] [--no-edit-runs] [--mcp]",
+    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--scoped-mix] [--more-go] [--gomod-meaning] [--no-edit-runs] [--mcp] [--files LIST.json]",
   );
 const dist = resolve(distArg);
 const expectedSteps = Number(countArg);
@@ -103,11 +103,32 @@ const random = () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 const pick = (items) => items[Math.floor(random() * items.length)];
-const files = execFileSync("git", ["ls-files", "-z"], { cwd: root })
+const sourceFiles = execFileSync("git", ["ls-files", "-z"], { cwd: root })
   .toString()
   .split("\0")
   .filter((path) => extensions.some((extension) => path.endsWith(extension)))
   .sort();
+// C-46: --files LIST.json names files (package manifests, followed source
+// entries) that half of the edits target; the rest pick any source file.
+const filesAt = flags.indexOf("--files");
+const targeted =
+  filesAt < 0 ? [] : JSON.parse(readFileSync(flags[filesAt + 1], "utf8"));
+const files = sourceFiles;
+const pickFile = () =>
+  targeted.length && random() < 0.5 ? pick(targeted) : pick(files);
+/** A manifest edit that keeps the JSON valid: add a field, drop the type
+ * entry, or change the version. */
+function manifestEdit(file, source) {
+  const json = JSON.parse(source);
+  const kind = pick(["manifest-field", "manifest-types", "manifest-version"]);
+  if (kind === "manifest-field") json.c46RandomEdit = (json.c46RandomEdit ?? 0) + 1;
+  if (kind === "manifest-types") {
+    delete json.types;
+    delete json.typings;
+  }
+  if (kind === "manifest-version") json.version = `0.0.${Math.floor(random() * 1000)}`;
+  return { file, kind, text: JSON.stringify(json, null, 2) + "\n" };
+}
 const run = (script, ...rest) =>
   execFileSync(process.execPath, [join(here, script), dist, ...rest], {
     stdio: ["ignore", "ignore", "inherit"],
@@ -692,11 +713,12 @@ const sourceOf = (file) =>
   sourceByFile.get(file) ??
   readFileSync(join(scratch, "pins", name, file), "utf8");
 for (let step = 0; step < expectedSteps; step++) {
-  let file = pick(files);
+  let file = pickFile();
   const original = sourceOf(file);
   let edit;
   let at = 0;
   if (repo.language === "go") edit = goEdit(step, file, original);
+  else if (file.endsWith(".json")) edit = manifestEdit(file, original);
   else if (repo.language === "rust") edit = rustEdit(step, file, original);
   else {
     const lines = original.split("\n");

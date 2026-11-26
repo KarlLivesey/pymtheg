@@ -369,8 +369,11 @@ test("a dependency linked to the checkout root reports the missing workspace ent
       .find(
         (link) => link.kind === "imports" && link.targetName === "fixture-root",
       );
-    assert.equal(link.resolution, "unresolved");
-    assert.equal(link.data.reason, "workspace-entry-unavailable");
+    // C-46: no compiler proof, but `dist/index.d.ts` has the src/ twin
+    // `src/index.ts`: followed, assumption-marked.
+    assert.equal(link.resolution, "resolved");
+    assert.deepEqual(link.data.assumes, ["ts-unbuilt-entry-is-src-twin"]);
+    assert.equal(link.data.unbuiltEntry.source, "src/index.ts");
   });
 });
 
@@ -1675,6 +1678,114 @@ test("a config extended by package name through an installed workspace link is r
       } else {
         assert.equal(missing, true, variant);
         assert.equal(open.data.reason, "incomplete-config", variant);
+      }
+    });
+  }
+});
+
+// C-46 review: a convention route withholds `@internal` declarations when a
+// config covering the source strips them, also when that config extends a
+// package; a config whose base was not read leaves the package no route.
+test("stripInternal through a package-extends config, and an unread base", async () => {
+  const cases = {
+    "installed external base, stripInternal in the package config": {
+      config: {
+        extends: "@tsconfig/node20/tsconfig.json",
+        compilerOptions: { stripInternal: true },
+        include: ["src"],
+      },
+      files: {
+        "node_modules/@tsconfig/node20/package.json": JSON.stringify({
+          name: "@tsconfig/node20",
+          version: "1.0.0",
+        }),
+        "node_modules/@tsconfig/node20/tsconfig.json": JSON.stringify({
+          compilerOptions: { strict: true },
+        }),
+      },
+      expect: "withheld",
+    },
+    "workspace base that strips": {
+      config: {
+        extends: "@repo/typescript-config/base.json",
+        include: ["src"],
+      },
+      files: {
+        "packages/typescript-config/package.json": JSON.stringify({
+          name: "@repo/typescript-config",
+          version: "0.0.0",
+        }),
+        "packages/typescript-config/base.json": JSON.stringify({
+          compilerOptions: { strict: true, stripInternal: true },
+        }),
+      },
+      link: [
+        "packages/p/node_modules/@repo/typescript-config",
+        "../../../typescript-config",
+      ],
+      expect: "withheld",
+    },
+    "a base that is not installed": {
+      config: { extends: "@missing/base/tsconfig.json", include: ["src"] },
+      files: {},
+      expect: "no route",
+    },
+  };
+  for (const [variant, { config, files, link, expect }] of Object.entries(
+    cases,
+  )) {
+    const { root, request, read, write } = await project();
+    await write(
+      "package.json",
+      JSON.stringify({ private: true, workspaces: ["packages/*"] }),
+    );
+    await write(
+      "tsconfig.json",
+      JSON.stringify({
+        compilerOptions: {
+          strict: true,
+          module: "ESNext",
+          moduleResolution: "Bundler",
+          types: [],
+        },
+        files: ["app.ts"],
+      }),
+    );
+    await write(
+      "packages/p/package.json",
+      JSON.stringify({
+        name: "p",
+        version: "1.0.0",
+        types: "./dist/index.d.ts",
+        scripts: { build: "tsup" },
+      }),
+    );
+    await write("packages/p/tsconfig.json", JSON.stringify(config));
+    await write(
+      "packages/p/src/index.ts",
+      "export function open() {}\n/** @internal */\nexport function hidden() {}\n",
+    );
+    await write(
+      "app.ts",
+      'import { open, hidden } from "p";\nopen();\nhidden();\n',
+    );
+    for (const [path, text] of Object.entries(files)) await write(path, text);
+    await mkdir(join(root, "node_modules"), { recursive: true });
+    await symlink("../packages/p", join(root, "node_modules/p"));
+    if (link) {
+      await mkdir(dirname(join(root, link[0])), { recursive: true });
+      await symlink(link[1], join(root, link[0]));
+    }
+    await request("index");
+    read((store, call) => {
+      const open = call("app.ts", "open");
+      const hidden = call("app.ts", "hidden");
+      if (expect === "withheld") {
+        assert.equal(open.resolution, "resolved", variant);
+        assert.notEqual(hidden.resolution, "resolved", variant);
+      } else {
+        assert.notEqual(open.resolution, "resolved", variant);
+        assert.notEqual(hidden.resolution, "resolved", variant);
       }
     });
   }
