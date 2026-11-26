@@ -1029,13 +1029,16 @@ SIGHUP or SIGQUIT stops the run in every language. The outcomes:
   example, a re-index of an unchanged, already complete index stopped during
   its inventory stays complete.
 - **`graph index` stopped after the index's completion was written:** the
-  index is complete. The command reports it, exits 0, and says on stderr
+  run's result stands. The command reports it and exits as the run would
+  have without the stop (0, or 2 when files failed), and says on stderr
   that the stop arrived after the index was complete.
 - **A command that syncs and then answers** (`graph file`, `graph symbol`
-  and the other queries without `--no-sync`, `link list`, `link check`),
+  and the other queries without `--no-sync`, `link list`, `link check`,
+  `link touched` without `--no-sync`),
   **stopped after its sync's completion write but before it answers:** exit
-  code 130 with no answer and no stderr line about the stop; `graph status`
-  says complete.
+  code 130 with no answer and no stderr line about the stop; the index the
+  sync wrote stands, and `graph status` reports it as it would without the
+  stop.
 
 Inside a language module's synchronous code, or a synchronous stretch the
 module marks after an await (Go marks its notes pass and its parse, Rust
