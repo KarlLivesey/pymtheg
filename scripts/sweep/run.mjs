@@ -7,7 +7,7 @@ import { lstat, mkdir, open, readdir, readFile, rename, rm, writeFile } from "no
 import { extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { installation, installerCommand } from "./install.mjs";
+import { installation, installerCommand, missingPackages } from "./install.mjs";
 
 const version = "0.1.0";
 const languageExtensions = {
@@ -402,6 +402,16 @@ async function runRepository(repo, release, scratch, limitSeconds, installed, go
         const failure = processFailure(install.process, stderr);
         const { outcome, ...details } = failure;
         return finalize(outcome === "wall-limit" ? outcome : "install-unavailable", { ...details, stage });
+      }
+      // Exit 0 is not enough (an `omit=dev` configuration installs without
+      // the typings): every declared package must be on disk.
+      const missing = await missingPackages(root);
+      if (missing.length) {
+        record.install.status = "incomplete";
+        record.install.reason = "incomplete-install";
+        record.install.missing = missing.slice(0, 20);
+        record.install.missingCount = missing.length;
+        return finalize("install-unavailable", { stage });
       }
     }
     stage = "init";

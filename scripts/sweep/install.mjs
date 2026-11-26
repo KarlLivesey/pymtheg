@@ -132,6 +132,9 @@ export async function installation(root, scratch, { legacyPeerDeps = false } = {
       version: exact?.[2],
       args: [
         "ci",
+        // Dev dependencies whatever the project's configuration says
+        // (`omit=dev` in its .npmrc): their typings are what is measured.
+        "--include=dev",
         ...(legacyPeerDeps ? ["--legacy-peer-deps"] : []),
         "--ignore-scripts",
         "--script-shell=/bin/false",
@@ -170,6 +173,8 @@ export async function installation(root, scratch, { legacyPeerDeps = false } = {
       args: [
         ...frozen,
         "--ignore-pnpmfile",
+        // Dev dependencies whatever the project's configuration says.
+        "--production=false",
         ...(legacy ? [
           "--config.manage-package-manager-versions=false",
           "--virtual-store-dir=node_modules/.pnpm",
@@ -197,10 +202,108 @@ export async function installation(root, scratch, { legacyPeerDeps = false } = {
             "--frozen-lockfile",
             "--ignore-scripts",
             "--non-interactive",
+            "--production=false",
             "--cache-folder",
             join(cache, "yarn-classic"),
           ]
         : ["--immutable", "--mode=skip-build"]),
     ],
   };
+}
+
+/**
+ * Review round 3 of C-42: whether the install is complete. For the root and
+ * every workspace, every package its manifest declares in `dependencies` and
+ * `devDependencies` (the direct dependencies its lockfile lists for it) must
+ * resolve on disk from that workspace's directory, as Node resolves a
+ * package: its own `node_modules`, then each parent's up to the root.
+ * Optional and peer dependencies may be absent. Returns the missing ones.
+ */
+export async function missingPackages(root) {
+  const read = async (path) => {
+    try {
+      return await readFile(join(root, path), "utf8");
+    } catch {
+      return undefined;
+    }
+  };
+  const manifest = (text) => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return undefined;
+    }
+  };
+  const rootManifest = manifest(await read("package.json")) ?? {};
+  // Workspace patterns: package.json `workspaces` (npm, yarn, bun) and
+  // pnpm-workspace.yaml `packages`.
+  const declared = Array.isArray(rootManifest.workspaces)
+    ? rootManifest.workspaces
+    : rootManifest.workspaces?.packages ?? [];
+  const yaml = (await read("pnpm-workspace.yaml")) ?? "";
+  const listed = [];
+  let inPackages = false;
+  for (const line of yaml.split("\n")) {
+    if (/^packages:\s*$/.test(line)) inPackages = true;
+    else if (inPackages && /^\s+-\s*/.test(line))
+      listed.push(line.replace(/^\s+-\s*/, "").replace(/^['"]|['"]\s*$/g, "").trim());
+    else if (inPackages && /^\S/.test(line)) inPackages = false;
+  }
+  const patterns = [...declared, ...listed].filter(
+    (pattern) => typeof pattern === "string" && !pattern.startsWith("!"),
+  );
+  const excluded = [...declared, ...listed]
+    .filter((pattern) => typeof pattern === "string" && pattern.startsWith("!"))
+    .map((pattern) => pattern.slice(1));
+  const { readdir } = await import("node:fs/promises");
+  const directories = async (path) => {
+    try {
+      return (await readdir(join(root, path), { withFileTypes: true }))
+        .filter((entry) => entry.isDirectory() && entry.name !== "node_modules")
+        .map((entry) => (path ? `${path}/${entry.name}` : entry.name));
+    } catch {
+      return [];
+    }
+  };
+  const expand = async (pattern) => {
+    const parts = pattern.replace(/\/+$/, "").split("/");
+    let found = [""];
+    for (const part of parts) {
+      const next = [];
+      for (const base of found)
+        if (part === "*") next.push(...(await directories(base)));
+        else if (part === "**") {
+          const all = [base];
+          for (let i = 0; i < all.length; i++)
+            all.push(...(await directories(all[i])));
+          next.push(...all);
+        } else next.push(base ? `${base}/${part}` : part);
+      found = next;
+    }
+    return found;
+  };
+  const workspaces = new Set([""]);
+  const skip = new Set();
+  for (const pattern of excluded)
+    for (const path of await expand(pattern)) skip.add(path);
+  for (const pattern of patterns)
+    for (const path of await expand(pattern))
+      if (!skip.has(path) && (await read(`${path}/package.json`)) !== undefined)
+        workspaces.add(path);
+  const resolves = async (from, name) => {
+    for (let path = from; ; path = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "") {
+      if ((await read(`${path ? `${path}/` : ""}node_modules/${name}/package.json`)) !== undefined)
+        return true;
+      if (!path) return false;
+    }
+  };
+  const missing = [];
+  for (const workspace of [...workspaces].sort()) {
+    const own = manifest(await read(`${workspace ? `${workspace}/` : ""}package.json`)) ?? {};
+    for (const field of ["dependencies", "devDependencies"])
+      for (const name of Object.keys(own[field] ?? {}).sort())
+        if (!(await resolves(workspace, name)))
+          missing.push(`${workspace || "."}: ${name}`);
+  }
+  return missing;
 }

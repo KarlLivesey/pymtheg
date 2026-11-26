@@ -233,74 +233,17 @@ interface NodeDiagnostics {
  * program, so the compiler itself answers TS2403 there. It shares the
  * program's parsed and bound files; only its type caches are its own.
  */
-/** The identifier inside `node` that starts at `start`. */
-function nameAt(node: ts.Node, start: number): ts.Identifier | undefined {
-  const file = node.getSourceFile();
-  if (node.getStart(file) <= start && start < node.end) {
-    if (ts.isIdentifier(node) && node.getStart(file) === start) return node;
-    for (const child of node.getChildren(file)) {
-      const found = nameAt(child, start);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-/** The declarations the compiler compares with each other: variables,
- * properties, and classes and interfaces (for their type parameters). */
-function comparedKind(node: ts.Node): string | undefined {
-  if (ts.isVariableDeclaration(node)) return "variable";
-  if (ts.isPropertySignature(node) || ts.isPropertyDeclaration(node))
-    return "property";
-  if (ts.isClassLike(node) || ts.isInterfaceDeclaration(node)) return "type";
-  return undefined;
-}
-/** Whether the compiler finds two declarations' type parameters different
- * (TS2428): names, and constraints and defaults where both have one; a
- * declaration may omit trailing parameters that have defaults. Compared as
- * written. */
-function typeParametersDiffer(a: ts.Node, b: ts.Node): boolean {
-  const list = (node: ts.Node) =>
-    ts.isClassLike(node) || ts.isInterfaceDeclaration(node)
-      ? ts.getEffectiveTypeParameterDeclarations(node)
-      : [];
-  const left = list(a);
-  const right = list(b);
-  const text = (node: ts.Node | undefined) =>
-    node?.getText().replace(/\s+/g, "");
-  for (let i = 0; i < Math.min(left.length, right.length); i++) {
-    const [x, y] = [left[i]!, right[i]!];
-    if (x.name.text !== y.name.text) return true;
-    for (const [p, q] of [
-      [x.constraint, y.constraint],
-      [x.default, y.default],
-    ] as const)
-      if (p && q && text(p) !== text(q)) return true;
-  }
-  const longer = left.length > right.length ? left : right;
-  const shorter = Math.min(left.length, right.length);
-  return longer.slice(shorter).some((parameter) => !parameter.default);
-}
-/** Whether the compiler finds two declarations' modifiers different
- * (TS2687): `?`, and private, protected, async, abstract, readonly and
- * static. */
-function modifiersDiffer(a: ts.Node, b: ts.Node): boolean {
-  const optional = (node: ts.Node) =>
-    !!(node as { questionToken?: ts.Node }).questionToken;
-  const flags = (node: ts.Node) =>
-    ts.canHaveModifiers(node) || ts.isVariableDeclaration(node)
-      ? ts.getCombinedModifierFlags(node as ts.Declaration) &
-        (ts.ModifierFlags.Private |
-          ts.ModifierFlags.Protected |
-          ts.ModifierFlags.Async |
-          ts.ModifierFlags.Abstract |
-          ts.ModifierFlags.Readonly |
-          ts.ModifierFlags.Static)
-      : 0;
-  return optional(a) !== optional(b) || flags(a) !== flags(b);
-}
 const declarationCheckers = new WeakMap<ts.Program, NodeDiagnostics>();
-/** C-42: the unit pairs in conflict, once per program (`conflictingUnitPairs`). */
-const unitConflictsByProgram = new WeakMap<ts.Program, Set<string>>();
+/**
+ * C-42: the units in conflict, once per program (`conflictingUnitPairs`):
+ * pairs of unit keys, and the units a diagnostic with no related location
+ * lies in, which conflict with any other unit.
+ */
+interface UnitConflicts {
+  pairs: Set<string>;
+  troubled: Set<string>;
+}
+const unitConflictsByProgram = new WeakMap<ts.Program, UnitConflicts>();
 function checkingDeclarations(program: ts.Program): NodeDiagnostics {
   let known = declarationCheckers.get(program);
   if (!known) {
@@ -1006,38 +949,24 @@ export function extractFile(
    * namespaces. They are read in every global scope: a script file,
    * `declare global`, and `global {}` inside an ambient `declare module "x"`
    * (how `@types/node` declares `URL`, `Buffer`, `console` and `process`).
-   * These diagnostics between declarations in two units are a conflict:
-   * - 2403, subsequent variable declarations must have the same type;
-   * - 2717, subsequent property declarations must have the same type;
-   * - 2300, duplicate identifier;
-   * - 2451, cannot redeclare a block-scoped variable;
-   * - 2428, all declarations must have identical type parameters;
-   * - 2687, all declarations must have identical modifiers.
-   *
-   * A conflict pairs exactly the two units whose declarations disagree:
-   * the unit of the declaration a diagnostic names, and the unit of the
-   * other declaration. The other is the diagnostic's related "was also
-   * declared here" location (2403, 2717 and the duplicates 2300, 2451).
-   * 2428 and 2687 carry none; there it is each declaration of the same
-   * symbol the compiler's own comparison finds different (type parameter
-   * names, constraints and defaults; the modifiers it compares and `?`).
-   * Only where neither finds one is the unit paired with the units that
-   * declare the name and are not themselves reported for it. Two units
-   * are never paired because both were reported against a third (DOM and
-   * Node against a first declaration in Workers). A conflict whose two
-   * declarations have the same unit key (two installed versions of
-   * `@types/node`; `lib.dom` and `lib.webworker`, both the unit `dom`)
-   * creates no pair: a link's target names the key, the same for both.
-   * Nor is it attributed to another unit: a declaration that disagrees
-   * with one of its own key pairs with no unit. A declaration's unit is the one its library candidate names (its
-   * `targetOf` unit: `node:url` for a `global` block inside `declare module
-   * "url"`), so conflicts and link unit sets use one key, and every
-   * `node:*` unit counts as the one package `@types/node`. Computed once per
-   * program (cached by program, as the second checker is), when a merged
-   * global is first met; `typescript.conflictScans` counts the computations
-   * and `typescript.conflictChecks` the declarations checked.
+   * Deny by default (review round 3): any diagnostic of that checker, whatever
+   * its code, makes units conflict when it lies in a declaration file of
+   * one of them. No code is listed and no spelling compared:
+   * - with related locations, it pairs every two units among its own
+   *   location's and theirs; only a pair inside one unit key is dropped (a
+   *   link's target names the key, the same for both: two installed
+   *   versions of `@types/node`, `lib.dom` and `lib.webworker`), and a pair
+   *   across units always counts;
+   * - with none, the unit it lies in conflicts with every other unit.
+   * A position's unit is its recorded global's, the one its library
+   * candidate names (its `targetOf` unit: `node:url` for a `global` block
+   * inside `declare module "url"`), else its file's; every `node:*` unit
+   * counts as the one package `@types/node`. Computed once per program
+   * (cached by program, as the second checker is), when a merged global is
+   * first met; `typescript.conflictScans` counts the computations and
+   * `typescript.conflictChecks` the statements submitted to the checker (a
+   * `var a: number, b: number` is one).
    */
-  const CONFLICT_CODES = new Set([2403, 2717, 2300, 2451, 2428, 2687]);
   // Conflicts are between typings packages: every `node:*` unit is one
   // package, `@types/node` (its modules' globals are one environment).
   const unitKey = (unit: { ecosystem: string; unit: string }) =>
@@ -1054,16 +983,23 @@ export function extractFile(
     /** The statement the second checker checks. */
     statement: ts.Statement;
   }
-  function conflictingUnitPairs(): Set<string> {
+  function conflictingUnitPairs(): UnitConflicts {
     const known = unitConflictsByProgram.get(program);
     if (known) return known;
-    const unitConflicts = new Set<string>();
+    const unitConflicts: UnitConflicts = {
+      pairs: new Set<string>(),
+      troubled: new Set<string>(),
+    };
+    // Every declaration file of a typings unit, by its unit key: a
+    // diagnostic outside a recorded global still lies in its file's unit.
+    const fileUnits = new Map<ts.SourceFile, string>();
     count("typescript.conflictScans");
     const byName = new Map<string, GlobalDeclaration[]>();
     const byFile = new Map<ts.SourceFile, GlobalDeclaration[]>();
     for (const source of program.getSourceFiles()) {
       const fileUnit = importer.declarationUnit(source);
       if (!fileUnit) continue;
+      fileUnits.set(source, unitKey(fileUnit));
       const keyOf = (declaration: ts.Declaration) => {
         const target = importer.targetOf(declaration, fileUnit, checker);
         return unitKey(target ?? fileUnit);
@@ -1152,12 +1088,15 @@ export function extractFile(
           found = entry;
       return found;
     };
+    // The unit a position lies in: its recorded global's (the unit its
+    // library candidate names), else its file's.
+    const unitAt = (
+      file: ts.SourceFile | undefined,
+      start: number | undefined,
+    ): string | undefined =>
+      at(file, start)?.unit ?? (file ? fileUnits.get(file) : undefined);
+    // Statements submitted to the second checker (`typescript.conflictChecks`).
     let checked = 0;
-    // The diagnostics first: whether a declaration was reported decides
-    // what its symbol's other declarations are paired with.
-    const diagnosed: { diagnostic: ts.Diagnostic; own: GlobalDeclaration }[] =
-      [];
-    const reportedAt = new Set<string>();
     for (const [file, entries] of byFile) {
       const statements = [
         ...new Set(
@@ -1173,110 +1112,44 @@ export function extractFile(
         undefined,
         statements,
       )) {
-        if (!CONFLICT_CODES.has(diagnostic.code)) continue;
-        const own = at(diagnostic.file, diagnostic.start);
-        if (!own) continue;
-        diagnosed.push({ diagnostic, own });
-        reportedAt.add(`${diagnostic.file!.fileName}\0${diagnostic.start}`);
-      }
-    }
-    const reported = (declaration: ts.Declaration) => {
-      const name = ts.getNameOfDeclaration(declaration) ?? declaration;
-      const file = name.getSourceFile();
-      return reportedAt.has(`${file.fileName}\0${name.getStart(file)}`);
-    };
-    const enclosing = (declaration: ts.Node) =>
-      at(declaration.getSourceFile(), declaration.getStart());
-    // The declarations a diagnostic's declaration disagrees with.
-    const otherSides = ({
-      diagnostic,
-      own,
-    }: (typeof diagnosed)[number]): GlobalDeclaration[] => {
-      const name = nameAt(own.node, diagnostic.start!);
-      const declaration = name?.parent;
-      const declarations =
-        (name && declarationChecker.getSymbolAtLocation(name)?.declarations) ??
-        [];
-      const others = (diagnostic.relatedInformation ?? []).map((info) =>
-        at(info.file, info.start),
-      );
-      // Only the declarations the compiler compares with this one: a
-      // merged symbol also has its interface beside a `var` of one name.
-      const compared = declaration
-        ? declarations.filter(
-            (other) =>
-              other !== declaration &&
-              comparedKind(other) !== undefined &&
-              comparedKind(other) === comparedKind(declaration),
-          )
-        : [];
-      if (diagnostic.code === 2428 || diagnostic.code === 2687) {
-        // Reported on declarations with no related location: the ones the
-        // compiler's comparison finds different are the other side.
-        const differs =
-          diagnostic.code === 2428 ? typeParametersDiffer : modifiersDiffer;
-        for (const other of compared)
-          if (differs(declaration!, other)) others.push(enclosing(other));
-      } else if (diagnostic.code === 2403 || diagnostic.code === 2717)
-        // Compared with the first declaration: the declarations not
-        // reported agree with it, so they disagree with this one too.
-        for (const other of compared)
-          if (!reported(other)) others.push(enclosing(other));
-      return others.filter(
-        (other): other is GlobalDeclaration =>
-          !!other && other.name === own.name,
-      );
-    };
-    // Per name, the units reported, for a diagnostic with no other known.
-    const reportedUnits = new Map<string, Set<string>>();
-    for (const { own } of diagnosed) {
-      const units = reportedUnits.get(own.name) ?? new Set<string>();
-      units.add(own.unit);
-      reportedUnits.set(own.name, units);
-    }
-    for (const entry of diagnosed) {
-      const { own } = entry;
-      let others = otherSides(entry);
-      // A declaration that disagrees with one of its own unit key is a
-      // conflict inside the key: it makes no pair, with that unit or any
-      // other (see above).
-      if (others.some((other) => other.unit === own.unit)) continue;
-      if (!others.length) {
-        // No other declaration known: the disagreement is with the units not
-        // reported for the name, unless the unit itself declares the name
-        // again (the DOM and WebWorker libraries), where it may be inside
-        // the key.
-        const declaring = byName.get(own.name)!;
-        if (
-          declaring.some(
-            (other) => other.unit === own.unit && other.node !== own.node,
-          )
-        )
-          continue;
-        others = declaring.filter(
-          (other) => !reportedUnits.get(own.name)!.has(other.unit),
+        // Deny by default (review round 3): any diagnostic, whatever its
+        // code, that lies in a unit's declaration file.
+        const own = unitAt(diagnostic.file, diagnostic.start);
+        const related = (diagnostic.relatedInformation ?? []).map((info) =>
+          unitAt(info.file, info.start),
         );
+        if (!related.length) {
+          // No other location: the unit conflicts with every other unit.
+          if (own) unitConflicts.troubled.add(own);
+          continue;
+        }
+        // The units it names: every pair across two of them conflicts.
+        // Only a pair inside one unit key is dropped (a link's target names
+        // the key, the same for both).
+        const units = [
+          ...new Set([own, ...related].filter((unit) => unit !== undefined)),
+        ];
+        for (let i = 0; i < units.length; i++)
+          for (let j = i + 1; j < units.length; j++)
+            unitConflicts.pairs.add(pairKey(units[i]!, units[j]!));
       }
-      for (const other of others)
-        if (other.unit !== own.unit)
-          unitConflicts.add(pairKey(own.unit, other.unit));
     }
     count("typescript.conflictChecks", checked);
     // Cached only once complete: an exception leaves no partial answer.
     unitConflictsByProgram.set(program, unitConflicts);
     return unitConflicts;
   }
-  /** Whether two of `units` are in conflict on a shared global (TS2403). */
+  /** Whether two of `units` are in conflict (see conflictingUnitPairs). */
   function unitsConflict(
     units: readonly { ecosystem: string; unit: string }[],
   ): boolean {
     const keys = [...new Set(units.map(unitKey))];
     if (keys.length < 2) return false;
-    const conflicts = conflictingUnitPairs();
-    if (!conflicts.size) return false;
+    const { pairs, troubled } = conflictingUnitPairs();
+    if (keys.some((key) => troubled.has(key))) return true;
     for (let a = 0; a < keys.length; a++)
       for (let b = a + 1; b < keys.length; b++)
-        if (conflicts.has(pairKey(keys[a]!, keys[b]!))) return true;
+        if (pairs.has(pairKey(keys[a]!, keys[b]!))) return true;
     return false;
   }
   /** The compiler's (merged) symbol of a declaration, from its name. */

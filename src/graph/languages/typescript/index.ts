@@ -888,6 +888,8 @@ export function mergeTied(
       "libraryFacts",
       "reason",
       "assumes",
+      // Decided below, for the link as a whole, never per program.
+      "mergedGlobal",
     ]);
     if (targets.size)
       merged.targets = byKey([...targets.entries()]).map(([, t]) => ({
@@ -906,8 +908,15 @@ export function mergeTied(
       if (!everyVariantSame) merged.tiedReasons = reasons;
     }
     if (!sameTargets || reasons.length) merged.projects = [...projects];
-    // C-42: one merged global only when every program gives the same set.
-    if (!sameTargets || reasons.length) delete merged.mergedGlobal;
+    // C-42: one merged global only when every program gives the same set
+    // and marks it; a program that does not mark it leaves no mark
+    // anywhere in the stored data, `byProject` included (review round 3).
+    if (
+      sameTargets &&
+      !reasons.length &&
+      datas.every((data) => data.mergedGlobal === true)
+    )
+      merged.mergedGlobal = true;
     assume(
       merged,
       ...datas.flatMap(
