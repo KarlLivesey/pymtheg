@@ -723,9 +723,9 @@ function decideToolchain(
         if (
           inScopeChain(use.scope, scope) &&
           unmet(use.conditions, site) &&
-          // One that may bring a trait, or that binds a name the
-          // receiver's trace uses (it may select the receiver's type).
-          (!use.notTrait || traceNames.has(use.name))
+          // One that may bring a trait. (One that binds a name on the
+          // receiver's trace is covered below, wherever it is.)
+          !use.notTrait
         )
           return "selected-receiver";
       // A name on the trace that a selected `use` binds anywhere in the

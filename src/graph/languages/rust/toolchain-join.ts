@@ -411,6 +411,9 @@ export function joinScip(
     for (const o of list) {
       if (o.s < from) continue;
       if (o.s >= to) break;
+      // A definition is no binding the site passes through (a module's
+      // definition sits at the start of its file, inside the first item).
+      if (o.def) continue;
       if (o.e > to || seenKeys.has(o.key)) continue;
       seenKeys.add(o.key);
       const entry = entryOf(o);
@@ -435,6 +438,7 @@ export function joinScip(
     for (const o of list) {
       if (o.s < fn.start) continue;
       if (o.s >= fn.end) break;
+      if (o.def) continue;
       if (seenKeys.has(o.key)) continue;
       seenKeys.add(o.key);
       const entry = entryOf(o);
