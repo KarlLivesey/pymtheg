@@ -3553,3 +3553,18 @@ and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall
 result; the 30 s grace only bounds how long an unanswering worker is
 given. See [C-48](changes/C-48.md).
 
+
+
+### Go calls through a local func value (C-63)
+
+**Decided (C-63, manager ruling for all three languages):** a Go call through
+a local binding that provably holds exactly one func literal (declared with
+it and never written, or declared without a value and written once with
+one; no write the extractor cannot see; not of a named func type, whose
+methods can write it) targets the enclosing function or
+method, with the binding's name and declaration span in
+`data.localBinding`, Rust's form. A call through a parameter, named result
+or receiver stays unresolved with the reason `local`. Everything else is as
+before. Go's module version is 33. **Why:** both shapes were stored
+unresolved with no reason; one closure is the function's own code, and a
+parameter's value comes from the caller. See [C-63](changes/C-63.md).

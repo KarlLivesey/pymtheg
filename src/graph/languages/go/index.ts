@@ -371,6 +371,7 @@ async function analyze(
     result.links = result.links.map((link, index) => {
       const note = group.get(index);
       if (!note) return link;
+      if (note.local) count("analyze.go.localParameterCalls");
       return {
         ...link,
         data: {
@@ -384,6 +385,9 @@ async function analyze(
           ...(note.invalid
             ? { reason: "invalid-code", cause: { files: note.invalid } }
             : {}),
+          // A call through a parameter, result or receiver: its value comes
+          // from the caller.
+          ...(note.local ? { reason: "local" } : {}),
           ...(note.open
             ? {
                 open: {
@@ -464,7 +468,7 @@ async function analyze(
 
 const go: LanguageModule = {
   id: ID,
-  version: "32",
+  version: "33",
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work", "**/vendor/modules.txt"],
   incrementalAnalysis: true,
