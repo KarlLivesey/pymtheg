@@ -1117,8 +1117,7 @@ export function extractFile(
           ),
         ].filter((unit): unit is string => unit !== undefined);
         const units = new Set(touched);
-        if (diagnostic.relatedInformation?.length && units.size === 1)
-          continue;
+        if (diagnostic.relatedInformation?.length && units.size === 1) continue;
         for (const unit of units) unitConflicts.troubled.add(unit);
       }
     }

@@ -1829,7 +1829,7 @@ test("a conflict inside a global namespace both units declare is found", async (
   assert.equal(agreeing.data.mergedGlobal, true);
 });
 
-test("with three units, a unit that differs from the first conflicts with every unit that agrees with it", async () => {
+test("with three units, the unit that differs and the first it differs from conflict with every other unit (deny by default)", async () => {
   const files = {
     "tsconfig.json": config({
       lib: ["es2022"],
@@ -1849,10 +1849,11 @@ test("with three units, a unit that differs from the first conflicts with every 
     ),
     "src/main.ts": "both();\nlater();\nexport {};\n",
   };
-  // A and B agree: their shared global stays marked.
+  // C's diagnostic names C and, as related, A: both conflict with every
+  // other unit (review round 3, deny by default), so A and B's shared
+  // global is unmarked too.
   const both = await globalsCase(files, "src/main.ts", "both");
-  assert.equal(both.data.mergedGlobal, true);
-  // C differs from the first (A), so from B too.
+  assert.equal(both.data.mergedGlobal, undefined);
   const later = await globalsCase(files, "src/main.ts", "later");
   assert.equal(later.data.mergedGlobal, undefined);
 });
@@ -1900,7 +1901,7 @@ test("every node:* unit is one package for the conflict test", async () => {
   assert.equal(link.data.mergedGlobal, undefined);
 });
 
-test("two units that differ from the first declaration but agree with each other are not paired", async () => {
+test("two units that differ from the first declaration are unmarked with each other too (deny by default)", async () => {
   const link = await globalsCase(
     {
       "tsconfig.json": config({
@@ -1921,13 +1922,13 @@ test("two units that differ from the first declaration but agree with each other
     "src/main.ts",
     "duo",
   );
-  assert.equal(link.data.mergedGlobal, true);
+  assert.equal(link.data.mergedGlobal, undefined);
 });
 
-// C-42 review round 2 ruling: a conflict pairs the two units whose
-// declarations disagree. Workers' Request is the first declaration; the
-// other two agree with each other and differ from it (the tRPC shape).
-test("two units reported against a third are each paired with it, not with each other", async () => {
+// The tRPC shape: Workers' Request is the first declaration; the other two
+// agree with each other and differ from it. Round 2 paired only each with
+// Workers; deny by default (round 3) unmarks every set among the three.
+test("two units reported against a third are unmarked with each other too (deny by default)", async () => {
   const files = {
     "tsconfig.json": config({
       lib: ["es2022"],
@@ -1946,9 +1947,10 @@ test("two units reported against a third are each paired with it, not with each 
       'declare module "undici" { global { var Request: { new (): Request }; function webAndNode(): void; function cfNode(): void; } }\n',
     "src/main.ts": "webAndNode();\ncfOnly();\nexport {};\n",
   };
-  // Web and Node agree with each other: not paired.
+  // Web and Node agree with each other, but each is reported against
+  // Workers: both conflict with every other unit (review round 3).
   const agreeing = await globalsCase(files, "src/main.ts", "webAndNode");
-  assert.equal(agreeing.data.mergedGlobal, true);
+  assert.equal(agreeing.data.mergedGlobal, undefined);
   // Workers and Web disagree: paired.
   const differing = await globalsCase(files, "src/main.ts", "cfOnly");
   assert.equal(differing.data.mergedGlobal, undefined);
@@ -2069,7 +2071,11 @@ test("the conflict check counts statements, not declarations", async () => {
 test("any diagnostic in a unit's declarations unmarks its sets, whatever its code", async () => {
   for (const [what, a, b] of [
     // TS2304, a missing type: no related location.
-    ["a missing type", "declare var thing: number;", "declare var thing: Missing;"],
+    [
+      "a missing type",
+      "declare var thing: number;",
+      "declare var thing: Missing;",
+    ],
     // An optional and a required member of one merged interface.
     [
       "optional and required overloads",
@@ -2149,8 +2155,11 @@ test("a set with a Node target the module synthesised is not marked", async () =
   // declarations, so it is not marked.
   const link = await globalsCase(
     {
-      "tsconfig.json": config({ lib: ["es2022", "dom"], types: [] }),
-      "src/main.ts": "setTimeout(() => {}, 1);\nexport {};\n",
+      // A Node builtin import, and no @types/node: the program expects Node
+      // without its typings.
+      "tsconfig.json": config({ lib: ["es2022", "dom"] }),
+      "src/main.ts":
+        'import { readFileSync } from "node:fs";\nsetTimeout(() => {}, 1);\nexport const read = readFileSync;\n',
     },
     "src/main.ts",
     "setTimeout",

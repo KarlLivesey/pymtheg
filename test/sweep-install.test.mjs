@@ -11,10 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import {
-  installation,
-  missingPackages,
-} from "../scripts/sweep/install.mjs";
+import { installation, missingPackages } from "../scripts/sweep/install.mjs";
 
 const run = promisify(execFile);
 const json = (value) => JSON.stringify(value, null, 2) + "\n";
@@ -23,7 +20,10 @@ test("the sweep's installers are told to install dev dependencies", async (t) =>
   const root = await mkdtemp(join(tmpdir(), "sweep-dev-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   await writeFile(join(root, "package.json"), json({ name: "app" }));
-  await writeFile(join(root, "package-lock.json"), json({ lockfileVersion: 3 }));
+  await writeFile(
+    join(root, "package-lock.json"),
+    json({ lockfileVersion: 3 }),
+  );
   assert.ok((await installation(root, root)).args.includes("--include=dev"));
   await rm(join(root, "package-lock.json"));
   await writeFile(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
