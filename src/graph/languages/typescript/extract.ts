@@ -230,7 +230,8 @@ interface NodeDiagnostics {
 /**
  * C-42 (review N1): a second checker of `program` that type-checks
  * declaration files (`skipLibCheck` and `skipDefaultLibCheck` off), one per
- * program, so the compiler itself answers TS2403 there. It shares the
+ * program, so the compiler itself reports its diagnostics there (any code:
+ * deny by default, review round 3). It shares the
  * program's parsed and bound files; only its type caches are its own.
  */
 const declarationCheckers = new WeakMap<ts.Program, NodeDiagnostics>();
@@ -950,10 +951,14 @@ export function extractFile(
    * Deny by default (review round 3): any diagnostic of that checker, whatever
    * its code, makes a unit conflict with every other unit when it lies in a
    * declaration file of that unit, or its related information does. No code
-   * is listed and no spelling compared. Only a diagnostic wholly inside one
-   * unit key is dropped (a link's target names the key, the same for both of
-   * its sides: two installed versions of `@types/node`, `lib.dom` and
-   * `lib.webworker`); any diagnostic that touches two units counts for both.
+   * is listed and no spelling compared. A diagnostic with related locations,
+   * all in one unit key, is dropped; one with no related location always
+   * counts against its unit. ("All" is the diagnostic's own location and
+   * each related one; a location in no unit, such as a checkout file, is not
+   * counted.) A link's target names the key, the same for both sides of a
+   * dropped diagnostic: two installed versions of `@types/node`, `lib.dom`
+   * and `lib.webworker`. Any diagnostic that touches two units counts for
+   * both.
    * A position's unit is its recorded global's, the one its library
    * candidate names (its `targetOf` unit: `node:url` for a `global` block
    * inside `declare module "url"`), else its file's; every `node:*` unit
@@ -1108,8 +1113,10 @@ export function extractFile(
         // Deny by default (review round 3): any diagnostic, whatever its
         // code, that lies in a unit's declaration file, or whose related
         // information does, makes that unit conflict with every other
-        // unit. Only a diagnostic wholly inside one unit key is dropped (a
-        // link's target names the key, the same for both of its sides).
+        // unit. A diagnostic with related locations, all in one unit key, is
+        // dropped (a link's target names the key, the same for both of its
+        // sides); one with no related location always counts against its
+        // unit.
         const touched = [
           unitAt(diagnostic.file, diagnostic.start),
           ...(diagnostic.relatedInformation ?? []).map((info) =>
@@ -1570,8 +1577,9 @@ export function extractFile(
         viaSpecifier && context.unbuilt?.forSpecifier(viaSpecifier);
       // C-42: one global symbol declared in several library units. Narrowed
       // D23: not when a unit is a test framework (competing packages: a file
-      // runs under one of them), nor when two of the units are in conflict
-      // on a shared global (TS2403, asked of the compiler).
+      // runs under one of them), nor when any of the units is in conflict
+      // (deny by default: any diagnostic of the declaration checker, asked
+      // of the compiler; see conflictingUnitPairs).
       const [mergedSymbol] = librarySymbols;
       const merged =
         !!libraries &&

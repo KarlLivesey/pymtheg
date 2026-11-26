@@ -888,8 +888,10 @@ and never yields a version pin.
     two assertion libraries' `expect`);
   - a set any of whose units the compiler finds a fault with in its global
     declarations: any diagnostic, of any code, that lies there or whose
-    related information does (deny by default), unless all its locations
-    lie in that one unit. Units are typings packages, so this covers
+    related information lies in that unit's declaration files (deny by
+    default). A diagnostic with related
+    locations, all in one unit key, is dropped; one with no related
+    location always counts against its unit. Units are typings packages, so this covers
     `@cloudflare/workers-types` against the DOM and `bun-types` against
     `@types/node`, and also a fault inside one package's own declarations
     in that program;

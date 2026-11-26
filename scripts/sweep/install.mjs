@@ -308,24 +308,25 @@ export async function missingPackages(root) {
  * The `packages` list of a pnpm-workspace.yaml, in block style
  * (`packages:` then `- "packages/*"` lines, indented or not) or flow style
  * (`packages: ["packages/*", apps/*]`, also over several lines). Quotes and
- * trailing comments are removed.
+ * trailing comments are removed, on every line (the first of a flow list
+ * too). Lines may end in CRLF.
  */
 export function workspacePatterns(yaml) {
+  const uncomment = (text) => text.replace(/(^|\s)#.*$/, "");
   const clean = (item) =>
-    item
-      .replace(/\s+#.*$/, "")
+    uncomment(item)
       .trim()
       .replace(/^(['"])(.*)\1$/, "$2")
       .trim();
-  const lines = yaml.split("\n");
+  const lines = yaml.split(/\r?\n/);
   const start = lines.findIndex((line) => /^packages\s*:/.test(line));
   if (start < 0) return [];
-  const rest = lines[start].replace(/^packages\s*:\s*/, "");
+  const rest = uncomment(lines[start].replace(/^packages\s*:\s*/, ""));
   if (rest.startsWith("[")) {
     // Flow style: up to the closing bracket.
     let text = rest;
     for (let i = start + 1; !text.includes("]") && i < lines.length; i++)
-      text += " " + lines[i].replace(/\s+#.*$/, "");
+      text += " " + uncomment(lines[i]);
     const inner = text.slice(1, text.indexOf("]"));
     return inner.split(",").map(clean).filter(Boolean);
   }

@@ -2457,10 +2457,13 @@ no set is marked when any of its units is a test framework, or when any of
 its units is in conflict. Deny by default (review round 3): any diagnostic,
 of any code, that a checker of declaration files (whatever `skipLibCheck`
 says) reports in a unit's global declarations, or whose related
-information lies there, makes that unit conflict with every other unit.
+information lies in that unit's declaration files, makes that unit
+conflict with every other unit (a set whose units are one unit key, only
+`node:*` units, has no other unit to conflict with).
 Units are typings packages (every `node:*` unit is `@types/node`). A
-diagnostic is dropped only when all its locations lie in one unit (two
-`@types/node` versions, `lib.dom` and `lib.webworker`). The mark is for environment globals: the language
+diagnostic with related locations, all in one unit key, is dropped (two
+`@types/node` versions, `lib.dom` and `lib.webworker`); one with no related
+location always counts against its unit. The mark is for environment globals: the language
 library, DOM, workers, Node and compatible runtimes, and packages that
 augment them.
 
@@ -3227,9 +3230,11 @@ of the program, with `skipLibCheck` off, checks every statement declaring a
 global that two or more units declare, once per program; any diagnostic it
 reports, of any code, that lies in a unit's declarations, or whose related
 information does, makes that unit conflict with every other unit. A
-diagnostic is dropped only when all its locations lie in one unit key. A
-unit in conflict is an alternative, so every merged global whose units
-include it is left unmarked, functions and interfaces included. Across
+diagnostic with related locations, all in one unit key, is dropped; one
+with no related location always counts against its unit. A unit in
+conflict is an alternative, so every merged global whose units
+include it is left unmarked, functions and interfaces included, unless the
+set's units are all one unit key (only `node:*` units). Across
 programs the mark is kept only when every program gives the same set and
 marks it; otherwise no mark is stored anywhere in the link's data. The candidate rows are deterministic, so the identity is the same in
 every file, program and run. **Rules out:** choosing one typing as the

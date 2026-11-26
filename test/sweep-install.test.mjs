@@ -139,6 +139,20 @@ test("pnpm workspace lists are read in block and flow style", async (t) => {
     workspacePatterns("packages: [\n  'packages/*', # all\n  tools\n]\n"),
     ["packages/*", "tools"],
   );
+  // Second review of round 5: CRLF line endings, and a comment after the
+  // opening bracket.
+  assert.deepEqual(
+    workspacePatterns('packages:\r\n  - "packages/*"\r\n  - apps/* # apps\r\n'),
+    ["packages/*", "apps/*"],
+  );
+  assert.deepEqual(
+    workspacePatterns("packages: [ # all\n  'packages/*',\n  tools\n]\n"),
+    ["packages/*", "tools"],
+  );
+  assert.deepEqual(
+    workspacePatterns("packages: [ # all\r\n  'packages/*',\r\n  tools ]\r\n"),
+    ["packages/*", "tools"],
+  );
   // A flow-style list's workspace with a missing dependency is caught.
   const root = await mkdtemp(join(tmpdir(), "sweep-flow-"));
   t.after(() => rm(root, { recursive: true, force: true }));
