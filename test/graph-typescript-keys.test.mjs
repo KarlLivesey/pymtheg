@@ -469,7 +469,7 @@ const MULTILINE = [
   'require) ? { conditional() { return "\\n"; } } : {};',
   "  const either = (enabled &&",
   "require) || { logical() { return 3; } };",
-  "  if (typeof module === \"object\" &&",
+  '  if (typeof module === "object" &&',
   "\t\tmodule.exports) { function umdHelper() { return 4; } umdHelper(); }",
   "  switch (x) { case x &&",
   "\t\trequire.main: { function mainHelper() { return 5; } mainHelper(); } }",

@@ -2311,7 +2311,9 @@ export function createJudge(input: JudgeInput): Judge {
         // C-60 review: the checker picks among several signatures by the
         // arguments' types; with a tainted argument that pick is not
         // trusted.
-        const kinds = construct ? ts.SignatureKind.Construct : ts.SignatureKind.Call;
+        const kinds = construct
+          ? ts.SignatureKind.Construct
+          : ts.SignatureKind.Call;
         if (
           checker.getSignaturesOfType(callee.type, kinds).length > 1 &&
           argumentsOf(call).some((argument) => tainted(expression(argument)))

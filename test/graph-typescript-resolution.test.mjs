@@ -8989,8 +8989,12 @@ test("a callee annotated typeof a function is judged as a direct call to it, and
     "tsconfig.json": strict,
     "models.ts": twoClasses,
     "broken.ts": broken ? "export const arg = ;\n" : "export const arg = 1;\n",
+    "made.ts": broken
+      ? "export const made = ;\n"
+      : 'import { Other } from "./models";\nexport const made = new Other();\n',
     "dep.ts": [
       'import { Clean, Other } from "./models";',
+      "export function identity<T>(x: T): T { return x; }",
       "export function good(x: string | number): Clean { return new Clean(); }",
       "export function overloaded(x: string): Clean;",
       "export function overloaded(x: number): Other;",
@@ -9000,7 +9004,8 @@ test("a callee annotated typeof a function is judged as a direct call to it, and
     ].join("\n"),
     "use.ts": [
       'import { arg } from "./broken";',
-      'import { api, good, overloaded } from "./dep";',
+      'import { made } from "./made";',
+      'import { api, good, identity, overloaded } from "./dep";',
       ...use,
       "",
     ].join("\n"),
@@ -9016,18 +9021,19 @@ test("a callee annotated typeof a function is judged as a direct call to it, and
       ],
       repaired: ["models.ts#Other.run"],
     },
-    ...["typeof good | typeof overloaded", "typeof overloaded | typeof good"].map(
-      (annotation) => ({
-        name: annotation,
-        use: [
-          "export function use(flag: boolean) {",
-          `  const s: ${annotation} = flag ? good : overloaded;`,
-          "  return s(arg).run(); // site",
-          "}",
-        ],
-        repaired: ["models.ts#Clean.run", "models.ts#Other.run"],
-      }),
-    ),
+    ...[
+      "typeof good | typeof overloaded",
+      "typeof overloaded | typeof good",
+    ].map((annotation) => ({
+      name: annotation,
+      use: [
+        "export function use(flag: boolean) {",
+        `  const s: ${annotation} = flag ? good : overloaded;`,
+        "  return s(arg).run(); // site",
+        "}",
+      ],
+      repaired: ["models.ts#Clean.run", "models.ts#Other.run"],
+    })),
     ...["good", "overloaded"].map((other) => ({
       name: `(m || ${other}) with m: typeof overloaded | undefined`,
       use: [
@@ -9040,6 +9046,18 @@ test("a callee annotated typeof a function is judged as a direct call to it, and
           ? ["models.ts#Clean.run", "models.ts#Other.run"]
           : ["models.ts#Other.run"],
     })),
+    {
+      // One signature: only judging the function itself sees that its
+      // return is the failed argument.
+      name: "typeof identity",
+      use: [
+        "export function use() {",
+        "  const s: typeof identity = identity;",
+        "  return s(made).run(); // site",
+        "}",
+      ],
+      repaired: ["models.ts#Other.run"],
+    },
     {
       name: "an indexed access to an overloaded member",
       use: [
