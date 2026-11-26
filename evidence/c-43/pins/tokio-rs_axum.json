@@ -22,22 +22,22 @@
  "route": {
   "links": 41067,
   "level2": 20701,
-  "level2NoneSeen": 16929,
+  "level2NoneSeen": 16952,
   "assumed": 1144,
   "proven": 15439,
   "toolchainDecided": 4118,
-  "toolchainSeen": 3772,
+  "toolchainSeen": 3749,
   "libraryModuleLinks": 0,
   "level2Percent": 50.41,
-  "level2NoneSeenPercent": 41.22,
+  "level2NoneSeenPercent": 41.28,
   "withModuleLinksPercent": 50.41,
   "toolchainDecidedPercent": 10.03
  },
  "decided": {
   "definite:definite": 3058,
   "definite:unresolved": 4107,
-  "label:none-seen": 346,
-  "label:seen": 3772,
+  "label:none-seen": 369,
+  "label:seen": 3749,
   "withheld:import-namespaces": 25,
   "definite:candidates": 11
  },
@@ -87,18 +87,18 @@
   }
  },
  "analyzerRun": {
-  "wallS": 30.9,
-  "cpuS": 75.9,
-  "peakMiB": 1956
+  "wallS": 39.2,
+  "cpuS": 86.1,
+  "peakMiB": 1967
  },
  "index": {
   "sourceOnly": {
-   "wallS": 32.9,
-   "cpuS": 49.7
+   "wallS": 33.9,
+   "cpuS": 50.8
   },
   "route": {
-   "wallS": 108.2,
-   "cpuS": 51.5
+   "wallS": 131.1,
+   "cpuS": 56.7
   }
  },
  "errors": {

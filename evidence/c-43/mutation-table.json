@@ -1,10 +1,6 @@
 {
   "control": {
-    "ran": 60,
-    "failed": []
-  },
-  "controlAfterGateTests": {
-    "ran": 62,
+    "ran": 66,
     "failed": []
   },
   "rows": [
@@ -15,13 +11,14 @@
       "ran": 1,
       "failed": [
         "real rust-analyzer, sixth review: glob twins of gated modules (no opaque macro) are decided for the active configuration and labelled; an import of a two-namespace name is withheld"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "gate: no symbol",
       "caught": false,
       "scope": "whole file",
-      "ran": 60,
+      "ran": 66,
       "failed": [],
       "note": "never reached: the join already gives `none:no-graph-symbol`"
     },
@@ -32,15 +29,16 @@
       "ran": 1,
       "failed": [
         "gates: a source-only definite target the toolchain disagrees with is kept, and counted"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "gate: source-only library",
       "caught": false,
       "scope": "whole file",
-      "ran": 60,
+      "ran": 66,
       "failed": [],
-      "note": "decide phase: never reached; the analysis cannot see source-only library targets"
+      "note": "decide phase: never reached; the analysis cannot see source-only library targets (the resolve-phase row is the gate)"
     },
     {
       "name": "gate: source-only library, resolve phase",
@@ -49,15 +47,16 @@
       "ran": 1,
       "failed": [
         "gates: a source-only library target is kept when the toolchain names a checkout symbol"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "gate: outside the candidate set",
       "caught": false,
       "scope": "whole file",
-      "ran": 62,
+      "ran": 66,
       "failed": [],
-      "note": "never reached in compiling code: the analysis has a candidate set only for a complete lookup with several definitions"
+      "note": "never reached in compiling code: the analysis has a candidate set only for a complete lookup with several definitions (the listed-twins row is the gate)"
     },
     {
       "name": "gate: outside the listed cfg twins (seventh review)",
@@ -66,7 +65,8 @@
       "ran": 1,
       "failed": [
         "gates: an answer outside the source-only candidate set is kept as the set, and counted"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "record: route-off data",
@@ -75,7 +75,8 @@
       "ran": 1,
       "failed": [
         "real rust-analyzer, sixth review G: the route-off data of every link is recoverable from the route-on store byte for byte"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "label: cfg-link",
@@ -84,7 +85,8 @@
       "ran": 1,
       "failed": [
         "gates: a checkout answer at the link's own name site upgrades an unresolved link, and the link records it"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "label: opaque-shadow",
@@ -93,28 +95,31 @@
       "ran": 2,
       "failed": [
         "real rust-analyzer, second review B1: cfg on whole modules, twins in a cfg_if!-style macro and conditional candidates are decided for this configuration and labelled; a module is never the answer for a function"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "label: selected item on the trace",
       "caught": true,
       "scope": "fifth review: a cfg-selected|oracle",
-      "ran": 7,
+      "ran": 8,
       "failed": [
         "real rust-analyzer, fifth review: a cfg-selected name (alias twins, a cfg(test) double, function twins) is decided for the active configuration and labelled seen",
         "real rust-analyzer, oracle (seed 62075): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers",
-        "real rust-analyzer, oracle (seed 62076): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
-      ]
+        "real rust-analyzer, oracle (seed 62076): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers",
+        "real rust-analyzer, oracle (seed 9001, the review shapes): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
+      ],
+      "note": ""
     },
     {
       "name": "label: generated entry",
       "caught": true,
       "scope": "whole file",
-      "ran": 60,
+      "ran": 66,
       "failed": [
-        "real rust-analyzer: a workspace with a proc macro and a build script is used, upgrades links and writes nothing to the project",
-        "real rust-analyzer, fifth review: a cfg-selected name (alias twins, a cfg(test) double, function twins) is decided for the active configuration and labelled seen"
-      ]
+        "real rust-analyzer: a workspace with a proc macro and a build script is used, upgrades links and writes nothing to the project"
+      ],
+      "note": ""
     },
     {
       "name": "label: selected use of the first segment",
@@ -123,84 +128,99 @@
       "ran": 3,
       "failed": [
         "real rust-analyzer, fifth review: a cfg-selected name (alias twins, a cfg(test) double, function twins) is decided for the active configuration and labelled seen"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "label: selected use of a later segment",
-      "caught": false,
-      "scope": "whole file",
-      "ran": 60,
-      "failed": [],
-      "note": "label only: other checks label the same fixtures; no fixture needs this check alone"
+      "caught": true,
+      "scope": "oracle",
+      "ran": 7,
+      "failed": [
+        "real rust-analyzer, oracle (seed 9001, the review shapes): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
+      ],
+      "note": ""
     },
     {
       "name": "label: selected candidate",
-      "caught": false,
-      "scope": "whole file",
-      "ran": 60,
-      "failed": [],
-      "note": "label only: other checks label the same fixtures; no fixture needs this check alone"
+      "caught": true,
+      "scope": "oracle",
+      "ran": 7,
+      "failed": [
+        "real rust-analyzer, oracle (seed 9001, the review shapes): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
+      ],
+      "note": ""
     },
     {
       "name": "label: gated function",
       "caught": true,
       "scope": "oracle|sixth review: selections",
-      "ran": 7,
+      "ran": 8,
       "failed": [
         "real rust-analyzer, oracle (seed 62076): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "label: selected member",
-      "caught": false,
-      "scope": "whole file",
-      "ran": 60,
-      "failed": [],
-      "note": "label only: other checks label the same fixtures; no fixture needs this check alone"
+      "caught": true,
+      "scope": "oracle",
+      "ran": 7,
+      "failed": [
+        "real rust-analyzer, oracle (seed 9001, the review shapes): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
+      ],
+      "note": ""
     },
     {
       "name": "label: selected import on a receiver",
       "caught": true,
       "scope": "^gates|basic|oracle",
-      "ran": 17,
+      "ran": 20,
       "failed": [
-        "real rust-analyzer, oracle (seed 4301): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers",
-        "real rust-analyzer, oracle (seed 62072): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers",
-        "real rust-analyzer, oracle (seed 62075): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
-      ]
+        "real rust-analyzer, oracle (seed 4301): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
+      ],
+      "note": ""
     },
     {
-      "name": "label: import naming a receiver's type (seventh review)",
+      "name": "label: field under a cfg (review of 90c66e77, item 2)",
       "caught": true,
       "scope": "oracle",
-      "ran": 6,
+      "ran": 7,
       "failed": [
-        "real rust-analyzer, oracle (seed 62075): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
-      ]
+        "real rust-analyzer, oracle (seed 9001, the review shapes): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
+      ],
+      "note": ""
     },
     {
-      "name": "label: renamed re-export (seventh review)",
-      "caught": false,
-      "scope": "whole file",
-      "ran": 60,
-      "failed": [],
-      "note": "label only: other checks label the same fixtures; no fixture needs this check alone"
+      "name": "label: field whose type names a selection (review of 90c66e77)",
+      "caught": true,
+      "scope": "fifth review: a cfg-selected|oracle",
+      "ran": 8,
+      "failed": [
+        "real rust-analyzer, fifth review: a cfg-selected name (alias twins, a cfg(test) double, function twins) is decided for the active configuration and labelled seen"
+      ],
+      "note": ""
     },
     {
-      "name": "label: gated field",
-      "caught": false,
-      "scope": "whole file",
-      "ran": 60,
-      "failed": [],
-      "note": "label only: other checks label the same fixtures; no fixture needs this check alone"
+      "name": "label: a later segment on a receiver trace (review of 90c66e77, item 5)",
+      "caught": true,
+      "scope": "oracle",
+      "ran": 7,
+      "failed": [
+        "real rust-analyzer, oracle (seed 62075): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers",
+        "real rust-analyzer, oracle (seed 9001, the review shapes): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
+      ],
+      "note": ""
     },
     {
       "name": "label: Deref/Index impl",
-      "caught": false,
-      "scope": "whole file",
-      "ran": 60,
-      "failed": [],
-      "note": "label only: other checks label the same fixtures; no fixture needs this check alone"
+      "caught": true,
+      "scope": "oracle",
+      "ran": 7,
+      "failed": [
+        "real rust-analyzer, oracle (seed 9001, the review shapes): every decided answer is right for its own configuration, an answer the settings change is labelled seen, and a changed configuration re-answers"
+      ],
+      "note": ""
     },
     {
       "name": "fix 3: validate before caching",
@@ -209,7 +229,8 @@
       "ran": 1,
       "failed": [
         "a library root rust-analyzer did not index makes the index partial"
-      ]
+      ],
+      "note": ""
     },
     {
       "name": "fix 5: cargo config precedence",
@@ -218,7 +239,29 @@
       "ran": 1,
       "failed": [
         "seventh review 5: with .cargo/config and .cargo/config.toml in one folder, cargo's precedence holds: the plain file is read"
-      ]
+      ],
+      "note": ""
+    },
+    {
+      "name": "review of 90c66e77, 7: outside dependencies’ files in the key",
+      "caught": true,
+      "scope": "item 7",
+      "ran": 2,
+      "failed": [
+        "real rust-analyzer, review of 90c66e77 item 7: an inherent method added beside a blanket impl in a path dependency outside the checkout re-runs the route and re-answers",
+        "real rust-analyzer, review of 90c66e77 item 7: a generic function whose return type changes in a path dependency outside the checkout re-runs the route and re-answers"
+      ],
+      "note": ""
+    },
+    {
+      "name": "review of 90c66e77, 9: rustflags cfg flags recorded",
+      "caught": true,
+      "scope": "item 9",
+      "ran": 1,
+      "failed": [
+        "review of 90c66e77 item 9: the recorded configuration names the --cfg flags the Cargo configuration's rustflags add"
+      ],
+      "note": ""
     },
     {
       "name": "fix 8: relative outside paths from the copy",
@@ -227,7 +270,8 @@
       "ran": 1,
       "failed": [
         "real rust-analyzer, seventh review 8: a relative path dependency outside the checkout resolves from the run's copy; restoring it makes the route used"
-      ]
+      ],
+      "note": ""
     }
   ]
 }

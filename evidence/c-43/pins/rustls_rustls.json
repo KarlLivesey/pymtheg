@@ -84,18 +84,18 @@
   }
  },
  "analyzerRun": {
-  "wallS": 94.9,
-  "cpuS": 457,
-  "peakMiB": 2372
+  "wallS": 118.4,
+  "cpuS": 520.3,
+  "peakMiB": 2358
  },
  "index": {
   "sourceOnly": {
-   "wallS": 103.1,
-   "cpuS": 133.9
+   "wallS": 143.9,
+   "cpuS": 172.5
   },
   "route": {
-   "wallS": 258.4,
-   "cpuS": 153.5
+   "wallS": 294.3,
+   "cpuS": 168.1
   }
  },
  "errors": {
