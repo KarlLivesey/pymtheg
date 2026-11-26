@@ -1,4 +1,4 @@
-all 8578, unowned 0
+all 8577, unowned 0
 ### sample golang/tools go/analysis/passes/nilness/nilness.go:265 call visit -> runFunc binding line 77
     	var visit func(b *ssa.BasicBlock, stack []fact)
     	visit = func(b *ssa.BasicBlock, stack []fact) {
@@ -57,20 +57,20 @@ all 8578, unowned 0
     			}
     
     			got := fmt.Sprintf("%s,%s,%s,%s", format(decl), format(spec), format(field), format(assign))
-### sample golang/tools gopls/internal/golang/implementation.go:681 call bindingFor -> unify binding line 636
-    	bindingFor := func(tp *types.TypeParam) *types.Type {
-    		if tp == nil {
-    			return nil
-    		}
-    		b := bindings[tp]
-    		if b == nil {
+### sample golang/tools gopls/internal/golang/implementation.go:507 call matches -> localImplementations binding line 426
+    	matches := func(candidateType types.Type) bool {
+    		// Test the direction of the relation.
+    		// The client may request either direction or both
+    		// (e.g. when the client is References),
+    		// and the Result reports each test independently;
+    		// both tests succeed when comparing identical
     	…
-    		if tpx != nil || tpy != nil {
-    			// Identical type params unify.
-    			if tpx == tpy {
-    				return true
-    			}
-    			bx := bindingFor(tpx)
+    	// Special case: for types that satisfy error,
+    	// report error in builtin.go (see #59527).
+    	//
+    	// (An inconsistency: we always report the type error
+    	// even when the query was for the method error.Error.)
+    	if matches(errorType) {
 ### sample golang/tools gopls/internal/golang/implementation.go:728 call uni -> unify binding line 661
     	var uni func(x, y types.Type) bool
     	uni = func(x, y types.Type) bool {
@@ -150,7 +150,7 @@ all 8578, unowned 0
     			}
     
     			firstFuncStart := indexOf("TEXT ·foo")
-### sample golang/tools internal/collection/set/set_test.go:199 call check -> TestInPlaceUpdates binding line 162
+### sample golang/tools internal/collection/set/set_test.go:195 call check -> TestInPlaceUpdates binding line 162
     	check := func(t *testing.T, m set.Set[int], want ...int) {
     		t.Helper()
     		if w := set.Of(want...); !m.Equal(w) {
@@ -158,12 +158,12 @@ all 8578, unowned 0
     		}
     	}
     	…
+    
+    	t.Run("DifferenceWith", func(t *testing.T) {
+    		x := set.Of(1, 2, 3)
+    		y := set.Of(2, 4)
     		x.DifferenceWith(y)
     		check(t, x, 1, 3)
-    
-    		// Self-aliasing
-    		x.DifferenceWith(x)
-    		check(t, x)
 ### sample golang/tools internal/flow/forward_test.go:200 call node -> TestFlowOrder binding line 191
     	node := func(logical int) int {
     		return int(perm[logical])
@@ -365,18 +365,21 @@ all 8578, unowned 0
     	// Groups.
     
     	tests = append(tests, makeTest(test{desc: "Groups"}, makeXY(
-### sample protocolbuffers/protobuf-go testing/prototest/message.go:131 call adjustExpr -> testFieldTypes binding line 122
-    	adjustExpr := func(idx int, expr string) string {
-    		expr = strings.Replace(expr, "fd.", "md.Fields().Get(i).", -1)
-    		expr = strings.Replace(expr, "(fd)", "(md.Fields().Get(i))", -1)
-    		expr = strings.Replace(expr, "mti.", "mt.Message(i).", -1)
-    		expr = strings.Replace(expr, "(i)", fmt.Sprintf("(%d)", idx), -1)
-    		return expr
+### sample protocolbuffers/protobuf-go testing/protocmp/xform.go:225 call addrType -> Transform binding line 204
+    	addrType := func(t reflect.Type) reflect.Type {
+    		if k := t.Kind(); k == reflect.Interface || k == reflect.Ptr {
+    			return t
+    		}
+    		return reflect.PtrTo(t)
     	}
-    	checkEnumDesc := func(idx int, gotExpr, wantExpr string, got, want protoreflect.EnumDescriptor) {
-    		if got != want {
-    			t.Errorf("descriptor mismatch: %v != %v: %v != %v", adjustExpr(idx, gotExpr), adjustExpr(idx, wantExpr), descName(got), descName(want))
-### sample cockroachdb/pebble compaction_test.go:2979 call key -> TestSharedObjectDeletePacing binding line 2968
+    	…
+    		if ps.Type().Kind() == reflect.Interface {
+    			vx, vy := ps.Values()
+    			if !vx.IsValid() || vx.IsNil() || !vy.IsValid() || vy.IsNil() {
+    				return false
+    			}
+    			return isMessageType(addrType(vx.Elem().Type())) && isMessageType(addrType(vy.Elem().Type()))
+### sample cockroachdb/pebble compaction_test.go:2974 call key -> TestSharedObjectDeletePacing binding line 2968
     	key := func(i int) string {
     		return fmt.Sprintf("k%02d", i)
     	}
@@ -384,25 +387,20 @@ all 8578, unowned 0
     	for i := 1; i <= numKeys; i++ {
     		require.NoError(t, d.Set([]byte(key(i)), randVal(), nil))
     		require.NoError(t, d.Compact(context.Background(), []byte(key(i)), []byte(key(i)+"1"), false))
-    	}
-    
-    	done := make(chan struct{})
-    	go func() {
-    		err = d.DeleteRange([]byte(key(5)), []byte(key(9)), nil)
-### sample cockroachdb/pebble db_test.go:1114 call sizeRolloverState -> TestRollManifest binding line 1011
-    	sizeRolloverState := func() (int64, int64) {
+### sample cockroachdb/pebble db_test.go:1109 call manifestFileNumber -> TestRollManifest binding line 1006
+    	manifestFileNumber := func() base.DiskFileNum {
     		d.mu.Lock()
     		defer d.mu.Unlock()
-    		return d.mu.versions.rotationHelper.DebugInfo()
+    		return d.mu.versions.manifestFileNum
     	}
-    
+    	sizeRolloverState := func() (int64, int64) {
     	…
+    
+    	// Test the logic that uses the future snapshot size to rollover.
+    	// Reminder: we have a snapshot with 8 files and the manifest has 1 edit
+    	// (flush) with 1 file.
+    	// Add 8 more files with a different key.
     	lastManifestNum = manifestFileNumber()
-    	for j := 0; j < 8; j++ {
-    		require.NoError(t, d.Set([]byte("c"), nil, nil))
-    		require.NoError(t, d.Flush())
-    	}
-    	lastSnapshotCount, editsSinceSnapshotCount = sizeRolloverState()
 ### sample cockroachdb/pebble internal/keyspan/keyspanimpl/merging_iter_test.go:199 call must -> testFragmenterEquivalenceOnce binding line 193
     	must := func(s *keyspan.Span, err error) *keyspan.Span {
     		require.NoError(t, err)
@@ -467,21 +465,22 @@ all 8578, unowned 0
     	sequential("WithProxyCheckSubnet", proxies("0.0.0.0/8"))
     	parallel("WithProxyCheck_ParallelSubnet", proxies("0.0.0.0/8"))
     	sequential("WithProxyCheckMultipleSubnet", proxies("192.168.0.0/24", "10.0.0.0/16", "0.0.0.0/8"))
-### sample gofiber/fiber ctx_test.go:9417 call parallel -> Benchmark_Ctx_IsProxyTrusted binding line 9324
-    	parallel := func(name string, config Config) {
-    		b.Run(name, func(b *testing.B) {
-    			app := New(config)
-    			b.ReportAllocs()
-    			b.ResetTimer()
-    			b.RunParallel(func(pb *testing.PB) {
-    	…
-    		"fc00::/7",        // Unique Local addresses
-    		"173.245.48.0/20", // My custom range
-    		"0.0.0.0/8",       // All IPv4 addresses
-    	)
-    	sequential("WithProxyCheckAllSubnets", allSubnets)
-    	parallel("WithProxyCheck_ParallelAllSubnets", allSubnets)
-### sample gofiber/fiber internal/fieldname/fieldname_test.go:381 call lines -> Test_KeepReceivedOrder binding line 363
+### sample gofiber/fiber ctx_test.go:9742 call codings -> Test_Ctx_Body_With_Compression_TooManyCodings binding line 9729
+    	codings := func(coding string, n int) string { return strings.TrimSuffix(strings.Repeat(coding+",", n), ",") }
+    	plain := []byte("john=doe")
+    	refused := []byte(ErrUnsupportedMediaType.Error())
+    
+    	app := New()
+    	for _, tc := range []struct {
+    		name     string
+    		encoding string
+    		sent     []byte
+    		want     []byte
+    		wantCode int
+    	}{
+    		{
+    			name: "gzip up to the cap", encoding: codings(StrGzip, maxContentCodings),
+### sample gofiber/fiber internal/fieldname/fieldname_test.go:382 call lines -> Test_KeepReceivedOrder binding line 363
     	lines := func(h *fasthttp.RequestHeader, name string, canonical bool) []string {
     		return lineValues(Lines(h, name, canonical))
     	}
@@ -489,12 +488,12 @@ all 8578, unowned 0
     	for _, canonical := range []bool{true, false} {
     		t.Run(fmt.Sprintf("canonical=%v", canonical), func(t *testing.T) {
     	…
-    			require.Equal(t, before, h.String(), "nothing to restore")
     
     			Del(h, "X-Junk", canonical)
     			require.Equal(t, []string{"https", "http"}, lines(h, "X-Forwarded-Proto", canonical))
     			require.True(t, KeepReceivedOrder(h, h.RawHeaders(), forwarding))
     			require.Equal(t, []string{"client", "proxy"}, lines(h, "X-Forwarded-For", canonical))
+    			require.Equal(t, []string{"http", "https"}, lines(h, "X-Forwarded-Proto", canonical))
 ### sample gofiber/fiber middleware/cache/cache_test.go:1902 call keyedBy -> Test_CacheStoreAndServe binding line 1879
     	keyedBy := func(suffix string) func(fiber.Ctx) string {
     		return func(c fiber.Ctx) string { return c.Path() + suffix }
@@ -587,20 +586,20 @@ all 8578, unowned 0
     				runLogsWrite(logs)
     			} else {
     				routine.FireAndForget(func() { runLogsWrite(logs) })
-### sample pocketbase/pocketbase core/record_model_test.go:1855 call expectedBeforeModelEventHandlerChecks -> TestRecordModelEventSync binding line 1765
-    	expectedBeforeModelEventHandlerChecks := func(t *testing.T, e *core.ModelEvent) {
-    		if e.Type != "test_a" {
-    			t.Fatalf("Expected type %q, got %q", "test_a", e.Type)
+### sample pocketbase/pocketbase core/record_model_test.go:1864 call expectedAfterModelEventHandlerChecks -> TestRecordModelEventSync binding line 1779
+    	expectedAfterModelEventHandlerChecks := func(t *testing.T, e *core.ModelEvent) {
+    		if e.Type != "test_d" {
+    			t.Fatalf("Expected type %q, got %q", "test_d", e.Type)
     		}
     
-    		if v := e.Context.Value("test"); v != nil {
+    		if v := e.Context.Value("test"); v != 789 {
     	…
+    			})
     
-    	modelErrorEventHandler := &hook.Handler[*core.ModelErrorEvent]{
-    		Priority: -999,
-    		Func: func(e *core.ModelErrorEvent) error {
-    			t.Run("before model error", func(t *testing.T) {
-    				expectedBeforeModelEventHandlerChecks(t, &e.ModelEvent)
+    			_ = e.Next()
+    
+    			t.Run("after model error", func(t *testing.T) {
+    				expectedAfterModelEventHandlerChecks(t, &e.ModelEvent)
 ### sample pocketbase/pocketbase tools/security/random_test.go:109 call run -> testRandomString binding line 84
     		var run func(int)
     		run = func(attempt int) {
@@ -666,7 +665,7 @@ all 8578, unowned 0
     	assertEscSequence("\x1b[1;12B", "alt-shift-down")
     	assertEscSequence("\x1b[1;12C", "alt-shift-right")
     	assertEscSequence("\x1b[1;12D", "alt-shift-left")
-### sample junegunn/fzf src/options.go:1567 call mergeAttr -> parseTheme binding line 1452
+### sample junegunn/fzf src/options.go:1569 call mergeAttr -> parseTheme binding line 1452
     			mergeAttr := func(cattr *tui.ColorAttr) {
     				for _, component := range components[1:] {
     					switch component {
@@ -674,12 +673,12 @@ all 8578, unowned 0
     						cattr.Attr = tui.AttrRegular
     					case "bold", "strong":
     	…
-    			case "alt-gutter":
-    				mergeAttr(&theme.AltGutter)
     			case "hl":
     				mergeAttr(&theme.Match)
     			case "current-hl", "hl+":
     				mergeAttr(&theme.CurrentMatch)
+    			case "selected-hl":
+    				mergeAttr(&theme.SelectedMatch)
 ### sample junegunn/fzf src/options.go:1811 call appendAction -> parseActionList binding line 1754
     	appendAction := func(types ...actionType) {
     		actions = append(actions, toActions(types...)...)

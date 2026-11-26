@@ -1,7 +1,7 @@
 {"pin":"golang/tools","main":{"total":250367,"level2":232672},"head":{"total":250367,"level2":234702},"localBinding":2030,"localReason":487,"wrongOwner":0,"otherChanged":0,"removed":0}
 {"pin":"cli/cli","main":{"total":208993,"level2":189755},"head":{"total":208993,"level2":190495},"localBinding":740,"localReason":278,"wrongOwner":0,"otherChanged":0,"removed":0}
 {"pin":"protocolbuffers/protobuf-go","main":{"total":217087,"level2":192254},"head":{"total":217087,"level2":192687},"localBinding":433,"localReason":80,"wrongOwner":0,"otherChanged":0,"removed":0}
-{"pin":"cockroachdb/pebble","main":{"total":200940,"level2":184399},"head":{"total":200940,"level2":185819},"localBinding":1420,"localReason":362,"wrongOwner":0,"otherChanged":0,"removed":0}
+{"pin":"cockroachdb/pebble","main":{"total":200940,"level2":184399},"head":{"total":200940,"level2":185818},"localBinding":1419,"localReason":362,"wrongOwner":0,"otherChanged":0,"removed":0}
 {"pin":"gofiber/fiber","main":{"total":143673,"level2":125425},"head":{"total":143673,"level2":126491},"localBinding":1066,"localReason":252,"wrongOwner":0,"otherChanged":0,"removed":0}
 {"pin":"evanw/esbuild","main":{"total":98034,"level2":96511},"head":{"total":98034,"level2":96966},"localBinding":455,"localReason":29,"wrongOwner":0,"otherChanged":0,"removed":0}
 {"pin":"pocketbase/pocketbase","main":{"total":70629,"level2":64702},"head":{"total":70629,"level2":64969},"localBinding":267,"localReason":58,"wrongOwner":0,"otherChanged":0,"removed":0}
