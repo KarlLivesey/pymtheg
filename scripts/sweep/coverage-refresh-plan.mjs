@@ -40,11 +40,10 @@ export function scoreTable(modes, base, own = false) {
     const moduleCell = unit.level2 ? `<br>${number(unit.level2)} library module links (${rate(unit)})<br>**${number(withModules.level2)} (${rate(withModules)}) with library module links**` : "";
     const gapCell = unit.level2 ? `${gap(now)}<br>${gap(withModules)} with library module links` : gap(now);
     // D17 clarified: with a toolchain route, Level 2 counting only the
-    // upgrades labelled none-seen (records that carry the label).
-    const seen = repos.reduce((total, repo) => total + (repo.toolchain?.upgradedSeen ?? 0), 0);
-    const labelled = repos.some((repo) => repo.toolchain?.upgradedSeen !== undefined);
-    const noneSeen = { ...now, level2: now.level2 - seen };
-    const labelCell = labelled ? `<br>${number(noneSeen.level2)} (${rate(noneSeen)}) counting only none-seen upgrades` : "";
+    // route-decided links labelled none-seen (exports that count the label).
+    const noneSeen = { ...now, level2: now.level2 - (now.seen ?? 0) };
+    const labelCell = now.seen !== undefined && mode !== "Source only" && mode !== "Bare"
+      ? `<br>${number(noneSeen.level2)} (${rate(noneSeen)}) counting only none-seen route answers` : "";
     return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split}${labelCell}${moduleCell} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gapCell} |`;
   };
   return [

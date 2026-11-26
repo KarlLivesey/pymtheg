@@ -24,11 +24,18 @@ export function firstBlocker(reasons, outcome) {
 
 export function score(repos, module, own = false) {
   const total = { links: 0, level2: 0, assumed: 0 };
+  // D17 clarified: route-decided Level 2 links labelled seen, from exports
+  // that count them (`labelled` says whether any did).
+  let seen = 0, labelled = false;
   for (const repo of repos) {
     if (!repo.counts || own && repo.language !== module) continue;
     for (const field of Object.keys(total)) total[field] += repo.counts[module][field];
+    if (repo.counts[module].seen !== undefined) {
+      labelled = true;
+      seen += repo.counts[module].seen;
+    }
   }
-  return total;
+  return labelled ? { ...total, seen } : total;
 }
 
 export function baselineScore(repos, module, own = false) {

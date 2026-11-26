@@ -1099,9 +1099,10 @@ and pattern sites. An upgraded link also stores `routeOff`, its complete data
 as source-only left it, so the configuration-free view can always be read
 back. The route’s state (`toolchain.rust` in graph answers) counts the
 upgrades by label (`upgradedSeen`, `upgradedNoneSeen`); the CLI line shows
-them, and the sweep’s public record and the coverage scoreboard’s opt-in Rust
-row give Level 2 with the route and Level 2 counting only none-seen upgrades
-beside the source-only figure.
+them and the sweep’s public record carries them. The coverage scoreboard’s
+opt-in Rust row gives Level 2 with the route and Level 2 counting only the
+route’s none-seen answers, counted from the stored links’ labels, beside the
+source-only figure.
 The answer's graph symbol must be of a kind
 the SCIP descriptor allows. A trait's associated type or const named in
 generic code (`S::Error`) is answered with the trait's declaration and
