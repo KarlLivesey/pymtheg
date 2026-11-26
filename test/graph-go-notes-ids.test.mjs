@@ -75,15 +75,20 @@ test("Go's overloaded-looking shapes get distinct notes ids, the ones the store 
       const ids = named.map((symbol) => symbol.id);
       assert.equal(new Set(ids).size, ids.length, `distinct in ${file.path}`);
       for (const id of ids) assert.doesNotMatch(id, /^draft:/);
-      // C-56b: the ids the store gives the same symbols.
-      assert.deepEqual(
-        [...ids].sort(),
+      // C-56b: each symbol gets the id and ordinal the store gives the
+      // symbol with the same key (not only the same set of ids).
+      const stored = new Map(
         store
           .findSymbols({ file: file.path })
-          .map((symbol) => symbol.id)
-          .sort(),
-        file.path,
+          .map((symbol) => [symbol.key, symbol]),
       );
+      assert.equal(stored.size, named.length, file.path);
+      for (const symbol of named) {
+        const own = stored.get(symbol.key);
+        assert.ok(own, `${symbol.key} in ${file.path}`);
+        assert.equal(symbol.ordinal, own.ordinal, `${symbol.key}`);
+        assert.equal(symbol.id, own.id, `${symbol.key}`);
+      }
     }
     // Each shape as Go's extractor names it. Several init functions share
     // kind and identity: the tie is broken by the ordinal, in source order.
