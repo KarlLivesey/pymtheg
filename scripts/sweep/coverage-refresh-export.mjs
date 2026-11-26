@@ -3,7 +3,7 @@ import { hash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { modules, outcomes, storedLibraryIdentity, storedTotalsAgree } from "./coverage-rules.mjs";
+import { mergedGlobalLevel2, modules, outcomes, storedLibraryIdentity, storedTotalsAgree } from "./coverage-rules.mjs";
 import { compare, firstBlocker, missColumns, sampleSize, seed, storedReasons } from "./coverage-refresh-data.mjs";
 
 // Keep raw process output in scratch. Source excerpts are from public pins,
@@ -43,6 +43,9 @@ function scan(attempt, repo, audit) {
       JOIN graph_symbols s ON s.id=c.symbol WHERE c.link=? ORDER BY s.file,s.name LIMIT 8`);
     const libraryCandidatesFor = db.prepare(`SELECT unit,symbol FROM graph_library_targets
       WHERE link=? AND role='candidate' ORDER BY unit,symbol LIMIT 8`);
+    const mergedCandidates = db.prepare(`SELECT ecosystem,unit,symbol FROM graph_library_targets
+      WHERE link=? AND role='candidate'`);
+    const checkoutCount = db.prepare("SELECT count(*) AS n FROM graph_candidates WHERE link=?");
     const rows = db.prepare(`SELECT l.file,l.id,l.kind,l.module,l.resolution,l.body,
         t.unit,t.symbol,t.evidence FROM graph_links l LEFT JOIN graph_library_targets t
         ON l.resolution='library' AND t.link=l.id AND t.role='target' ORDER BY l.file`).iterate();
@@ -75,7 +78,11 @@ function scan(attempt, repo, audit) {
       totals.links++;
       byOutcome.set(outcome, byOutcome.get(outcome) + 1);
       const library = outcome === "library" ? storedLibraryIdentity({ file, resolution: outcome, library: row }) : null;
-      if (outcome === "resolved" || library?.level === 2) {
+      // D23: a merged environment global counts at Level 2 as proven.
+      const merged = outcome === "ambiguous" && data.mergedGlobal === true &&
+        mergedGlobalLevel2(data, mergedCandidates.all(id), checkoutCount.get(id).n);
+      if (merged) totals.merged = (totals.merged ?? 0) + 1;
+      if (outcome === "resolved" || library?.level === 2 || merged) {
         totals.level2++;
         if (Array.isArray(data.assumes) && data.assumes.length) totals.assumed++;
         continue;

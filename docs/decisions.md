@@ -2453,10 +2453,17 @@ single-symbol proof. **Narrowed in review (22 November 2026):** the compiler
 also merges globals that two competing packages declare (`describe` and `it`
 from two test frameworks loaded together, `expect` from two assertion
 libraries). Those units ARE alternatives: a file runs under one of them. So
-no set is marked when any of its units is a test framework, or when its
-variable declarations disagree on the type (the compiler's own
-"subsequent variable declarations must have the same type" condition, which
-`skipLibCheck` hides). The mark is for environment globals: the language
+no set is marked when any of its units is a test framework, or when any of
+its units is in conflict. Deny by default (review round 3): any diagnostic,
+of any code, that a checker of declaration files (whatever `skipLibCheck`
+says) reports on a unit's global declaration of a name that two or more units declare (a name only one unit declares is not checked), or whose related
+information lies in that unit's declaration files, makes that unit
+conflict with every other unit (a set whose units are one unit key, only
+`node:*` units, has no other unit to conflict with).
+Units are typings packages (every `node:*` unit is `@types/node`). A
+diagnostic with related locations, all in one unit key, is dropped (two
+`@types/node` versions, `lib.dom` and `lib.webworker`); one with no related
+location always counts against its unit. The mark is for environment globals: the language
 library, DOM, workers, Node and compatible runtimes, and packages that
 augment them.
 
@@ -3205,6 +3212,38 @@ analysis. Module analysis would have to run in a worker that the
 coordinator terminates, as `check` does.
 [C-47](changes/C-47.md)
 
+### C-42 Merged environment globals
+
+A global declared by several environment typings, for example `URL` in the
+DOM library and in `@types/node`, is one compiler symbol: the checker merges
+the declarations. The graph keeps the link a candidate set, whose library
+candidates name each declaring unit with its own symbol path, and marks it
+`mergedGlobal`. The mark is set only when every declaration's name resolves
+to the same symbol, every declaration is in the global scope (a script file
+or `declare global`, never an ambient `declare module "x"`), there are at
+least two library units, no checkout candidate, and no synthesised target.
+After D23 was narrowed, two more conditions apply. No unit may be a test
+framework or a competing test package (`isTestPackage`: jest, mocha,
+vitest, their scoped parts, chai, jasmine, qunit and the like). And no
+unit may be in conflict. Deny by default (review round 3): a second checker
+of the program, with `skipLibCheck` off, checks every statement declaring a
+global that two or more units declare, once per program; any diagnostic it
+reports, of any code, that lies in a unit's declarations, or whose related
+information does, makes that unit conflict with every other unit. A
+diagnostic with related locations, all in one unit key, is dropped; one
+with no related location always counts against its unit. A unit in
+conflict is an alternative, so every merged global whose units
+include it is left unmarked, functions and interfaces included, unless the
+set's units are all one unit key (only `node:*` units). Across
+programs the mark is kept only when every program gives the same set and
+marks it; otherwise no mark is stored anywhere in the link's data. The candidate rows are deterministic, so the identity is the same in
+every file, program and run. **Rules out:** choosing one typing as the
+target; marking different symbols (union arms) or sets that only one
+program's settings would select. A merged global counts at Level 2 as
+proven (D23; `coverage-rules.mjs` `mergedGlobalLevel2`). A member call whose
+signature selection is proven is narrowed first to one declaration, as for
+any merged member. [C-42](changes/C-42.md)
+
 ### C-47b An expanding generic type ends at the judge's bound
 
 **Decided (C-47b):** a generic type that binds a larger value at every
@@ -3227,7 +3266,11 @@ own; only the call's joined answer is cached by the call. A hashed part of
 a TypeScript key is a hash of the restored source names, never of the
 compiler's fresh spelling. A config base that the compiler drops because
 its root is not an object (TS5092) keeps the `incomplete-config` marker, as
-an unreadable base does. **Why:** each was found with a fixture. The
+an unreadable base does. A callee annotated `typeof f`, with `f` a
+function (or a union of them, also with `undefined` or `null`), is judged
+exactly as a direct call to `f`; any other callee of a checker type with
+more than one signature and a tainted argument is invalid code. **Why:**
+each was found with a fixture. The
 second part of a union took the first part's signature, which gave a
 definite link through a failed file in one order only. An unrelated edit
 changed a renamed file's keys. And a dropped base was taken as read.
@@ -3613,6 +3656,19 @@ resting heap grows by the kept value (cli/cli 94 → 247 MiB, under the
 512 MiB bound). **Unchanged:** without a session, every read and every
 stored row as before. See [C-55](changes/C-55.md).
 
+
+### Go's notes pass names symbols as the store does (C-56a)
+
+**Decided (C-56a):** Go's analysis notes pass names each symbol by the
+core's id rule (path, module, kind, identity and the ordinal among the
+file's symbols with the same kind and identity, by source order), under
+its own project id, instead of a draft id built from the extractor's key,
+which carries a source offset. **Why:** a body edit moved every draft id
+below it, so nothing the pass builds could be kept across an edit (C-56).
+**Unchanged:** every stored key, id and row, the notes and the links the
+pass finds, and Go's module version (unchanged, 33): the draft ids were never stored,
+and a Go body edit already rewrites no other file's stored link data.
+See [C-56a](changes/C-56a.md).
 ### Nothing stored beside a source file holds a program (C-64)
 
 **Decided (C-64):** a value the TypeScript module stores beside a source
