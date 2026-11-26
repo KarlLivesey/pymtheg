@@ -360,7 +360,10 @@ export async function indexProject(
         [...expected].every(([path, hash]) => {
           let now = "";
           try {
-            now = contentHash(readFileSync(join(root, path)));
+            const bytes = readFileSync(join(root, path));
+            count("index.verifiedFiles");
+            count("index.verifiedBytes", bytes.length);
+            now = contentHash(bytes);
           } catch {
             // Unreadable now, as a failed capture is: its hash is "".
           }
