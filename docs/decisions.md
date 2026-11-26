@@ -2453,15 +2453,14 @@ single-symbol proof. **Narrowed in review (22 November 2026):** the compiler
 also merges globals that two competing packages declare (`describe` and `it`
 from two test frameworks loaded together, `expect` from two assertion
 libraries). Those units ARE alternatives: a file runs under one of them. So
-no set is marked when any of its units is a test framework, or when two of
-its units are in conflict on any shared global. Conflict is what the
-compiler itself reports between two units' declarations of one global
-(TS2403 and TS2717, identity of declared types; TS2300 and TS2451,
-duplicates; TS2428, type parameters; TS2687, modifiers), asked of a checker
-that checks declaration files whatever `skipLibCheck` says. A conflict
-pairs exactly the two units whose declarations disagree, by typings
-package (every `node:*` unit is `@types/node`); one inside a single unit
-key (two `@types/node` versions, `lib.dom` and `lib.webworker`) pairs none. The mark is for environment globals: the language
+no set is marked when any of its units is a test framework, or when any of
+its units is in conflict. Deny by default (review round 3): any diagnostic,
+of any code, that a checker of declaration files (whatever `skipLibCheck`
+says) reports in a unit's global declarations, or whose related
+information lies there, makes that unit conflict with every other unit.
+Units are typings packages (every `node:*` unit is `@types/node`). A
+diagnostic is dropped only when all its locations lie in one unit (two
+`@types/node` versions, `lib.dom` and `lib.webworker`). The mark is for environment globals: the language
 library, DOM, workers, Node and compatible runtimes, and packages that
 augment them.
 
@@ -3222,17 +3221,17 @@ or `declare global`, never an ambient `declare module "x"`), there are at
 least two library units, no checkout candidate, and no synthesised target.
 After D23 was narrowed, two more conditions apply. No unit may be a test
 framework or a competing test package (`isTestPackage`: jest, mocha,
-vitest, their scoped parts, chai, jasmine, qunit and the like). And no two
-of the units may be in conflict on a shared global. Conflict is what the
-compiler reports between two units' declarations of one global (TS2403,
-TS2717, TS2300, TS2451, TS2428, TS2687), from a second checker of the
-program that checks every declaration of globals declared in two or more
-units, with `skipLibCheck` off, once per program. It pairs exactly the two
-units whose declarations disagree, by typings package; a conflict inside
-one unit key pairs none. Units in conflict are alternatives, so every global
-they both declare is left unmarked, functions and interfaces included.
-Across programs the mark is kept only when every program gives the same
-set. The candidate rows are deterministic, so the identity is the same in
+vitest, their scoped parts, chai, jasmine, qunit and the like). And no
+unit may be in conflict. Deny by default (review round 3): a second checker
+of the program, with `skipLibCheck` off, checks every statement declaring a
+global that two or more units declare, once per program; any diagnostic it
+reports, of any code, that lies in a unit's declarations, or whose related
+information does, makes that unit conflict with every other unit. A
+diagnostic is dropped only when all its locations lie in one unit key. A
+unit in conflict is an alternative, so every merged global whose units
+include it is left unmarked, functions and interfaces included. Across
+programs the mark is kept only when every program gives the same set and
+marks it; otherwise no mark is stored anywhere in the link's data. The candidate rows are deterministic, so the identity is the same in
 every file, program and run. **Rules out:** choosing one typing as the
 target; marking different symbols (union arms) or sets that only one
 program's settings would select. A merged global counts at Level 2 as

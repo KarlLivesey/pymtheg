@@ -886,11 +886,13 @@ and never yields a version pin.
   - a set of different symbols, such as the arms of a union receiver;
   - a set that includes a test package (two test frameworks' `describe`,
     two assertion libraries' `expect`);
-  - a set whose units include two that the compiler finds in conflict
-    on any shared global (TS2403, TS2717, TS2300, TS2451, TS2428 or
-    TS2687, paired by typings package), such as
-    `@cloudflare/workers-types` and the DOM, or `bun-types` and
-    `@types/node`;
+  - a set any of whose units the compiler finds a fault with in its global
+    declarations: any diagnostic, of any code, that lies there or whose
+    related information does (deny by default), unless all its locations
+    lie in that one unit. Units are typings packages, so this covers
+    `@cloudflare/workers-types` against the DOM and `bun-types` against
+    `@types/node`, and also a fault inside one package's own declarations
+    in that program;
   - a set merged by a module augmentation (`declare module "fastify"`), which
     is one symbol but not a global.
 - **Unbuilt checkout packages:** The configured compiler emit can identify

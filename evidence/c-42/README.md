@@ -3,9 +3,11 @@
 [Change note](../../docs/changes/C-42.md)
 
 Measured on the 19 installed TypeScript pins in `pins.json` here (all
-TypeScript pins of `sweep/repos.json` except microsoft/TypeScript), main `e230922` against
-the C-42 build (review round 2). Both used the SW-6 runner and policy, in one session on the
-dev server. `audit.jsonl` was drawn on round 1's list.
+TypeScript pins of `sweep/repos.json` except microsoft/TypeScript), main `b6fd7c9` against
+the C-42 build with review round 3's rule (deny by default). Both used the SW-6 runner and
+policy (with round 3's install check), in one session on the dev server. turborepo, Dexie and
+mermaid were swept again in that session after two install fixes; their runs replace the
+first ones. `audit.jsonl` was drawn on round 1's list.
 
 ## Files
 
@@ -13,18 +15,24 @@ dev server. `audit.jsonl` was drawn on round 1's list.
   set on main whose candidates are all library declarations, classified by
   the same site on the C-42 measurement build: (a) one merged global
   symbol, (b) not marked, by the module's own reason, (c) other. Also split
-  by declaring units, by name and by pin.
+  by declaring units, by name and by pin, and every environment-only set
+  partitioned into marked and the reasons (`environmentOnly`; its
+  `remainder` must be 0).
 - `measure-fields.patch`: the measurement build. Applied to this branch, it
-  makes the module record why a one-symbol set is not marked
-  (`unitConflict`, `oneSymbolNotGlobal`) in the link's data; nothing else
-  changes. Its run's marked count and Level 2 equal the candidate's.
+  makes the module record why a set of two or more library units is not
+  marked (`notMarked`, in the order the mark's conditions are tested) in
+  the link's data, and log every diagnostic that makes a unit conflict
+  (`PYM_CONFLICT_LOG`); nothing else changes. Its run's marked count and
+  Level 2 equal the candidate's.
+- `conflict-diagnostics.json`: from that log, per pin, the diagnostics that
+  made a unit conflict, by code and units, with one example each.
 - `compare.mjs`, `compare-installed.json`: every link and symbol on main
   against the C-42 build, per pin. Level 2 is given without and with the
   proposed rule, along with row counts.
 - `merged-links.jsonl.gz`: every link counted by the rule (D23, narrowed).
-- `conflict-cost.json`: the conflict check's counted work per pin (scans
-  and declarations checked), from the measurement build's log
-  (`PYM_CONFLICT_LOG`).
+- `conflict-cost.json`: the conflict check's counted work per pin and per
+  index run (scans, and statements submitted to the second checker), from
+  the measurement build's log. The sweep runs a cold and a warm index.
 - `merged-links-before-narrowing.jsonl.gz`: the same list from the first
   version, before D23 was narrowed, on an older main (kept for the record;
   the split no longer reads it).
