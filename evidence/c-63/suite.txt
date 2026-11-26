@@ -1,0 +1,6 @@
+Full suite on the dev server, commit 523fbf33:
+
+tsc ok
+All matched files use Prettier code style!
+npm test: tests 3408, pass 3408, fail 0, cancelled 0
+npm run test:backend: tests 97, pass 97, fail 0, cancelled 0, skipped 0

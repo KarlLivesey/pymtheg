@@ -985,15 +985,17 @@ export function projectModel(
       );
       if (!group.failure) {
         // A base reached by package name was read. Its settings are complete
-        // unless it was unreadable (6053/5083) or its JSON has syntax errors
-        // (1xxx diagnostics in another file): then the compiler drops what
-        // it cannot parse, and the marker stays.
+        // unless it was unreadable (6053/5083), its root is not an object
+        // (5092, C-60: `[]` or `55`), or its JSON has syntax errors (1xxx
+        // diagnostics in another file): then the compiler drops what it
+        // cannot read, and the marker stays.
         if (
           installedConfigRead &&
           !parsed.errors.some(
             ({ code, file }) =>
               code === 6053 ||
               code === 5083 ||
+              code === 5092 ||
               (code >= 1000 &&
                 code < 2000 &&
                 file !== undefined &&

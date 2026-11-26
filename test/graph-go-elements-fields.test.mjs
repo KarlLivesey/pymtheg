@@ -6,6 +6,7 @@
 // external interface).
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { deepFreeze } from "../dist/graph/kept-input.js";
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -442,11 +443,12 @@ test("the outcome does not depend on the order the store supplies files, symbols
       const module = {
         ...go,
         resolve: (context) =>
+          // Frozen, as the indexer hands Go its inputs under the tests.
           go.resolve({
             ...context,
-            files: flip(context.files),
-            symbols: flip(context.symbols),
-            links: deepFirst(context.links),
+            files: deepFreeze(flip(context.files)),
+            symbols: deepFreeze(flip(context.symbols)),
+            links: deepFreeze(deepFirst(context.links)),
           }),
       };
       const report = await indexProject(

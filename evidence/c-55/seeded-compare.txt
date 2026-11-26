@@ -1,0 +1,473 @@
+restic, final build:
+{
+ "steps": 35,
+ "totals": {
+  "before": {
+   "cpuMs": 506540,
+   "decoded": 42194,
+   "analysisInputMs": 0,
+   "resolverInputMs": 0
+  },
+  "after": {
+   "cpuMs": 479503,
+   "decoded": 6961,
+   "analysisInputMs": 999.6639999999996,
+   "resolverInputMs": 34590.116
+  }
+ },
+ "byKind": {
+  "interface": {
+   "steps": 7,
+   "before": {
+    "cpuMs": 106525,
+    "decoded": 9158
+   },
+   "after": {
+    "cpuMs": 98145,
+    "decoded": 2063
+   }
+  },
+  "break": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 39307,
+    "decoded": 2608
+   },
+   "after": {
+    "cpuMs": 42884,
+    "decoded": 658
+   }
+  },
+  "dot": {
+   "steps": 1,
+   "before": {
+    "cpuMs": 14302,
+    "decoded": 1304
+   },
+   "after": {
+    "cpuMs": 14536,
+    "decoded": 188
+   }
+  },
+  "move": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 31133,
+    "decoded": 2614
+   },
+   "after": {
+    "cpuMs": 31995,
+    "decoded": 380
+   }
+  },
+  "embed": {
+   "steps": 5,
+   "before": {
+    "cpuMs": 77688,
+    "decoded": 6551
+   },
+   "after": {
+    "cpuMs": 73251,
+    "decoded": 1070
+   }
+  },
+  "add-export": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 19825,
+    "decoded": 1224
+   },
+   "after": {
+    "cpuMs": 21961,
+    "decoded": 105
+   }
+  },
+  "body": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 8258,
+    "decoded": 1125
+   },
+   "after": {
+    "cpuMs": 6809,
+    "decoded": 7
+   }
+  },
+  "gomod": {
+   "steps": 5,
+   "before": {
+    "cpuMs": 83006,
+    "decoded": 6553
+   },
+   "after": {
+    "cpuMs": 74017,
+    "decoded": 950
+   }
+  },
+  "comment": {
+   "steps": 1,
+   "before": {
+    "cpuMs": 3534,
+    "decoded": 562
+   },
+   "after": {
+    "cpuMs": 3566,
+    "decoded": 4
+   }
+  },
+  "file-add": {
+   "steps": 3,
+   "before": {
+    "cpuMs": 45539,
+    "decoded": 3930
+   },
+   "after": {
+    "cpuMs": 41877,
+    "decoded": 574
+   }
+  },
+  "build": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 31243,
+    "decoded": 2627
+   },
+   "after": {
+    "cpuMs": 27797,
+    "decoded": 385
+   }
+  },
+  "import": {
+   "steps": 3,
+   "before": {
+    "cpuMs": 46180,
+    "decoded": 3938
+   },
+   "after": {
+    "cpuMs": 42665,
+    "decoded": 577
+   }
+  }
+ },
+ "maxLiveMiBAfter": 120,
+ "maxKeptMiB": 24
+}
+restic, frozen build:
+{
+ "steps": 35,
+ "totals": {
+  "before": {
+   "cpuMs": 506540,
+   "decoded": 42194,
+   "analysisInputMs": 0,
+   "resolverInputMs": 0
+  },
+  "after": {
+   "cpuMs": 561130,
+   "decoded": 6961,
+   "analysisInputMs": 2039.782,
+   "resolverInputMs": 41024.388000000006
+  }
+ },
+ "byKind": {
+  "interface": {
+   "steps": 7,
+   "before": {
+    "cpuMs": 106525,
+    "decoded": 9158
+   },
+   "after": {
+    "cpuMs": 117958,
+    "decoded": 2063
+   }
+  },
+  "break": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 39307,
+    "decoded": 2608
+   },
+   "after": {
+    "cpuMs": 52721,
+    "decoded": 658
+   }
+  },
+  "dot": {
+   "steps": 1,
+   "before": {
+    "cpuMs": 14302,
+    "decoded": 1304
+   },
+   "after": {
+    "cpuMs": 21465,
+    "decoded": 188
+   }
+  },
+  "move": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 31133,
+    "decoded": 2614
+   },
+   "after": {
+    "cpuMs": 34164,
+    "decoded": 380
+   }
+  },
+  "embed": {
+   "steps": 5,
+   "before": {
+    "cpuMs": 77688,
+    "decoded": 6551
+   },
+   "after": {
+    "cpuMs": 85341,
+    "decoded": 1070
+   }
+  },
+  "add-export": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 19825,
+    "decoded": 1224
+   },
+   "after": {
+    "cpuMs": 20338,
+    "decoded": 105
+   }
+  },
+  "body": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 8258,
+    "decoded": 1125
+   },
+   "after": {
+    "cpuMs": 7733,
+    "decoded": 7
+   }
+  },
+  "gomod": {
+   "steps": 5,
+   "before": {
+    "cpuMs": 83006,
+    "decoded": 6553
+   },
+   "after": {
+    "cpuMs": 86295,
+    "decoded": 950
+   }
+  },
+  "comment": {
+   "steps": 1,
+   "before": {
+    "cpuMs": 3534,
+    "decoded": 562
+   },
+   "after": {
+    "cpuMs": 3482,
+    "decoded": 4
+   }
+  },
+  "file-add": {
+   "steps": 3,
+   "before": {
+    "cpuMs": 45539,
+    "decoded": 3930
+   },
+   "after": {
+    "cpuMs": 48461,
+    "decoded": 574
+   }
+  },
+  "build": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 31243,
+    "decoded": 2627
+   },
+   "after": {
+    "cpuMs": 33563,
+    "decoded": 385
+   }
+  },
+  "import": {
+   "steps": 3,
+   "before": {
+    "cpuMs": 46180,
+    "decoded": 3938
+   },
+   "after": {
+    "cpuMs": 49609,
+    "decoded": 577
+   }
+  }
+ },
+ "maxLiveMiBAfter": 120,
+ "maxKeptMiB": 24
+}
+cli/cli, frozen build:
+{
+ "steps": 35,
+ "totals": {
+  "before": {
+   "cpuMs": 1399878,
+   "decoded": 85729,
+   "analysisInputMs": 0,
+   "resolverInputMs": 0
+  },
+  "after": {
+   "cpuMs": 1369567,
+   "decoded": 18985,
+   "analysisInputMs": 4959.8550000000005,
+   "resolverInputMs": 145274.232
+  }
+ },
+ "byKind": {
+  "body": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 27575,
+    "decoded": 2389
+   },
+   "after": {
+    "cpuMs": 27328,
+    "decoded": 1262
+   }
+  },
+  "embed": {
+   "steps": 3,
+   "before": {
+    "cpuMs": 131990,
+    "decoded": 8606
+   },
+   "after": {
+    "cpuMs": 116803,
+    "decoded": 1856
+   }
+  },
+  "gomod": {
+   "steps": 3,
+   "before": {
+    "cpuMs": 124702,
+    "decoded": 8605
+   },
+   "after": {
+    "cpuMs": 132251,
+    "decoded": 2235
+   }
+  },
+  "file-add": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 91947,
+    "decoded": 5739
+   },
+   "after": {
+    "cpuMs": 75940,
+    "decoded": 1232
+   }
+  },
+  "move": {
+   "steps": 5,
+   "before": {
+    "cpuMs": 218480,
+    "decoded": 14351
+   },
+   "after": {
+    "cpuMs": 228700,
+    "decoded": 3089
+   }
+  },
+  "break": {
+   "steps": 3,
+   "before": {
+    "cpuMs": 188519,
+    "decoded": 8621
+   },
+   "after": {
+    "cpuMs": 163699,
+    "decoded": 2268
+   }
+  },
+  "signature": {
+   "steps": 5,
+   "before": {
+    "cpuMs": 103321,
+    "decoded": 6247
+   },
+   "after": {
+    "cpuMs": 105005,
+    "decoded": 626
+   }
+  },
+  "add-export": {
+   "steps": 1,
+   "before": {
+    "cpuMs": 15277,
+    "decoded": 1196
+   },
+   "after": {
+    "cpuMs": 14922,
+    "decoded": 70
+   }
+  },
+  "interface": {
+   "steps": 6,
+   "before": {
+    "cpuMs": 284785,
+    "decoded": 17267
+   },
+   "after": {
+    "cpuMs": 284069,
+    "decoded": 3781
+   }
+  },
+  "build": {
+   "steps": 2,
+   "before": {
+    "cpuMs": 102972,
+    "decoded": 5757
+   },
+   "after": {
+    "cpuMs": 96355,
+    "decoded": 1249
+   }
+  },
+  "file-delete": {
+   "steps": 1,
+   "before": {
+    "cpuMs": 44432,
+    "decoded": 2875
+   },
+   "after": {
+    "cpuMs": 52566,
+    "decoded": 622
+   }
+  },
+  "comment": {
+   "steps": 1,
+   "before": {
+    "cpuMs": 17636,
+    "decoded": 1197
+   },
+   "after": {
+    "cpuMs": 15306,
+    "decoded": 70
+   }
+  },
+  "import": {
+   "steps": 1,
+   "before": {
+    "cpuMs": 48242,
+    "decoded": 2879
+   },
+   "after": {
+    "cpuMs": 56623,
+    "decoded": 625
+   }
+  }
+ },
+ "maxLiveMiBAfter": 248,
+ "maxKeptMiB": 91
+}
