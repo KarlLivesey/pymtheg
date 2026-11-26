@@ -4,6 +4,7 @@
 // leaves every other symbol's id as it was; Go's overloaded-looking shapes
 // get distinct ids; the stored graph equals a cold index.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -75,20 +76,35 @@ test("Go's overloaded-looking shapes get distinct notes ids, the ones the store 
       const ids = named.map((symbol) => symbol.id);
       assert.equal(new Set(ids).size, ids.length, `distinct in ${file.path}`);
       for (const id of ids) assert.doesNotMatch(id, /^draft:/);
-      // The same naming as the store's: identity and ordinal.
+      // Each symbol gets the store's own ordinal, matched by key, and the id
+      // the core builds from it (under the notes pass's project id).
       const stored = new Map(
         store
           .findSymbols({ file: file.path })
-          .map((symbol) => [
-            `${symbol.kind}\0${symbol.identity}\0${symbol.ordinal}`,
-            1,
-          ]),
+          .map((symbol) => [symbol.key, symbol]),
       );
-      for (const symbol of named)
-        assert.ok(
-          stored.has(`${symbol.kind}\0${symbol.identity}\0${symbol.ordinal}`),
-          `${symbol.kind} ${symbol.identity} in ${file.path}`,
+      for (const symbol of named) {
+        const own = stored.get(symbol.key);
+        assert.ok(own, `${symbol.key} in ${file.path}`);
+        assert.equal(symbol.ordinal, own.ordinal, `${symbol.key}`);
+        assert.equal(
+          symbol.id,
+          `symbol:${createHash("sha256")
+            .update(
+              JSON.stringify([
+                "v2",
+                "go-overflow",
+                file.module,
+                file.path,
+                own.kind,
+                own.identity,
+                own.ordinal,
+              ]),
+            )
+            .digest("hex")}`,
+          `${symbol.key}`,
         );
+      }
     }
     // Each shape as Go's extractor names it. Several init functions share
     // kind and identity: the tie is broken by the ordinal, in source order.

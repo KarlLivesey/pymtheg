@@ -398,7 +398,11 @@ export interface LinkNote {
   };
 }
 
-/** The project id the notes pass computes its symbols' ids under. */
+/**
+ * The project id the notes pass computes its symbols' ids under. It changes
+ * no output: the ids stay inside the pass, and the notes it returns are
+ * keyed by file and link index, never by a symbol id.
+ */
 const NOTES_PROJECT = "go-overflow";
 /**
  * C-56a: a file's symbols as the notes pass names them: the ids the core
@@ -426,11 +430,12 @@ export function linkNotes(
   const links: GraphLink[] = [];
   // C-56a: the symbols are named as the store names them (kind, identity
   // and ordinal; never a source offset), so moving code leaves ids as they
-  // were. A body edit can still rename a function-local type or anonymous
-  // struct elsewhere in the file: those are numbered within the enclosing
-  // declaration's identity, so a new one in the first of two `init`
-  // renumbers the second's. Link sources are keys of the same file's
-  // symbols.
+  // were. A body edit keeps every id outside the edited declaration, with
+  // one exception: function-local types and anonymous structs are numbered
+  // within the enclosing declaration's identity, so a new one in the first
+  // of two `init` renumbers the second's. Inside the edited declaration, an
+  // anonymous struct inserted above another renumbers the later one. Link
+  // sources are keys of the same file's symbols.
   const ids = new Map<string, string>();
   const id = (path: string, key: string) => ids.get(`${path}\u0000${key}`)!;
   for (const file of files) {
