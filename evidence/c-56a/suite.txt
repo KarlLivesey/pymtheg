@@ -7,7 +7,9 @@ All matched files use Prettier code style!
 npm test: tests 3410, pass 3410, fail 0, cancelled 0
 npm run test:backend: tests 97, pass 97, fail 0, cancelled 0, skipped 0
 
-On the pushed tree after merging main (aded2242):
+On the pushed tree after merging main and the review fixes (73e0ddf3):
 
-npm test: tests 3431, pass 3431, fail 0, cancelled 0
+tsc ok
+All matched files use Prettier code style!
+npm test: tests 3432, pass 3432, fail 0, cancelled 0
 npm run test:backend: tests 97, pass 97, fail 0
