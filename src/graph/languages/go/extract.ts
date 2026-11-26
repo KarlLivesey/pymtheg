@@ -229,6 +229,22 @@ interface Binding {
   writes: Desc[];
   /** Some write is not knowable (address taken, op-assignment, range/receive `=`). */
   opaque: boolean;
+  /** The declaring identifier: its name and span. */
+  name?: { name: string; start: number; end: number };
+  /** A parameter, result or receiver of the enclosing function or literal. */
+  parameter?: boolean;
+  /** Declared with a value (not a zero value); `literal` when it is a func literal. */
+  initialized?: boolean;
+  literal?: boolean;
+  /** For each write, whether it assigns a func literal. */
+  literalWrites: boolean[];
+}
+/** Facts of a declaration, for local calls (see `localCalls`). */
+interface Declared {
+  at?: Node;
+  parameter?: boolean;
+  initialized?: boolean;
+  literal?: boolean;
 }
 
 /**
@@ -243,6 +259,8 @@ export class GoExtractor {
   private scopes: Map<string, Desc>[] = [];
   private byKey = new Map<string, SymbolDraft>();
   private owner = "file";
+  /** Calls through a local binding, decided once every write is seen. */
+  private localCalls: { link: LinkDraft; binding: Binding }[] = [];
 
   constructor(
     private readonly path: string,
@@ -281,6 +299,19 @@ export class GoExtractor {
         beforePackage = false;
         this.declaration(child);
       }
+    }
+    // A call through a local binding, now that every write has been seen: a
+    // binding provably holding exactly one func literal is the enclosing
+    // function's own (`localBinding`, as Rust and TypeScript record it); a
+    // call through a parameter, result or receiver (`localParameter`) is
+    // left unresolved with the reason `local`: its value comes from the
+    // caller.
+    for (const { link, binding } of this.localCalls) {
+      const data = link.data as { [key: string]: Json };
+      if (binding.parameter && binding.name)
+        data.localParameter = binding.name as unknown as Json;
+      else if (binding.name && singleLiteral(binding))
+        data.localBinding = binding.name as unknown as Json;
     }
     // Live local bindings become plain JSON only now that every write has been seen.
     for (const link of this.links) {
@@ -390,20 +421,32 @@ export class GoExtractor {
     }
   }
   /** Declares a local in the innermost scope; variables become live bindings. */
-  private declare(name: string, desc: Desc): void {
+  private declare(name: string, desc: Desc, declared: Declared = {}): void {
     if (name === "_" || !this.scopes.length) return;
-    const binding: Binding = { d: desc, writes: [], opaque: false };
+    const binding: Binding = {
+      d: desc,
+      writes: [],
+      opaque: false,
+      literalWrites: [],
+      ...(declared.at ? { name: { name, ...range(declared.at) } } : {}),
+      ...(declared.parameter ? { parameter: true } : {}),
+      ...(declared.initialized ? { initialized: true } : {}),
+      ...(declared.literal ? { literal: true } : {}),
+    };
     this.scopes
       .at(-1)!
       .set(name, desc.k === "localtype" ? desc : { k: "ref", b: binding });
   }
   /** Records a write to a local variable; null means the written value is not knowable. */
-  private write(name: string, desc: Desc | null): void {
+  private write(name: string, desc: Desc | null, literal = false): void {
     const found = this.local(name);
     if (found?.k !== "ref") return;
     const binding = found.b as Binding;
     if (desc === null) binding.opaque = true;
-    else binding.writes.push(desc);
+    else {
+      binding.writes.push(desc);
+      binding.literalWrites.push(literal);
+    }
   }
   /** Replaces live bindings with plain descriptions. Cycles and deep chains become `local`. */
   private finalize(desc: Desc, stack: Binding[] = []): Desc {
@@ -631,10 +674,11 @@ export class GoExtractor {
           });
         const receiverName = fieldOf(declaration, "name");
         if (receiverName && receiverType !== "?")
-          this.declare(receiverName.text, {
-            k: "val",
-            t: { n: receiverType },
-          });
+          this.declare(
+            receiverName.text,
+            { k: "val", t: { n: receiverType } },
+            { at: receiverName, parameter: true },
+          );
         this.walkTypeParams(typeParameters);
         this.parameters(parameters);
         this.parameters(result);
@@ -959,7 +1003,10 @@ export class GoExtractor {
       const variadic = parameter.type === "variadic_parameter_declaration";
       for (const name of fieldsOf(parameter, "name"))
         if (name)
-          this.declare(name.text, variadic ? { k: "cont", e: value } : value);
+          this.declare(name.text, variadic ? { k: "cont", e: value } : value, {
+            at: name,
+            parameter: true,
+          });
     }
   }
 
@@ -1532,9 +1579,15 @@ export class GoExtractor {
         left.forEach((name, index) => {
           if (!isName(name)) return;
           // `a, err := …` redeclares nothing already in this scope: it writes it.
+          const literal = isFuncLiteral(right, left.length, index);
           if (this.scopes.at(-1)?.get(name.text)?.k === "ref")
-            this.write(name.text, descs[index]!);
-          else this.declare(name.text, descs[index]!);
+            this.write(name.text, descs[index]!, literal);
+          else
+            this.declare(name.text, descs[index]!, {
+              at: name,
+              initialized: true,
+              literal,
+            });
         });
         return;
       }
@@ -1548,7 +1601,11 @@ export class GoExtractor {
         left.forEach((target, index) => {
           const name = unparen(target);
           if (isName(name) && this.local(name.text)?.k === "ref")
-            this.write(name.text, descs ? descs[index]! : null);
+            this.write(
+              name.text,
+              descs ? descs[index]! : null,
+              !!descs && isFuncLiteral(right, left.length, index),
+            );
           else this.walk(target);
         });
         return;
@@ -1590,7 +1647,8 @@ export class GoExtractor {
                   ? { k: "elem", x: source }
                   : { k: "key", x: source }
                 : source;
-          if (defines) this.declare(name.text, value);
+          if (defines)
+            this.declare(name.text, value, { at: name, initialized: true });
           else if (this.local(name.text)?.k === "ref")
             this.write(name.text, null);
           else this.walk(name);
@@ -1627,7 +1685,11 @@ export class GoExtractor {
                 types.length === 1 && types[0]!.text !== "nil"
                   ? this.typedValue(types[0]!)
                   : operand;
-              for (const name of alias) this.declare(name.text, single);
+              for (const name of alias)
+                this.declare(name.text, single, {
+                  at: name,
+                  initialized: true,
+                });
               // Tree-sitter returns a new wrapper per access: compare positions.
               for (const item of named(child))
                 if (
@@ -1654,7 +1716,11 @@ export class GoExtractor {
           for (const value of values) this.walk(value);
           const descs = this.specDescs(names, type, values);
           names.forEach((name, index) =>
-            this.declare(name.text, descs[index]!),
+            this.declare(name.text, descs[index]!, {
+              at: name,
+              initialized: values.length > 0,
+              literal: isFuncLiteral(values, names.length, index),
+            }),
           );
         }
         return;
@@ -1767,7 +1833,7 @@ export class GoExtractor {
           // Conversion to a predeclared type such as string(b): not a call, unless
           // a package declaration named `string` shadows it.
           this.predeclared(callee, "call");
-        } else
+        } else {
           this.link("calls", callee.text, range(callee), {
             expr: (bound ?? { k: "name", n: callee.text }) as unknown as Json,
             // Stable parse fact; `analyze` sets `builtin` only when no package
@@ -1776,6 +1842,12 @@ export class GoExtractor {
               ? { builtinName: true }
               : {}),
           });
+          if (bound?.k === "ref")
+            this.localCalls.push({
+              link: this.links.at(-1)!,
+              binding: bound.b as Binding,
+            });
+        }
       } else if (callee.type === "selector_expression") {
         const operand = fieldOf(callee, "operand");
         this.link("calls", compact(callee), range(callee), {
@@ -1945,4 +2017,28 @@ export class GoExtractor {
       return this.predeclared(node, "type");
     this.link("references", name, range(node), { t: { n: name } });
   }
+}
+
+/** Whether `values[index]`, the value assigned to the `index`th of `count` names, is a func literal. */
+function isFuncLiteral(
+  values: readonly Node[],
+  count: number,
+  index: number,
+): boolean {
+  if (values.length !== count) return false;
+  const value = values[index];
+  return !!value && unparen(value).type === "func_literal";
+}
+
+/**
+ * A binding that can hold only one func literal: declared with it and never
+ * written, or declared without a value and written exactly once, with a func
+ * literal. A write the extractor cannot see (address taken, op-assignment)
+ * proves nothing.
+ */
+function singleLiteral(binding: Binding): boolean {
+  if (binding.opaque) return false;
+  if (binding.initialized)
+    return !!binding.literal && binding.writes.length === 0;
+  return binding.writes.length === 1 && binding.literalWrites[0] === true;
 }
