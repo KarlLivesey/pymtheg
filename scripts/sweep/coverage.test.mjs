@@ -9,7 +9,7 @@ import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { readLabels } from "./coverage-refresh-data.mjs";
 import { aggregate, auditDesign, estimateCoverage, failedRustInfluence, installedCoverage, median, stratumShare } from "./coverage.mjs";
-import { classify, columns, externalIdentity, goImports, libraryModuleLinks, libraryModuleRow, libraryScore, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
+import { classify, columns, externalIdentity, goImports, libraryModuleLinks, libraryModuleRow, libraryScore, mergedGlobalLevel2, repositoryScore, reviewQuotas, rustImports, sampleKey, sampleStratum, sourceScope, workspaceNames } from "./coverage-rules.mjs";
 
 test("assumed Level 2 links remain in the total and are counted separately", () => {
   const score = libraryScore([
@@ -605,6 +605,76 @@ test("stored resolution classes, library included, agree with the CLI's counts o
     assert.equal(library, 3);
     assert.equal(storedTotalsAgree(rows, released), false, "a CLI without library counts cannot have stored library rows");
     assert.equal(storedTotalsAgree(rows, { ...counts, unresolved: counts.unresolved + library, library: 0 }), false);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+test("D23: a merged environment global counts when it names the symbol and every declaring unit", () => {
+  const dom = { ecosystem: "dom", unit: "dom", symbol: "Console.prototype.log" };
+  const node = { ecosystem: "npm", unit: "@types/node", symbol: "Console.prototype.log" };
+  const merged = { mergedGlobal: true };
+  assert.equal(mergedGlobalLevel2(merged, [dom, node], 0), true);
+  // Not marked by the module: a candidate set of alternatives.
+  assert.equal(mergedGlobalLevel2({}, [dom, node], 0), false);
+  // A checkout candidate, one unit only, or a candidate without a symbol.
+  assert.equal(mergedGlobalLevel2(merged, [dom, node], 1), false);
+  assert.equal(mergedGlobalLevel2(merged, [dom, { ...dom, symbol: "Console.log" }], 0), false);
+  assert.equal(mergedGlobalLevel2(merged, [dom, { ...node, symbol: undefined }], 0), false);
+  assert.equal(mergedGlobalLevel2(merged, [dom], 0), false);
+});
+
+test("D23: merged environment globals are summed per language from the counts", async () => {
+  const { mergedGlobalCount } = await import("./coverage-refresh-data.mjs");
+  const repos = [
+    { language: "typescript", counts: { typescript: { links: 9, level2: 6, assumed: 0, merged: 2 }, go: { links: 1, level2: 1, assumed: 0 } } },
+    { language: "go", counts: { typescript: { links: 4, level2: 4, assumed: 0, merged: 1 } } },
+    { language: "typescript" },
+  ];
+  assert.equal(mergedGlobalCount(repos, "typescript"), 3);
+  assert.equal(mergedGlobalCount(repos, "typescript", true), 2);
+  // Archives without the count (before C-42) contribute nothing.
+  assert.equal(mergedGlobalCount(repos, "go"), 0);
+});
+
+test("D23: the refresh export counts a stored merged environment global at Level 2 and as merged", async () => {
+  const { mkdtempSync, mkdirSync: mkdir, writeFileSync: write, readFileSync: read, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join: joinPath } = await import("node:path");
+  const { executeGraph } = await import("../../dist/graph/commands.js");
+  const { exportRefresh } = await import("./coverage-refresh-export.mjs");
+  const scratch = mkdtempSync(joinPath(tmpdir(), "pymtheg-merged-export-"));
+  try {
+    const attempt = joinPath(scratch, "attempt");
+    const root = joinPath(attempt, "checkout");
+    const files = {
+      "tsconfig.json": JSON.stringify({ compilerOptions: { strict: true, lib: ["es2022", "dom"], types: ["node"] }, include: ["src"] }),
+      "node_modules/@types/node/package.json": JSON.stringify({ name: "@types/node", version: "20.0.0", types: "index.d.ts" }),
+      "node_modules/@types/node/index.d.ts":
+        "export {};\ndeclare global { interface Console { log(...data: any[]): void } var console: Console; }\n",
+      "src/main.ts": 'console.log("x");\nexport {};\n',
+    };
+    for (const [path, text] of Object.entries(files)) {
+      mkdir(joinPath(root, path, ".."), { recursive: true });
+      write(joinPath(root, path), text);
+    }
+    await executeGraph({ command: "index", root });
+    const status = await executeGraph({ command: "status", root });
+    write(joinPath(attempt, "warm.out"), JSON.stringify(status));
+    const output = joinPath(scratch, "export.json");
+    exportRefresh(
+      { mode: "installed", release: { sha256: "c42" }, repos: [{ id: "fixture/merged", language: "typescript", commit: "0", outcome: "finished" }] },
+      output,
+      () => attempt,
+    );
+    const [repo] = JSON.parse(read(output, "utf8")).repos;
+    const merged = status.counts.ambiguous;
+    assert.equal(merged, 1, "the fixture stores one marked candidate set");
+    assert.equal(repo.counts.typescript.merged, 1);
+    // The marked set is in Level 2; nothing else changes the count.
+    const links = repo.counts.typescript.links;
+    assert.ok(repo.counts.typescript.level2 >= 1 && repo.counts.typescript.level2 <= links);
+    assert.ok(!repo.inventory.some(([module, , outcome]) => module === "typescript" && outcome === "ambiguous"));
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

@@ -367,9 +367,10 @@ export interface GraphStorage {
     paths?: readonly string[],
   ): StorageResult<ResolutionFile[]>;
   /**
-   * C-55: a point in this connection's `replaceFile` and `removeFile`
-   * calls, and the paths written after one. Every file-level fact (record,
-   * symbols, resolver projection) is written only by those two.
+   * C-55: a point in this connection's `replaceFile` calls, and the paths
+   * written after one. Every file-level fact (record, symbols, resolver
+   * projection) is written only by `replaceFile` and `removeFile`; removals
+   * are not recorded, as readers assemble inputs only for paths stored now.
    */
   writeMark?(): number;
   pathsWrittenSince?(mark: number): Set<string>;

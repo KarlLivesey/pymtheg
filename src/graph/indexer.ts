@@ -957,13 +957,13 @@ async function finishReport(
   return report;
 }
 
+/** A keepsInput module's input, frozen under the test suite (C-55). */
+const frozenFor = <T>(module: LanguageModule, value: T): T =>
+  module.keepsInput ? guard(value) : value;
 /**
  * One module's resolve over freshly read input. The input lives only in this
  * frame, so it is released when the module returns.
  */
-/** A keepsInput module's input, frozen under the test suite (C-55). */
-const frozenFor = <T>(module: LanguageModule, value: T): T =>
-  module.keepsInput ? guard(value) : value;
 async function runResolve(
   module: LanguageModule,
   store: GraphStorage,

@@ -1,0 +1,355 @@
+{
+ "trpc/trpc": {
+  "2430 dom:dom": {
+   "n": 138,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [],
+    "message": "Interface 'MessageEvent<T>' incorrectly extends interface 'Bun.MessageEvent<T>'.   Types of property 'ports' are incompatible.     Type 'readonly MessagePort[]'"
+   }
+  },
+  "2300 dom:dom+npm:bun-types": {
+   "n": 52,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [
+     "node_modules/bun-types/globals.d.ts"
+    ],
+    "message": "Duplicate identifier 'fetch'."
+   }
+  },
+  "2428 typescript-lib:es": {
+   "n": 150,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.es2015.collection.d.ts",
+    "related": [],
+    "message": "All declarations of 'WeakMap' must have identical type parameters."
+   }
+  },
+  "2300 npm:@types/node+npm:bun-types": {
+   "n": 56,
+   "ex": {
+    "file": "node_modules/@types/node/web-globals/fetch.d.ts",
+    "related": [
+     "node_modules/bun-types/globals.d.ts"
+    ],
+    "message": "Duplicate identifier 'fetch'."
+   }
+  },
+  "2687 npm:@types/node": {
+   "n": 164,
+   "ex": {
+    "file": "node_modules/@types/node/module.d.ts",
+    "related": [],
+    "message": "All declarations of 'dirname' must have identical modifiers."
+   }
+  },
+  "2687 npm:next": {
+   "n": 16,
+   "ex": {
+    "file": "node_modules/next/types/global.d.ts",
+    "related": [],
+    "message": "All declarations of 'browser' must have identical modifiers."
+   }
+  },
+  "2687 npm:bun-types": {
+   "n": 216,
+   "ex": {
+    "file": "node_modules/bun-types/globals.d.ts",
+    "related": [],
+    "message": "All declarations of 'browser' must have identical modifiers."
+   }
+  },
+  "2300 npm:bun-types+dom:dom+npm:@types/node": {
+   "n": 46,
+   "ex": {
+    "file": "node_modules/bun-types/globals.d.ts",
+    "related": [
+     "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+     "node_modules/@types/node/web-globals/fetch.d.ts"
+    ],
+    "message": "Duplicate identifier 'fetch'."
+   }
+  },
+  "2717 npm:bun-types+dom:dom": {
+   "n": 138,
+   "ex": {
+    "file": "node_modules/bun-types/globals.d.ts",
+    "related": [
+     "/__pymtheg_typescript_lib__/lib.dom.d.ts"
+    ],
+    "message": "Subsequent property declarations must have the same type.  Property 'closed' must be of type 'Promise<void>', but here has type 'Promise<undefined>'."
+   }
+  },
+  "2717 npm:bun-types+typescript-lib:es": {
+   "n": 50,
+   "ex": {
+    "file": "node_modules/bun-types/globals.d.ts",
+    "related": [
+     "/__pymtheg_typescript_lib__/lib.es2015.symbol.wellknown.d.ts"
+    ],
+    "message": "Subsequent property declarations must have the same type.  Property '[Symbol.toStringTag]' must be of type '\"ArrayBuffer\"', but here has type 'string'."
+   }
+  },
+  "2428 npm:lodash": {
+   "n": 48,
+   "ex": {
+    "file": "node_modules/@types/lodash/index.d.ts",
+    "related": [],
+    "message": "All declarations of 'WeakMap' must have identical type parameters."
+   }
+  },
+  "2320 npm:react": {
+   "n": 4,
+   "ex": {
+    "file": "node_modules/@types/react/global.d.ts",
+    "related": [],
+    "message": "Interface 'Event' cannot simultaneously extend types 'Event' and '{ readonly bubbles: boolean; cancelBubble: () => void; readonly cancelable: boolean; readonly "
+   }
+  },
+  "2320 npm:@types/node": {
+   "n": 12,
+   "ex": {
+    "file": "node_modules/@types/node/web-globals/fetch.d.ts",
+    "related": [],
+    "message": "Interface 'MessageEvent<T>' cannot simultaneously extend types 'MessageEvent<any>' and 'MessageEvent<T>'.   Named property 'data' of types 'MessageEvent<any>' a"
+   }
+  },
+  "2403 npm:bun-types+npm:@types/node": {
+   "n": 60,
+   "ex": {
+    "file": "node_modules/bun-types/globals.d.ts",
+    "related": [
+     "node_modules/@types/node/stream/web.d.ts"
+    ],
+    "message": "Subsequent variable declarations must have the same type.  Variable 'ReadableStream' must be of type '{ new (underlyingSource: UnderlyingByteSource, strategy?: "
+   }
+  },
+  "2300 npm:bun-types+npm:@types/node": {
+   "n": 4,
+   "ex": {
+    "file": "node_modules/bun-types/globals.d.ts",
+    "related": [
+     "node_modules/@types/node/web-globals/fetch.d.ts"
+    ],
+    "message": "Duplicate identifier 'fetch'."
+   }
+  },
+  "2717 npm:bun-types+npm:vite": {
+   "n": 4,
+   "ex": {
+    "file": "node_modules/bun-types/globals.d.ts",
+    "related": [
+     "node_modules/vite/types/importMeta.d.ts"
+    ],
+    "message": "Subsequent property declarations must have the same type.  Property 'env' must be of type 'ImportMetaEnv', but here has type 'ProcessEnv'."
+   }
+  },
+  "6200 dom:dom+npm:@cloudflare/workers-types": {
+   "n": 6,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [
+     "node_modules/@cloudflare/workers-types/index.d.ts"
+    ],
+    "message": "Definitions of the following identifiers conflict with those in another file: DOMException, console, BufferSource, CompileError, RuntimeError, ValueType, Global"
+   }
+  },
+  "2687 dom:dom": {
+   "n": 132,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [],
+    "message": "All declarations of 'kty' must have identical modifiers."
+   }
+  },
+  "2344 dom:dom": {
+   "n": 10,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [],
+    "message": "Type 'HTMLElementTagNameMap[K]' does not satisfy the constraint 'Element'.   Type 'HTMLCanvasElement | HTMLElement | HTMLAnchorElement | HTMLScriptElement | HTM"
+   }
+  },
+  "2403 npm:@types/node+npm:@cloudflare/workers-types": {
+   "n": 6,
+   "ex": {
+    "file": "node_modules/@types/node/buffer.d.ts",
+    "related": [
+     "node_modules/@cloudflare/workers-types/index.d.ts"
+    ],
+    "message": "Subsequent variable declarations must have the same type.  Variable 'Buffer' must be of type 'any', but here has type 'BufferConstructor'."
+   }
+  },
+  "2300 npm:@types/node+npm:@cloudflare/workers-types": {
+   "n": 6,
+   "ex": {
+    "file": "node_modules/@types/node/url.d.ts",
+    "related": [
+     "node_modules/@cloudflare/workers-types/index.d.ts"
+    ],
+    "message": "Duplicate identifier 'URLPattern'."
+   }
+  },
+  "6200 npm:@cloudflare/workers-types+dom:dom": {
+   "n": 2,
+   "ex": {
+    "file": "node_modules/@cloudflare/workers-types/index.d.ts",
+    "related": [
+     "/__pymtheg_typescript_lib__/lib.dom.d.ts"
+    ],
+    "message": "Definitions of the following identifiers conflict with those in another file: DOMException, console, BufferSource, CompileError, RuntimeError, ValueType, Global"
+   }
+  }
+ },
+ "withastro/astro": {
+  "6200 dom:dom+npm:@cloudflare/workers-types": {
+   "n": 16,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [
+     "node_modules/@cloudflare/workers-types/index.d.ts"
+    ],
+    "message": "Definitions of the following identifiers conflict with those in another file: console, BufferSource, CompileError, RuntimeError, ValueType, Global, ImportValue,"
+   }
+  },
+  "2687 dom:dom": {
+   "n": 176,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [],
+    "message": "All declarations of 'kty' must have identical modifiers."
+   }
+  },
+  "2430 dom:dom": {
+   "n": 42,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [],
+    "message": "Interface 'Comment' incorrectly extends interface 'CharacterData'.   Types of property 'after' are incompatible.     Type '{ (content: string, options?: Content"
+   }
+  },
+  "2344 dom:dom": {
+   "n": 10,
+   "ex": {
+    "file": "/__pymtheg_typescript_lib__/lib.dom.d.ts",
+    "related": [],
+    "message": "Type 'HTMLElementTagNameMap[K]' does not satisfy the constraint 'Element'.   Type 'HTMLElement | HTMLAnchorElement | HTMLScriptElement | HTMLEmbedElement | HTML"
+   }
+  },
+  "2403 npm:@types/node+npm:@cloudflare/workers-types": {
+   "n": 8,
+   "ex": {
+    "file": "node_modules/@types/node/buffer.d.ts",
+    "related": [
+     "node_modules/@cloudflare/workers-types/index.d.ts"
+    ],
+    "message": "Subsequent variable declarations must have the same type.  Variable 'Buffer' must be of type 'any', but here has type 'BufferConstructor'."
+   }
+  },
+  "6200 npm:@cloudflare/workers-types+dom:dom": {
+   "n": 8,
+   "ex": {
+    "file": "node_modules/@cloudflare/workers-types/experimental/index.d.ts",
+    "related": [
+     "/__pymtheg_typescript_lib__/lib.dom.d.ts"
+    ],
+    "message": "Definitions of the following identifiers conflict with those in another file: console, BufferSource, CompileError, RuntimeError, ValueType, Global, ImportValue,"
+   }
+  },
+  "2403 npm:@cloudflare/workers-types+dom:dom": {
+   "n": 8,
+   "ex": {
+    "file": "node_modules/@cloudflare/workers-types/experimental/index.d.ts",
+    "related": [
+     "/__pymtheg_typescript_lib__/lib.dom.d.ts"
+    ],
+    "message": "Subsequent variable declarations must have the same type.  Variable 'onmessage' must be of type '((this: Window, ev: MessageEvent<any>) => any) | null', but her"
+   }
+  },
+  "2717 npm:@cloudflare/workers-types+dom:dom": {
+   "n": 16,
+   "ex": {
+    "file": "node_modules/@cloudflare/workers-types/experimental/index.d.ts",
+    "related": [
+     "/__pymtheg_typescript_lib__/lib.dom.d.ts"
+    ],
+    "message": "Subsequent property declarations must have the same type.  Property 'value' must be of type 'T', but here has type 'keyof ValueTypeMap'."
+   }
+  },
+  "2315 npm:@cloudflare/workers-types": {
+   "n": 30,
+   "ex": {
+    "file": "node_modules/@cloudflare/workers-types/experimental/index.d.ts",
+    "related": [],
+    "message": "Type 'EventListenerOrEventListenerObject' is not generic."
+   }
+  },
+  "2508 npm:@cloudflare/workers-types": {
+   "n": 2,
+   "ex": {
+    "file": "node_modules/@cloudflare/workers-types/index.d.ts",
+    "related": [],
+    "message": "No base constructor has the specified number of type arguments."
+   }
+  },
+  "2403 npm:@cloudflare/workers-types+npm:@types/node": {
+   "n": 4,
+   "ex": {
+    "file": "node_modules/@cloudflare/workers-types/index.d.ts",
+    "related": [
+     "node_modules/@types/node/globals.d.ts"
+    ],
+    "message": "Subsequent variable declarations must have the same type.  Variable 'process' must be of type 'Process', but here has type 'any'."
+   }
+  }
+ },
+ "colinhacks/zod": {
+  "2649 npm:@types/node": {
+   "n": 3,
+   "ex": {
+    "file": "node_modules/@types/node/crypto.d.ts",
+    "related": [],
+    "message": "Cannot augment module 'webcrypto' with value exports because it resolves to a non-module entity."
+   }
+  },
+  "2374 npm:@types/node": {
+   "n": 4,
+   "ex": {
+    "file": "node_modules/@types/node/globals.d.ts",
+    "related": [],
+    "message": "Duplicate index signature for type 'string'."
+   }
+  }
+ },
+ "vercel/turborepo": {
+  "2386 npm:@types/node": {
+   "n": 14,
+   "ex": {
+    "file": "node_modules/@types/node/module.d.ts",
+    "related": [],
+    "message": "Overload signatures must all be optional or required."
+   }
+  }
+ },
+ "dexie/Dexie.js": {
+  "2694 npm:@types/node": {
+   "n": 4,
+   "ex": {
+    "file": "node_modules/@types/node/web-globals/console.d.ts",
+    "related": [],
+    "message": "Namespace 'console' has no exported member 'Console'."
+   }
+  }
+ },
+ "mermaid-js/mermaid": {
+  "2792 npm:@types/node": {
+   "n": 1,
+   "ex": {
+    "file": "node_modules/@types/node/web-globals/fetch.d.ts",
+    "related": [],
+    "message": "Cannot find module 'undici-types'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+   }
+  }
+ }
+}

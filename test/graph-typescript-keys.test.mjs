@@ -577,12 +577,22 @@ test("a store written by the previous TypeScript module version is rebuilt and e
     await tree.index();
     const db = new DatabaseSync(tree.database);
     try {
+      // The current version's leading number, and the one before it.
+      const current = /"version":"(\d+)\+typescript-/.exec(
+        db.prepare("SELECT body FROM graph_files WHERE path='lib.cjs'").get()
+          .body,
+      )[1];
+      const previous = String(Number(current) - 1);
       const changed = db
         .prepare(
-          'UPDATE graph_files SET body=replace(body, \'"version":"50+typescript-\', \'"version":"49+typescript-\') WHERE body LIKE \'%"version":"50+typescript-%\'',
+          "UPDATE graph_files SET body=replace(body, ?, ?) WHERE instr(body, ?) > 0",
         )
-        .run().changes;
-      assert.ok(changed > 0, "TypeScript rows at version 50");
+        .run(
+          `"version":"${current}+typescript-`,
+          `"version":"${previous}+typescript-`,
+          `"version":"${current}+typescript-`,
+        ).changes;
+      assert.ok(changed > 0, `TypeScript rows at version ${current}`);
       db.prepare(
         "UPDATE graph_symbols SET body=replace(body, '\"identity\":\"', '\"identity\":\"old.') WHERE rowid=(SELECT min(rowid) FROM graph_symbols WHERE file='lib.cjs')",
       ).run();

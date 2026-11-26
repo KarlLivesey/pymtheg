@@ -28,6 +28,16 @@ export function score(repos, module, own = false) {
   return total;
 }
 
+/** D23: merged environment globals of one language, already in its Level 2. */
+export function mergedGlobalCount(repos, module, own = false) {
+  let merged = 0;
+  for (const repo of repos) {
+    if (!repo.counts || own && repo.language !== module) continue;
+    merged += repo.counts[module]?.merged ?? 0;
+  }
+  return merged;
+}
+
 export function baselineScore(repos, module, own = false) {
   const rows = repos.filter((repo) => !own || repo.language === module).flatMap((repo) => repo.breakdown ?? []);
   const { total, resolved, symbol, assumedLevel2 } = libraryScore(rows, (language) => language === module);

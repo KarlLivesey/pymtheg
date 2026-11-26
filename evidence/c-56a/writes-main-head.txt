@@ -1,0 +1,61 @@
+{
+ "pin": "restic",
+ "steps": 35,
+ "equalHead": 35,
+ "equalMain": 35,
+ "countersDiffering": 0,
+ "totals": {
+  "main": {
+   "store.filesWritten": 314,
+   "store.symbolRowsWritten": 7162,
+   "store.linkRowsInserted": 66622,
+   "store.linkRowsDeleted": 66190,
+   "store.linkTargetsRewritten": 46932
+  },
+  "head": {
+   "store.filesWritten": 314,
+   "store.symbolRowsWritten": 7162,
+   "store.linkRowsInserted": 66622,
+   "store.linkRowsDeleted": 66190,
+   "store.linkTargetsRewritten": 46932
+  }
+ },
+ "body": {
+  "steps": 2,
+  "otherFilesMain": 0,
+  "otherFilesHead": 0,
+  "linkTargetsMain": 151,
+  "linkTargetsHead": 151
+ }
+}
+{
+ "pin": "cli",
+ "steps": 35,
+ "equalHead": 35,
+ "equalMain": 35,
+ "countersDiffering": 0,
+ "totals": {
+  "main": {
+   "store.filesWritten": 464,
+   "store.symbolRowsWritten": 14277,
+   "store.linkRowsInserted": 108796,
+   "store.linkRowsDeleted": 108406,
+   "store.linkTargetsRewritten": 75795
+  },
+  "head": {
+   "store.filesWritten": 464,
+   "store.symbolRowsWritten": 14277,
+   "store.linkRowsInserted": 108796,
+   "store.linkRowsDeleted": 108406,
+   "store.linkTargetsRewritten": 75795
+  }
+ },
+ "body": {
+  "steps": 2,
+  "otherFilesMain": 0,
+  "otherFilesHead": 0,
+  "linkTargetsMain": 206,
+  "linkTargetsHead": 206
+ }
+}
+

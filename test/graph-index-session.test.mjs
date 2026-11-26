@@ -861,6 +861,8 @@ test("kept inputs count the UTF-8 bytes of the stored rows they were read from",
       'package a\n\n// Grüße, 世界, \u{1F600}\ntype 世界 struct{ Ä int }\n\nfunc Hëllo() string { return "héllo \u{1F600}" }\n',
     "b/b.go":
       'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.世界 }\n\nfunc B() string { return a.Hëllo() }\n',
+    // A failed file: its diagnostic quotes the non-ASCII token it stopped at.
+    "c/c.go": "package c\n\nfunc Größe() int { return 1 世界 }\n",
   });
   const store = new SqliteGraphStore(join(base, "graph.sqlite"));
   try {
@@ -888,6 +890,8 @@ test("kept inputs count the UTF-8 bytes of the stored rows they were read from",
     const db = new DatabaseSync(join(base, "graph.sqlite"), { readOnly: true });
     let expected = 0;
     let units = 0;
+    let diagnosticBytes = 0;
+    let diagnosticUnits = 0;
     const add = (text) => {
       expected += Buffer.byteLength(text ?? "");
       units += (text ?? "").length;
@@ -916,11 +920,18 @@ test("kept inputs count the UTF-8 bytes of the stored rows they were read from",
         add(row.facts);
         add(row.diagnostics);
         add(row.links);
+        diagnosticBytes += Buffer.byteLength(row.diagnostics ?? "");
+        diagnosticUnits += (row.diagnostics ?? "").length;
       }
     } finally {
       db.close();
     }
     assert.notEqual(expected, units, "the rows hold non-ASCII text");
+    assert.notEqual(
+      diagnosticBytes,
+      diagnosticUnits,
+      "the diagnostics hold non-ASCII text",
+    );
     assert.equal(counted, expected);
   } finally {
     store.close();
@@ -1090,6 +1101,51 @@ process.exit(answer.sync.complete ? 0 : 1);
     assert.deepEqual(await differencesFromCold(base, root, cold()), []);
   } finally {
     proto.completeGraphCommandState = publish;
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("without a session, Go's resolver is given frozen files and symbols under the tests", async () => {
+  const production = await discoverLanguages();
+  const seen = [];
+  const registry = new LanguageRegistry(
+    production.modules.map((module) =>
+      module.id !== "go"
+        ? module
+        : {
+            ...module,
+            resolve(context) {
+              seen.push({
+                files: context.files.every(
+                  (file) =>
+                    Object.isFrozen(file) && Object.isFrozen(file.result),
+                ),
+                symbols: context.symbols.every((symbol) =>
+                  Object.isFrozen(symbol),
+                ),
+                count: context.files.length,
+              });
+              return module.resolve(context);
+            },
+          },
+    ),
+  );
+  const { base, root } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go": "package a\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() }\n',
+  });
+  const store = new SqliteGraphStore(join(base, "graph.sqlite"));
+  try {
+    await indexProject(root, registry, store);
+    assert.ok(seen.length > 0 && seen.every((run) => run.count > 0));
+    assert.deepEqual(
+      seen.map(({ files, symbols }) => ({ files, symbols })),
+      seen.map(() => ({ files: true, symbols: true })),
+    );
+  } finally {
+    store.close();
     rmSync(base, { recursive: true, force: true });
   }
 });
