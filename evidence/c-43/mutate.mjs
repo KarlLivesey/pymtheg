@@ -19,7 +19,7 @@ const MUTATIONS = [
   ["gate: no symbol", INDEX, 'if (!identityOf.has(target)) return kept("withheld:no-symbol");', "if (!identityOf.has(target)) return l;", "^gates"],
   ["gate: source-only differs", INDEX, 'return kept("kept:source-only-differs");', 'from = "definite";', "^gates: a source-only definite target"],
   ["gate: source-only library", INDEX, 'else if (r?.library) return kept("kept:source-only-library");', "else if (false) {}", "^gates|library"],
-  ["gate: source-only library, resolve phase", ANALYSIS, "if (link.targetId === record.target) {", "if (true) {", "^gates: a source-only library"],
+  ["gate: source-only library, resolve phase", ANALYSIS, "if (link.targetId === record.target) {", "if (link.targetId === record.target || link.data !== undefined) {", "^gates: a source-only library"],
   ["gate: outside the candidate set", INDEX, "if (!r.candidateIds.includes(target))", "if (false)", "^gates|candidate"],
   ["gate: outside the listed cfg twins (seventh review)", INDEX, "!listed.includes(target)", "false", "^gates: an answer outside"],
   // The record.
