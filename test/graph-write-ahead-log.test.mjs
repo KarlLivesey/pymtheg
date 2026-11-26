@@ -77,6 +77,12 @@ function rows(root) {
       out[name] = db
         .prepare(`SELECT * FROM ${name}`)
         .all()
+        // C-62: the run generation counts the runs that claimed the store,
+        // so a repaired store has one more than a clean one; it is not
+        // graph content.
+        .filter(
+          (row) => !(name === "graph_meta" && row.key === "index-generation"),
+        )
         .map((row) => JSON.stringify(Object.values(row)))
         .sort();
     return out;
