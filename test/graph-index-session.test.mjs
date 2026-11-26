@@ -974,3 +974,122 @@ test("Go's analysis gets only frozen records in every session run", async () => 
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+// C-62 with C-55: a session run that another run overtakes after its claim
+// keeps nothing. The keeping module's resolver (after the run's claim and
+// analysis write) has another connection index an edit of the tree: a newer
+// claim, which completes. The overtaken run publishes nothing, so its
+// session drops what it had and what the run set; the next run builds its
+// map afresh and the store equals a cold index.
+test("C-62: a session run overtaken after its claim keeps nothing, and the next run equals cold", async () => {
+  const files = Object.fromEntries(
+    Array.from({ length: 4 }, (_, i) => [`${i}.syn`, `source ${i}`]),
+  );
+  const { base, root, write } = tree(files);
+  try {
+    const { module, state } = keepingModule();
+    let overtake = false;
+    const resolve = module.resolve;
+    module.resolve = async function (context) {
+      if (overtake) {
+        overtake = false;
+        write("3.syn", "edited by the newer run");
+        const newer = await executeGraph(
+          { command: "index", root },
+          { registry: cold() },
+        );
+        assert.equal(newer.sync.complete, true, "the newer run completed");
+      }
+      return resolve.call(this, context);
+    };
+    const session = new IndexSession({
+      registry: new LanguageRegistry([module]),
+    });
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("1.syn", "edit a");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.deepEqual([state.builds, state.reuses], [1, 1]);
+    // The overtaken run: it reads the kept map, sets it again, and loses.
+    write("1.syn", "edit b");
+    overtake = true;
+    const dropped = session.counts.dropped;
+    const overtaken = await index(root, session).catch((error) => error);
+    assert.equal(overtake, false, "the newer run ran");
+    assert.notEqual(overtaken?.sync?.complete, true, "it did not complete");
+    assert.ok(session.counts.dropped > dropped, "the session dropped");
+    assert.deepEqual([state.builds, state.reuses], [1, 2]);
+    // Nothing the overtaken run kept is reused: the map is built afresh.
+    write("2.syn", "edit c");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.deepEqual([state.builds, state.reuses], [2, 2]);
+    assert.deepEqual(await differencesFromCold(base, root, cold()), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+// C-62 with C-55, the publication path: another process claims and
+// completes just before the session run publishes its completion (after
+// all of the run's rows). The overtaken run publishes nothing; the session
+// keeps nothing it set, and the next run builds afresh and equals cold.
+test("C-62: a session run overtaken just before it publishes keeps nothing, and the next run equals cold", async () => {
+  const files = Object.fromEntries(
+    Array.from({ length: 4 }, (_, i) => [`${i}.syn`, `source ${i}`]),
+  );
+  const { base, root, write } = tree(files);
+  // The newer run, in another process, with the same module.
+  const other = join(base, "newer.mjs");
+  writeFileSync(
+    other,
+    `import { executeGraph } from ${JSON.stringify(new URL("../dist/graph/commands.js", import.meta.url).href)};
+import { LanguageRegistry } from ${JSON.stringify(new URL("../dist/graph/index.js", import.meta.url).href)};
+import { module as synthetic } from ${JSON.stringify(new URL("./fixtures/graph-core/synthetic.mjs", import.meta.url).href)};
+const module = { ...synthetic, id: "keeping", version: "1", resolve(context) {
+  const named = new Map(context.symbols.map((s) => [s.name, s.id]));
+  return { resolutions: context.links.map((link) => ({ linkId: link.id, targetId: named.get(link.targetName) ?? null })), links: [] };
+} };
+const answer = await executeGraph({ command: "index", root: process.argv[2] }, { registry: new LanguageRegistry([module]) });
+process.exit(answer.sync.complete ? 0 : 1);
+`,
+  );
+  const proto = SqliteGraphStore.prototype;
+  const publish = proto.completeGraphCommandState;
+  let overtake = false;
+  proto.completeGraphCommandState = function (...args) {
+    if (overtake) {
+      overtake = false;
+      write("3.syn", "edited by the newer run");
+      const newer = spawnSync(process.execPath, [other, root], {
+        encoding: "utf8",
+        timeout: 180_000,
+        killSignal: "SIGKILL",
+      });
+      assert.equal(newer.status, 0, newer.stderr);
+    }
+    return publish.apply(this, args);
+  };
+  try {
+    const { module, state } = keepingModule();
+    const session = new IndexSession({
+      registry: new LanguageRegistry([module]),
+    });
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("1.syn", "edit a");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.deepEqual([state.builds, state.reuses], [1, 1]);
+    // The overtaken run reads the kept map, sets it again, and loses at
+    // its publication.
+    write("1.syn", "edit b");
+    overtake = true;
+    await index(root, session).catch(() => undefined);
+    assert.equal(overtake, false, "the newer run ran");
+    assert.deepEqual([state.builds, state.reuses], [1, 2]);
+    write("2.syn", "edit c");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.deepEqual([state.builds, state.reuses], [2, 2]);
+    assert.deepEqual(await differencesFromCold(base, root, cold()), []);
+  } finally {
+    proto.completeGraphCommandState = publish;
+    rmSync(base, { recursive: true, force: true });
+  }
+});
