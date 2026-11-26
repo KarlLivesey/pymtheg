@@ -1980,11 +1980,11 @@ test("two units reported against a third are unmarked with each other too (deny 
   assert.equal(differing.data.mergedGlobal, undefined);
 });
 
-// A conflict inside one unit key creates no pair, and is attributed to no
-// other unit: two installed versions of @types/node (Dexie), and the DOM
-// and WebWorker libraries, both the unit `dom` (vitest's web-worker
-// package).
-test("two installed versions of @types/node in conflict leave a merged global marked", async () => {
+// Two installed versions of @types/node (Dexie) share one unit key. This
+// fixture gives no diagnostic; it checks only that two versions share one
+// unit key, so the merged global stays marked. (The DOM and WebWorker
+// libraries, both the unit `dom`, are the next test.)
+test("two installed versions of @types/node share one unit key and leave a merged global marked", async () => {
   const nodeTypes = (version, n) => ({
     "package.json": manifest("@types/node", version),
     "index.d.ts": `declare module "url" { global { var dual: { n: ${n} }; function helper(): void; } }\n`,
@@ -2007,7 +2007,8 @@ test("two installed versions of @types/node in conflict leave a merged global ma
         v,
       ]),
     ),
-    // Agrees with the first @types/node, so differs from the second.
+    // A third declaration of the same names; this fixture gives no
+    // diagnostic.
     ...typesPackage(
       "env-b",
       "declare var dual: { n: number };\ndeclare function helper(): void;\n",

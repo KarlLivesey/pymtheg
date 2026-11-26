@@ -923,7 +923,7 @@ and never yields a version pin.
     global declaration of a name that two or more units declare: any
     diagnostic, of any code, that lies there or whose related information
     lies in that unit's declaration files (deny by default). A statement
-    whose name only one unit declares is not checked, so a diagnostic
+    none of whose names two or more unit keys declare is not checked, so a diagnostic
     there (for example TS2430, an interface that incorrectly extends
     another) leaves the set marked: a stated limit of C-42. A diagnostic with related
     locations, all in one unit key, is dropped (a location in no unit, a
