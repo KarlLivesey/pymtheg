@@ -1006,22 +1006,30 @@ meet no cut. The same file tree therefore produces the same graph after a
 fresh or incremental index. [C-36](changes/C-36.md)
 
 **CLI cancellation (C-50).** `pymtheg graph` and the graph work of
-`pymtheg link` run in a worker thread. SIGINT, SIGTERM, SIGHUP or SIGQUIT
-ends the run with exit code 130 for every language. Inside a language
-module's synchronous code, or a synchronous stretch the module marks after
-an await (Go marks its notes pass and its parse, Rust its parse), the
-worker is terminated;
-the next index repairs the store. Anywhere else the run's processes are
-killed, the module's abort signal fires, and the command stops at its next
-checkpoint with the index incomplete; every checkpoint reads the
-coordinator's cancel flag, so none passes once it is set, and a signal
-after the last one (before the result is posted) may still see exit 0. A
-module that ignores the signal
-while its promise is awaited holds the run until that promise settles; a
-second signal does nothing more. A link query that does not sync runs in
-place. A graph run that exhausts the worker's heap ends with exit code 3
-and `Graph error: Worker terminated due to reaching memory limit`, leaving
-the store as a killed run does. [C-50](changes/C-50.md)
+`pymtheg link` that may sync run in a worker thread. SIGINT, SIGTERM,
+SIGHUP or SIGQUIT stops the run in every language, with one of two
+outcomes:
+
+- **Stopped before the index was fully written:** no completion line, exit
+  code 130, and `graph status` reports the index incomplete. The next index
+  repairs it.
+- **Stopped after the index's completion was written:** the index is
+  complete. The command reports it, exits 0, and says on stderr that the
+  stop arrived after the index was complete.
+
+Inside a language module's synchronous code, or a synchronous stretch the
+module marks after an await (Go marks its notes pass and its parse, Rust
+its parse), the worker is terminated. Anywhere else the run's processes
+are killed, the module's abort signal fires, and the command stops at its
+next checkpoint. Every checkpoint reads the coordinator's cancel flag, so
+none passes once it is set. A signal that arrives after the last one (just
+before the result is posted) may still see the result. A module that
+ignores the signal while its promise is awaited holds the run until that
+promise settles; a second signal does nothing more. A link query that does
+not sync runs in place: a signal during it is handled when it returns, and
+the command exits 130. A graph run that exhausts the worker's heap ends
+with exit code 3 and `Graph error: Worker terminated due to reaching memory
+limit`, leaving the store as a killed run does. [C-50](changes/C-50.md)
 
 **Toolchain processes (C-54).** Every child process the graph starts runs
 in its own process group, recorded in memory the server owns. Cancelling a

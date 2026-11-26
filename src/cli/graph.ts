@@ -248,6 +248,12 @@ export async function graphCommand(
     process.stdout.write(
       json ? JSON.stringify(response) + "\n" : formatGraph(response),
     );
+    // C-50 review: a stop that arrived once the index was complete does not
+    // undo it; the index stands, and the command says so.
+    if (signal.aborted)
+      process.stderr.write(
+        "Graph: the stop arrived after the index was complete; the result stands.\n",
+      );
     return response.exitCode;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

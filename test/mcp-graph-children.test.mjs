@@ -145,9 +145,10 @@ const buildFolders = (project) => {
 
 test("C-54: cancelling an MCP index ends the Go toolchain and the child it started, and its folder is removed", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-mcp-children-"));
+  let jobs;
   try {
     const { project, ready } = await trustedProject(root);
-    const jobs = new GraphJobs(project);
+    jobs = new GraphJobs(project);
     const job = jobs.start({ command: "index" });
     await until(
       () => existsSync(ready) || job.state !== "running",
@@ -167,8 +168,10 @@ test("C-54: cancelling an MCP index ends the Go toolchain and the child it start
     );
     // The worker answered the abort after the route removed its folder.
     assert.deepEqual(buildFolders(project), []);
-    await jobs.close();
   } finally {
+    // C-50 review: closed whatever the assertions found, so a failed
+    // assertion ends the test instead of leaving its worker running.
+    await jobs?.close();
     killFake(join(root, "tools", "ready.json"));
     await rm(root, { recursive: true, force: true });
   }
@@ -261,9 +264,10 @@ for (const signal of ["SIGTERM", "SIGINT", "SIGHUP", "SIGQUIT"])
 
 test("C-54: cancelling a requirement-link job that indexes ends the Go toolchain and its child", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-links-children-"));
+  let jobs;
   try {
     const { project, ready } = await trustedProject(root);
-    const jobs = new LinkJobs(project);
+    jobs = new LinkJobs(project);
     // A list by symbol syncs the graph first: the Go route runs.
     const job = jobs.start("list", { symbol: "F" });
     await until(
@@ -281,8 +285,10 @@ test("C-54: cancelling a requirement-link job that indexes ends the Go toolchain
       () => !running(pids.go) && !running(pids.child),
       "a toolchain process outlived the link job",
     );
-    await jobs.close();
   } finally {
+    // C-50 review: closed whatever the assertions found, so a failed
+    // assertion ends the test instead of leaving its worker running.
+    await jobs?.close();
     killFake(join(root, "tools", "ready.json"));
     await rm(root, { recursive: true, force: true });
   }
@@ -291,12 +297,13 @@ test("C-54: cancelling a requirement-link job that indexes ends the Go toolchain
 test("C-54: a worker that never answers the abort is terminated when the cancel's grace ends, and its child is killed", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-silent-children-"));
   const ready = join(root, "ready.txt");
+  let jobs;
   try {
     const project = join(root, "project");
     mkdirSync(project);
     await initializeWorkspace(project, undefined, { trust: "source-only" });
     const clock = controlledClock();
-    const jobs = new GraphJobs(realpathSync(project), {
+    jobs = new GraphJobs(realpathSync(project), {
       launch: (control, childGroups) =>
         new Worker(
           new URL(
@@ -327,8 +334,10 @@ test("C-54: a worker that never answers the abort is terminated when the cancel'
     await cancelling;
     assert.equal(job.state, "cancelled");
     await until(() => !running(pid), "the child outlived the cancel");
-    await jobs.close();
   } finally {
+    // C-50 review: closed whatever the assertions found, so a failed
+    // assertion ends the test instead of leaving its worker running.
+    await jobs?.close();
     const pid = readPid(ready);
     if (pid) killGroup(pid);
     await rm(root, { recursive: true, force: true });

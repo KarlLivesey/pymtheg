@@ -60,3 +60,46 @@ test("a clean-up that reads an empty ready file does not kill its own process gr
   );
   assert.deepEqual([code, signal, out], [0, null, "survived"]);
 });
+
+// C-50 review: a test's clean-up signals only a process it started. A pid
+// file of {"pid":1}, or a live process without the test's marker, is never
+// signalled.
+test("a test's clean-up kills only a process it started", async (t) => {
+  const { killOwned } = await import("./owned-processes.mjs");
+  const dir = await mkdtemp(join(tmpdir(), "pym-owned-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const calls = [];
+  t.mock.method(process, "kill", (...args) => {
+    calls.push(args);
+    return true;
+  });
+  assert.equal(killOwned(1, dir), false, "init");
+  assert.equal(killOwned(0, dir), false, "own group");
+  assert.equal(
+    killOwned(JSON.parse('{"pid":1}').pid, dir),
+    false,
+    "a pid file",
+  );
+  assert.equal(
+    killOwned(process.pid, dir),
+    false,
+    "no marker on its command line",
+  );
+  assert.deepEqual(calls, []);
+  t.mock.restoreAll();
+  // A process this test started, with the marker on its command line.
+  const child = spawn(
+    process.execPath,
+    ["-e", "setInterval(() => {}, 1 << 30)", join(dir, "marker")],
+    { stdio: "ignore" },
+  );
+  const closed = new Promise((resolve) =>
+    child.on("close", (...result) => resolve(result)),
+  );
+  // Once its command line can be read, it is killed.
+  for (let turn = 0; !killOwned(child.pid, dir); turn++) {
+    assert.ok(turn < 100_000, "the child's command line was never readable");
+    await new Promise(setImmediate);
+  }
+  assert.deepEqual(await closed, [null, "SIGKILL"]);
+});

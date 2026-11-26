@@ -472,18 +472,35 @@ export function useGraphRunner(run: GraphRunner): void {
 }
 /**
  * One graph request of a link command. A query without a sync (`noSync`)
- * never indexes, so no language module runs and a worker would make
- * nothing cancellable: it runs in place, between the command's abort
- * checks. Only a request that may sync goes to the runner (C-50 review:
- * `link touched --impact` started one worker per symbol).
+ * never indexes, so no language module runs: it is a bounded read of the
+ * store, and it runs in place (C-50 review: `link touched --impact` started
+ * one worker per symbol). A signal that arrives while it runs is handled
+ * when it returns, and the command then stops: the query's answer is not
+ * used, and the command exits 130, as one interrupted in the worker does.
+ * Only a request that may sync goes to the runner.
  */
-function runGraph(
+async function runGraph(
   request: GraphRequest,
   signal: AbortSignal | undefined,
 ): Promise<GraphResponse> {
-  return request.noSync
-    ? executeGraph(request, signal ? { signal } : {})
-    : graphRunner(request, signal);
+  if (!request.noSync) return graphRunner(request, signal);
+  const response = await executeGraph(request, signal ? { signal } : {});
+  if (signal) {
+    await pastPendingSignals();
+    signal.throwIfAborted();
+  }
+  return response;
+}
+/**
+ * Resolves after the event loop has passed a poll phase, where Node runs
+ * the handler of a signal delivered before this was called: an immediate,
+ * a timer (the next loop's timers phase), then an immediate again, which
+ * runs after that loop's poll phase. An order of phases, not a wait.
+ */
+async function pastPendingSignals(): Promise<void> {
+  await new Promise(setImmediate);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await new Promise(setImmediate);
 }
 async function syncGraph(root: string, options: CodeLinkOptions) {
   // A path query with a fixed name: the answer is unused; only the sync and

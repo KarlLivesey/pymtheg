@@ -88,16 +88,14 @@ export async function serveGraphRequest(
           CONTROL.section,
           inside === true ? SECTION.module : SECTION.core,
         );
-        if (inside === true && Atomics.load(shared, CONTROL.cancel) === 1) {
-          cancel.abort();
-          cancel.signal.throwIfAborted();
-        }
       },
     });
-    // The last checkpoint: a cancel set before here answers as cancelled,
-    // even when the command finished (an index's completion is then
-    // already written). A signal after it may still see the result.
-    cancel.signal.throwIfAborted();
+    // The last checkpoint. A stop set before here answers as cancelled,
+    // unless it is an index whose completion is already written: the index
+    // is complete, so that is its answer, and the CLI says the stop came
+    // after it (C-50 review). A signal after this may still see the result.
+    if (!(request.command === "index" && response.sync.complete))
+      cancel.signal.throwIfAborted();
     post({ kind: "result", response });
   } catch (error) {
     post({

@@ -311,6 +311,9 @@ export async function linkCommand(
         ],
       };
     } else throw usage(`Unknown link subcommand ${quote(sub)}.\n${linkUsage}`);
+    // C-50 review: a command interrupted before it finished exits 130, as
+    // every graph command does; its answer is not printed.
+    signal.throwIfAborted();
     process.stdout.write(
       json
         ? JSON.stringify({

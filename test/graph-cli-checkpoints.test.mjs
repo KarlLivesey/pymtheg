@@ -35,7 +35,7 @@ async function project(t, edit) {
 
 /** Runs `request` in the pausing worker and aborts once it has paused. */
 async function aborted(request, pause) {
-  const flag = new Int32Array(new SharedArrayBuffer(4));
+  const flag = new Int32Array(new SharedArrayBuffer(8));
   const controller = new AbortController();
   const run = runGraphInWorker(request, {
     signal: controller.signal,
@@ -46,15 +46,22 @@ async function aborted(request, pause) {
     () => "resolved",
     (error) => `${error.name}: ${error.message}`,
   );
-  // A run that ends without pausing fails the test instead of hanging it.
-  const waited = Atomics.waitAsync(flag, 0, 0);
-  const first = await Promise.race([
-    waited.async ? waited.value.then(() => "paused") : "paused",
-    outcome.then((value) => `ended before pausing (${value})`),
-  ]);
-  assert.equal(first, "paused");
-  controller.abort();
-  return (await outcome).split(":")[0];
+  try {
+    // A run that ends without pausing fails the test instead of hanging it.
+    const waited = Atomics.waitAsync(flag, 0, 0);
+    const first = await Promise.race([
+      waited.async ? waited.value.then(() => "paused") : "paused",
+      outcome.then((value) => `ended before pausing (${value})`),
+    ]);
+    assert.equal(first, "paused");
+    controller.abort();
+    return (await outcome).split(":")[0];
+  } finally {
+    // Whatever was found, the worker is released and the run ends.
+    controller.abort();
+    Atomics.store(flag, 1, 1);
+    await outcome;
+  }
 }
 
 const status = async (root) =>
@@ -82,13 +89,14 @@ test("an edited index paused after its last store write of the run stops before 
   assert.equal(await status(root), false);
 });
 
-test("an index paused inside its completion write answers cancelled: the result is the last checkpoint", async (t) => {
+test("an index paused inside its completion write is complete: the stop came after it", async (t) => {
   const root = await project(t, true);
+  // The flag is set after the checkpoint ahead of the write, so the
+  // completion is written; the answer is the index's, complete (C-50
+  // review: one outcome per stop).
   assert.equal(
     await aborted({ command: "index", root }, "completeGraphCommandState"),
-    "AbortError",
+    "resolved",
   );
-  // The flag was set after the checkpoint before the write, so the
-  // completion is written; the answer is still the cancel's.
   assert.equal(await status(root), true);
 });

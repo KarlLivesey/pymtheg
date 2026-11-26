@@ -12,6 +12,7 @@
 // reported is killed too. That bound only turns a hang into a failure.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { killOwned } from "./owned-processes.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -52,13 +53,13 @@ async function scenario(name) {
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line));
-  if (!ended)
-    for (const pid of [-child.pid, ...facts.map((f) => f.pid).filter(Boolean)])
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {
-        /* already gone */
-      }
+  if (!ended) {
+    // Only processes this test started: each carries the scenario's
+    // scratch path on its command line (test/owned-processes.mjs).
+    killOwned(child.pid, scratch, { group: true });
+    for (const { pid } of facts.filter((f) => f.pid !== undefined))
+      killOwned(pid, scratch);
+  }
   await rm(scratch, { recursive: true, force: true });
   assert.ok(ended, `the ${name} scenario did not finish: ${out}`);
   return Object.assign({}, ...facts.filter((f) => !f.pid));
