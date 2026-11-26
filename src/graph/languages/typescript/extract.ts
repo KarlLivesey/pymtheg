@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 import { posix } from "node:path";
 import ts from "typescript";
+import { count } from "../../work.js";
 import {
   competingTestNames,
   globalTypeAvailability,
   isTestFramework,
+  isTestPackage,
   isTestGlobal,
   nodeCanDeclare,
   nodeGlobalCall,
@@ -188,6 +190,11 @@ interface Targets {
   noAnswer?: boolean;
   competingTypes?: readonly string[];
   /**
+   * C-42: the library candidates are the declarations, in several library
+   * units, of one global compiler symbol (a merged environment global).
+   */
+  mergedGlobal?: boolean;
+  /**
    * Why there is no complete target set: external, local, no-symbol,
    * missing-module, external-package, unresolved-alias, computed-specifier.
    */
@@ -217,6 +224,52 @@ const TYPE_ONLY = new Set([
   ts.SyntaxKind.TypeAliasDeclaration,
   ts.SyntaxKind.TypeParameter,
 ]);
+/** The checker's diagnostics for chosen nodes (public on the object, not typed). */
+interface NodeDiagnostics {
+  getDiagnostics(
+    file: ts.SourceFile,
+    token: undefined,
+    nodes: readonly ts.Node[],
+  ): readonly ts.Diagnostic[];
+  getSymbolAtLocation(node: ts.Node): ts.Symbol | undefined;
+}
+/**
+ * C-42 (review N1): a second checker of `program` that type-checks
+ * declaration files (`skipLibCheck` and `skipDefaultLibCheck` off), one per
+ * program, so the compiler itself reports its diagnostics there (any code:
+ * deny by default, review round 3). It shares the
+ * program's parsed and bound files; only its type caches are its own.
+ */
+const declarationCheckers = new WeakMap<ts.Program, NodeDiagnostics>();
+/**
+ * C-42: the units in conflict, once per program (`conflictingUnitPairs`):
+ * each conflicts with every other unit.
+ */
+interface UnitConflicts {
+  troubled: Set<string>;
+}
+const unitConflictsByProgram = new WeakMap<ts.Program, UnitConflicts>();
+function checkingDeclarations(program: ts.Program): NodeDiagnostics {
+  let known = declarationCheckers.get(program);
+  if (!known) {
+    const options = {
+      ...program.getCompilerOptions(),
+      skipLibCheck: false,
+      skipDefaultLibCheck: false,
+      noCheck: false,
+    };
+    const host = Object.create(program, {
+      getCompilerOptions: { value: () => options },
+    }) as ts.Program;
+    known = (
+      ts as unknown as {
+        createTypeChecker(host: ts.Program): NodeDiagnostics;
+      }
+    ).createTypeChecker(host);
+    declarationCheckers.set(program, known);
+  }
+  return known;
+}
 const isLimit = (error: unknown) =>
   error instanceof RangeError && /call stack/i.test(error.message);
 /** Thrown when the checker overflows: retry with `key` in RenameContext.skip. */
@@ -886,6 +939,238 @@ export function extractFile(
     }
     return undefined;
   }
+  /**
+   * C-42 (narrowed D23; reviews N1, N1b, rounds 2 and 3): the library units
+   * the compiler finds a fault with in their global declarations. A set
+   * holding such a unit and another is not one target, so no merged global
+   * whose units include it is marked, whatever kind of symbol it is
+   * (`Request`, `fetch`, `RequestInit`, `reader.cancel`).
+   *
+   * The answer is the compiler's own. `skipLibCheck` suppresses these checks
+   * in declaration files, so a second checker of the same program, told
+   * `skipLibCheck` is off, checks every declaration of each global name that
+   * two or more units declare: variables (`var`, `let`, `const`), functions,
+   * classes, interfaces with their members, type aliases, enums and
+   * namespaces. They are read in every global scope: a script file,
+   * `declare global`, and `global {}` inside an ambient `declare module "x"`
+   * (how `@types/node` declares `URL`, `Buffer`, `console` and `process`).
+   * Deny by default (review round 3): any diagnostic of that checker, whatever
+   * its code, makes a unit conflict with every other unit when it lies in a
+   * declaration file of that unit, or its related information does. No code
+   * is listed and no spelling compared. A diagnostic with related locations,
+   * all in one unit key, is dropped; one with no related location always
+   * counts against its unit. ("All" is the diagnostic's own location and
+   * each related one; a location in no unit, such as a checkout file, is not
+   * counted.) A link's target names the key, the same for both sides of a
+   * dropped diagnostic: two installed versions of `@types/node`, `lib.dom`
+   * and `lib.webworker`. Any diagnostic that touches two units counts for
+   * both.
+   * A position's unit is its recorded global's, the one its library
+   * candidate names (its `targetOf` unit: `node:url` for a `global` block
+   * inside `declare module "url"`), else its file's; every `node:*` unit
+   * counts as the one package `@types/node`. Computed once per program
+   * (cached by program, as the second checker is), when a merged global is
+   * first met; `typescript.conflictScans` counts the computations and
+   * `typescript.conflictChecks` the statements submitted to the checker (a
+   * `var a: number, b: number` is one).
+   */
+  // Conflicts are between typings packages: every `node:*` unit is one
+  // package, `@types/node` (its modules' globals are one environment).
+  const unitKey = (unit: { ecosystem: string; unit: string }) =>
+    unit.ecosystem === "node"
+      ? "npm\0@types/node"
+      : `${unit.ecosystem}\0${unit.unit}`;
+  interface GlobalDeclaration {
+    name: string;
+    unit: string;
+    /** The span diagnostics are matched against. */
+    node: ts.Node;
+    /** The statement the second checker checks. */
+    statement: ts.Statement;
+  }
+  function conflictingUnitPairs(): UnitConflicts {
+    const known = unitConflictsByProgram.get(program);
+    if (known) return known;
+    const unitConflicts: UnitConflicts = {
+      troubled: new Set<string>(),
+    };
+    // Every declaration file of a typings unit, by its unit key: a
+    // diagnostic outside a recorded global still lies in its file's unit.
+    const fileUnits = new Map<ts.SourceFile, string>();
+    count("typescript.conflictScans");
+    const byName = new Map<string, GlobalDeclaration[]>();
+    const byFile = new Map<ts.SourceFile, GlobalDeclaration[]>();
+    for (const source of program.getSourceFiles()) {
+      const fileUnit = importer.declarationUnit(source);
+      if (!fileUnit) continue;
+      fileUnits.set(source, unitKey(fileUnit));
+      const keyOf = (declaration: ts.Declaration) => {
+        const target = importer.targetOf(declaration, fileUnit, checker);
+        return unitKey(target ?? fileUnit);
+      };
+      const record = (
+        name: ts.Node | undefined,
+        node: ts.Declaration,
+        statement: ts.Statement,
+      ) => {
+        if (!name || !ts.isIdentifier(name)) return;
+        const entry = { name: name.text, unit: keyOf(node), node, statement };
+        const list = byName.get(entry.name) ?? [];
+        list.push(entry);
+        byName.set(entry.name, list);
+        const inFile = byFile.get(source) ?? [];
+        inFile.push(entry);
+        byFile.set(source, inFile);
+      };
+      const globalStatement = (statement: ts.Statement): void => {
+        if (ts.isVariableStatement(statement))
+          for (const declaration of statement.declarationList.declarations)
+            record(declaration.name, declaration, statement);
+        else if (
+          ts.isFunctionDeclaration(statement) ||
+          ts.isClassDeclaration(statement) ||
+          ts.isInterfaceDeclaration(statement) ||
+          ts.isTypeAliasDeclaration(statement) ||
+          ts.isEnumDeclaration(statement)
+        )
+          record(statement.name, statement, statement);
+        else if (ts.isModuleDeclaration(statement)) {
+          if (statement.flags & ts.NodeFlags.GlobalAugmentation)
+            globalBlock(statement);
+          else if (ts.isIdentifier(statement.name))
+            record(statement.name, statement, statement);
+        }
+      };
+      const globalBlock = (block: ts.ModuleDeclaration) => {
+        if (block.body && ts.isModuleBlock(block.body))
+          block.body.statements.forEach(globalStatement);
+      };
+      // `global {}` blocks inside an ambient `declare module "x"`.
+      const ambient = (statement: ts.Statement): void => {
+        if (!ts.isModuleDeclaration(statement)) return;
+        if (statement.flags & ts.NodeFlags.GlobalAugmentation)
+          return globalBlock(statement);
+        if (
+          ts.isStringLiteral(statement.name) &&
+          statement.body &&
+          ts.isModuleBlock(statement.body)
+        )
+          statement.body.statements.forEach(ambient);
+      };
+      if (!ts.isExternalModule(source))
+        source.statements.forEach(globalStatement);
+      else source.statements.forEach(ambient);
+      if (!ts.isExternalModule(source))
+        for (const statement of source.statements)
+          if (
+            ts.isModuleDeclaration(statement) &&
+            ts.isStringLiteral(statement.name)
+          )
+            ambient(statement);
+    }
+    const shared = new Set(
+      [...byName.entries()]
+        .filter(([, list]) => new Set(list.map(({ unit }) => unit)).size > 1)
+        .map(([name]) => name),
+    );
+    if (!shared.size) {
+      unitConflictsByProgram.set(program, unitConflicts);
+      return unitConflicts;
+    }
+    const declarationChecker = checkingDeclarations(program);
+    // The innermost recorded declaration of a shared name at a position.
+    const at = (file: ts.SourceFile | undefined, start: number | undefined) => {
+      if (!file || start === undefined) return undefined;
+      let found: GlobalDeclaration | undefined;
+      for (const entry of byFile.get(file) ?? [])
+        if (
+          shared.has(entry.name) &&
+          entry.node.getStart(file) <= start &&
+          start < entry.node.end &&
+          (!found || entry.node.getStart(file) >= found.node.getStart(file))
+        )
+          found = entry;
+      return found;
+    };
+    // The unit a position lies in: its recorded global's (the unit its
+    // library candidate names), else its file's.
+    const unitAt = (
+      file: ts.SourceFile | undefined,
+      start: number | undefined,
+    ): string | undefined =>
+      at(file, start)?.unit ?? (file ? fileUnits.get(file) : undefined);
+    // Statements submitted to the second checker (`typescript.conflictChecks`).
+    let checked = 0;
+    for (const [file, entries] of byFile) {
+      const statements = [
+        ...new Set(
+          entries
+            .filter(({ name }) => shared.has(name))
+            .map(({ statement }) => statement),
+        ),
+      ];
+      if (!statements.length) continue;
+      checked += statements.length;
+      for (const diagnostic of declarationChecker.getDiagnostics(
+        file,
+        undefined,
+        statements,
+      )) {
+        // Deny by default (review round 3): any diagnostic, whatever its
+        // code, that lies in a unit's declaration file, or whose related
+        // information does, makes that unit conflict with every other
+        // unit. A diagnostic with related locations, all in one unit key, is
+        // dropped (a link's target names the key, the same for both of its
+        // sides); one with no related location always counts against its
+        // unit.
+        const touched = [
+          unitAt(diagnostic.file, diagnostic.start),
+          ...(diagnostic.relatedInformation ?? []).map((info) =>
+            unitAt(info.file, info.start),
+          ),
+        ].filter((unit): unit is string => unit !== undefined);
+        const units = new Set(touched);
+        if (diagnostic.relatedInformation?.length && units.size === 1) continue;
+        for (const unit of units) unitConflicts.troubled.add(unit);
+      }
+    }
+    count("typescript.conflictChecks", checked);
+    // Cached only once complete: an exception leaves no partial answer.
+    unitConflictsByProgram.set(program, unitConflicts);
+    return unitConflicts;
+  }
+  /** Whether two of `units` are in conflict (see conflictingUnitPairs). */
+  function unitsConflict(
+    units: readonly { ecosystem: string; unit: string }[],
+  ): boolean {
+    const keys = [...new Set(units.map(unitKey))];
+    if (keys.length < 2) return false;
+    const { troubled } = conflictingUnitPairs();
+    return keys.some((key) => troubled.has(key));
+  }
+  /** The compiler's (merged) symbol of a declaration, from its name. */
+  function declaredSymbol(declaration: ts.Declaration): ts.Symbol | undefined {
+    const name = ts.getNameOfDeclaration(declaration);
+    const symbol = name && checker.getSymbolAtLocation(name);
+    return symbol && !(symbol.flags & ts.SymbolFlags.Alias)
+      ? symbol
+      : undefined;
+  }
+  /**
+   * Whether a declaration is in the global scope (C-42): in a script file
+   * (such as `lib.dom.d.ts`) or inside `declare global` / `global {}`, and
+   * not inside an ambient module (`declare module "x"`) or a module file.
+   */
+  function environmentDeclaration(declaration: ts.Node): boolean {
+    for (let node = declaration.parent; node; node = node.parent) {
+      if (ts.isModuleDeclaration(node)) {
+        if (node.flags & ts.NodeFlags.GlobalAugmentation) return true;
+        if (ts.isStringLiteral(node.name)) return false;
+      }
+      if (ts.isSourceFile(node)) return !ts.isExternalModule(node);
+    }
+    return false;
+  }
   function resolveChecked(found: Lookup, meaning: Meaning): Targets {
     const receiver = found.receiver;
     if (found.reason || !found.symbol)
@@ -900,6 +1185,10 @@ export function extractFile(
     let firstAlias: ts.Symbol | undefined;
     let declaredSomewhere = false;
     let missingGlobalTypes = false;
+    // C-42: the compiler symbols whose declarations gave library facts, and
+    // whether any library fact is synthesised or outside the global scope.
+    const librarySymbols = new Set<ts.Symbol | undefined>();
+    let unmergedLibrary = false;
     let installedType = false;
     let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
     let verifyObjectProducers = false;
@@ -1172,18 +1461,20 @@ export function extractFile(
                 if (owners?.length) {
                   for (const { name } of owners) {
                     const node = nodeMemberTarget(name, member!, proved.symbol);
-                    if (node)
+                    if (node) {
                       (libraryFacts ??= new Map()).set(libraryKey(node), node);
-                    else missingGlobalTypes = true;
+                      unmergedLibrary = true;
+                    } else missingGlobalTypes = true;
                   }
                 } else if (
                   nodeCanDeclare(owner) &&
                   !(meaning === "type" && proved.symbol === "CryptoKey")
                 ) {
                   const node = nodeGlobalTarget(proved.symbol);
-                  if (node)
+                  if (node) {
                     (libraryFacts ??= new Map()).set(libraryKey(node), node);
-                  else missingGlobalTypes = true;
+                    unmergedLibrary = true;
+                  } else missingGlobalTypes = true;
                 }
               }
             }
@@ -1193,6 +1484,9 @@ export function extractFile(
               importer.targetKey(proved),
               proved,
             );
+            if (namespace || !environmentDeclaration(declaration))
+              unmergedLibrary = true;
+            else librarySymbols.add(declaredSymbol(declaration));
           } else if (inCheckout(declaration)) {
             if (!record(declaration, current)) local++;
           } else external++;
@@ -1336,12 +1630,32 @@ export function extractFile(
         specifier && ts.isStringLiteralLike(specifier) ? specifier : undefined;
       const unbuiltEntry =
         viaSpecifier && context.unbuilt?.forSpecifier(viaSpecifier);
+      // C-42: one global symbol declared in several library units. Narrowed
+      // D23: not when a unit is a test framework (competing packages: a file
+      // runs under one of them), nor when any of the units is in conflict
+      // (deny by default: any diagnostic of the declaration checker, asked
+      // of the compiler; see conflictingUnitPairs).
+      const [mergedSymbol] = librarySymbols;
+      const merged =
+        !!libraries &&
+        libraries.length > 1 &&
+        !targets.length &&
+        !unmergedLibrary &&
+        librarySymbols.size === 1 &&
+        !!mergedSymbol &&
+        new Set(libraries.map(({ ecosystem, unit }) => `${ecosystem}\0${unit}`))
+          .size > 1 &&
+        !libraries.some(
+          ({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit),
+        ) &&
+        !unitsConflict(libraries);
       return {
         targets,
         viaAlias,
         receiver,
         declarations,
         ...(libraries && { libraryFacts: libraries }),
+        ...(merged && { mergedGlobal: true }),
         ...(unbuiltEntry && { unbuiltEntry }),
         ...(viaSpecifier && { viaSpecifier }),
       };
@@ -2334,10 +2648,12 @@ export function extractFile(
       facts.targets = found.targets.map((target) => ({ ...target }));
     if (found.libraryFacts?.length && !reason) {
       if (insideWith(at)) reason = "dynamic-scope";
-      else
+      else {
         facts.libraryFacts = found.libraryFacts.map((target) => ({
           ...target,
         }));
+        if (found.mergedGlobal) facts.mergedGlobal = true;
+      }
     }
     if (reason) facts.reason = reason;
     if (

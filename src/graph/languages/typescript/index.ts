@@ -4,6 +4,7 @@ import ts from "typescript";
 import { contentHash } from "../../index.js";
 import { validSourceRange } from "../../identity.js";
 import type {
+  AnalysisPath,
   AnalyzedFile,
   Diagnostic,
   GraphFile,
@@ -566,6 +567,7 @@ function withoutTaint(result: ParseResult): ParseResult {
         return link;
       delete data.targets;
       delete data.libraryFacts;
+      delete data.mergedGlobal;
       data.reason = "taint-budget-exhausted";
       return { ...link, data };
     }),
@@ -648,6 +650,7 @@ function withWorkspaceAssumptions(
           if (previous) return previous;
           delete data.targets;
           delete data.libraryFacts;
+          delete data.mergedGlobal;
           data.reason = "workspace-build-output-missing";
           return { ...link, data };
         }
@@ -845,6 +848,7 @@ export function mergeTied(
         "reason",
         "assumes",
         "cause",
+        "mergedGlobal",
       ]);
       merged.reason = "invalid-code";
       const list = [...causes].sort();
@@ -888,6 +892,8 @@ export function mergeTied(
       "libraryFacts",
       "reason",
       "assumes",
+      // Decided below, for the link as a whole, never per program.
+      "mergedGlobal",
     ]);
     if (targets.size)
       merged.targets = byKey([...targets.entries()]).map(([, t]) => ({
@@ -906,6 +912,15 @@ export function mergeTied(
       if (!everyVariantSame) merged.tiedReasons = reasons;
     }
     if (!sameTargets || reasons.length) merged.projects = [...projects];
+    // C-42: one merged global only when every program gives the same set
+    // and marks it; a program that does not mark it leaves no mark
+    // anywhere in the stored data, `byProject` included (review round 3).
+    if (
+      sameTargets &&
+      !reasons.length &&
+      datas.every((data) => data.mergedGlobal === true)
+    )
+      merged.mergedGlobal = true;
     assume(
       merged,
       ...datas.flatMap(
@@ -932,6 +947,7 @@ export function mergeTied(
         delete merged.unbuiltEntry;
         delete merged.targets;
         delete merged.libraryFacts;
+        delete merged.mergedGlobal;
         merged.reason = "ambiguous-project";
         merged.assumes = assumptions.filter(
           (name) => name !== unbuiltEntryAssumption,
@@ -981,8 +997,18 @@ export function typescriptModule(
     extensions: [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
     contextFiles: CONTEXT_PATTERNS,
     dependencyInputs: true,
+    reportsAnalysisPath: true,
     analyze(context) {
       const files = context.files.filter(readable);
+      // The report's path (C-38A): a first index is one with no complete
+      // run before it, by the store's record (after a takeover every file
+      // record looks new).
+      const firstIndex = context.firstIndex === true;
+      const note = (path: AnalysisPath["path"]) =>
+        context.notePath?.({
+          path,
+          ...(firstIndex && { note: "no previous index" }),
+        });
       // Unchanged snapshot: stored facts came from a complete analysis of these
       // exact sources and contexts by this module version, so they are reused
       // without building a program. The core retries a failed file whose content
@@ -1026,6 +1052,7 @@ export function typescriptModule(
           .map((file) => [file, syntaxFailure(file.path, file.text)] as const);
         if (again.every(([, failure]) => failure)) {
           statistics.reused++;
+          note("reused");
           return [
             ...kept.map((file) => ({ path: file.path, result: file.result })),
             ...again.map(([file, failure]) => ({
@@ -1039,6 +1066,7 @@ export function typescriptModule(
         }
       }
       if (context.dependencyInputs) context.dependencyInputs.refreshed = true;
+      note("full");
       const model = projectModel(
         files,
         context.contextFiles,
@@ -1097,6 +1125,7 @@ export function typescriptModule(
                 };
                 delete next.targets;
                 delete next.libraryFacts;
+                delete next.mergedGlobal;
                 return { ...link, data: next };
               }
               if (

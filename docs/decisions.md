@@ -2453,10 +2453,17 @@ single-symbol proof. **Narrowed in review (22 November 2026):** the compiler
 also merges globals that two competing packages declare (`describe` and `it`
 from two test frameworks loaded together, `expect` from two assertion
 libraries). Those units ARE alternatives: a file runs under one of them. So
-no set is marked when any of its units is a test framework, or when its
-variable declarations disagree on the type (the compiler's own
-"subsequent variable declarations must have the same type" condition, which
-`skipLibCheck` hides). The mark is for environment globals: the language
+no set is marked when any of its units is a test framework, or when any of
+its units is in conflict. Deny by default (review round 3): any diagnostic,
+of any code, that a checker of declaration files (whatever `skipLibCheck`
+says) reports on a unit's global declaration of a name that two or more units declare (a name only one unit declares is not checked), or whose related
+information lies in that unit's declaration files, makes that unit
+conflict with every other unit (a set whose units are one unit key, only
+`node:*` units, has no other unit to conflict with).
+Units are typings packages (every `node:*` unit is `@types/node`). A
+diagnostic with related locations, all in one unit key, is dropped (two
+`@types/node` versions, `lib.dom` and `lib.webworker`); one with no related
+location always counts against its unit. The mark is for environment globals: the language
 library, DOM, workers, Node and compatible runtimes, and packages that
 augment them.
 
@@ -3205,6 +3212,38 @@ analysis. Module analysis would have to run in a worker that the
 coordinator terminates, as `check` does.
 [C-47](changes/C-47.md)
 
+### C-42 Merged environment globals
+
+A global declared by several environment typings, for example `URL` in the
+DOM library and in `@types/node`, is one compiler symbol: the checker merges
+the declarations. The graph keeps the link a candidate set, whose library
+candidates name each declaring unit with its own symbol path, and marks it
+`mergedGlobal`. The mark is set only when every declaration's name resolves
+to the same symbol, every declaration is in the global scope (a script file
+or `declare global`, never an ambient `declare module "x"`), there are at
+least two library units, no checkout candidate, and no synthesised target.
+After D23 was narrowed, two more conditions apply. No unit may be a test
+framework or a competing test package (`isTestPackage`: jest, mocha,
+vitest, their scoped parts, chai, jasmine, qunit and the like). And no
+unit may be in conflict. Deny by default (review round 3): a second checker
+of the program, with `skipLibCheck` off, checks every statement declaring a
+global that two or more units declare, once per program; any diagnostic it
+reports, of any code, that lies in a unit's declarations, or whose related
+information does, makes that unit conflict with every other unit. A
+diagnostic with related locations, all in one unit key, is dropped; one
+with no related location always counts against its unit. A unit in
+conflict is an alternative, so every merged global whose units
+include it is left unmarked, functions and interfaces included, unless the
+set's units are all one unit key (only `node:*` units). Across
+programs the mark is kept only when every program gives the same set and
+marks it; otherwise no mark is stored anywhere in the link's data. The candidate rows are deterministic, so the identity is the same in
+every file, program and run. **Rules out:** choosing one typing as the
+target; marking different symbols (union arms) or sets that only one
+program's settings would select. A merged global counts at Level 2 as
+proven (D23; `coverage-rules.mjs` `mergedGlobalLevel2`). A member call whose
+signature selection is proven is narrowed first to one declaration, as for
+any merged member. [C-42](changes/C-42.md)
+
 ### C-47b An expanding generic type ends at the judge's bound
 
 **Decided (C-47b):** a generic type that binds a larger value at every
@@ -3227,7 +3266,11 @@ own; only the call's joined answer is cached by the call. A hashed part of
 a TypeScript key is a hash of the restored source names, never of the
 compiler's fresh spelling. A config base that the compiler drops because
 its root is not an object (TS5092) keeps the `incomplete-config` marker, as
-an unreadable base does. **Why:** each was found with a fixture. The
+an unreadable base does. A callee annotated `typeof f`, with `f` a
+function (or a union of them, also with `undefined` or `null`), is judged
+exactly as a direct call to `f`; any other callee of a checker type with
+more than one signature and a tainted argument is invalid code. **Why:**
+each was found with a fixture. The
 second part of a union took the first part's signature, which gave a
 definite link through a failed file in one order only. An unrelated edit
 changed a renamed file's keys. And a dropped base was taken as read.
@@ -3522,7 +3565,7 @@ A run holding files that main's parse write would have written commits its
 run mark at the end of the parse write, where its first commit used to be,
 so a run started after that point finds it unfinished and takes over
 (files of a module reusing its analysis, C-27 and C-36, were held before
-and claim nothing). **Why:** every Go and Rust file was stored as parsed
+and claim nothing; C-38A later claims for them too). **Why:** every Go and Rust file was stored as parsed
 and then replaced whole as analysed, and every TypeScript file as a
 placeholder and then as analysed; on four pins that was 46-57% of the rows
 a cold index changed. **Trade:** held results stay in memory until
@@ -3601,6 +3644,27 @@ member keeps the checker's answer (`[ia, ib].reduce((x, y) => y).run()`
 → `IA.run`). A walk stops after computing 100,000 expressions or at 200
 nested steps (a cached result counted at the depth it reached), both
 unresolved, so the outcome never depends on the stack. See [C-41](changes/C-41.md).
+### C-38A The early claim covers modules reusing their analysis; the report names the analysis path
+
+**Decided (C-38A):** the early store claim (C-53) is made whenever any
+module holds back edited files' writes, also a module reusing its
+analysis, which C-53 left out. **Why:** without it a run that begins during
+that analysis finds no write since its start, answers without writing, and
+the first run then writes its analysis of the older text (the Go and
+Rust race tests). The index report also lists, per module that reports
+one (`reportsAnalysisPath`) and has files in the index, the path its
+analysis took (`reused` or `full` for TypeScript); "no previous index"
+comes from the store's record that a run finished completely, kept across
+later runs. **Trade:** a run stopped during a reusing analysis, or taken
+over, leaves its unfinished mark: a `--no-sync` query reports
+`incomplete` over the previous complete rows, and the next index is a full
+analysis (reviewer A, 20 Go packages with one edited: `unchanged=0
+indexed=20` after an interrupted run, `unchanged=19 indexed=1` before).
+**Limit:** before its claim a run is unprotected: paused after parsing a
+file that is then restored, it overwrites a completed run's rows; paused
+after its walk, it deletes the row of a file another run added. Both end
+`incomplete` and the next index repairs them; closing the window is the
+next chunk. See [C-38A](changes/C-38A.md).
 
 
 ### Go calls through a local func value (C-63)

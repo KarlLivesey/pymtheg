@@ -1,0 +1,147 @@
+diff --git a/src/graph/languages/typescript/extract.ts b/src/graph/languages/typescript/extract.ts
+index f8677c3d..7a9e5eaa 100644
+--- a/src/graph/languages/typescript/extract.ts
++++ b/src/graph/languages/typescript/extract.ts
+@@ -1,4 +1,5 @@
+ // SPDX-License-Identifier: MIT
++import { appendFileSync } from "node:fs";
+ import { posix } from "node:path";
+ import ts from "typescript";
+ import { count } from "../../work.js";
+@@ -188,6 +189,7 @@ interface Targets {
+    * units, of one global compiler symbol (a merged environment global).
+    */
+   mergedGlobal?: boolean;
++  notMarked?: string;
+   /**
+    * Why there is no complete target set: external, local, no-symbol,
+    * missing-module, external-package, unresolved-alias, computed-specifier.
+@@ -1090,6 +1092,7 @@ export function extractFile(
+       at(file, start)?.unit ?? (file ? fileUnits.get(file) : undefined);
+     // Statements submitted to the second checker (`typescript.conflictChecks`).
+     let checked = 0;
++    const troubling: unknown[] = [];
+     for (const [file, entries] of byFile) {
+       const statements = [
+         ...new Set(
+@@ -1119,9 +1122,34 @@ export function extractFile(
+         const units = new Set(touched);
+         if (diagnostic.relatedInformation?.length && units.size === 1) continue;
+         for (const unit of units) unitConflicts.troubled.add(unit);
++        if (troubling.length < 40)
++          troubling.push({
++            code: diagnostic.code,
++            file: diagnostic.file?.fileName ?? null,
++            related: (diagnostic.relatedInformation ?? []).map(
++              (info) => info.file?.fileName ?? null,
++            ),
++            units: [...units],
++            message: ts
++              .flattenDiagnosticMessageText(diagnostic.messageText, " ")
++              .slice(0, 160),
++          });
+       }
+     }
+     count("typescript.conflictChecks", checked);
++    if (process.env.PYM_CONFLICT_LOG)
++      appendFileSync(
++        process.env.PYM_CONFLICT_LOG,
++        JSON.stringify({
++          pid: process.pid,
++          cwd: process.cwd(),
++          config: program.getCompilerOptions().configFilePath ?? null,
++          checked,
++          names: shared.size,
++          troubled: [...unitConflicts.troubled],
++          troubling,
++        }) + "\n",
++      );
+     // Cached only once complete: an exception leaves no partial answer.
+     unitConflictsByProgram.set(program, unitConflicts);
+     return unitConflicts;
+@@ -1176,6 +1204,8 @@ export function extractFile(
+     // whether any library fact is synthesised or outside the global scope.
+     const librarySymbols = new Set<ts.Symbol | undefined>();
+     let unmergedLibrary = false;
++    let synthesisedNode = false;
++    let notGlobal = false;
+     let installedType = false;
+     let nodeReceivers: ReturnType<typeof nodeReceiverTypes> | undefined;
+     let verifyObjectProducers = false;
+@@ -1447,6 +1477,7 @@ export function extractFile(
+                     if (node) {
+                       (libraryFacts ??= new Map()).set(libraryKey(node), node);
+                       unmergedLibrary = true;
++                      synthesisedNode = true;
+                     } else missingGlobalTypes = true;
+                   }
+                 } else if (
+@@ -1457,6 +1488,7 @@ export function extractFile(
+                   if (node) {
+                     (libraryFacts ??= new Map()).set(libraryKey(node), node);
+                     unmergedLibrary = true;
++                    synthesisedNode = true;
+                   } else missingGlobalTypes = true;
+                 }
+               }
+@@ -1467,9 +1499,10 @@ export function extractFile(
+               importer.targetKey(proved),
+               proved,
+             );
+-            if (namespace || !environmentDeclaration(declaration))
++            if (namespace || !environmentDeclaration(declaration)) {
+               unmergedLibrary = true;
+-            else librarySymbols.add(declaredSymbol(declaration));
++              notGlobal = true;
++            } else librarySymbols.add(declaredSymbol(declaration));
+           } else if (inCheckout(declaration)) {
+             if (!record(declaration, current)) local++;
+           } else external++;
+@@ -1586,6 +1619,28 @@ export function extractFile(
+           ({ ecosystem, unit }) => ecosystem === "npm" && isTestPackage(unit),
+         ) &&
+         !unitsConflict(libraries);
++      // Measurement build only: why a set of two or more library units is
++      // not marked, in the order the mark's conditions are tested.
++      const units = new Set(
++        (libraries ?? []).map(({ ecosystem, unit }) => `${ecosystem}\0${unit}`),
++      ).size;
++      const notMarked =
++        merged || !libraries || libraries.length < 2 || units < 2
++          ? undefined
++          : targets.length
++            ? "a checkout candidate"
++            : synthesisedNode
++              ? "a synthesised Node target"
++              : notGlobal
++                ? "a declaration outside the global scope"
++                : librarySymbols.size !== 1 || !mergedSymbol
++                  ? `distinct symbols (${librarySymbols.size}${librarySymbols.has(undefined) ? ", one without a symbol" : ""})`
++                  : libraries.some(
++                        ({ ecosystem, unit }) =>
++                          ecosystem === "npm" && isTestPackage(unit),
++                      )
++                    ? "a test package"
++                    : "units in conflict";
+       return {
+         targets,
+         viaAlias,
+@@ -1593,6 +1648,7 @@ export function extractFile(
+         declarations,
+         ...(libraries && { libraryFacts: libraries }),
+         ...(merged && { mergedGlobal: true }),
++        ...(notMarked && { notMarked }),
+         ...(unbuiltEntry && { unbuiltEntry }),
+         ...(viaSpecifier && { viaSpecifier }),
+       };
+@@ -2590,6 +2646,10 @@ export function extractFile(
+           ...target,
+         }));
+         if (found.mergedGlobal) facts.mergedGlobal = true;
++        if ((found as { notMarked?: string }).notMarked)
++          (facts as Record<string, unknown>).notMarked = (
++            found as { notMarked?: string }
++          ).notMarked;
+       }
+     }
+     if (reason) facts.reason = reason;
