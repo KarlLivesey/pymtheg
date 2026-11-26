@@ -1024,25 +1024,28 @@ SIGHUP or SIGQUIT stops them in every language. What a stop guarantees,
 for every command:
 
 - **What the command does.** A stop that takes effect before the graph
-  worker's last checkpoint (for `graph index`, the one just before its
-  completion is written; for a command that syncs the index before
-  answering, for example `graph file` or `link list`, the one at the end
-  of its last request to the worker) ends the command with exit code 130
+  worker's last checkpoint (for a `graph index` that ends with the index
+  complete, the last one before its completion is written, or before an
+  already complete index is confirmed; for every other run, including a
+  `graph index` that writes no completion, and for a command that syncs the
+  index before answering, for example `graph file` or `link list`, the one
+  at the end of its last request to the worker) ends the command with exit code 130
   and no result: no index report, no answer, no link change. A stop that
   arrives after that checkpoint is too late: the command may finish as it
   would have without the stop, with the same result, and exits as the run
   would have without it. A `graph` command then says on stderr, if the
   stop came before it printed, that the stop arrived late and the result
   stands; a `link` command prints no such line, and one that runs a
-  further in-place query after its sync (for example `link list
-  --symbol`) stops at the check after that query, with exit code 130 and
+  further in-place query after its sync (for example `link list --symbol`
+  or `link touched`) stops at the check after that query, with exit code 130 and
   no answer, if the stop came before that check.
 - **What state the index is left in** depends only on the sync, whatever
   the command then does. A sync that wrote its completion leaves the index
   as it wrote it: `graph status` reports it as it would without the stop.
   A sync stopped after it began writing and before its completion leaves
   the index reporting incomplete; one stopped before it began writing
-  leaves the status as it was. The next index repairs an incomplete store
+  leaves the status as it was (a first index leaves an empty store, which
+  reports incomplete rather than missing). The next index repairs an incomplete store
   to equal a cold index.
 - **Progress lines** already printed may appear before a stop, `graph
   complete: N/N` included: a run prints that line even when it writes no
@@ -1053,10 +1056,12 @@ for every command:
   not handled: it ends the CLI by that signal ([C-50](changes/C-50.md),
   "Not built").
 
-A wording oddity, not a fault: when files failed and the stop came after
-the completion write, `graph index` prints "Graph index: incomplete" in
-its report on stdout (files failed) while stderr says the stop arrived
-after the index was complete.
+A wording oddity, not a fault: a late stop of `graph index` is always
+reported on stderr as arriving "after the index was complete". When files
+failed and the stop came after the completion write, the report on stdout
+says "Graph index: incomplete" (files failed); and a stop that arrives as
+the worker posts the result of an index that wrote no completion gets the
+same stderr line while the index is incomplete.
 
 Inside a language module's synchronous code, or a synchronous stretch the
 module marks after an await (Go marks its notes pass and its parse, Rust
