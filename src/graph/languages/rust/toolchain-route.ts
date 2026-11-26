@@ -178,7 +178,7 @@ async function route(
     version: install.analyzerVersion,
     rustc: install.rustcVersion,
     ...(install.rustupToolchain ? { toolchain: install.rustupToolchain } : {}),
-    configuration: configurationFor(install, run.target),
+    configuration: configurationFor(install, run.target, prepared.cfgFlags),
     target: run.target,
     cached: run.cached,
     key: run.key,
@@ -226,18 +226,25 @@ async function route(
     traces: joined.traces,
     functionTraces: joined.functionTraces,
     rustAnalyzer: install.analyzerVersion,
-    configuration: configurationFor(install, run.target),
+    configuration: configurationFor(install, run.target, prepared.cfgFlags),
   };
 }
 
-/** The configuration as it ran: the host, or the configured build target. */
+/**
+ * The configuration as it ran: the host, or the configured build target,
+ * and the `--cfg` flags the Cargo configuration's rustflags add.
+ */
 const configurationFor = (
   install: { configuration: string; host: string },
   target: string,
+  cfgFlags: readonly string[] = [],
 ) =>
-  target === install.host
+  (target === install.host
     ? install.configuration
     : install.configuration.replace(
         `${install.host} (host)`,
         `${target} ([build] target)`,
-      );
+      )) +
+  (cfgFlags.length
+    ? `, rustflags ${cfgFlags.map((flag) => `--cfg ${flag}`).join(" ")}`
+    : "");

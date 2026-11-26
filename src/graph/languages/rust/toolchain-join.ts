@@ -120,12 +120,14 @@ export interface JoinFacts {
  * C-43 design B: one binding on an answered link's trace, as rust-analyzer
  * resolved it in its one configuration: a checkout item (its graph id), an
  * item of the checkout's crates with no declaration the graph has (macro
- * output), a local binding (and whether its definition is in the index), or
+ * output), a named field (the graph id of the type declaring it, and its
+ * name), a local binding (and whether its definition is in the index), or
  * an item of another crate.
  */
 export type TraceEntry =
   | { k: "item"; id: string }
   | { k: "generated" }
+  | { k: "field"; owner: string; name: string }
   | { k: "local"; defined: boolean }
   | { k: "library"; crate: string };
 export interface LinkTrace {
@@ -382,7 +384,25 @@ export function joinScip(
     if (!def) return { k: "generated" };
     const name = texts.get(def.path)!.slice(def.s, def.e).replace(/^r#/, "");
     const found = symbolAt(def.path, def.s, name, undefined);
-    return found ? { k: "item", id: found.id } : { k: "generated" };
+    if (found) return { k: "item", id: found.id };
+    // A named field (a term of a type) is no graph symbol: its entry is the
+    // type that declares it and the field's name, so the label reads the
+    // type's own selection and whether the field itself is under a cfg
+    // (manager's review of 90c66e77, items 2 and 6).
+    const n = p.kinds.length;
+    if (n >= 2 && p.kinds[n - 1] === "term" && p.kinds[n - 2] === "type") {
+      let owner: { id: string; start: number; end: number } | undefined;
+      for (const sym of symbolsByFile.get(def.path) ?? [])
+        if (
+          sym.start <= def.s &&
+          def.s < sym.end &&
+          sym.name === p.path[n - 2] &&
+          (!owner || sym.end - sym.start < owner.end - owner.start)
+        )
+          owner = sym;
+      if (owner) return { k: "field", owner: owner.id, name };
+    }
+    return { k: "generated" };
   };
   const traceOf = (path: string, from: number, to: number): TraceEntry[] => {
     const list = occurrences.get(path) ?? [];

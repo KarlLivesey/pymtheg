@@ -57,7 +57,7 @@ export function formatGraph(response: GraphResponse): string {
   if (rust)
     lines.push(
       rust.state === "used"
-        ? `Toolchain rust: used (${rust.version}; ${rust.configuration}); ${rust.upgradedLinks} links upgraded, ${rust.confirmedLinks} confirmed, ${rust.disagreements} kept where source-only differs, ${Object.values(rust.withheld ?? {}).reduce((a, b) => a + b, 0)} withheld by gates, ${rust.libraryOffered ?? 0} library answers offered where source-only stays open`
+        ? `Toolchain rust: used (${rust.version}; ${rust.configuration}); ${rust.upgradedLinks} links upgraded (${rust.upgradedSeen ?? 0} labelled seen, ${rust.upgradedNoneSeen ?? 0} none-seen), ${rust.confirmedLinks} confirmed, ${rust.disagreements} kept where source-only differs, ${Object.values(rust.withheld ?? {}).reduce((a, b) => a + b, 0)} withheld by gates, ${rust.libraryOffered ?? 0} library answers offered where source-only stays open`
         : rust.state === "partial"
           ? `Toolchain rust: partial (${rust.version}), source-only links: ${rust.reason}`
           : rust.state === "unavailable"

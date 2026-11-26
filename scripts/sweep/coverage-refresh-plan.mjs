@@ -39,7 +39,13 @@ export function scoreTable(modes, base, own = false) {
     const split = now.assumed ? `<br>${number(proven.level2)} proven (${rate(proven)})<br>${number(assumed.level2)} assumption-marked (${rate(assumed)})` : "";
     const moduleCell = unit.level2 ? `<br>${number(unit.level2)} library module links (${rate(unit)})<br>**${number(withModules.level2)} (${rate(withModules)}) with library module links**` : "";
     const gapCell = unit.level2 ? `${gap(now)}<br>${gap(withModules)} with library module links` : gap(now);
-    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split}${moduleCell} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gapCell} |`;
+    // D17 clarified: with a toolchain route, Level 2 counting only the
+    // upgrades labelled none-seen (records that carry the label).
+    const seen = repos.reduce((total, repo) => total + (repo.toolchain?.upgradedSeen ?? 0), 0);
+    const labelled = repos.some((repo) => repo.toolchain?.upgradedSeen !== undefined);
+    const noneSeen = { ...now, level2: now.level2 - seen };
+    const labelCell = labelled ? `<br>${number(noneSeen.level2)} (${rate(noneSeen)}) counting only none-seen upgrades` : "";
+    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split}${labelCell}${moduleCell} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gapCell} |`;
   };
   return [
     "| Language | Mode | Links now | Level 2 now | Level 2 at 0.1.0 | Links to 90% |",

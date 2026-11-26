@@ -2418,9 +2418,11 @@ complete route-off data, so the configuration-free view can always be read
 back. A route-decided link counts at Level 2. C-43's design B, the trace of
 build-condition selections, is kept as a label only: `selection: "seen"`
 with a reason from a closed set, or `"none-seen"`, which means the label's
-checks found nothing and is no claim about any other configuration. Reports
-give three figures: source-only, with the route, and with the route counting
-only `"none-seen"` links. **What still blocks:** an answer wrong for its own
+checks found nothing and is no claim about any other configuration. Every
+report of the route gives three figures: source-only, with the route, and
+with the route counting only `"none-seen"` upgrades (the route’s state counts
+upgrades by label; the CLI line, the sweep’s public record and the coverage
+scoreboard carry them). **What still blocks:** an answer wrong for its own
 configuration (an import of a name bound in two namespaces, a join that
 places an answer on the wrong site, an answer kept after an edit or a change
 of configuration). A changed target, feature set or Cargo configuration is

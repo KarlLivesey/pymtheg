@@ -471,10 +471,12 @@ export const modeLanguage = { installed: "typescript", "go-toolchain": "go", "ru
  */
 export function rustToolchainRecord(state, redact) {
   if (!state) throw Error("Rust toolchain run did not report its state");
-  const { version, configuration, partial, upgradedLinks, confirmedLinks, disagreements, withheld, libraryAnswers } = state;
+  const { version, configuration, partial, upgradedLinks, upgradedSeen, upgradedNoneSeen, confirmedLinks, disagreements, withheld, libraryAnswers } = state;
+  // D17 clarified: the upgrades by selection label, so the public record
+  // gives Level 2 counting only none-seen links beside the route’s figure.
   return { state: state.state, ...(state.reason && { reason: redact(state.reason) }),
     version, configuration, ...(partial && { partialCount: partial.length }),
-    upgradedLinks, confirmedLinks, disagreements, withheld, libraryAnswers };
+    upgradedLinks, upgradedSeen, upgradedNoneSeen, confirmedLinks, disagreements, withheld, libraryAnswers };
 }
 
 async function main() {

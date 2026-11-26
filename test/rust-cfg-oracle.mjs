@@ -36,7 +36,7 @@ export const INGREDIENTS = {
     expect: [
       [`crate::p${i}_free`, `src/lib.rs#p${i}_free`, `src/lib.rs#p${i}_free`],
     ],
-    lib: `pub struct P${i};\nimpl P${i} {\n    pub fn go${i}(&self) -> u32 {\n        0\n    }\n}\npub fn p${i}_free() -> u32 {\n    0\n}\npub fn site${i}() -> u32 {\n    P${i}.go${i}() + crate::p${i}_free()\n}\n`,
+    lib: `pub struct P${i};\nimpl P${i} {\n    pub fn go${i}(&self) -> u32 {\n        0\n    }\n}\npub fn p${i}_free() -> u32 {\n    0\n}\npub struct PC${i} {\n    pub inner: P${i},\n}\npub fn site${i}(c: &PC${i}) -> u32 {\n    P${i}.go${i}() + crate::p${i}_free() + c.inner.go${i}()\n}\n`,
   }),
   "use-twin": (i) => ({
     expect: [
@@ -137,7 +137,58 @@ export const INGREDIENTS = {
     ],
     lib: `mod api${i} {\n${pair(`RF${i}`, `RS${i}`, i)}    ${FAST}\n    pub type Chosen${i} = RF${i};\n    ${SLOW}\n    pub type Chosen${i} = RS${i};\n}\npub use api${i}::Chosen${i} as RP${i};\nmod user${i} {\n    use crate::RP${i};\n    pub fn site${i}() -> u32 {\n        RP${i}::mk${i}().go${i}()\n    }\n}\n`,
   }),
+  // Manager's review of 90c66e77, item 1 (a) and item 5: a cfg-chosen
+  // `use` re-export at the crate root, reached as `crate::E::…` from a
+  // file with no import (the path's later segment; the receiver's trace).
+  "reexport-later-segment": (i) => ({
+    expect: [
+      [`crate::E${i}::mk${i}`, `src/fe${i}.rs#`, `src/se${i}.rs#`],
+      [`crate::E${i}::mk${i}().go${i}`, `src/fe${i}.rs#`, `src/se${i}.rs#`],
+    ],
+    lib: `mod fe${i};\nmod se${i};\nmod u${i};\n${FAST}\npub(crate) use fe${i}::E${i};\n${SLOW}\npub(crate) use se${i}::E${i};\n`,
+    files: {
+      [`src/fe${i}.rs`]: pair(`E${i}`, `X${i}a`, i),
+      [`src/se${i}.rs`]: pair(`E${i}`, `X${i}b`, i),
+      [`src/u${i}.rs`]: `pub fn site${i}() -> u32 {\n    crate::E${i}::mk${i}();\n    crate::E${i}::mk${i}().go${i}()\n}\n`,
+    },
+  }),
+  // Item 1 (b): a glob's name beside a cfg-gated local item of that name.
+  "glob-beside-gated": (i) => ({
+    expect: [
+      [`gf${i}`, `src/cs${i}.rs#gb${i}::gf${i}`, `src/cs${i}.rs#gf${i}`],
+    ],
+    lib: `mod cs${i};\n`,
+    files: {
+      [`src/cs${i}.rs`]: `mod gb${i} {\n    pub fn gf${i}() -> u32 {\n        1\n    }\n}\nuse self::gb${i}::*;\n${SLOW}\npub fn gf${i}() -> u32 {\n    2\n}\npub fn site${i}() -> u32 {\n    gf${i}()\n}\n`,
+    },
+  }),
+  // Item 1 (c): a cfg-gated inherent method beside the same method through
+  // `Deref`.
+  "gated-member-over-deref": (i) => ({
+    expect: [[`w.dgo${i}`, `impl B${i}::dgo${i}`, `impl W${i}::dgo${i}`]],
+    lib: `pub struct B${i};\nimpl B${i} {\n    pub fn dgo${i}(&self) -> u32 {\n        1\n    }\n}\npub struct W${i}(B${i});\nimpl core::ops::Deref for W${i} {\n    type Target = B${i};\n    fn deref(&self) -> &B${i} {\n        &self.0\n    }\n}\n${SLOW}\nimpl W${i} {\n    pub fn dgo${i}(&self) -> u32 {\n        2\n    }\n}\npub fn site${i}() -> u32 {\n    let w = W${i}(B${i});\n    w.dgo${i}()\n}\n`,
+  }),
+  // Item 1 (d): two cfg-chosen `Deref` impls with different targets.
+  "deref-twins": (i) => ({
+    expect: [[`w.dm${i}`, `impl DA${i}::dm${i}`, `impl DB${i}::dm${i}`]],
+    lib: `pub struct DA${i};\nimpl DA${i} {\n    pub fn dm${i}(&self) -> u32 {\n        1\n    }\n}\npub struct DB${i};\nimpl DB${i} {\n    pub fn dm${i}(&self) -> u32 {\n        2\n    }\n}\npub struct DW${i}(DA${i}, DB${i});\n${FAST}\nimpl core::ops::Deref for DW${i} {\n    type Target = DA${i};\n    fn deref(&self) -> &DA${i} {\n        &self.0\n    }\n}\n${SLOW}\nimpl core::ops::Deref for DW${i} {\n    type Target = DB${i};\n    fn deref(&self) -> &DB${i} {\n        &self.1\n    }\n}\npub fn site${i}() -> u32 {\n    let w = DW${i}(DA${i}, DB${i});\n    w.dm${i}()\n}\n`,
+  }),
+  // Item 2: a field chosen by cfg (two fields of one name), read on the
+  // receiver's way to the call.
+  "gated-field": (i) => ({
+    expect: [[`h.v.fg${i}`, `impl GA${i}::fg${i}`, `impl GB${i}::fg${i}`]],
+    lib: `pub struct GA${i};\nimpl GA${i} {\n    pub fn fg${i}(&self) -> u32 {\n        1\n    }\n}\npub struct GB${i};\nimpl GB${i} {\n    pub fn fg${i}(&self) -> u32 {\n        2\n    }\n}\npub struct GH${i} {\n    ${FAST}\n    pub v: GA${i},\n    ${SLOW}\n    pub v: GB${i},\n}\npub fn site${i}(h: &GH${i}) -> u32 {\n    h.v.fg${i}()\n}\n`,
+  }),
 };
+
+/** The review shapes of the manager's review of 90c66e77 (items 1, 2, 5). */
+export const REVIEW_SHAPES = [
+  "reexport-later-segment",
+  "glob-beside-gated",
+  "gated-member-over-deref",
+  "deref-twins",
+  "gated-field",
+];
 
 const CFG_IF = [
   "macro_rules! cfg_if {",
@@ -149,12 +200,18 @@ const CFG_IF = [
   "",
 ].join("\n");
 
-/** One crate from a seed: the control and `count` other ingredients. */
-export function generate(seed, count = 4) {
+/**
+ * One crate from a seed: the control and `count` other ingredients, or the
+ * control and the named ingredients.
+ */
+export function generate(seed, count = 4, named = undefined) {
   const r = rng(seed);
-  const names = Object.keys(INGREDIENTS).filter((n) => n !== "control");
+  const names = Object.keys(INGREDIENTS).filter(
+    (n) => n !== "control" && !REVIEW_SHAPES.includes(n),
+  );
   const chosen = ["control"];
-  for (let k = 0; k < count; k++) chosen.push(names[r.int(names.length)]);
+  if (named) chosen.push(...named);
+  else for (let k = 0; k < count; k++) chosen.push(names[r.int(names.length)]);
   let lib = "#![allow(dead_code, unused_imports)]\n";
   const files = {
     "Cargo.toml":

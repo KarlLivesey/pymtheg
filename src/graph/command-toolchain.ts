@@ -40,6 +40,12 @@ export interface ToolchainModuleState {
   partial?: string[];
   /** Links the toolchain made definite (from unresolved, candidates or failed). */
   upgradedLinks?: number;
+  /**
+   * Rust (D17 clarified): the upgraded links by selection label. Level 2
+   * counting only none-seen links is the route’s Level 2 less upgradedSeen.
+   */
+  upgradedSeen?: number;
+  upgradedNoneSeen?: number;
   /** Source-only definite links the toolchain confirmed. */
   confirmedLinks?: number;
   /** Candidate sets (or unresolved dispatch) the toolchain verified. */
@@ -170,6 +176,8 @@ function rustState(
     upgradedLinks:
       (decided["definite:unresolved"] ?? 0) +
       (decided["definite:candidates"] ?? 0),
+    upgradedSeen: decided["label:seen"] ?? 0,
+    upgradedNoneSeen: decided["label:none-seen"] ?? 0,
     confirmedLinks: decided["definite:definite"] ?? 0,
     disagreements: decided["kept:source-only-differs"] ?? 0,
     withheld,

@@ -1050,10 +1050,16 @@ folder left by a killed run is removed by the next run, which can tell it is
 no longer live from a lock the operating system releases); the crate archives
 and git databases are symbolic links to the user's own folders, which offline
 cargo only reads; the user's `PATH` follows the toolchain's, since build
-scripts link and may call `cc` or `pkg-config`. Running it runs the
+scripts link and may call `cc` or `pkg-config`. A build script that probes
+the system (libraries, `pkg-config`, tools on `PATH`) is not in the key: a
+change there is not noticed while an index is in use. The recorded
+configuration names the `--cfg` flags of `[build]` and `[target.<triple>]`
+rustflags in the Cargo configuration (not of `[target.'cfg(…)']` sections). Running it runs the
 project's build scripts and proc macros, as building it would; there is no
 sandbox. Each subprocess is bounded, not the run as a whole: `cargo metadata`
-and `cargo tree` ten minutes each (past it the index is `partial`),
+ten minutes (past it the index is `partial`), `cargo tree` ten minutes
+(past it, or on failure, the expected build units come from `cargo
+metadata`’s resolved graph, which errs towards `partial`),
 `rust-analyzer scip` and `diagnostics` one hour each (past it `unavailable`
 and `partial`), 256 MiB of output each, and a 1 GiB index. The run is
 cancellable: in the CLI the index's signal kills the process groups; over MCP
@@ -1065,8 +1071,9 @@ end on their own. Any failure of the route other than cancellation reports
 A partial index is never cached. The index is cached in the user's
 cache folder (outside the checkout, as for the Go route), keyed by the tool versions, the configuration, every
 captured manifest, lockfile and Cargo configuration, every captured Rust file,
-every other project file's path, size and time, and which lockfile crates are
-in the crate cache. Answers are taken under C-19's strict join: the occurrence
+every other project file's path, size and time, which lockfile crates are
+in the crate cache, and every file of each `path` dependency outside the
+checkout (path, size and time; Rust and Cargo files by content). Answers are taken under C-19's strict join: the occurrence
 at the link's own name site, the one symbol there, a kind that fits the link,
 no module answer for a `use`, no `extern crate` or crate root, no symbol
 defined more than once, no non-macro item of a proc-macro crate from another
@@ -1090,8 +1097,11 @@ another file, a cfg-chosen trait in a prelude, build-script output or
 `include!` beyond where rust-analyzer names them, or fields at struct-literal
 and pattern sites. An upgraded link also stores `routeOff`, its complete data
 as source-only left it, so the configuration-free view can always be read
-back. Reports give Level 2 source-only, with the route, and with the route
-counting only `"none-seen"` links.
+back. The route’s state (`toolchain.rust` in graph answers) counts the
+upgrades by label (`upgradedSeen`, `upgradedNoneSeen`); the CLI line shows
+them, and the sweep’s public record and the coverage scoreboard’s opt-in Rust
+row give Level 2 with the route and Level 2 counting only none-seen upgrades
+beside the source-only figure.
 The answer's graph symbol must be of a kind
 the SCIP descriptor allows. A trait's associated type or const named in
 generic code (`S::Error`) is answered with the trait's declaration and

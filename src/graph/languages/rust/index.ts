@@ -376,6 +376,8 @@ function decideToolchain(
       conditions: string[];
       opaque: boolean;
       gatedFields: string[];
+      /** Named fields (not cfg-gated): name and declared type text. */
+      fieldTypes: Map<string, string>;
     }
   >();
   updated.forEach((f, i) => {
@@ -394,6 +396,13 @@ function decideToolchain(
         conditions: ((data.conditions ?? []) as string[]).map(String),
         opaque: !!data.underOpaqueAttribute,
         gatedFields: ((data.gatedFields ?? []) as Json[]).map(String),
+        fieldTypes: new Map(
+          ((data.fields ?? []) as Json[]).flatMap((x) =>
+            Array.isArray(x) && typeof x[1] === "string"
+              ? [[String(x[0]), x[1]] as [string, string]]
+              : [],
+          ),
+        ),
       });
     });
   });
@@ -466,15 +475,7 @@ function decideToolchain(
       const name =
         (typeof data.alias === "string" && data.alias) ||
         lastSegment(l.targetName);
-      const own = ((data.conditions ?? []) as Json[]).map(String);
-      // Seventh review: a `use` whose target source-only resolved to a
-      // selected item (`pub use api::Chosen as Public` with `Chosen` a cfg
-      // alias twin) selects the name it binds; a marker no site implies.
-      const reexportsSelected =
-        !!resolved && !glob && selectedItem(resolved, own);
-      const conditions = reexportsSelected
-        ? [...own, "?reexport-of-selected"]
-        : own;
+      const conditions = ((data.conditions ?? []) as Json[]).map(String);
       list.push({
         scope: typeof data.scope === "string" ? data.scope : "",
         name,
@@ -538,8 +539,23 @@ function decideToolchain(
   type Entry =
     | { k: "item"; id: string }
     | { k: "generated" }
+    | { k: "field"; owner: string; name: string }
     | { k: "local"; defined: boolean }
     | { k: "library"; crate: string };
+  /** The checkout symbols by name, for names written in a type. */
+  const symbolsByName = new Map<string, string[]>();
+  for (const [id, fact] of symbolFact) {
+    const list = symbolsByName.get(fact.name) ?? [];
+    list.push(id);
+    symbolsByName.set(fact.name, list);
+  }
+  /** Whether a written type names a selected item or `use` binding. */
+  const typeNamesSelected = (text: string, site: readonly string[]) =>
+    (text.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []).some(
+      (name) =>
+        (symbolsByName.get(name) ?? []).some((id) => selectedItem(id, site)) ||
+        (selectedImportNames.get(name) ?? []).some((cs) => unmet(cs, site)),
+    );
   /** Design B: why a trace leaves the answer undecided, or null. */
   const traceVerdict = (
     entries: readonly Entry[],
@@ -552,7 +568,19 @@ function decideToolchain(
       if (entry.k === "item") {
         if (selectedItem(entry.id, site)) return selected;
       } else if (entry.k === "generated") return selected;
-      else if (entry.k === "local") {
+      else if (entry.k === "field") {
+        // A named field: selected with the type that declares it, when the
+        // field itself is under a cfg the site does not imply, or when its
+        // declared type names a selected item or a name a selected `use`
+        // binds (a field whose type is a cfg-chosen alias).
+        const owner = symbolFact.get(entry.owner);
+        if (
+          selectedItem(entry.owner, site) ||
+          (owner?.gatedFields ?? []).includes(entry.name) ||
+          typeNamesSelected(owner?.fieldTypes.get(entry.name) ?? "", site)
+        )
+          return selected;
+      } else if (entry.k === "local") {
         if (!entry.defined) return "trace-incomplete";
       } else if (!STANDARD.has(entry.crate)) dependency = true;
     }
@@ -700,11 +728,19 @@ function decideToolchain(
           (!use.notTrait || traceNames.has(use.name))
         )
           return "selected-receiver";
+      // A name on the trace that a selected `use` binds anywhere in the
+      // package, as for a path's later segments: `crate::Engine::new().run()`
+      // through `#[cfg(feature = "fast")] pub(crate) use fe::Engine;` in
+      // another file (manager's review of 90c66e77, item 5).
+      for (const traced of traceNames)
+        if (
+          (selectedImportNames.get(traced) ?? []).some((cs) => unmet(cs, site))
+        )
+          return "selected-receiver";
       for (const entry of entries) {
         if (entry.k !== "item") continue;
         const fact = symbolFact.get(entry.id);
         if (!fact) continue;
-        if (fact.gatedFields.includes(name)) return "selected-receiver";
         if ((derefImpls.get(fact.name) ?? []).some((cs) => unmet(cs, site)))
           return "selected-receiver";
       }
@@ -783,6 +819,10 @@ function decideToolchain(
         from = "unresolved";
       }
       bump(`definite:${from}`);
+      // The label of each upgrade, so every report can give Level 2
+      // counting only none-seen links (D17 clarified).
+      if (from !== "definite")
+        bump(selection ? "label:seen" : "label:none-seen");
       // The open link's data stays until the stored link takes the answer:
       // the record lists what then goes (`clears`), and the link decider
       // removes it only then. A link whose source-only answer is kept in
