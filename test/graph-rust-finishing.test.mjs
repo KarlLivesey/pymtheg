@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { once } from "node:events";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -10,6 +9,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { executeGraph } from "../dist/graph/commands.js";
 import { SqliteGraphStore } from "../dist/graph/store.js";
+import { SAFETY_BOUND_MS, closing, endChild } from "./owned-processes.mjs";
 
 async function project(t, files) {
   const root = await mkdtemp(join(tmpdir(), "pym-rust-finishing-"));
@@ -23,15 +23,14 @@ async function project(t, files) {
 }
 
 const cargo = '[package]\nname="app"\nedition="2021"\n';
-// Turns a CLI that never exits into a failure (C-50 review).
-const HANG_GUARD_MS = 3 * 60_000;
 const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
 
 function graphCli(root, ...args) {
   const result = spawnSync(
     process.execPath,
     [cli, "graph", ...args, "--json", "--root", root],
-    { encoding: "utf8" },
+    // C-50 review: a CLI that never exits is killed and fails here.
+    { encoding: "utf8", timeout: SAFETY_BOUND_MS, killSignal: "SIGKILL" },
   );
   assert.ifError(result.error);
   assert.equal(result.signal, null, result.stderr);
@@ -177,7 +176,10 @@ for (const [phase, signal] of [
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
-    t.after(() => child.kill("SIGKILL"));
+    t.after(() => endChild(child));
+    // C-50 review: a CLI that never exits fails here instead of hanging the
+    // run. The bound decides nothing when the test passes.
+    const closed = closing(child, "the CLI to exit after the signal");
     let ready = false;
     let stdout = "";
     child.stdout.setEncoding("utf8").on("data", (text) => {
@@ -189,17 +191,7 @@ for (const [phase, signal] of [
       ready = true;
       child.kill(signal);
     });
-    // C-50 review: a CLI that never exits fails here instead of hanging the
-    // run. The bound decides nothing when the test passes.
-    let bounded = false;
-    const bound = setTimeout(() => {
-      bounded = true;
-      child.kill("SIGKILL");
-    }, HANG_GUARD_MS);
-    const closed = await once(child, "close");
-    clearTimeout(bound);
-    assert.equal(bounded, false, "the CLI did not exit after the signal");
-    assert.deepEqual(closed, [130, null]);
+    assert.deepEqual(await closed.wait(), [130, null]);
     assert.ok(ready);
     assert.equal(JSON.parse(stdout).exitCode, 130);
 

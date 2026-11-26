@@ -14,12 +14,16 @@ import { createInterface } from "node:readline";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { SAFETY_BOUND_MS, closing, endChild } from "./owned-processes.mjs";
 
 const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
 const preload = new URL("./fixtures/graph-cli/stop-points.mjs", import.meta.url)
   .href;
-// Only turns a run that never exits into a failure; it decides nothing.
-const BOUND_MS = 180_000;
+// C-50 review: every process a test starts has a bound (a run that never
+// exits fails) and is killed in the test's clean-up, whatever it found.
+const limit = { timeout: SAFETY_BOUND_MS, killSignal: "SIGKILL" };
+const execBounded = (args) =>
+  promisify(execFile)(process.execPath, args, limit);
 
 async function project(t) {
   const root = await mkdtemp(join(tmpdir(), "pym-cli-stop-"));
@@ -36,7 +40,7 @@ const status = (root) =>
     spawnSync(
       process.execPath,
       [cli, "graph", "status", "--root", root, "--json"],
-      { encoding: "utf8" },
+      { encoding: "utf8", ...limit },
     ).stdout,
   ).sync.complete;
 
@@ -46,6 +50,7 @@ async function interrupted(args, env, ready, after) {
     env: { ...process.env, ...env },
     stdio: ["ignore", "pipe", "pipe"],
   });
+  const closed = closing(child, "the CLI to exit");
   let stdout = "";
   let stderr = "";
   child.stdout.setEncoding("utf8").on("data", (text) => (stdout += text));
@@ -57,21 +62,12 @@ async function interrupted(args, env, ready, after) {
     child.kill("SIGINT");
     await after?.();
   });
-  let bounded = false;
-  const bound = setTimeout(() => {
-    bounded = true;
-    child.kill("SIGKILL");
-  }, BOUND_MS);
   try {
-    const [code] = await new Promise((resolve) =>
-      child.on("close", (...result) => resolve(result)),
-    );
-    assert.equal(bounded, false, `the CLI did not exit: ${stderr}`);
+    const [code] = await closed.wait();
     assert.ok(seen, `the stop point was reached: ${stderr}`);
     return { code, stdout, stderr };
   } finally {
-    clearTimeout(bound);
-    child.kill("SIGKILL");
+    endChild(child);
   }
 }
 
@@ -103,21 +99,9 @@ test("a stop before the completion write leaves no completion: exit 130, no comp
 
 test("link list --no-sync interrupted during its in-place query exits 130", async (t) => {
   const root = await project(t);
-  await promisify(execFile)(process.execPath, [
-    cli,
-    "init",
-    root,
-    "--format",
-    "json",
-  ]);
+  await execBounded([cli, "init", root, "--format", "json"]);
   // Indexed, so the in-place query reads a store.
-  await promisify(execFile)(process.execPath, [
-    cli,
-    "graph",
-    "index",
-    "--root",
-    root,
-  ]);
+  await execBounded([cli, "graph", "index", "--root", root]);
   const go = join(root, "..", `${root.split("/").pop()}.go`);
   t.after(() => rm(go, { force: true }));
   const run = await interrupted(

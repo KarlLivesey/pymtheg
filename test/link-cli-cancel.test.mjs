@@ -13,15 +13,16 @@ import { createInterface } from "node:readline";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { SAFETY_BOUND_MS, closing, endChild } from "./owned-processes.mjs";
 
 const cli = fileURLToPath(new URL("../dist/cli/main.js", import.meta.url));
 const preload = new URL(
   "./fixtures/graph-cli/stuck-typescript.mjs",
   import.meta.url,
 );
-// Only turns a regression that never exits into a failure; a passing run
-// exits as soon as it has handled the signal.
-const BOUND_MS = 180_000;
+// C-50 review: every process a test starts has a bound (a regression that
+// never exits fails; a passing run exits as soon as it has handled the
+// signal) and is killed in the test's clean-up, whatever it found.
 
 for (const command of ["list", "check"])
   test(`link ${command} exits 130 on SIGINT during a stuck graph sync`, async (t) => {
@@ -32,13 +33,11 @@ for (const command of ["list", "check"])
       join(root, "src", "app.ts"),
       "export function start(n: number): number {\n  return n + 1;\n}\n",
     );
-    await promisify(execFile)(process.execPath, [
-      cli,
-      "init",
-      root,
-      "--format",
-      "json",
-    ]);
+    await promisify(execFile)(
+      process.execPath,
+      [cli, "init", root, "--format", "json"],
+      { timeout: SAFETY_BOUND_MS, killSignal: "SIGKILL" },
+    );
     // A changed file, so the sync analyses again.
     await writeFile(join(root, "src", "more.ts"), "export const more = 1;\n");
 
@@ -51,6 +50,8 @@ for (const command of ["list", "check"])
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
+    t.after(() => endChild(child));
+    const closed = closing(child, "the CLI to exit after SIGINT");
     let stdout = "";
     child.stdout.setEncoding("utf8").on("data", (text) => (stdout += text));
     let ready = false;
@@ -59,20 +60,7 @@ for (const command of ["list", "check"])
       ready = true;
       child.kill("SIGINT");
     });
-    let bounded = false;
-    const bound = setTimeout(() => {
-      bounded = true;
-      child.kill("SIGKILL");
-    }, BOUND_MS);
-    t.after(() => {
-      clearTimeout(bound);
-      child.kill("SIGKILL");
-    });
-    const [code, signal] = await new Promise((resolve) =>
-      child.on("close", (...result) => resolve(result)),
-    );
-    clearTimeout(bound);
-    assert.equal(bounded, false, "the CLI did not exit after SIGINT");
+    const [code, signal] = await closed.wait();
     assert.ok(ready, "the analysis was entered");
     assert.deepEqual([code, signal], [130, null]);
     assert.equal(JSON.parse(stdout).exitCode, 130);

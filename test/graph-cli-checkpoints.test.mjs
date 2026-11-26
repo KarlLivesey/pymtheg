@@ -6,6 +6,9 @@
 // completion write, went on to answer, and the CLI exited 0 after SIGINT.
 // The worker (test/graph-cli-pause-worker.mjs) pauses inside one store
 // method until the flag is set; the test aborts once it has paused.
+//
+// C-50 review: every wait has a bound that ends the test, and the worker
+// each test starts is terminated in its clean-up whatever it found.
 import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -15,6 +18,7 @@ import { runGraphInWorker } from "../dist/cli/graph-runner.js";
 import { executeGraph } from "../dist/graph/commands.js";
 import { LanguageRegistry } from "../dist/graph/index.js";
 import { fixtureFiles, fixtureModule } from "./graph-kill-fixture.mjs";
+import { bounded } from "./owned-processes.mjs";
 
 const registry = () => new LanguageRegistry([fixtureModule()]);
 
@@ -37,11 +41,14 @@ async function project(t, edit) {
 async function aborted(request, pause) {
   const flag = new Int32Array(new SharedArrayBuffer(8));
   const controller = new AbortController();
+  let worker;
   const run = runGraphInWorker(request, {
     signal: controller.signal,
     workerURL: new URL("./graph-cli-pause-worker.mjs", import.meta.url),
     workerData: { flag: flag.buffer, pause },
+    onWorker: (started) => (worker = started),
   });
+  const end = () => worker.terminate();
   const outcome = run.then(
     () => "resolved",
     (error) => `${error.name}: ${error.message}`,
@@ -49,18 +56,22 @@ async function aborted(request, pause) {
   try {
     // A run that ends without pausing fails the test instead of hanging it.
     const waited = Atomics.waitAsync(flag, 0, 0);
-    const first = await Promise.race([
-      waited.async ? waited.value.then(() => "paused") : "paused",
-      outcome.then((value) => `ended before pausing (${value})`),
-    ]);
+    const first = await bounded(
+      Promise.race([
+        waited.async ? waited.value.then(() => "paused") : "paused",
+        outcome.then((value) => `ended before pausing (${value})`),
+      ]),
+      "the worker to pause",
+      end,
+    );
     assert.equal(first, "paused");
     controller.abort();
-    return (await outcome).split(":")[0];
+    return (await bounded(outcome, "the run to end", end)).split(":")[0];
   } finally {
-    // Whatever was found, the worker is released and the run ends.
+    // Whatever was found, the worker is released and ended.
     controller.abort();
     Atomics.store(flag, 1, 1);
-    await outcome;
+    await end();
   }
 }
 
@@ -111,14 +122,17 @@ test("a marked stretch entered after a cooperative cancel is refused", async (t)
   await writeFile(join(root, "z.x"), "def stretch\n");
   const flag = new Int32Array(new SharedArrayBuffer(16));
   const controller = new AbortController();
+  let worker;
   const run = runGraphInWorker(
     { command: "index", root },
     {
       signal: controller.signal,
       workerURL: new URL("./graph-cli-stretch-worker.mjs", import.meta.url),
       workerData: { flag: flag.buffer },
+      onWorker: (started) => (worker = started),
     },
   );
+  const end = () => worker.terminate();
   const outcome = run.then(
     () => "resolved",
     (error) => error.name,
@@ -129,20 +143,25 @@ test("a marked stretch entered after a cooperative cancel is refused", async (t)
   };
   try {
     const blocked = Atomics.waitAsync(flag, 0, 0);
-    if (blocked.async) await blocked.value;
+    if (blocked.async)
+      await bounded(blocked.value, "the unmarked code to be reached", end);
     controller.abort();
     release(1);
     // Either the run ends (the stretch refused), or the stretch is entered.
     const entered = Atomics.waitAsync(flag, 2, 0);
-    const first = await Promise.race([
-      outcome,
-      entered.async ? entered.value.then(() => "entered") : "entered",
-    ]);
+    const first = await bounded(
+      Promise.race([
+        outcome,
+        entered.async ? entered.value.then(() => "entered") : "entered",
+      ]),
+      "the run to end or the stretch to be entered",
+      end,
+    );
     assert.equal(first, "AbortError");
     assert.equal(Atomics.load(flag, 2), 0, "the stretch was never entered");
   } finally {
     release(1);
     release(3);
-    await outcome;
+    await end();
   }
 });

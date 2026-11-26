@@ -15,6 +15,7 @@ import {
   useGraphRunner,
 } from "../dist/architecture/code-links.js";
 import { executeGraph } from "../dist/graph/commands.js";
+import { SAFETY_BOUND_MS } from "./owned-processes.mjs";
 
 const cli = join(import.meta.dirname, "..", "dist", "cli", "main.js");
 
@@ -31,13 +32,12 @@ test("link touched --file --impact hands the runner one request, the sync, whate
     join(root, "src", "use.ts"),
     'import { f0, f1 } from "./app";\nexport const sum = f0() + f1();\n',
   );
-  await promisify(execFile)(process.execPath, [
-    cli,
-    "init",
-    root,
-    "--format",
-    "json",
-  ]);
+  // C-50 review: a CLI that never exits is killed and fails here.
+  await promisify(execFile)(
+    process.execPath,
+    [cli, "init", root, "--format", "json"],
+    { timeout: SAFETY_BOUND_MS, killSignal: "SIGKILL" },
+  );
   const requests = [];
   useGraphRunner((request, signal) => {
     requests.push({ command: request.command, noSync: !!request.noSync });

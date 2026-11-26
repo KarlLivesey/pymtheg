@@ -12,7 +12,7 @@
 // reported is killed too. That bound only turns a hang into a failure.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { killOwned } from "./owned-processes.mjs";
+import { bounded, killOwned } from "./owned-processes.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -53,12 +53,13 @@ async function scenario(name) {
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line));
-  if (!ended) {
-    // Only processes this test started: each carries the scenario's
-    // scratch path on its command line (test/owned-processes.mjs).
-    killOwned(child.pid, scratch, { group: true });
-    for (const { pid } of facts.filter((f) => f.pid !== undefined))
-      killOwned(pid, scratch);
+  // Whatever the scenario found, nothing it started is left running. Only
+  // processes this test started are killed: each carries the scenario's
+  // scratch path on its command line (test/owned-processes.mjs).
+  if (!ended) killOwned(child.pid, scratch, { group: true });
+  for (const { pid } of facts.filter((f) => f.pid !== undefined)) {
+    killOwned(pid, scratch, { group: true });
+    killOwned(pid, scratch);
   }
   await rm(scratch, { recursive: true, force: true });
   assert.ok(ended, `the ${name} scenario did not finish: ${out}`);
@@ -173,24 +174,31 @@ test("a module's marked synchronous stretch is reported as inside the module cal
 
 test("a run that is not aborted answers through the worker", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "pymtheg-cli-run-"));
+  // C-50 review: ended whatever the test found.
+  let worker;
   try {
     for (const [path, text] of Object.entries(fixtureFiles(3)))
       await writeFile(join(scratch, path), text);
     const flag = new SharedArrayBuffer(4);
     const progress = [];
-    const response = await runGraphInWorker(
-      { command: "index", root: scratch },
-      {
-        signal: new AbortController().signal,
-        progress: (p) => progress.push(p.phase),
-        workerURL: new URL("./graph-cli-stuck-worker.mjs", import.meta.url),
-        workerData: { flag },
-      },
+    const response = await bounded(
+      runGraphInWorker(
+        { command: "index", root: scratch },
+        {
+          signal: new AbortController().signal,
+          progress: (p) => progress.push(p.phase),
+          workerURL: new URL("./graph-cli-stuck-worker.mjs", import.meta.url),
+          workerData: { flag },
+          onWorker: (started) => (worker = started),
+        },
+      ),
+      "the run to answer",
     );
     assert.equal(response.status, "ok");
     assert.equal(response.counts.files, 3);
     assert.ok(progress.includes("complete"));
   } finally {
+    await worker?.terminate();
     await rm(scratch, { recursive: true, force: true });
   }
 });

@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { pathToFileURL } from "node:url";
 import { isProcessId, killGroup } from "../dist/backends/child-groups.js";
+import { closing, endChild } from "./owned-processes.mjs";
 
 test("killGroup refuses 0, -1, 1, NaN and fractions without calling process.kill", (t) => {
   const calls = [];
@@ -53,11 +54,12 @@ test("a clean-up that reads an empty ready file does not kill its own process gr
     detached: true,
     stdio: ["ignore", "pipe", "inherit"],
   });
+  // C-50 review: bounded, and ended whatever the test found.
+  t.after(() => endChild(child));
+  const closed = closing(child, "the clean-up to finish");
   let out = "";
   child.stdout.on("data", (chunk) => (out += chunk));
-  const [code, signal] = await new Promise((resolve) =>
-    child.on("close", (...result) => resolve(result)),
-  );
+  const [code, signal] = await closed.wait();
   assert.deepEqual([code, signal, out], [0, null, "survived"]);
 });
 
@@ -93,13 +95,13 @@ test("a test's clean-up kills only a process it started", async (t) => {
     ["-e", "setInterval(() => {}, 1 << 30)", join(dir, "marker")],
     { stdio: "ignore" },
   );
-  const closed = new Promise((resolve) =>
-    child.on("close", (...result) => resolve(result)),
-  );
+  // C-50 review: bounded, and ended whatever the test found.
+  t.after(() => endChild(child));
+  const closed = closing(child, "the killed child to close");
   // Once its command line can be read, it is killed.
   for (let turn = 0; !killOwned(child.pid, dir); turn++) {
     assert.ok(turn < 100_000, "the child's command line was never readable");
     await new Promise(setImmediate);
   }
-  assert.deepEqual(await closed, [null, "SIGKILL"]);
+  assert.deepEqual(await closed.wait(), [null, "SIGKILL"]);
 });

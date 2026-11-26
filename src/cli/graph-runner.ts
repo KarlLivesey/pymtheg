@@ -42,6 +42,8 @@ export interface GraphRunOptions {
   /** Tests run the coordinator with their own worker (same protocol). */
   workerURL?: URL;
   workerData?: Record<string, unknown>;
+  /** Tests are handed the worker, so they can end it whatever they found. */
+  onWorker?: (worker: Worker) => void;
 }
 
 /** The error an aborted run rejects with: the one `signal.throwIfAborted()` gives. */
@@ -70,6 +72,7 @@ export function runGraphInWorker(
       options.workerURL ?? new URL("./graph-worker-main.js", import.meta.url),
       { workerData: { ...options.workerData, request, control, childGroups } },
     );
+    options.onWorker?.(worker);
     let settled = false;
     let terminated = false;
     const finish = (outcome: () => void) => {

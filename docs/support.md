@@ -1010,9 +1010,12 @@ fresh or incremental index. [C-36](changes/C-36.md)
 SIGHUP or SIGQUIT stops the run in every language, with one of two
 outcomes:
 
-- **Stopped before the index was fully written:** no completion line, exit
-  code 130, and `graph status` reports the index incomplete. The next index
-  repairs it.
+- **Stopped before the index was fully written:** no completion line and
+  exit code 130. A run stopped after it began writing leaves the index
+  incomplete in `graph status`, and the next index repairs it. A run stopped
+  before it wrote anything leaves the status as it was before the run: for
+  example, a re-index of an unchanged, already complete index stopped during
+  its inventory stays complete.
 - **Stopped after the index's completion was written:** the index is
   complete. The command reports it, exits 0, and says on stderr that the
   stop arrived after the index was complete.

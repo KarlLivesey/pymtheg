@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { test } from "node:test";
+import { afterEach, beforeEach, test } from "node:test";
 import { Worker } from "node:worker_threads";
 import { executeGraph } from "../dist/graph/commands.js";
 import {
@@ -22,6 +22,7 @@ import { module as synthetic } from "./fixtures/graph-core/synthetic.mjs";
 import { keepingModule } from "./fixtures/mcp-graph/keeping-module.mjs";
 import { tableModule } from "./fixtures/graph-session/table-module.mjs";
 import { controlledClock } from "./controlled-clock.mjs";
+import { SAFETY_BOUND_MS } from "./owned-processes.mjs";
 
 const production = await discoverLanguages();
 const worker = new URL(
@@ -49,16 +50,66 @@ const goFiles = {
 const synFiles = Object.fromEntries(
   Array.from({ length: 4 }, (_, i) => [`${i}.syn`, `source ${i}`]),
 );
+// C-50 review: a test whose awaited event never comes fails instead of
+// hanging the run. The bound runs from the test's last step (a worker
+// started, a job finished): past it every worker the test's jobs started is
+// terminated and its gates are opened, so each of its waits ends. Whatever
+// the test found, its workers are terminated when it ends. The bound
+// decides nothing when a test passes.
+let current;
+beforeEach(() => {
+  let timer;
+  const mine = (current = {
+    workers: [],
+    gates: [],
+    expired: false,
+    step() {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        mine.expired = true;
+        for (const gate of mine.gates)
+          for (let i = 0; i < gate.length; i++) {
+            Atomics.store(gate, i, 1);
+            Atomics.notify(gate, i);
+          }
+        for (const started of mine.workers) void started.terminate();
+      }, SAFETY_BOUND_MS);
+    },
+    end: () => clearTimeout(timer),
+  });
+  mine.step();
+});
+afterEach(async () => {
+  const mine = current;
+  mine.end();
+  await Promise.all(mine.workers.map((started) => started.terminate()));
+  assert.equal(
+    mine.expired,
+    false,
+    "Safety budget exhausted; evidence unresolved",
+  );
+});
+/** Turns of the event loop until `condition` holds, or the test's bound has passed. */
+async function turnsUntil(condition) {
+  while (!condition() && !current.expired) await new Promise(setImmediate);
+}
+
 /** Jobs whose workers run `mode`, with a gate the test holds. */
 function jobsFor(root, mode, options = {}) {
   const gate = new Int32Array(new SharedArrayBuffer(16));
+  const mine = current;
+  mine.gates.push(gate);
   const jobs = new GraphJobs(root, {
-    launch: (control) =>
-      new Worker(worker, {
+    launch: (control) => {
+      const started = new Worker(worker, {
         workerData: { control, gate: gate.buffer, mode, root },
         stdout: true,
         stderr: true,
-      }),
+      });
+      mine.workers.push(started);
+      mine.step();
+      return started;
+    },
     ...options,
   });
   return {
@@ -77,6 +128,7 @@ function jobsFor(root, mode, options = {}) {
 const run = async (jobs) => {
   const job = jobs.start({ command: "index" });
   await job.done;
+  current.step();
   return job;
 };
 async function differencesFromCold(base, root, registry) {
@@ -452,7 +504,7 @@ test("a cancel inside a synchronous stretch a module marks after an await ends t
     // Watches for a grace until the cancel has finished; a scheduled grace
     // is fired at once, so the cancel always finishes.
     let graced = false;
-    while (!retired) {
+    while (!retired && !current.expired) {
       if (clock.pending > 0) {
         graced = true;
         clock.fireNext();
@@ -497,7 +549,7 @@ test("a marked stretch entered after a cancel taken on the grace path is refused
     await stopped();
     const cancelling = jobs.cancel(job.id).then(() => "answered");
     // The cancel is on its grace path: the section is the awaited one.
-    while (clock.pending === 0) await new Promise(setImmediate);
+    await turnsUntil(() => clock.pending > 0);
     release();
     const entered = Atomics.waitAsync(gate, 2, 0);
     const first = await Promise.race([
@@ -527,7 +579,7 @@ test("a module that ignores the abort while its promise is awaited is ended when
     const job = jobs.start({ command: "index" });
     await stopped();
     const cancelling = jobs.cancel(job.id);
-    while (clock.pending === 0) await new Promise(setImmediate);
+    await turnsUntil(() => clock.pending > 0);
     assert.equal(clock.fireNext(), 30_000);
     await cancelling;
     assert.equal(job.state, "cancelled");
