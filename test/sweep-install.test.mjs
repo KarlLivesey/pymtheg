@@ -146,10 +146,9 @@ test("pnpm workspace lists are read in block and flow style", async (t) => {
     ["packages/*", "apps/*"],
   );
   // Round 6: a UTF-8 byte order mark before the first key.
-  assert.deepEqual(
-    workspacePatterns('\uFEFFpackages:\n  - "packages/*"\n'),
-    ["packages/*"],
-  );
+  assert.deepEqual(workspacePatterns('\uFEFFpackages:\n  - "packages/*"\n'), [
+    "packages/*",
+  ]);
   assert.deepEqual(
     workspacePatterns("packages: [ # all\n  'packages/*',\n  tools\n]\n"),
     ["packages/*", "tools"],
