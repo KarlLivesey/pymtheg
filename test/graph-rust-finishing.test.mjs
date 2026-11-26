@@ -199,11 +199,12 @@ for (const [phase, signal] of [
     );
     const partial = graphCli(root, "file", file, "--no-sync");
     // C-36: an incremental module's edited records are written after its
-    // analysis, so a run stopped during analysis has written nothing. The
-    // stored graph is still the previous complete one, as before any index
-    // of the edit. A run stopped later leaves its unfinished mark.
-    assert.equal(partial.status, phase === "analyze" ? "ok" : "incomplete");
-    assert.equal(partial.exitCode, phase === "analyze" ? 0 : 2);
+    // analysis, so a run stopped during analysis has written no records: the
+    // stored rows are still the previous complete graph's. C-38A: the run
+    // claims the store before that analysis (also when it reuses its
+    // analysis), so a run stopped there leaves its unfinished mark too.
+    assert.equal(partial.status, "incomplete");
+    assert.equal(partial.exitCode, 2);
     assert.equal(partial.sync.complete, false);
     assert.ok(
       partial.warnings.some((warning) => warning.code === "index-incomplete"),
