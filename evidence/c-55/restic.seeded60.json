@@ -1,0 +1,848 @@
+{
+ "id": "restic/restic",
+ "seed": 5521,
+ "expectedSteps": 60,
+ "steps": [
+  {
+   "step": 0,
+   "file": "internal/restic/c27_random_0_test.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 6720,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 1,
+   "file": "internal/terminal/password.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 6734,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 2,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11442,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 3,
+   "file": "internal/ui/restore/text_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 6746,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 4,
+   "file": "internal/ui/progress/counter_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 6739,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 5,
+   "file": "internal/fs/node_unix_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 6884,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 6,
+   "file": "internal/debug/round_tripper_debug.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9284,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 7,
+   "file": "internal/restorer/restorer_unix_test.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2359,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 8,
+   "file": "internal/fs/setflags_linux_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7559,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 9,
+   "file": "internal/repository/index/indexmap.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7388,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 10,
+   "file": "internal/debug/stacktrace.go",
+   "kind": "import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7477,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 11,
+   "file": "internal/repository/index/index_parallel.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8218,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 12,
+   "file": "internal/archiver/tree_saver_test.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8870,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 13,
+   "file": "internal/fs/setflags_linux_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9117,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 14,
+   "file": "internal/backend/layout/layout_test.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2817,
+   "resolvedFiles": 5,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 15,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8398,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 16,
+   "file": "internal/fuse/snapshots_dirstruct.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2615,
+   "resolvedFiles": 13,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 17,
+   "file": "cmd/restic/cmd_key_add.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8982,
+   "resolvedFiles": 560,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 18,
+   "file": "internal/repository/c27_random_18_test.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8278,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 19,
+   "file": "internal/data/testing.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8070,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 20,
+   "file": "cmd/restic/cmd_restore.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2041,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 21,
+   "file": "internal/backend/sftp/sftp_test.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2017,
+   "resolvedFiles": 7,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 22,
+   "file": "internal/repository/index/associated_data_test.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8501,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 23,
+   "file": "internal/repository/prune.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8131,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 24,
+   "file": "internal/backend/rest/config_test.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7874,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 25,
+   "file": "internal/filter/include.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7959,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 26,
+   "file": "internal/fs/fs_local_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8256,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 27,
+   "file": "internal/backend/s3/config.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8325,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 28,
+   "file": "helpers/build-release-binaries/main.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8766,
+   "resolvedFiles": 561,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 29,
+   "file": "internal/ui/format_test.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2211,
+   "resolvedFiles": 4,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 30,
+   "file": "internal/global/secondary_repo_test.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 1943,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 31,
+   "file": "internal/repository/key.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3319,
+   "resolvedFiles": 40,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 32,
+   "file": "cmd/restic/cmd_snapshots.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 3917,
+   "resolvedFiles": 84,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 33,
+   "file": "cmd/restic/c27_random_33.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8011,
+   "resolvedFiles": 562,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 34,
+   "file": "internal/repository/lock_file.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 9108,
+   "resolvedFiles": 562,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 35,
+   "file": "cmd/restic/lock.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7595,
+   "resolvedFiles": 562,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 36,
+   "file": "cmd/restic/cmd_repair_index_integration_test.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7760,
+   "resolvedFiles": 562,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 37,
+   "file": "internal/data/tree.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 2516,
+   "resolvedFiles": 24,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 38,
+   "file": "internal/filter/doc.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7637,
+   "resolvedFiles": 562,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 39,
+   "file": "internal/fs/stat_unix.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 1989,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 40,
+   "file": "internal/textfile/read_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7720,
+   "resolvedFiles": 562,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 41,
+   "file": "internal/backend/rclone/backend_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8409,
+   "resolvedFiles": 562,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 42,
+   "file": "internal/filter/exclude_test.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8341,
+   "resolvedFiles": 562,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 43,
+   "file": "internal/feature/c27_random_43.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 8251,
+   "resolvedFiles": 563,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 44,
+   "file": "internal/fs/c27_random_44_test.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7869,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 45,
+   "file": "internal/backend/backend.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 7832,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 46,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 15104,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 47,
+   "file": "internal/restorer/truncate_windows.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11877,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 48,
+   "file": "internal/backend/s3/s3.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10981,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 49,
+   "file": "cmd/restic/c27_random_49.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10681,
+   "resolvedFiles": 565,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 50,
+   "file": "internal/backend/all/all.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10144,
+   "resolvedFiles": 565,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 51,
+   "file": "internal/fs/interface.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10754,
+   "resolvedFiles": 565,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 52,
+   "file": "internal/restic/c27_random_0_test.go",
+   "kind": "file-delete",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10448,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 53,
+   "file": "cmd/restic/cmd_dump_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10386,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 54,
+   "file": "internal/ui/progress/terminal.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10592,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 55,
+   "file": "internal/backend/local/local_test.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11145,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 56,
+   "file": "internal/backend/local/local_windows.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 11296,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 57,
+   "file": "internal/repository/repository.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10397,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 58,
+   "file": "internal/options/secret_string.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10234,
+   "resolvedFiles": 564,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 59,
+   "file": "internal/repository/testing.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "wallMs": 10535,
+   "resolvedFiles": 327,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  }
+ ],
+ "equal": true
+}
