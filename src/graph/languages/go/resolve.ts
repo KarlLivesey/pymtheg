@@ -388,6 +388,8 @@ export interface LinkNote {
    * member's declaring owner is not provable from the checkout (C-14).
    */
   library?: "library-member-unproven";
+  /** Unresolved: a call through a parameter, result or receiver (`local`). */
+  local?: true;
   /** Decided by the toolchain route (see Decision.toolchain). */
   toolchain?: {
     upgrade: "definite" | "verified" | "external" | "library";
@@ -478,6 +480,7 @@ export function linkNotes(
   for (const [linkId, files] of resolver.invalid) note(linkId).invalid = files;
   for (const linkId of resolver.libraryMembers)
     note(linkId).library = "library-member-unproven";
+  for (const linkId of resolver.locals) note(linkId).local = true;
   for (const [linkId, decided] of resolver.toolchain)
     note(linkId).toolchain = decided;
   return output;
@@ -510,6 +513,8 @@ class GoResolver {
   readonly invalid = new Map<string, string[]>();
   /** Members selected on a library-typed value whose owner is unproven (C-14). */
   readonly libraryMembers = new Set<string>();
+  /** Calls through a parameter, result or receiver left without a target. */
+  readonly locals = new Set<string>();
   /** Links the toolchain route decided (W3-L), for the link notes. */
   readonly toolchain = new Map<string, NonNullable<LinkNote["toolchain"]>>();
   /** Failed files by directory (a file that cannot be read is not valid code). */
@@ -741,6 +746,11 @@ class GoResolver {
         this.open.set(link.id, ["import-destination-uncertain"]);
       else if (!distinct.length && this.libraryMember(link))
         this.libraryMembers.add(link.id);
+      else if (
+        !distinct.length &&
+        (link.data as { localParameter?: unknown } | undefined)?.localParameter
+      )
+        this.locals.add(link.id);
     }
     return { resolutions, links: added };
   }
@@ -3813,6 +3823,18 @@ class GoResolver {
       case "embeds":
       case "references":
       case "calls": {
+        // A call through a local binding that holds exactly one func literal
+        // (parse fact, `localBinding`): the enclosing function's own.
+        if (
+          (link.data as { localBinding?: unknown } | undefined)?.localBinding
+        ) {
+          const owner = link.sourceId
+            ? this.symbolsById.get(link.sourceId)
+            : undefined;
+          return owner && (owner.kind === "function" || owner.kind === "method")
+            ? this.definite([owner])
+            : UNRESOLVED;
+        }
         if (data.t) {
           const types = this.declaredTypes(data.t, link.file);
           if (!types.length) {
