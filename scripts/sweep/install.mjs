@@ -244,14 +244,7 @@ export async function missingPackages(root) {
     ? rootManifest.workspaces
     : rootManifest.workspaces?.packages ?? [];
   const yaml = (await read("pnpm-workspace.yaml")) ?? "";
-  const listed = [];
-  let inPackages = false;
-  for (const line of yaml.split("\n")) {
-    if (/^packages:\s*$/.test(line)) inPackages = true;
-    else if (inPackages && /^\s+-\s*/.test(line))
-      listed.push(line.replace(/^\s+-\s*/, "").replace(/^['"]|['"]\s*$/g, "").trim());
-    else if (inPackages && /^\S/.test(line)) inPackages = false;
-  }
+  const listed = workspacePatterns(yaml);
   const patterns = [...declared, ...listed].filter(
     (pattern) => typeof pattern === "string" && !pattern.startsWith("!"),
   );
@@ -309,4 +302,39 @@ export async function missingPackages(root) {
           missing.push(`${workspace || "."}: ${name}`);
   }
   return missing;
+}
+
+/**
+ * The `packages` list of a pnpm-workspace.yaml, in block style
+ * (`packages:` then `- "packages/*"` lines, indented or not) or flow style
+ * (`packages: ["packages/*", apps/*]`, also over several lines). Quotes and
+ * trailing comments are removed.
+ */
+export function workspacePatterns(yaml) {
+  const clean = (item) =>
+    item
+      .replace(/\s+#.*$/, "")
+      .trim()
+      .replace(/^(['"])(.*)\1$/, "$2")
+      .trim();
+  const lines = yaml.split("\n");
+  const start = lines.findIndex((line) => /^packages\s*:/.test(line));
+  if (start < 0) return [];
+  const rest = lines[start].replace(/^packages\s*:\s*/, "");
+  if (rest.startsWith("[")) {
+    // Flow style: up to the closing bracket.
+    let text = rest;
+    for (let i = start + 1; !text.includes("]") && i < lines.length; i++)
+      text += " " + lines[i].replace(/\s+#.*$/, "");
+    const inner = text.slice(1, text.indexOf("]"));
+    return inner.split(",").map(clean).filter(Boolean);
+  }
+  const items = [];
+  for (const line of lines.slice(start + 1)) {
+    if (/^\s*(#.*)?$/.test(line)) continue;
+    const item = /^\s*-\s*(.*)$/.exec(line);
+    if (!item) break;
+    items.push(clean(item[1]));
+  }
+  return items.filter(Boolean);
 }
