@@ -3611,3 +3611,26 @@ or receiver stays unresolved with the reason `local`. Everything else is as
 before. Go's module version is 33. **Why:** both shapes were stored
 unresolved with no reason; one closure is the function's own code, and a
 parameter's value comes from the caller. See [C-63](changes/C-63.md).
+
+### A module may have its decoded inputs kept by the index session (C-55)
+
+**Decided (C-55):** in an index session the indexer keeps the decoded
+inputs of a module that opts in (`keepsInput`, Go): its analysis records,
+every file's resolver projection and every symbol, as session kept state
+under C-45's rules. A run re-reads only the paths the store has written
+since they were read; the store records every path its `replaceFile`
+calls write. `replaceFile` and `removeFile` are the only writers of
+file-level facts, and inputs are assembled only for paths stored now, so
+removals need no record. The session compares the completion record once,
+at the run's baseline (`confirm`); the comparison C-45 also made when a run
+began could change no outcome and is removed. Each input is given in the order the same read gives without a
+session: records by UTF-16 code units, the resolver projection by UTF-8
+bytes (SQL `ORDER BY path`), symbols by id. The module must not
+change its inputs in place; the test suite freezes them, production does
+not (freezing costs about two thirds of decoding). A kept value above
+128 MiB (UTF-8 bytes) of stored JSON is not kept. **Why:** a Go body edit decoded every
+stored record twice per run (about 3.9 s of a cli/cli body edit through
+the MCP worker); kept, those reads take 0.4 s. **Trade:** the worker's
+resting heap grows by the kept value (cli/cli 94 → 247 MiB, under the
+512 MiB bound). **Unchanged:** without a session, every read and every
+stored row as before. See [C-55](changes/C-55.md).
