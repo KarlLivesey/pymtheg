@@ -1,105 +1,192 @@
 {
- "note": "typescript.conflictScans and declarations checked (typescript.conflictChecks) per pin, from the measurement build",
- "total": {
-  "scans": 607,
-  "checked": 298136,
-  "maxChecked": 1172
- },
+ "note": "typescript.conflictScans and statements submitted (typescript.conflictChecks) per pin and per index run (the sweep runs a cold and a warm index)",
  "byPin": {
-  "changesets/changesets": {
-   "scans": 1,
-   "checked": 307,
-   "maxChecked": 307
-  },
-  "colinhacks/zod": {
-   "scans": 11,
-   "checked": 5060,
-   "maxChecked": 959
-  },
-  "dexie/Dexie.js": {
-   "scans": 12,
-   "checked": 4959,
-   "maxChecked": 1033
+  "nestjs/nest": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 36,
+     "checked": 10822
+    }
+   ]
   },
   "excalidraw/excalidraw": {
-   "scans": 11,
-   "checked": 9139,
-   "maxChecked": 855
-  },
-  "honojs/hono": {
-   "scans": 18,
-   "checked": 5438,
-   "maxChecked": 518
-  },
-  "mermaid-js/mermaid": {
-   "scans": 11,
-   "checked": 4224,
-   "maxChecked": 397
-  },
-  "nestjs/nest": {
-   "scans": 36,
-   "checked": 10822,
-   "maxChecked": 330
-  },
-  "oclif/core": {
-   "scans": 5,
-   "checked": 1765,
-   "maxChecked": 360
-  },
-  "pingdotgg/t3code": {
-   "scans": 12,
-   "checked": 3897,
-   "maxChecked": 737
-  },
-  "pmndrs/zustand": {
-   "scans": 2,
-   "checked": 1525,
-   "maxChecked": 775
-  },
-  "puppeteer/puppeteer": {
-   "scans": 11,
-   "checked": 3900,
-   "maxChecked": 392
-  },
-  "react-hook-form/react-hook-form": {
-   "scans": 3,
-   "checked": 2224,
-   "maxChecked": 766
-  },
-  "reduxjs/redux-toolkit": {
-   "scans": 12,
-   "checked": 9181,
-   "maxChecked": 989
-  },
-  "trpc/trpc": {
-   "scans": 78,
-   "checked": 62222,
-   "maxChecked": 1120
-  },
-  "vercel/turborepo": {
-   "scans": 68,
-   "checked": 20630,
-   "maxChecked": 739
-  },
-  "vitejs/vite": {
-   "scans": 12,
-   "checked": 3500,
-   "maxChecked": 306
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 11,
+     "checked": 9139
+    }
+   ]
   },
   "vitest-dev/vitest": {
-   "scans": 20,
-   "checked": 13975,
-   "maxChecked": 861
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 20,
+     "checked": 13975
+    }
+   ]
   },
-  "withastro/astro": {
-   "scans": 282,
-   "checked": 134860,
-   "maxChecked": 1172
+  "puppeteer/puppeteer": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 11,
+     "checked": 3900
+    }
+   ]
+  },
+  "vitejs/vite": {
+   "runs": 2,
+   "perRun": [
+    {
+     "scans": 6,
+     "checked": 1750
+    },
+    {
+     "scans": 6,
+     "checked": 1750
+    }
+   ]
+  },
+  "reduxjs/redux-toolkit": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 12,
+     "checked": 9181
+    }
+   ]
+  },
+  "honojs/hono": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 18,
+     "checked": 5438
+    }
+   ]
+  },
+  "react-hook-form/react-hook-form": {
+   "runs": 2,
+   "perRun": [
+    {
+     "scans": 3,
+     "checked": 2224
+    },
+    {
+     "scans": 3,
+     "checked": 2224
+    }
+   ]
+  },
+  "changesets/changesets": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 1,
+     "checked": 307
+    }
+   ]
   },
   "yargs/yargs": {
-   "scans": 2,
-   "checked": 508,
-   "maxChecked": 391
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 2,
+     "checked": 508
+    }
+   ]
+  },
+  "pmndrs/zustand": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 2,
+     "checked": 1525
+    }
+   ]
+  },
+  "oclif/core": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 5,
+     "checked": 1765
+    }
+   ]
+  },
+  "pingdotgg/t3code": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 12,
+     "checked": 3897
+    }
+   ]
+  },
+  "trpc/trpc": {
+   "runs": 2,
+   "perRun": [
+    {
+     "scans": 39,
+     "checked": 31111
+    },
+    {
+     "scans": 39,
+     "checked": 31111
+    }
+   ]
+  },
+  "withastro/astro": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 141,
+     "checked": 67430
+    }
+   ]
+  },
+  "colinhacks/zod": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 11,
+     "checked": 5060
+    }
+   ]
+  },
+  "vercel/turborepo": {
+   "runs": 2,
+   "perRun": [
+    {
+     "scans": 34,
+     "checked": 10315
+    },
+    {
+     "scans": 34,
+     "checked": 10315
+    }
+   ]
+  },
+  "dexie/Dexie.js": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 12,
+     "checked": 4959
+    }
+   ]
+  },
+  "mermaid-js/mermaid": {
+   "runs": 1,
+   "perRun": [
+    {
+     "scans": 11,
+     "checked": 4224
+    }
+   ]
   }
  }
 }
