@@ -188,13 +188,15 @@ test("the ordinal follows source order, not key order", async () => {
         .filter((symbol) => symbol.name === "init")
         .map((symbol) => [symbol.range.start, symbol.ordinal])
         .sort((a, b) => a[0] - b[0]);
-    const keys = notesSymbols(store.getFile("p/o.go"))
+    const keys = notesSymbols(store.projectId, store.getFile("p/o.go"))
       .filter((symbol) => symbol.name === "init")
       .map((symbol) => symbol.key)
       .sort();
     assert.ok(keys[0].includes(`:${second}:`), "key order differs");
     assert.deepEqual(
-      inits(notesSymbols(store.getFile("p/o.go"))).map(([, n]) => n),
+      inits(notesSymbols(store.projectId, store.getFile("p/o.go"))).map(
+        ([, n]) => n,
+      ),
       [0, 1],
     );
     assert.deepEqual(
