@@ -315,7 +315,9 @@ export class GoExtractor {
         singleLiteral(binding) &&
         // Inside a function or method: a literal in a package-level
         // initializer has no enclosing function to target.
-        link.sourceKey !== "file"
+        ["function", "method"].includes(
+          this.byKey.get(link.sourceKey ?? "")?.kind ?? "",
+        )
       )
         data.localBinding = binding.name as unknown as Json;
     }

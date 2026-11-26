@@ -87,6 +87,11 @@ var literal = func() int {
 	return c()
 }
 
+var typed func() int = func() int {
+	c := func() int { return 2 }
+	return c()
+}
+
 func Package() int { return pkg() }
 `;
 
@@ -201,7 +206,10 @@ test("calls through one local func literal target the enclosing function; parame
       calls
         .filter((call) => call.name === "c")
         .map((call) => [call.target, call.localBinding, call.reason]),
-      [[null, null, null]],
+      [
+        [null, null, null],
+        [null, null, null],
+      ],
     );
   } finally {
     store.close();
