@@ -58,6 +58,7 @@ test("Turborepo's pnpm 12 pin uses a frozen, script-free install with the suppor
     assert.equal(install.version, "12.0.0");
     assert.deepEqual(install.args, ["install", "--frozen-lockfile", "--ignore-scripts", "--ignore-pnpmfile",
       "--store-dir", join(root, "install-cache", "pnpm")]);
+    assert.equal(install.env.npm_config_production, "false");
     await writeFile(lock, "resolution: {tarball: git+https://example.invalid/project.git}\n");
     assert.deepEqual(await installation(root, root), { manager: "pnpm", status: "unsupported", reason: "git-dependency" });
   } finally {

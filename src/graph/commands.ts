@@ -573,18 +573,15 @@ export async function executeGraph(
       const started = performance.now();
       options.progress?.({ phase: "inventory", done: 0, total });
       // C-45: what a session kept is used only if the store is as its last
-      // completed run left it (the completion record), for this project,
-      // store and configuration.
-      sessionRun = options.session?.beginRun(
-        {
-          root,
-          store: path,
-          projectId: currentStore.projectId,
-          configuration,
-          settings,
-        },
-        previousState?.fingerprint ?? null,
-      );
+      // completed run left it (the completion record, checked at the run's
+      // baseline by `confirm`), for this project, store and configuration.
+      sessionRun = options.session?.beginRun({
+        root,
+        store: path,
+        projectId: currentStore.projectId,
+        configuration,
+        settings,
+      });
       const run = sessionRun;
       const indexed = await indexProject(root, tracked, adapter, {
         excludeDirectories: [".pymtheg"],
@@ -592,6 +589,9 @@ export async function executeGraph(
           ? {
               kept: (module: LanguageModule) =>
                 run.kept(module.id, module.version),
+              ...(options.session?.keptInputBytes !== undefined
+                ? { keptInputBytes: options.session.keptInputBytes }
+                : {}),
             }
           : {}),
         onFileCompared: (path) => {
@@ -673,6 +673,13 @@ export async function executeGraph(
         const partial = files
           .filter((file) => file.status === "partial")
           .map((file) => file.path);
+        const reportedPaths = registry.modules
+          .filter(
+            (module) =>
+              module.reportsAnalysisPath &&
+              files.some((file) => file.module === module.id),
+          )
+          .map((module) => ({ module: module.id, path: "reused" as const }));
         report = {
           ...listing,
           unclaimed: listing.unclaimed.sort(),
@@ -696,6 +703,9 @@ export async function executeGraph(
           errors: [],
           analysisErrors: [],
           resolutionErrors: [],
+          // C-38A: nothing analysed, so each reporting module with files
+          // took its stored results whole.
+          ...(reportedPaths.length && { analysisPaths: reportedPaths }),
         };
         durationMs = 0;
       }
