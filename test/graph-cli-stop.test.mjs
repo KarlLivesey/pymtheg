@@ -122,3 +122,31 @@ test("link list --no-sync interrupted during its in-place query exits 130", asyn
   assert.equal(run.code, 130, run.stderr);
   assert.equal(JSON.parse(run.stdout).exitCode, 130);
 });
+
+// C-50 review: a command that syncs and then answers, stopped after its
+// sync's completion write but before it answers, exits 130 with no answer
+// (the JSON error, no result) and no stderr line about the stop; the index
+// its sync wrote stays complete. Only `graph index` reports its result
+// after a late stop.
+for (const [what, args, init] of [
+  ["graph file", (root) => ["graph", "file", "src/a.ts", "--root", root, "--json"], false],
+  ["link list", (root) => ["link", "list", "--root", root, "--json"], true],
+  ["link check", (root) => ["link", "check", "--root", root, "--json"], true],
+])
+  test(`${what} stopped after its sync's completion write exits 130 with no answer; the index stays complete`, async (t) => {
+    const root = await project(t);
+    if (init) await execBounded([cli, "init", root, "--format", "json"]);
+    // An edit, so the command's sync indexes and writes a completion.
+    await writeFile(join(root, "src", "b.ts"), "export const b = 2;\n");
+    const run = await interrupted(
+      args(root),
+      { PYM_TEST_STOP_POINT: "after-completion" },
+      "stop point after-completion",
+    );
+    assert.equal(run.code, 130, run.stderr);
+    const answer = JSON.parse(run.stdout);
+    assert.equal(answer.status, "error", run.stdout);
+    assert.equal(answer.exitCode, 130);
+    assert.doesNotMatch(run.stderr, /the stop arrived/);
+    assert.equal(status(root), true);
+  });

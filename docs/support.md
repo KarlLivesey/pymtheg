@@ -1007,8 +1007,7 @@ fresh or incremental index. [C-36](changes/C-36.md)
 
 **CLI cancellation (C-50).** `pymtheg graph` and the graph work of
 `pymtheg link` that may sync run in a worker thread. SIGINT, SIGTERM,
-SIGHUP or SIGQUIT stops the run in every language, with one of two
-outcomes:
+SIGHUP or SIGQUIT stops the run in every language. The outcomes:
 
 - **Stopped before the index was fully written:** no completion line and
   exit code 130. A run stopped after it began writing leaves the index
@@ -1016,9 +1015,14 @@ outcomes:
   before it wrote anything leaves the status as it was before the run: for
   example, a re-index of an unchanged, already complete index stopped during
   its inventory stays complete.
-- **Stopped after the index's completion was written:** the index is
-  complete. The command reports it, exits 0, and says on stderr that the
-  stop arrived after the index was complete.
+- **`graph index` stopped after the index's completion was written:** the
+  index is complete. The command reports it, exits 0, and says on stderr
+  that the stop arrived after the index was complete.
+- **A command that syncs and then answers** (`graph file`, `graph symbol`
+  and the other queries without `--no-sync`, `link list`, `link check`),
+  **stopped after its sync's completion write but before it answers:** exit
+  code 130 with no answer and no stderr line about the stop; `graph status`
+  says complete.
 
 Inside a language module's synchronous code, or a synchronous stretch the
 module marks after an await (Go marks its notes pass and its parse, Rust
