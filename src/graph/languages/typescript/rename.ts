@@ -1217,6 +1217,28 @@ export function renameShadowed(
   return { text: output, renamed: [...renamed], uncertain, reasons, assumed };
 }
 
+/** Restorers made by `nameRestorer` (for tests: what is stored per file). */
+const restorers = new WeakSet<(text: string) => string>();
+/**
+ * C-64: `restoreNames` over a copy of `names`, for storing beside a source
+ * file. Made here, at module level, it closes over the copied strings only:
+ * a function made inside the extraction would close over its scope, and so
+ * over the program and checker, and lib files outlive every program.
+ */
+export function nameRestorer(names: FreshNames): (text: string) => string {
+  const copy: FreshNames = { local: { ...names.local }, uncertain: { ...names.uncertain } };
+  for (const table of [copy.local, copy.uncertain])
+    for (const value of Object.values(table))
+      if (typeof value !== "string") throw TypeError("fresh names must be strings");
+  const restore = (text: string) => restoreNames(text, copy);
+  restorers.add(restore);
+  return restore;
+}
+/** Whether `restore` was made by `nameRestorer` (tests). */
+export const isNameRestorer = (restore: unknown): boolean =>
+  typeof restore === "function" &&
+  restorers.has(restore as (text: string) => string);
+
 /** Puts the original names back into a name or message derived from a renamed file. */
 export function restoreNames(value: string, names: FreshNames): string {
   let result = value;

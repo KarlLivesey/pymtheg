@@ -16,7 +16,14 @@ import {
 } from "../dist/graph/index.js";
 import { module as synthetic } from "./fixtures/graph-core/synthetic.mjs";
 import ts from "typescript";
-import typescriptModule from "../dist/graph/languages/typescript/index.js";
+import typescriptModule, {
+  typescriptModule as typescriptModuleFactory,
+} from "../dist/graph/languages/typescript/index.js";
+import {
+  isNameRestorer,
+  nameRestorer,
+} from "../dist/graph/languages/typescript/rename.js";
+import { storedKeyNames } from "../dist/graph/languages/typescript/symbols.js";
 
 /** Marks every decoded stored file record so live ones can be counted. */
 class DecodedFile {}
@@ -398,4 +405,102 @@ test("after a TypeScript analysis no compiler program or checker stays alive", a
     store?.close();
     await rm(scratch, { recursive: true, force: true });
   }
+});
+
+// C-64: each program's extraction stored, beside every one of its source
+// files (lib files included), a closure made inside the extraction, which
+// held the program and its checker. Lib files are shared by every program
+// and outlive them, so programs built and replaced during one analysis
+// stayed alive (six at once on microsoft/TypeScript). Counted, without
+// timing: at the first checker call of each rebuilt program, the checker
+// types alive do not grow with the number of programs built before it.
+test("a program replaced during an analysis does not stay alive through what is stored beside its files", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-index-memory-"));
+  let store;
+  try {
+    const root = join(scratch, "project");
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(
+      join(root, "tsconfig.json"),
+      JSON.stringify({ compilerOptions: { strict: true }, include: ["src"] }),
+    );
+    for (let i = 0; i < 4; i++)
+      await writeFile(
+        join(root, "src", `m${i}.ts`),
+        `import { f${(i + 1) % 4} } from "./m${(i + 1) % 4}";\n` +
+          `export function f${i}(): number {\n  return [1, 2].map((x) => x + 1).length;\n}\n` +
+          `export const v${i} = f${(i + 1) % 4};\n`,
+      );
+    const Type = ts.objectAllocator.getTypeConstructor();
+    const REBUILDS = 4;
+    let faults = 0;
+    let measureNext = false;
+    const alive = [];
+    const files = new Set();
+    const module = typescriptModuleFactory({
+      checkerFault(method, node) {
+        const source = node?.getSourceFile();
+        if (source) files.add(source);
+        if (measureNext) {
+          measureNext = false;
+          alive.push(queryObjects(Type, { format: "count" }));
+        }
+        // A stack overflow during extraction (not the warm-up): the
+        // session rebuilds its program and extracts the file again.
+        if (
+          faults < REBUILDS &&
+          method === "getSymbolAtLocation" &&
+          source?.fileName.endsWith("/src/m1.ts") &&
+          new Error().stack.includes("extractFile")
+        ) {
+          faults++;
+          measureNext = true;
+          throw new RangeError("Maximum call stack size exceeded");
+        }
+      },
+    });
+    store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "memory");
+    const report = await indexProject(
+      root,
+      new LanguageRegistry([module]),
+      store,
+    );
+    assert.equal(report.analysisErrors.length, 0);
+    assert.equal(faults, REBUILDS);
+    assert.equal(alive.length, REBUILDS);
+    // The same program built again holds the same types: no earlier one
+    // adds its own.
+    assert.deepEqual(
+      alive,
+      alive.map(() => alive[0]),
+      `checker types alive after each rebuild: ${alive.join(", ")}`,
+    );
+    // What is stored beside a file holds only the fresh names' strings.
+    assert.ok(files.size > 0);
+    for (const file of files)
+      assert.ok(isNameRestorer(storedKeyNames(file)), file.fileName);
+  } finally {
+    store?.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test("the stored name restorer copies the fresh names and accepts only strings", () => {
+  const names = {
+    local: { require: "__pym_r1", module: "__pym_m1", exports: "__pym_e1" },
+    uncertain: { require: "__pym_r2", module: "__pym_m2", exports: "__pym_e2" },
+  };
+  const restore = nameRestorer(names);
+  assert.ok(isNameRestorer(restore));
+  assert.equal(restore("__pym_r1.x"), "require.x");
+  names.local.require = "changed";
+  assert.equal(restore("__pym_r1.x"), "require.x");
+  assert.throws(
+    () =>
+      nameRestorer({
+        local: { ...names.local, require: {} },
+        uncertain: names.uncertain,
+      }),
+    TypeError,
+  );
 });

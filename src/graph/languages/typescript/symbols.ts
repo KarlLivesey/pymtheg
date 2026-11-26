@@ -608,6 +608,8 @@ const fileKeys = new WeakMap<ts.SourceFile, Map<ts.Node, string>>();
  * the compiler's spelling share a group and never one key.
  */
 const keyNames = new WeakMap<ts.SourceFile, (text: string) => string>();
+/** The restorer stored for `file`, if any (tests, C-64). */
+export const storedKeyNames = (file: ts.SourceFile) => keyNames.get(file);
 export function setKeyNames(
   file: ts.SourceFile,
   restore: (text: string) => string,
