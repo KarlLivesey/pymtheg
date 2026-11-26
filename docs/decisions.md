@@ -3655,3 +3655,17 @@ the MCP worker); kept, those reads take 0.4 s. **Trade:** the worker's
 resting heap grows by the kept value (cli/cli 94 → 247 MiB, under the
 512 MiB bound). **Unchanged:** without a session, every read and every
 stored row as before. See [C-55](changes/C-55.md).
+
+
+### Go's notes pass names symbols as the store does (C-56a)
+
+**Decided (C-56a):** Go's analysis notes pass names each symbol by the
+core's id rule (path, module, kind, identity and the ordinal among the
+file's symbols with the same kind and identity, by source order), under
+its own project id, instead of a draft id built from the extractor's key,
+which carries a source offset. **Why:** a body edit moved every draft id
+below it, so nothing the pass builds could be kept across an edit (C-56).
+**Unchanged:** every stored key, id and row, the notes and the links the
+pass finds, and Go's module version (unchanged, 33): the draft ids were never stored,
+and a Go body edit already rewrites no other file's stored link data.
+See [C-56a](changes/C-56a.md).
