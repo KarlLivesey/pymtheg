@@ -973,6 +973,18 @@ the project links whose target, or one of whose candidates, is library unit
 It finds only stored library targets: unresolved links may hide more uses. The MCP form, its
 selector forms per language and its limits are in [the code guide](code-guide.md).
 
+**Concurrent index runs (C-62).** When two index runs overlap, the one
+another run has overtaken writes nothing and never disturbs the newer run's
+mark. Its baseline is read before it walks the tree, so a commit by any
+other run after that stops it at its first write. That first write also
+refuses a capture the disk no longer matches (the walk, or a file the run
+would write), since another run may have found the newer tree current
+without writing. Only the newest run that claimed the store publishes its
+completion. The overtaken run answers taken over, stale or incomplete; the
+newer run's result stands, and the store equals a cold index of the tree
+with no further index. No lease or timeout is involved.
+[C-62](changes/C-62.md)
+
 An explicit source-only index can reuse a verified completion checkpoint
 after one content inventory. It reports zero indexed files and the current
 stored counts. A change to content, settings or dependencies, a missing

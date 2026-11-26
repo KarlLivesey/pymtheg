@@ -1,0 +1,16 @@
+{"round":"1","build":"base","corpus":"restic","run":"cold","wallMs":18200,"cpuMs":23874,"maxRssKiB":711824,"complete":true,"filesRead":560,"bytesRead":2435829,"verifiedFiles":0,"verifiedBytes":0}
+{"round":"1","build":"base","corpus":"restic","run":"edit","wallMs":2941,"cpuMs":4444,"maxRssKiB":362404,"complete":true,"filesRead":560,"bytesRead":2435849,"verifiedFiles":0,"verifiedBytes":0}
+{"round":"1","build":"base","corpus":"vector","run":"cold","wallMs":346904,"cpuMs":421322,"maxRssKiB":3863824,"complete":true,"filesRead":1633,"bytesRead":17480346,"verifiedFiles":0,"verifiedBytes":0}
+{"round":"1","build":"base","corpus":"vector","run":"edit","wallMs":46665,"cpuMs":75871,"maxRssKiB":2318012,"complete":true,"filesRead":1633,"bytesRead":17480366,"verifiedFiles":0,"verifiedBytes":0}
+{"round":"1","build":"head","corpus":"restic","run":"cold","wallMs":16836,"cpuMs":21899,"maxRssKiB":710940,"complete":true,"filesRead":560,"bytesRead":2435829,"verifiedFiles":560,"verifiedBytes":2435829}
+{"round":"1","build":"head","corpus":"restic","run":"edit","wallMs":2829,"cpuMs":4425,"maxRssKiB":374268,"complete":true,"filesRead":560,"bytesRead":2435849,"verifiedFiles":2,"verifiedBytes":17306}
+{"round":"1","build":"head","corpus":"vector","run":"cold","wallMs":330713,"cpuMs":405535,"maxRssKiB":4024884,"complete":true,"filesRead":1633,"bytesRead":17480346,"verifiedFiles":1633,"verifiedBytes":17480346}
+{"round":"1","build":"head","corpus":"vector","run":"edit","wallMs":49848,"cpuMs":78496,"maxRssKiB":2309508,"complete":true,"filesRead":1633,"bytesRead":17480366,"verifiedFiles":49,"verifiedBytes":468658}
+{"round":"2","build":"base","corpus":"restic","run":"cold","wallMs":18226,"cpuMs":24202,"maxRssKiB":712188,"complete":true,"filesRead":560,"bytesRead":2435829,"verifiedFiles":0,"verifiedBytes":0}
+{"round":"2","build":"base","corpus":"restic","run":"edit","wallMs":2936,"cpuMs":4418,"maxRssKiB":372864,"complete":true,"filesRead":560,"bytesRead":2435849,"verifiedFiles":0,"verifiedBytes":0}
+{"round":"2","build":"base","corpus":"vector","run":"cold","wallMs":322058,"cpuMs":394163,"maxRssKiB":4029524,"complete":true,"filesRead":1633,"bytesRead":17480346,"verifiedFiles":0,"verifiedBytes":0}
+{"round":"2","build":"base","corpus":"vector","run":"edit","wallMs":45033,"cpuMs":74519,"maxRssKiB":2304976,"complete":true,"filesRead":1633,"bytesRead":17480366,"verifiedFiles":0,"verifiedBytes":0}
+{"round":"2","build":"head","corpus":"restic","run":"cold","wallMs":16773,"cpuMs":22494,"maxRssKiB":790072,"complete":true,"filesRead":560,"bytesRead":2435829,"verifiedFiles":560,"verifiedBytes":2435829}
+{"round":"2","build":"head","corpus":"restic","run":"edit","wallMs":2888,"cpuMs":4531,"maxRssKiB":368484,"complete":true,"filesRead":560,"bytesRead":2435849,"verifiedFiles":2,"verifiedBytes":17306}
+{"round":"2","build":"head","corpus":"vector","run":"cold","wallMs":359279,"cpuMs":438355,"maxRssKiB":4039612,"complete":true,"filesRead":1633,"bytesRead":17480346,"verifiedFiles":1633,"verifiedBytes":17480346}
+{"round":"2","build":"head","corpus":"vector","run":"edit","wallMs":48310,"cpuMs":77572,"maxRssKiB":2305428,"complete":true,"filesRead":1633,"bytesRead":17480366,"verifiedFiles":49,"verifiedBytes":468658}
