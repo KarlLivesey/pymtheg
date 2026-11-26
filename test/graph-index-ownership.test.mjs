@@ -47,7 +47,8 @@ const LANGUAGES = {
   },
   rust: {
     files: {
-      "Cargo.toml": '[package]\nname = "app"\nversion = "0.1.0"\nedition = "2021"\n',
+      "Cargo.toml":
+        '[package]\nname = "app"\nversion = "0.1.0"\nedition = "2021"\n',
       "src/lib.rs": "pub mod a;\npub fn use_it() -> u32 { a::hello() }\n",
       "src/a.rs": "pub fn hello() -> u32 { 1 }\n",
     },
@@ -260,7 +261,12 @@ for (const order of ["A, B", "B, A"])
 
 // A run killed at any gate leaves a store that one more index makes equal
 // to a cold index of the tree; a run killed before its claim wrote nothing.
-for (const gate of ["after-walk", "after-parse", "before-finish", "before-publish"])
+for (const gate of [
+  "after-walk",
+  "after-parse",
+  "before-finish",
+  "before-publish",
+])
   test(
     `a run killed at ${gate} needs at most one more index`,
     { skip: !proc && "needs /proc to see the child stopped" },

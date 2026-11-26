@@ -350,13 +350,24 @@ export async function indexProject(
   // current, may have seen a newer tree than this run captured; then this
   // run writes nothing. A run that writes nothing never checks.
   {
+    // Only paths a module claims or reads as context can change what the
+    // run writes: a file of no module (a store kept in the tree, its
+    // journal) may come and go.
+    const relevant = (path: string): boolean => {
+      try {
+        if (registry.claim(path)) return true;
+      } catch {
+        return true;
+      }
+      return registry.modules.some((module) => needsContext(module, path));
+    };
     const expected = new Map<string, string>();
     for (const file of updates)
       expected.set(file.path, captures.get(file.path)?.hash ?? "");
     for (const file of contexts) expected.set(file.path, file.hash);
     store.verifyIndexCapture?.(
       () =>
-        sameWalk(root, excluded, options.excludeFiles, paths) &&
+        sameWalk(root, excluded, options.excludeFiles, paths, relevant) &&
         [...expected].every(([path, hash]) => {
           let now = "";
           try {
@@ -990,15 +1001,17 @@ async function parsedLinks(store: GraphStorage, module: string) {
 }
 
 /**
- * C-62: whether the tree's files are still `paths`, walked as the run walked
- * it (synchronously: this runs under a write lock).
+ * C-62: whether the tree's relevant files are still the ones the run walked,
+ * walked as the run walked it (synchronously: this runs under a write lock).
  */
 function sameWalk(
   root: string,
   excluded: ReadonlySet<string>,
   excludeFiles: readonly string[] | undefined,
-  paths: readonly string[],
+  walked: readonly string[],
+  relevant: (path: string) => boolean,
 ): boolean {
+  const paths = walked.filter(relevant);
   const found: string[] = [];
   const walk = (directory: string): void => {
     const entries = readdirSync(join(root, directory), { withFileTypes: true });
@@ -1016,9 +1029,9 @@ function sameWalk(
   } catch {
     return false;
   }
-  found.sort(compare);
+  const kept = found.filter(relevant).sort(compare);
   return (
-    found.length === paths.length &&
-    found.every((path, index) => path === paths[index])
+    kept.length === paths.length &&
+    kept.every((path, index) => path === paths[index])
   );
 }

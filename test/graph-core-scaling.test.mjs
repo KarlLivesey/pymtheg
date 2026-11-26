@@ -192,9 +192,14 @@ test("first/repeat work is linear; unchanged has zero parses and writes and a fi
           assert.ok(ownIds.has(args[1]), sql);
         else if (/graph_links|graph_candidates/.test(sql))
           assert.ok(ownIds.has(args[0]), sql);
-        // The index run's mark (C-22): set with the first write, cleared last.
+        // The index run's mark (C-22): set with the first write, cleared
+        // last; its generation (C-62) moves with the mark.
         else if (/graph_meta/.test(sql))
-          assert.match(sql, /'index-run'|'command-complete'/, sql);
+          assert.match(
+            sql,
+            /'index-run'|'command-complete'|'index-generation'/,
+            sql,
+          );
         else assert.fail(`Unexpected write: ${sql}`);
       }
       assert.ok(
