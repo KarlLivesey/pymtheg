@@ -3522,7 +3522,7 @@ A run holding files that main's parse write would have written commits its
 run mark at the end of the parse write, where its first commit used to be,
 so a run started after that point finds it unfinished and takes over
 (files of a module reusing its analysis, C-27 and C-36, were held before
-and claim nothing). **Why:** every Go and Rust file was stored as parsed
+and claim nothing; C-38A later claims for them too). **Why:** every Go and Rust file was stored as parsed
 and then replaced whole as analysed, and every TypeScript file as a
 placeholder and then as analysed; on four pins that was 46-57% of the rows
 a cold index changed. **Trade:** held results stay in memory until
@@ -3553,6 +3553,27 @@ and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall
 result; the 30 s grace only bounds how long an unanswering worker is
 given. See [C-48](changes/C-48.md).
 
+### C-38A The early claim covers modules reusing their analysis; the report names the analysis path
+
+**Decided (C-38A):** the early store claim (C-53) is made whenever any
+module holds back edited files' writes, also a module reusing its
+analysis, which C-53 left out. **Why:** without it a run that begins during
+that analysis finds no write since its start, answers without writing, and
+the first run then writes its analysis of the older text (the Go and
+Rust race tests). The index report also lists, per module that reports
+one (`reportsAnalysisPath`) and has files in the index, the path its
+analysis took (`reused` or `full` for TypeScript); "no previous index"
+comes from the store's record that a run finished completely, kept across
+later runs. **Trade:** a run stopped during a reusing analysis, or taken
+over, leaves its unfinished mark: a `--no-sync` query reports
+`incomplete` over the previous complete rows, and the next index is a full
+analysis (reviewer A, 20 Go packages with one edited: `unchanged=0
+indexed=20` after an interrupted run, `unchanged=19 indexed=1` before).
+**Limit:** before its claim a run is unprotected: paused after parsing a
+file that is then restored, it overwrites a completed run's rows; paused
+after its walk, it deletes the row of a file another run added. Both end
+`incomplete` and the next index repairs them; closing the window is the
+next chunk. See [C-38A](changes/C-38A.md).
 
 
 ### Go calls through a local func value (C-63)
