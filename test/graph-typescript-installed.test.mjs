@@ -1526,6 +1526,63 @@ test("a manifest range the compiler cannot parse does not fail the importing fil
   });
 });
 
+// C-60: a base whose root is not an object (TS5092) is dropped by the
+// compiler. Reached by package name, the link stays `incomplete-config`, as
+// for an unreadable base; reached by relative path, the file fails.
+test("a config base by package name whose root is not an object keeps the config incomplete; by relative path it fails the file", async () => {
+  for (const root of ["[]", "55"]) {
+    for (const by of ["package", "relative"]) {
+      const { root: dir, request, read, write } = await project();
+      await write("node_modules/kit/package.json", manifest("kit", "1.0.0"));
+      await write(
+        "node_modules/kit/index.d.ts",
+        "export interface Box { open(): void }\nexport declare const box: Box;\n",
+      );
+      await write(
+        "packages/tsconfig/package.json",
+        JSON.stringify({ name: "@scope/tsconfig", version: "0.0.0" }),
+      );
+      await write("packages/tsconfig/library.json", root);
+      await write(
+        "packages/app/tsconfig.json",
+        JSON.stringify({
+          extends:
+            by === "package"
+              ? "@scope/tsconfig/library.json"
+              : "../tsconfig/library.json",
+          include: ["src"],
+        }),
+      );
+      await write(
+        "packages/app/src/a.ts",
+        'import { box } from "kit";\nbox.open();\n',
+      );
+      if (by === "package") {
+        const link = join(dir, "packages/app/node_modules/@scope/tsconfig");
+        await mkdir(dirname(link), { recursive: true });
+        await symlink("../../../tsconfig", link);
+      }
+      await request("index");
+      read((store, call) => {
+        const file = store.getFile("packages/app/src/a.ts").result;
+        const variant = `${by} base ${root}`;
+        if (by === "relative") assert.equal(file.status, "failed", variant);
+        else {
+          assert.ok(
+            file.diagnostics.some(({ message }) =>
+              message.includes("node_modules is never captured"),
+            ),
+            variant,
+          );
+          const open = call("packages/app/src/a.ts", "box.open");
+          assert.notEqual(open.resolution, "library", variant);
+          assert.equal(open.data.reason, "incomplete-config", variant);
+        }
+      });
+    }
+  }
+});
+
 test("a config extended by package name through an installed workspace link is read; an absent one stays incomplete", async () => {
   const cases = {
     "workspace config package": {
