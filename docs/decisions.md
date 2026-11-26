@@ -3220,6 +3220,20 @@ measured trees. **Rules out:** treating a repeated declaration as already
 judged, unless what a judgement reads is first made explicit in the code
 rather than argued in a note. [C-47](changes/C-47.md)
 
+### C-60 A judgement or key does not depend on unrelated order or text
+
+**Decided (C-60):** the judge judges each part of a union callee on its
+own; only the call's joined answer is cached by the call. A hashed part of
+a TypeScript key is a hash of the restored source names, never of the
+compiler's fresh spelling. A config base that the compiler drops because
+its root is not an object (TS5092) keeps the `incomplete-config` marker, as
+an unreadable base does. **Why:** each was found with a fixture. The
+second part of a union took the first part's signature, which gave a
+definite link through a failed file in one order only. An unrelated edit
+changed a renamed file's keys. And a dropped base was taken as read.
+**Rules out:** a per-call memo shared by different callees of that call;
+key hashes of text that depends on other files. [C-60](changes/C-60.md)
+
 ### C-62 An overtaken index run writes nothing
 
 **Decided (C-62):** an index run's baseline (data version, mark,
@@ -3576,3 +3590,41 @@ file that is then restored, it overwrites a completed run's rows; paused
 after its walk, it deletes the row of a file another run added. Both end
 `incomplete` and the next index repairs them; closing the window is the
 next chunk. See [C-38A](changes/C-38A.md).
+
+
+### Go calls through a local func value (C-63)
+
+**Decided (C-63, manager ruling for all three languages):** a Go call through
+a local binding that provably holds exactly one func literal (declared with
+it and never written, or declared without a value and written once with
+one; no write the extractor cannot see; not of a named func type, whose
+methods can write it) targets the enclosing function or
+method, with the binding's name and declaration span in
+`data.localBinding`, Rust's form. A call through a parameter, named result
+or receiver stays unresolved with the reason `local`. Everything else is as
+before. Go's module version is 33. **Why:** both shapes were stored
+unresolved with no reason; one closure is the function's own code, and a
+parameter's value comes from the caller. See [C-63](changes/C-63.md).
+
+### A module may have its decoded inputs kept by the index session (C-55)
+
+**Decided (C-55):** in an index session the indexer keeps the decoded
+inputs of a module that opts in (`keepsInput`, Go): its analysis records,
+every file's resolver projection and every symbol, as session kept state
+under C-45's rules. A run re-reads only the paths the store has written
+since they were read; the store records every path its `replaceFile`
+calls write. `replaceFile` and `removeFile` are the only writers of
+file-level facts, and inputs are assembled only for paths stored now, so
+removals need no record. The session compares the completion record once,
+at the run's baseline (`confirm`); the comparison C-45 also made when a run
+began could change no outcome and is removed. Each input is given in the order the same read gives without a
+session: records by UTF-16 code units, the resolver projection by UTF-8
+bytes (SQL `ORDER BY path`), symbols by id. The module must not
+change its inputs in place; the test suite freezes them, production does
+not (freezing costs about two thirds of decoding). A kept value above
+128 MiB (UTF-8 bytes) of stored JSON is not kept. **Why:** a Go body edit decoded every
+stored record twice per run (about 3.9 s of a cli/cli body edit through
+the MCP worker); kept, those reads take 0.4 s. **Trade:** the worker's
+resting heap grows by the kept value (cli/cli 94 → 247 MiB, under the
+512 MiB bound). **Unchanged:** without a session, every read and every
+stored row as before. See [C-55](changes/C-55.md).
