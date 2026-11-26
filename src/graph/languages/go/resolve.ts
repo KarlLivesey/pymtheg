@@ -425,8 +425,12 @@ export function linkNotes(
   const symbols: GraphSymbol[] = [];
   const links: GraphLink[] = [];
   // C-56a: the symbols are named as the store names them (kind, identity
-  // and ordinal; never a source offset), so a body edit leaves every other
-  // symbol's id as it was. Link sources are keys of the same file's symbols.
+  // and ordinal; never a source offset), so moving code leaves ids as they
+  // were. A body edit can still rename a function-local type or anonymous
+  // struct elsewhere in the file: those are numbered within the enclosing
+  // declaration's identity, so a new one in the first of two `init`
+  // renumbers the second's. Link sources are keys of the same file's
+  // symbols.
   const ids = new Map<string, string>();
   const id = (path: string, key: string) => ids.get(`${path}\u0000${key}`)!;
   for (const file of files) {

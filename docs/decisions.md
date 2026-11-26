@@ -3602,6 +3602,6 @@ its own project id, instead of a draft id built from the extractor's key,
 which carries a source offset. **Why:** a body edit moved every draft id
 below it, so nothing the pass builds could be kept across an edit (C-56).
 **Unchanged:** every stored key, id and row, the notes and the links the
-pass finds, and Go's module version (32): the draft ids were never stored,
+pass finds, and Go's module version (unchanged, 33): the draft ids were never stored,
 and a Go body edit already rewrites no other file's stored link data.
 See [C-56a](changes/C-56a.md).
