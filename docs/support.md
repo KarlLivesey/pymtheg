@@ -415,6 +415,17 @@ file (its ID can change when files are added or removed).
   selection names it: a field or concrete method gets `Owner.Name` with its
   declaring named type and package, evidence `declaring-owner`;
   third-party interface methods stay dispatch.
+- **Local func values (C-63):** a call through a local binding that provably
+  holds exactly one func literal (declared with it and never written, or
+  declared without a value and written once with one; no write the source
+  hides, such as an address taken; not of a named func type, whose methods
+  can write it) targets the enclosing function or method,
+  with the binding's name and declaration span in `data.localBinding` (the
+  Rust and TypeScript form). A call through a parameter, a named result or a
+  receiver is unresolved with the reason `local`: its value comes from the
+  caller. A local assigned several func values, or one the source cannot
+  follow, is as below; one assigned a named function resolves to it, as
+  before.
 - **Unresolved:** members of third-party and non-local `replace` types,
   and standard-library members the table does not settle (above); imports Go forbids (`internal`,
   `package main`, a `replace` of a module that is not required, a local
@@ -930,8 +941,10 @@ and never yields a version pin.
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).
 - **`partial` files** have complete but qualified facts, never syntax errors: an
-  `extends` base that was not captured (`incomplete-config`; a package preset
-  such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler
+  `extends` base that was not captured, or a base the compiler drops
+  because it is unreadable, has syntax errors or a root that is not an object
+  (`incomplete-config`; a package preset such as `@tsconfig/node20` leaves
+  most cross-file links unresolved; [C-60](changes/C-60.md)), compiler
   stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
   be decided statically.
 - **Files the compiler or memory cannot take (C-13):** a file the TypeScript

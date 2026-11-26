@@ -8746,3 +8746,372 @@ test("const assertions store no reference link, while real type references in as
     },
   );
 });
+
+// ----- C-60: a union callee's parts are judged each on its own -----
+
+/** A strict project: `use.ts` calls a union of `parts` with `arg`. */
+function unionCallee(parts, broken) {
+  const select = parts
+    .slice(0, -1)
+    .reduceRight(
+      (rest, part, i) => `flag${i} ? ${part} : ${rest}`,
+      parts.at(-1),
+    );
+  return {
+    "tsconfig.json": JSON.stringify({
+      compilerOptions: { strict: true, noEmit: true },
+      include: ["*.ts"],
+    }),
+    "models.ts":
+      'export class Clean { run() { return "clean"; } }\nexport class Other { run() { return 2; } }\n',
+    "broken.ts": broken ? "export const arg = ;\n" : "export const arg = 1;\n",
+    "dep.ts": [
+      'import { Clean, Other } from "./models";',
+      "export function good(x: string | number): Clean { return new Clean(); }",
+      "export function overloaded(x: string): Clean;",
+      "export function overloaded(x: number): Other;",
+      'export function overloaded(x: string | number): Clean | Other { return typeof x === "string" ? new Clean() : new Other(); }',
+      "export function numeric(x: number): Other { return new Other(); }",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { arg } from "./broken";',
+      'import { good, numeric, overloaded } from "./dep";',
+      `export function use(${parts
+        .map((_, i) => `flag${i}: boolean`)
+        .slice(0, -1)
+        .join(", ")}) {`,
+      `  const selected = ${select};`,
+      "  return selected(arg).run();",
+      "}",
+      "",
+    ].join("\n"),
+  };
+}
+const runLink = async (parts, broken) => {
+  const { links } = await indexFiles(unionCallee(parts, broken));
+  const link = linkAt({ links }, "use.ts", "selected(arg).run()", "run");
+  return {
+    resolution: link.resolution,
+    reason: link.reason ?? null,
+    targets: link.targets,
+  };
+};
+
+test("a union callee whose argument comes from a failed file is invalid code in either order", async () => {
+  // `overloaded` picks its signature by the argument, which the failed file
+  // decides; `good` does not. Before C-60 the second part reused the first
+  // part's signature: `good : overloaded` gave a definite Clean.run.
+  for (const parts of [
+    ["good", "overloaded"],
+    ["overloaded", "good"],
+  ]) {
+    const broken = await runLink(parts, true);
+    assert.equal(broken.reason, "invalid-code", parts.join(" : "));
+    assert.deepEqual(broken.targets, [], parts.join(" : "));
+    // Repaired, the call is either class's `run`.
+    const fixed = await runLink(parts, false);
+    assert.equal(fixed.resolution, "ambiguous", parts.join(" : "));
+    assert.deepEqual(
+      fixed.targets,
+      ["models.ts#Clean.run", "models.ts#Other.run"],
+      parts.join(" : "),
+    );
+  }
+});
+
+test("a union callee's link does not depend on the order of its parts", async () => {
+  const permutations = (list) =>
+    list.length <= 1
+      ? [list]
+      : list.flatMap((first, i) =>
+          permutations([...list.slice(0, i), ...list.slice(i + 1)]).map(
+            (rest) => [first, ...rest],
+          ),
+        );
+  for (const broken of [true, false]) {
+    const answers = new Map();
+    for (const parts of permutations(["good", "overloaded", "numeric"]))
+      answers.set(
+        parts.join(" : "),
+        JSON.stringify(await runLink(parts, broken)),
+      );
+    assert.equal(
+      new Set(answers.values()).size,
+      1,
+      `${broken ? "broken" : "repaired"}: ${JSON.stringify(Object.fromEntries(answers))}`,
+    );
+  }
+});
+
+// ----- C-60 review: callback parameters under a union callee -----
+
+const orders = (list) =>
+  list.length <= 1
+    ? [list]
+    : list.flatMap((first, i) =>
+        orders([...list.slice(0, i), ...list.slice(i + 1)]).map((rest) => [
+          first,
+          ...rest,
+        ]),
+      );
+const selector = (parts) =>
+  parts
+    .slice(0, -1)
+    .reduceRight(
+      (rest, part, i) => `flag${i} ? ${part} : ${rest}`,
+      parts.at(-1),
+    );
+const flags = (parts) =>
+  parts
+    .slice(0, -1)
+    .map((_, i) => `flag${i}: boolean`)
+    .join(", ");
+const strict = JSON.stringify({
+  compilerOptions: { strict: true, noEmit: true },
+  include: ["*.ts"],
+});
+const twoClasses =
+  'export class Clean { run() { return "clean"; } }\nexport class Other { run() { return 2; } }\n';
+
+test("a callback's parameter typed by a failed file through a union callee is invalid code in every order; repaired, it is the true target", async () => {
+  // Each branch's callback takes `Input` from the failed file; `pick` picks
+  // its overload by it. Before C-60 the union's joined return stood in for
+  // the parameter's type, and gave a definite Clean.run.
+  const files = (parts, broken) => ({
+    "tsconfig.json": strict,
+    "models.ts": twoClasses,
+    "broken.ts": broken
+      ? "export type Input = ;\n"
+      : "export type Input = number;\n",
+    "dep.ts": [
+      'import { Clean, Other } from "./models";',
+      'import type { Input } from "./broken";',
+      "export function left(cb: (value: Input) => void): void { cb(1 as any); }",
+      "export function right(cb: (value: Input) => void): void { cb(1 as any); }",
+      "export function middle(cb: (value: Input) => void): void { cb(1 as any); }",
+      "export function pick(x: string): Clean;",
+      "export function pick(x: number): Other;",
+      "export function pick(x: unknown): Clean | Other { return typeof x === 'string' ? new Clean() : new Other(); }",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { left, middle, pick, right } from "./dep";',
+      `export function use(${flags(parts)}) {`,
+      `  const call = ${selector(parts)};`,
+      "  call((value) => pick(value).run());",
+      "}",
+      "",
+    ].join("\n"),
+  });
+  for (const branches of [
+    ["left", "right"],
+    ["left", "right", "middle"],
+  ])
+    for (const parts of orders(branches)) {
+      const what = parts.join(" : ");
+      const broken = linkAt(
+        await indexFiles(files(parts, true)),
+        "use.ts",
+        "pick(value).run()",
+        "run",
+      );
+      assert.equal(broken.reason, "invalid-code", what);
+      const fixed = linkAt(
+        await indexFiles(files(parts, false)),
+        "use.ts",
+        "pick(value).run()",
+        "run",
+      );
+      assert.equal(fixed.resolution, "resolved", what);
+      assert.deepEqual(fixed.targets, ["models.ts#Other.run"], what);
+    }
+});
+
+test("a callback's parameter the branches agree on stays definite through a union callee in every order", async () => {
+  // Every branch gives its callback a Box<Failed>; `value.clean` does not
+  // depend on the failed part. Main resolved it with the void function
+  // first; an earlier version of C-60 made it invalid code in both orders.
+  const files = (parts) => ({
+    "tsconfig.json": strict,
+    "models.ts": twoClasses,
+    "broken.ts": "export type Failed = ;\n",
+    "dep.ts": [
+      'import { Clean, Other } from "./models";',
+      'import type { Failed } from "./broken";',
+      "export interface Box<T> { clean: Clean; failed: T }",
+      "export function voidFn(cb: (value: Box<Failed>) => void): void {}",
+      "export function cleanFn(cb: (value: Box<Failed>) => void): Clean { return new Clean(); }",
+      "export function otherFn(cb: (value: Box<Failed>) => void): Other { return new Other(); }",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { cleanFn, otherFn, voidFn } from "./dep";',
+      `export function use(${flags(parts)}) {`,
+      `  const call = ${selector(parts)};`,
+      "  call((value) => value.clean.run());",
+      "}",
+      "",
+    ].join("\n"),
+  });
+  for (const branches of [
+    ["voidFn", "cleanFn"],
+    ["voidFn", "cleanFn", "otherFn"],
+  ])
+    for (const parts of orders(branches)) {
+      const link = linkAt(
+        await indexFiles(files(parts)),
+        "use.ts",
+        "value.clean.run()",
+        "run",
+      );
+      assert.equal(link.resolution, "resolved", parts.join(" : "));
+      assert.deepEqual(
+        link.targets,
+        ["models.ts#Clean.run"],
+        parts.join(" : "),
+      );
+    }
+});
+
+test("the stored explanation of a union callee's invalid code does not depend on the order of its parts", async () => {
+  const files = (parts) => ({
+    "tsconfig.json": strict,
+    "models.ts": twoClasses,
+    "broken.ts": "export const arg = ;\n",
+    "dep.ts": [
+      'import { Clean, Other } from "./models";',
+      "export function identity<T>(x: T): T { return x; }",
+      "export function overloaded(x: string): Clean;",
+      "export function overloaded(x: number): Other;",
+      "export function overloaded(x: unknown): Clean | Other { return typeof x === 'string' ? new Clean() : new Other(); }",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { arg } from "./broken";',
+      'import { identity, overloaded } from "./dep";',
+      `export function use(${flags(parts)}) {`,
+      `  const selected = ${selector(parts)};`,
+      "  return selected(arg).run();",
+      "}",
+      "",
+    ].join("\n"),
+  });
+  const causes = new Set();
+  for (const parts of orders(["identity", "overloaded"])) {
+    const link = linkAt(
+      await indexFiles(files(parts)),
+      "use.ts",
+      "selected(arg).run()",
+      "run",
+    );
+    assert.equal(link.reason, "invalid-code", parts.join(" : "));
+    causes.add(JSON.stringify(link.cause));
+  }
+  assert.equal(causes.size, 1, [...causes].join("\n"));
+});
+
+// ----- C-60 review: callees annotated with `typeof` -----
+
+test("a callee annotated typeof a function is judged as a direct call to it, and an overloaded checked type with a failed argument is invalid code", async () => {
+  const files = (broken, use) => ({
+    "tsconfig.json": strict,
+    "models.ts": twoClasses,
+    "broken.ts": broken ? "export const arg = ;\n" : "export const arg = 1;\n",
+    "made.ts": broken
+      ? "export const made = ;\n"
+      : 'import { Other } from "./models";\nexport const made = new Other();\n',
+    "dep.ts": [
+      'import { Clean, Other } from "./models";',
+      "export function identity<T>(x: T): T { return x; }",
+      "export function good(x: string | number): Clean { return new Clean(); }",
+      "export function overloaded(x: string): Clean;",
+      "export function overloaded(x: number): Other;",
+      "export function overloaded(x: unknown): Clean | Other { return typeof x === 'string' ? new Clean() : new Other(); }",
+      "export const api = { overloaded };",
+      "",
+    ].join("\n"),
+    "use.ts": [
+      'import { arg } from "./broken";',
+      'import { made } from "./made";',
+      'import { api, good, identity, overloaded } from "./dep";',
+      ...use,
+      "",
+    ].join("\n"),
+  });
+  const cases = [
+    {
+      name: "typeof overloaded",
+      use: [
+        "export function use() {",
+        "  const s: typeof overloaded = overloaded;",
+        "  return s(arg).run(); // site",
+        "}",
+      ],
+      repaired: ["models.ts#Other.run"],
+    },
+    ...[
+      "typeof good | typeof overloaded",
+      "typeof overloaded | typeof good",
+    ].map((annotation) => ({
+      name: annotation,
+      use: [
+        "export function use(flag: boolean) {",
+        `  const s: ${annotation} = flag ? good : overloaded;`,
+        "  return s(arg).run(); // site",
+        "}",
+      ],
+      repaired: ["models.ts#Clean.run", "models.ts#Other.run"],
+    })),
+    ...["good", "overloaded"].map((other) => ({
+      name: `(m || ${other}) with m: typeof overloaded | undefined`,
+      use: [
+        "export function use(m: typeof overloaded | undefined) {",
+        `  return (m || ${other})(arg).run(); // site`,
+        "}",
+      ],
+      repaired:
+        other === "good"
+          ? ["models.ts#Clean.run", "models.ts#Other.run"]
+          : ["models.ts#Other.run"],
+    })),
+    {
+      // One signature: only judging the function itself sees that its
+      // return is the failed argument.
+      name: "typeof identity",
+      use: [
+        "export function use() {",
+        "  const s: typeof identity = identity;",
+        "  return s(made).run(); // site",
+        "}",
+      ],
+      repaired: ["models.ts#Other.run"],
+    },
+    {
+      name: "an indexed access to an overloaded member",
+      use: [
+        "export function use() {",
+        '  const s: (typeof api)["overloaded"] = api.overloaded;',
+        "  return s(arg).run(); // site",
+        "}",
+      ],
+      repaired: ["models.ts#Other.run"],
+    },
+  ];
+  for (const { name, use, repaired } of cases) {
+    const broken = linkAt(
+      await indexFiles(files(true, use)),
+      "use.ts",
+      "// site",
+      "run",
+    );
+    assert.equal(broken.reason, "invalid-code", name);
+    const fixed = linkAt(
+      await indexFiles(files(false, use)),
+      "use.ts",
+      "// site",
+      "run",
+    );
+    assert.deepEqual(fixed.targets, repaired, name);
+  }
+});
