@@ -28,11 +28,11 @@ import {
   CHILD_GROUP_SLOTS,
   forgetChildGroup,
   isProcessId,
-  killGroup,
   recordChildGroup,
 } from "../dist/backends/child-groups.js";
 import { runProcess } from "../dist/backends/process.js";
 import { controlledClock } from "./controlled-clock.mjs";
+import { killOwned } from "./owned-processes.mjs";
 import { initializeWorkspace } from "../dist/project/workspace.js";
 import {
   toolchainWorkDirectory,
@@ -131,7 +131,9 @@ function killFake(ready) {
   if (!existsSync(ready)) return;
   try {
     const { go } = JSON.parse(readFileSync(ready, "utf8"));
-    killGroup(go);
+    // Only the fake go this test started: it runs from the ready file's
+    // folder (test/owned-processes.mjs).
+    killOwned(go, dirname(ready), { group: true });
   } catch {
     /* not written whole */
   }
@@ -338,8 +340,10 @@ test("C-54: a worker that never answers the abort is terminated when the cancel'
     // C-50 review: closed whatever the assertions found, so a failed
     // assertion ends the test instead of leaving its worker running.
     await jobs?.close();
+    // Only the child this test started: its command line holds the ready
+    // file's path (test/owned-processes.mjs).
     const pid = readPid(ready);
-    if (pid) killGroup(pid);
+    if (pid) killOwned(pid, ready, { group: true });
     await rm(root, { recursive: true, force: true });
   }
 });

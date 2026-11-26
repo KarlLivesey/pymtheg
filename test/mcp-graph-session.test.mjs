@@ -51,7 +51,7 @@ const synFiles = Object.fromEntries(
 );
 /** Jobs whose workers run `mode`, with a gate the test holds. */
 function jobsFor(root, mode, options = {}) {
-  const gate = new Int32Array(new SharedArrayBuffer(12));
+  const gate = new Int32Array(new SharedArrayBuffer(16));
   const jobs = new GraphJobs(root, {
     launch: (control) =>
       new Worker(worker, {
@@ -471,6 +471,46 @@ test("a cancel inside a synchronous stretch a module marks after an await ends t
   } finally {
     clearTimeout(bound);
     release();
+    await jobs.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+// C-50 review: a cancel the server takes while a module's promise is
+// awaited (the grace path), after which the module enters a marked stretch.
+// The stretch's entry is refused, so the worker answers within the grace
+// instead of running the stretch, which the server would not end.
+test("a marked stretch entered after a cancel taken on the grace path is refused, and the worker answers", async () => {
+  const { base, root } = tree(synFiles);
+  const clock = controlledClock();
+  const { jobs, stopped, gate, release } = jobsFor(root, "block-stretch", {
+    cancelClock: clock,
+    graceMs: 30_000,
+  });
+  const free = () => {
+    release();
+    Atomics.store(gate, 3, 1);
+    Atomics.notify(gate, 3);
+  };
+  try {
+    const job = jobs.start({ command: "index" });
+    await stopped();
+    const cancelling = jobs.cancel(job.id).then(() => "answered");
+    // The cancel is on its grace path: the section is the awaited one.
+    while (clock.pending === 0) await new Promise(setImmediate);
+    release();
+    const entered = Atomics.waitAsync(gate, 2, 0);
+    const first = await Promise.race([
+      cancelling,
+      entered.async ? entered.value.then(() => "entered") : "entered",
+    ]);
+    assert.equal(first, "answered");
+    assert.equal(Atomics.load(gate, 2), 0, "the stretch was never entered");
+    assert.equal(job.answer, "cancelled", "the worker answered");
+    assert.equal(clock.pending, 0, "the grace did not have to end it");
+  } finally {
+    free();
+    while (clock.pending > 0) clock.fireNext();
     await jobs.close();
     rmSync(base, { recursive: true, force: true });
   }

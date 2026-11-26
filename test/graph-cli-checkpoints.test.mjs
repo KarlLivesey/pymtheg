@@ -100,3 +100,49 @@ test("an index paused inside its completion write is complete: the stop came aft
   );
   assert.equal(await status(root), true);
 });
+
+// C-50 review: a cancel taken cooperatively in an awaited call's unmarked
+// code, after which the module enters a marked stretch. The stretch's entry
+// re-reads the flag and refuses: the coordinator did not terminate the
+// worker (the section was not the module's), so a stretch begun now would
+// run to its end.
+test("a marked stretch entered after a cooperative cancel is refused", async (t) => {
+  const root = await project(t, false);
+  await writeFile(join(root, "z.x"), "def stretch\n");
+  const flag = new Int32Array(new SharedArrayBuffer(16));
+  const controller = new AbortController();
+  const run = runGraphInWorker(
+    { command: "index", root },
+    {
+      signal: controller.signal,
+      workerURL: new URL("./graph-cli-stretch-worker.mjs", import.meta.url),
+      workerData: { flag: flag.buffer },
+    },
+  );
+  const outcome = run.then(
+    () => "resolved",
+    (error) => error.name,
+  );
+  const release = (at) => {
+    Atomics.store(flag, at, 1);
+    Atomics.notify(flag, at);
+  };
+  try {
+    const blocked = Atomics.waitAsync(flag, 0, 0);
+    if (blocked.async) await blocked.value;
+    controller.abort();
+    release(1);
+    // Either the run ends (the stretch refused), or the stretch is entered.
+    const entered = Atomics.waitAsync(flag, 2, 0);
+    const first = await Promise.race([
+      outcome,
+      entered.async ? entered.value.then(() => "entered") : "entered",
+    ]);
+    assert.equal(first, "AbortError");
+    assert.equal(Atomics.load(flag, 2), 0, "the stretch was never entered");
+  } finally {
+    release(1);
+    release(3);
+    await outcome;
+  }
+});

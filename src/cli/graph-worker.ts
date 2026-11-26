@@ -88,6 +88,13 @@ export async function serveGraphRequest(
           CONTROL.section,
           inside === true ? SECTION.module : SECTION.core,
         );
+        // C-50 review: entering module code (a call, or a stretch the module
+        // marks while its promise is awaited) re-reads the flag after the
+        // section is set, and refuses once it is set. A cancel taken
+        // cooperatively in the awaited call's unmarked code must not then
+        // let the module run a whole marked stretch: the coordinator saw the
+        // section as not the module's and will not terminate it.
+        if (inside === true) cancel.signal.throwIfAborted();
       },
     });
     // The last checkpoint. A stop set before here answers as cancelled,

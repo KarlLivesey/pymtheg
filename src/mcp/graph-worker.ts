@@ -129,7 +129,7 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
         session,
         progress: (progress) =>
           parentPort!.postMessage({ kind: "progress", id, progress }),
-        onModuleCall: (inside) =>
+        onModuleCall: (inside) => {
           Atomics.store(
             control,
             CONTROL.section,
@@ -138,7 +138,13 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
               : inside === "awaiting"
                 ? SECTION.awaiting
                 : SECTION.core,
-          ),
+          );
+          // C-50 review: entering module code (a call, or a stretch the
+          // module marks while awaited) after a cancel is refused: the
+          // server took that cancel while the section was not the module's
+          // (the grace path), so it would not end a stretch begun now.
+          if (inside === true) signal.throwIfAborted();
+        },
       });
       const view = new GraphView(response);
       if (view.bytes() > agentLimits.graphResultBytes)

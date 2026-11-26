@@ -21,6 +21,10 @@
 //         "stretch-module" the synthetic module; its analysis awaits, then
 //                        stops inside a marked synchronous stretch
 //                        (`synchronousStretch`) until released
+//         "block-stretch" the synthetic module; its analysis awaits, stops in
+//                        unmarked code until released (gate[1]), then enters
+//                        a marked stretch, raising gate[2], which runs until
+//                        gate[3] is set
 //         "table-race"   the table module (C-45 review); while gate[2] is 1,
 //                        the next run's baseline is preceded by another
 //                        process's complete `graph index` (once)
@@ -150,6 +154,23 @@ if (workerData.mode === "stretch-module") {
       async analyze() {
         await Promise.resolve();
         return synchronousStretch(stop);
+      },
+    },
+  ]);
+}
+if (workerData.mode === "block-stretch") {
+  registry = new LanguageRegistry([
+    {
+      ...synthetic,
+      async analyze() {
+        await Promise.resolve();
+        stop();
+        return synchronousStretch(() => {
+          Atomics.store(gate, 2, 1);
+          Atomics.notify(gate, 2);
+          while (Atomics.load(gate, 3) === 0) Atomics.wait(gate, 3, 0);
+          return { resolutions: [], links: [] };
+        });
       },
     },
   ]);

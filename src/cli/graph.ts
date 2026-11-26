@@ -248,11 +248,14 @@ export async function graphCommand(
     process.stdout.write(
       json ? JSON.stringify(response) + "\n" : formatGraph(response),
     );
-    // C-50 review: a stop that arrived once the index was complete does not
-    // undo it; the index stands, and the command says so.
+    // C-50 review: a stop that arrived once the command had finished (for
+    // an index, once its completion was written) does not undo it; the
+    // result stands, and the command says so.
     if (signal.aborted)
       process.stderr.write(
-        "Graph: the stop arrived after the index was complete; the result stands.\n",
+        positional[0] === "index"
+          ? "Graph: the stop arrived after the index was complete; the result stands.\n"
+          : "Graph: the stop arrived after the command had finished; the result stands.\n",
       );
     return response.exitCode;
   } catch (error) {
