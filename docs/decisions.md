@@ -3240,6 +3240,21 @@ proven (D23; `coverage-rules.mjs` `mergedGlobalLevel2`). A member call whose
 signature selection is proven is narrowed first to one declaration, as for
 any merged member. [C-42](changes/C-42.md)
 
+### C-47b An expanding generic type ends at the judge's bound
+
+**Decided (C-47b):** a generic type that binds a larger value at every
+level (Vitest's `TestAPI.extend`) is not given a special rule in the
+structural judgement; it reaches the depth bound and its link is
+`invalid-code` with `judge-budget-exhausted`. **Why:** a cut that judged
+only the bound values at a repeated declaration was built and reviewed
+three times; each round found an input the declaration's own judgement
+reads beside its nodes (an unbound parameter's constraint, whether `self`
+is present, the kind of value a tuple rest spreads), and each gap gave a
+clean link through a failed file. The cut would change one link on the
+measured trees. **Rules out:** treating a repeated declaration as already
+judged, unless what a judgement reads is first made explicit in the code
+rather than argued in a note. [C-47](changes/C-47.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000
