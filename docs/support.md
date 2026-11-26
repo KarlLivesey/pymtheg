@@ -463,7 +463,9 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   checkout, is exactly those alternatives (a build enabling none of them does
   not compile, E0583). Each alternative is the module only under its own
   predicate, and the plain file only when none applies
-  ([C-57](changes/C-57.md)): what one declares is conditional the same way.
+  ([C-57](changes/C-57.md)): what one declares is conditional the same way,
+  and a site is looked up only in the places of its file where its own
+  conditions can hold.
   A name or macro two mutually exclusive alternatives define is never one
   definite target, no offset in one alternative decides against another, and
   a failed alternative is cited only where its predicate can hold where the

@@ -2977,8 +2977,11 @@ plain module file in the checkout, is exactly its captured alternatives: a
 build enabling none of them does not compile (E0583). Each alternative is
 the module only under its own predicate, and the plain file only when none
 applies (C-57): everything declared in one is conditional the same way, no
-offset in one alternative is compared with another's, and a failed
-alternative is cited only where its predicate can hold.
+offset in one alternative is compared with another's, a failed
+alternative is cited only where its predicate can hold, and a site is
+looked up only in the places of its file where its own conditions can hold
+(a file both alternatives declare, or inline modules of one name under
+opposite cfgs).
 With no lockfile, a dependency declared by registry version requirement
 alone resolves from the default registry, together with the facade's own
 registry dependencies, unless the root manifest patches or replaces the
