@@ -136,11 +136,14 @@ async function route(
   const documents = run.documents;
   // A library root rust-analyzer did not index: its files have no answers.
   const indexed = new Set(documents.map((doc) => doc.path));
+  // The run checks roots before caching; a cached index is complete.
   const partial = [
-    ...run.partial,
-    ...run.facts.libraryRoots
-      .filter((path) => !indexed.has(path))
-      .map((path) => `crate root ${path} is not in the index`),
+    ...new Set([
+      ...run.partial,
+      ...run.facts.libraryRoots
+        .filter((path) => !indexed.has(path))
+        .map((path) => `crate root ${path} is not in the index`),
+    ]),
   ];
   // Files where a proc macro failed to expand give no answers.
   const withheld = run.withheld;

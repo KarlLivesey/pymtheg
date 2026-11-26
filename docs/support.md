@@ -1052,8 +1052,10 @@ and git databases are symbolic links to the user's own folders, which offline
 cargo only reads; the user's `PATH` follows the toolchain's, since build
 scripts link and may call `cc` or `pkg-config`. Running it runs the
 project's build scripts and proc macros, as building it would; there is no
-sandbox. Each subprocess of the run is bounded (one hour and 256 MiB of
-output each, not a total for the run; a 1 GiB index) and
+sandbox. Each subprocess is bounded, not the run as a whole: `cargo metadata`
+and `cargo tree` ten minutes each (past it the index is `partial`),
+`rust-analyzer scip` and `diagnostics` one hour each (past it `unavailable`
+and `partial`), 256 MiB of output each, and a 1 GiB index. The run is
 cancellable: in the CLI the index's signal kills the process groups; over MCP
 a cancel asks the job to abort and then terminates its worker, and the server
 kills every process group the job recorded, on cancel and when it exits. A

@@ -37,6 +37,7 @@ import { nameSite } from "../dist/graph/languages/rust/toolchain-join.js";
 import { setRunControls } from "../dist/graph/languages/rust/toolchain-route.js";
 import {
   buildTarget,
+  prepareRun,
   tomlString,
 } from "../dist/graph/languages/rust/toolchain.js";
 import { toolchainState } from "../dist/graph/command-toolchain.js";
@@ -594,6 +595,29 @@ test("a toolchain record stands only on a link stored with its target; a kept so
   );
 });
 
+test("seventh review 5: with .cargo/config and .cargo/config.toml in one folder, cargo's precedence holds: the plain file is read", async () => {
+  await scratch(async (root) => {
+    const project = join(root, "project");
+    mkdirSync(project, { recursive: true });
+    const prepared = prepareRun(
+      project,
+      { cargoHome: join(root, "cargo-home"), host: "x86_64-unknown-linux-gnu" },
+      [
+        {
+          path: ".cargo/config",
+          text: '[build]\ntarget = "aarch64-unknown-linux-gnu"\n',
+        },
+        {
+          path: ".cargo/config.toml",
+          text: '[build]\ntarget = ["a", "b"]\n',
+        },
+      ],
+      join(root, "work"),
+    );
+    assert.equal(prepared.target, "aarch64-unknown-linux-gnu", JSON.stringify(prepared));
+  });
+});
+
 test("sixth review C: [build] target is read as a TOML string in every quoting form", () => {
   const host = "x86_64-unknown-linux-gnu";
   const target = (text) => buildTarget([text], host);
@@ -1095,6 +1119,15 @@ test("a library root rust-analyzer did not index makes the index partial", async
       dump.state.reason,
       "crate root src/lib.rs is not in the index",
     );
+    // Seventh review 3: the incomplete index was not cached; once the
+    // complete one is available, an explicit index uses it.
+    writeFileSync(scip, gateScip());
+    const again = await index(project, root, {
+      environment: environment(tools),
+    });
+    assert.equal(again.state.state, "used", JSON.stringify(again.state));
+    assert.equal(note(again.report, "available").cached, false);
+    assert.equal(runs(tools), 2);
   });
 });
 
@@ -3072,63 +3105,105 @@ test(
   },
 );
 
-// Design B's oracle: crates from the review rounds' selection shapes, the
-// route run with and without default features. No link decided in both may
-// name two different targets; the control is decided in both (not vacuous).
+// The oracle (D17 clarified): crates from the review rounds' selection
+// shapes. Every answer the route decides must be what that configuration
+// resolves, under default features and without them, and a change of the
+// configuration (here the crate's default features, part of the key) must
+// re-answer, never reuse.
 for (const seed of [4301, 4302])
   test(
-    `real rust-analyzer, design B oracle (seed ${seed}): no link decided under one setting names a different target under the other`,
+    `real rust-analyzer, oracle (seed ${seed}): every decided answer is right for its own configuration, and a changed configuration re-answers`,
     needsAnalyzer,
     async () => {
       await scratch(async (root) => {
         const project = join(root, "oracle");
-        const { files, ingredients } = generateOracle(seed, 5);
+        const { files, ingredients, expectations } = generateOracle(seed, 5);
         writeProject(project, files);
-        const a = await index(project, root, {
-          environment: process.env,
-          store: "a.sqlite",
-          toolchainDirectory: "tc-a",
-        });
-        if (a.state.state === "unavailable" && /rust-src/.test(a.state.reason))
+        const run = async (store, noDefault) => {
+          if (noDefault) setRunControls({ noDefaultFeatures: true });
+          try {
+            return await index(project, root, {
+              environment: process.env,
+              store,
+              toolchainDirectory: `tc-${store}`,
+            });
+          } finally {
+            if (noDefault) setRunControls({});
+          }
+        };
+        const fast = await run("a.sqlite", false);
+        if (fast.state.state === "unavailable" && /rust-src/.test(fast.state.reason))
           return;
-        setRunControls({ noDefaultFeatures: true });
-        let b;
-        try {
-          b = await index(project, root, {
-            environment: process.env,
-            store: "b.sqlite",
-            toolchainDirectory: "tc-b",
-          });
-        } finally {
-          setRunControls({});
-        }
-        assert.equal(a.state.state, "used", JSON.stringify(a.state));
-        assert.equal(b.state.state, "used", JSON.stringify(b.state));
-        const decided = (dump) =>
-          new Map(
-            dump.links
-              .filter((l) => l.data?.toolchain?.target)
-              .map((l) => [l.id, [l.targetName, l.data.toolchain.target]]),
+        const slow = await run("b.sqlite", true);
+        assert.equal(fast.state.state, "used", JSON.stringify(fast.state));
+        assert.equal(slow.state.state, "used", JSON.stringify(slow.state));
+        const wrong = (dump, setting) => {
+          const out = [];
+          for (const [name, onFast, onSlow] of expectations)
+            for (const l of dump.links.filter((l) => l.targetName === name)) {
+              if (!l.data?.toolchain || !l.targetSymbol) continue;
+              const at = `${l.targetSymbol.file}#${l.targetSymbol.identity}`;
+              const want = setting === "fast" ? onFast : onSlow;
+              if (!at.includes(want)) out.push(`${setting} ${name}: ${at}, want ${want}`);
+            }
+          return out;
+        };
+        assert.deepEqual(
+          [...wrong(fast, "fast"), ...wrong(slow, "slow")],
+          [],
+          ingredients.join(", "),
+        );
+        // The control is decided under both settings (not vacuous).
+        for (const dump of [fast, slow])
+          assert.equal(
+            dump.links.find((l) => l.targetName === "crate::p0_free")?.data
+              ?.toolchain?.origin,
+            "toolchain",
           );
-        const da = decided(a);
-        const db = decided(b);
-        const conflicts = [...da]
-          .filter(([id, pair]) => db.has(id) && db.get(id)[1] !== pair[1])
-          .map(([, pair]) => pair[0]);
-        assert.deepEqual(conflicts, [], ingredients.join(", "));
-        const control = (dump) =>
-          dump.links.find((l) => l.targetName === "crate::p0_free")?.data
-            ?.toolchain?.origin;
-        assert.equal(
-          control(a),
-          "toolchain",
-          "the control is decided (default)",
+        // A changed configuration re-answers: the same store, the crate's
+        // default features now empty (fast off), must answer as `slow` did.
+        writeFileSync(
+          join(project, "Cargo.toml"),
+          files["Cargo.toml"].replace('default = ["fast"]', "default = []"),
         );
-        assert.equal(
-          control(b),
-          "toolchain",
-          "the control is decided (no default)",
-        );
+        const switched = await run("a.sqlite", false);
+        assert.equal(switched.state.state, "used", JSON.stringify(switched.state));
+        assert.deepEqual(wrong(switched, "slow"), [], "after the switch");
       });
     },
   );
+
+test(
+  "real rust-analyzer, seventh review 8: a relative path dependency outside the checkout resolves from the run's copy; restoring it makes the route used",
+  needsAnalyzer,
+  async () => {
+    await scratch(async (root) => {
+      const project = join(root, "app");
+      writeProject(project, {
+        "Cargo.toml":
+          '[package]\nname = "app"\nversion = "0.1.0"\nedition = "2021"\n\n[dependencies]\ndep = { path = "../dep" }\n',
+        "src/lib.rs": "pub fn a() -> u32 {\n    dep::d()\n}\n",
+      });
+      const missing = await index(project, root, {
+        environment: process.env,
+        store: "g.sqlite",
+      });
+      if (
+        missing.state.state === "unavailable" &&
+        /rust-src/.test(missing.state.reason)
+      )
+        return;
+      assert.notEqual(missing.state.state, "used", JSON.stringify(missing.state));
+      writeProject(join(root, "dep"), {
+        "Cargo.toml":
+          '[package]\nname = "dep"\nversion = "0.1.0"\nedition = "2021"\n',
+        "src/lib.rs": "pub fn d() -> u32 {\n    1\n}\n",
+      });
+      const restored = await index(project, root, {
+        environment: process.env,
+        store: "g.sqlite",
+      });
+      assert.equal(restored.state.state, "used", JSON.stringify(restored.state));
+    });
+  },
+);
