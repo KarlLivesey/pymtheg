@@ -236,11 +236,9 @@ interface NodeDiagnostics {
 const declarationCheckers = new WeakMap<ts.Program, NodeDiagnostics>();
 /**
  * C-42: the units in conflict, once per program (`conflictingUnitPairs`):
- * pairs of unit keys, and the units a diagnostic with no related location
- * lies in, which conflict with any other unit.
+ * each conflicts with every other unit.
  */
 interface UnitConflicts {
-  pairs: Set<string>;
   troubled: Set<string>;
 }
 const unitConflictsByProgram = new WeakMap<ts.Program, UnitConflicts>();
@@ -935,11 +933,11 @@ export function extractFile(
     return undefined;
   }
   /**
-   * C-42 (narrowed D23; reviews N1, N1b, round 2): the pairs of library units
-   * that the compiler finds in conflict on a shared global. A set holding
-   * such a pair are alternatives as units, not one target, so no merged
-   * global whose units include the pair is marked, whatever kind of symbol
-   * it is (`Request`, `fetch`, `RequestInit`, `reader.cancel`).
+   * C-42 (narrowed D23; reviews N1, N1b, rounds 2 and 3): the library units
+   * the compiler finds a fault with in their global declarations. A set
+   * holding such a unit and another is not one target, so no merged global
+   * whose units include it is marked, whatever kind of symbol it is
+   * (`Request`, `fetch`, `RequestInit`, `reader.cancel`).
    *
    * The answer is the compiler's own. `skipLibCheck` suppresses these checks
    * in declaration files, so a second checker of the same program, told
@@ -950,14 +948,12 @@ export function extractFile(
    * `declare global`, and `global {}` inside an ambient `declare module "x"`
    * (how `@types/node` declares `URL`, `Buffer`, `console` and `process`).
    * Deny by default (review round 3): any diagnostic of that checker, whatever
-   * its code, makes units conflict when it lies in a declaration file of
-   * one of them. No code is listed and no spelling compared:
-   * - with related locations, it pairs every two units among its own
-   *   location's and theirs; only a pair inside one unit key is dropped (a
-   *   link's target names the key, the same for both: two installed
-   *   versions of `@types/node`, `lib.dom` and `lib.webworker`), and a pair
-   *   across units always counts;
-   * - with none, the unit it lies in conflicts with every other unit.
+   * its code, makes a unit conflict with every other unit when it lies in a
+   * declaration file of that unit, or its related information does. No code
+   * is listed and no spelling compared. Only a diagnostic wholly inside one
+   * unit key is dropped (a link's target names the key, the same for both of
+   * its sides: two installed versions of `@types/node`, `lib.dom` and
+   * `lib.webworker`); any diagnostic that touches two units counts for both.
    * A position's unit is its recorded global's, the one its library
    * candidate names (its `targetOf` unit: `node:url` for a `global` block
    * inside `declare module "url"`), else its file's; every `node:*` unit
@@ -973,8 +969,6 @@ export function extractFile(
     unit.ecosystem === "node"
       ? "npm\0@types/node"
       : `${unit.ecosystem}\0${unit.unit}`;
-  const pairKey = (a: string, b: string) =>
-    a < b ? `${a}\n${b}` : `${b}\n${a}`;
   interface GlobalDeclaration {
     name: string;
     unit: string;
@@ -987,7 +981,6 @@ export function extractFile(
     const known = unitConflictsByProgram.get(program);
     if (known) return known;
     const unitConflicts: UnitConflicts = {
-      pairs: new Set<string>(),
       troubled: new Set<string>(),
     };
     // Every declaration file of a typings unit, by its unit key: a
@@ -1113,25 +1106,20 @@ export function extractFile(
         statements,
       )) {
         // Deny by default (review round 3): any diagnostic, whatever its
-        // code, that lies in a unit's declaration file.
-        const own = unitAt(diagnostic.file, diagnostic.start);
-        const related = (diagnostic.relatedInformation ?? []).map((info) =>
-          unitAt(info.file, info.start),
-        );
-        if (!related.length) {
-          // No other location: the unit conflicts with every other unit.
-          if (own) unitConflicts.troubled.add(own);
+        // code, that lies in a unit's declaration file, or whose related
+        // information does, makes that unit conflict with every other
+        // unit. Only a diagnostic wholly inside one unit key is dropped (a
+        // link's target names the key, the same for both of its sides).
+        const touched = [
+          unitAt(diagnostic.file, diagnostic.start),
+          ...(diagnostic.relatedInformation ?? []).map((info) =>
+            unitAt(info.file, info.start),
+          ),
+        ].filter((unit): unit is string => unit !== undefined);
+        const units = new Set(touched);
+        if (diagnostic.relatedInformation?.length && units.size === 1)
           continue;
-        }
-        // The units it names: every pair across two of them conflicts.
-        // Only a pair inside one unit key is dropped (a link's target names
-        // the key, the same for both).
-        const units = [
-          ...new Set([own, ...related].filter((unit) => unit !== undefined)),
-        ];
-        for (let i = 0; i < units.length; i++)
-          for (let j = i + 1; j < units.length; j++)
-            unitConflicts.pairs.add(pairKey(units[i]!, units[j]!));
+        for (const unit of units) unitConflicts.troubled.add(unit);
       }
     }
     count("typescript.conflictChecks", checked);
@@ -1145,12 +1133,8 @@ export function extractFile(
   ): boolean {
     const keys = [...new Set(units.map(unitKey))];
     if (keys.length < 2) return false;
-    const { pairs, troubled } = conflictingUnitPairs();
-    if (keys.some((key) => troubled.has(key))) return true;
-    for (let a = 0; a < keys.length; a++)
-      for (let b = a + 1; b < keys.length; b++)
-        if (pairs.has(pairKey(keys[a]!, keys[b]!))) return true;
-    return false;
+    const { troubled } = conflictingUnitPairs();
+    return keys.some((key) => troubled.has(key));
   }
   /** The compiler's (merged) symbol of a declaration, from its name. */
   function declaredSymbol(declaration: ts.Declaration): ts.Symbol | undefined {
