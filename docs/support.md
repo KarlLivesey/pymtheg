@@ -893,7 +893,8 @@ and never yields a version pin.
     whose name only one unit declares is not checked, so a diagnostic
     there (for example TS2430, an interface that incorrectly extends
     another) leaves the set marked: a stated limit of C-42. A diagnostic with related
-    locations, all in one unit key, is dropped; one with no related
+    locations, all in one unit key, is dropped (a location in no unit, a
+    checkout file, is not counted); one with no related
     location always counts against its unit. Units are typings packages, so this covers
     `@cloudflare/workers-types` against the DOM and `bun-types` against
     `@types/node`, and also a diagnostic with no related location reported
