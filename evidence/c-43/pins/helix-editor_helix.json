@@ -10,34 +10,35 @@
  "sourceOnly": {
   "links": 90583,
   "level2": 40673,
+  "level2NoneSeen": 40673,
   "assumed": 2491,
   "proven": 38182,
   "toolchainDecided": 0,
+  "toolchainSeen": 0,
   "libraryModuleLinks": 0,
   "level2Percent": 44.9,
   "withModuleLinksPercent": 44.9
  },
  "route": {
   "links": 90583,
-  "level2": 42583,
+  "level2": 52175,
+  "level2NoneSeen": 42583,
   "assumed": 2491,
   "proven": 38182,
-  "toolchainDecided": 1910,
+  "toolchainDecided": 11502,
+  "toolchainSeen": 9592,
   "libraryModuleLinks": 0,
-  "level2Percent": 47.01,
-  "withModuleLinksPercent": 47.01,
-  "toolchainDecidedPercent": 2.11
+  "level2Percent": 57.6,
+  "level2NoneSeenPercent": 47.01,
+  "withModuleLinksPercent": 57.6,
+  "toolchainDecidedPercent": 12.7
  },
  "decided": {
-  "definite:definite": 13924,
-  "withheld:dependency-on-trace": 336,
-  "definite:unresolved": 1910,
-  "withheld:selected-receiver": 3494,
-  "withheld:selected-binding": 162,
-  "withheld:cfg-link": 586,
-  "withheld:opaque-shadow": 5461,
-  "withheld:import-namespaces": 21,
-  "withheld:trace-incomplete": 62
+  "definite:definite": 14425,
+  "definite:unresolved": 11479,
+  "withheld:import-namespaces": 24,
+  "kept:source-only-differs": 5,
+  "definite:candidates": 23
  },
  "join": {
   "filter:import-names-module": 152,
@@ -57,44 +58,101 @@
   "filter:kind-incompatible": 2
  },
  "agreement": {
-  "confirmed": 13924,
-  "differs": 0,
-  "percent": 100
+  "confirmed": 14425,
+  "differs": 5,
+  "percent": 99.97
  },
- "disagreements": [],
+ "disagreements": [
+  {
+   "file": "helix-core/src/line_ending.rs",
+   "range": [
+    10534,
+    10556
+   ],
+   "kind": "calls",
+   "name": "get_line_ending_of_str",
+   "sourceOnly": "symbol:db45fa901bf91a8ff549bff4a28c19dca955f52b7930b9aef1c976ab87e8e4e6",
+   "toolchain": "symbol:6f3de9ac687bfed92c7eaa2caca0e3bcf7a13bd036b9a8f02264577557ae678d"
+  },
+  {
+   "file": "helix-event/src/runtime.rs",
+   "range": [
+    1827,
+    1839
+   ],
+   "kind": "types",
+   "name": "RuntimeLocal",
+   "sourceOnly": "symbol:a88991e2c88a9c89f96cf5e53c73cb798cbc13fb0887a929093be40f5b4fa170",
+   "toolchain": "symbol:62cdd6761111db172f01095022f479710a12c0f70c2b63b32d220de76c0c44de"
+  },
+  {
+   "file": "helix-event/src/runtime.rs",
+   "range": [
+    2241,
+    2253
+   ],
+   "kind": "types",
+   "name": "RuntimeLocal",
+   "sourceOnly": "symbol:a88991e2c88a9c89f96cf5e53c73cb798cbc13fb0887a929093be40f5b4fa170",
+   "toolchain": "symbol:62cdd6761111db172f01095022f479710a12c0f70c2b63b32d220de76c0c44de"
+  },
+  {
+   "file": "helix-term/src/application.rs",
+   "range": [
+    55181,
+    55194
+   ],
+   "kind": "types",
+   "name": "TerminalEvent",
+   "sourceOnly": "symbol:e12063fec41ac13e21340fcfa63d7a43a11c68d3059c51bf476399b855a6365e",
+   "toolchain": "symbol:1931fcddefa3d23d4914419c57c2938b529824b947cf9c49cd387a08fa0a52ec"
+  },
+  {
+   "file": "helix-view/src/clipboard.rs",
+   "range": [
+    1351,
+    1368
+   ],
+   "kind": "types",
+   "name": "ClipboardProvider",
+   "sourceOnly": "symbol:8b240decc97b386bf4ac63f0c6637d963b45f68d7d5bbf9495f4141d12f80a52",
+   "toolchain": "symbol:9d688d96ba044dc1468270555d0f404dad6c7766498cc724e475959a56f59aa2"
+  }
+ ],
  "check": {
   "linksBefore": 90583,
   "linksAfter": 90583,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 10122,
-  "outcomeDataDiffers": 0
+  "outcomes": 29,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
  },
  "design": {
-  "decided": 1910,
+  "decided": 11502,
   "path": {
-   "decided": 1644,
-   "kept": 264
+   "decided": 6634,
+   "kept": 3177
   },
   "receiver": {
-   "decided": 266,
-   "keptNames": 243,
-   "keptTraceable": 222
+   "decided": 4868,
+   "keptNames": 4443,
+   "keptTraceable": 3085
   }
  },
  "analyzerRun": {
-  "wallS": 110.1,
-  "cpuS": 1064.4,
-  "peakMiB": 2457
+  "wallS": 111.6,
+  "cpuS": 1064.7,
+  "peakMiB": 2453
  },
  "index": {
   "sourceOnly": {
-   "wallS": 76.6,
-   "cpuS": 102.3
+   "wallS": 73.3,
+   "cpuS": 100.1
   },
   "route": {
-   "wallS": 286.4,
-   "cpuS": 120.6
+   "wallS": 284.9,
+   "cpuS": 120.4
   }
  },
  "errors": {
@@ -104,23 +162,17 @@
  "funnel": {
   "open": 49651,
   "buckets": {
-   "other: withheld:dependency-on-trace": 336,
+   "credited": 11502,
    "no identity: library item": 23187,
    "gate: trait-method declaration": 1558,
-   "credited": 1910,
    "no answer: no-name-site": 220,
    "gate: kind/namespace": 51,
    "no identity: local binding": 7954,
-   "other: withheld:selected-receiver": 3494,
    "no identity: generated item": 505,
-   "other: withheld:selected-binding": 162,
-   "gate: a name an opaque item may shadow (confirm-only)": 5461,
    "no identity: declaration without a graph symbol": 473,
    "gate: known error classes": 40,
-   "gate: an import of a name bound in several namespaces": 21,
+   "gate: an import of a name bound in several namespaces": 24,
    "no answer: no-occurrence-at-site": 843,
-   "other: withheld:trace-incomplete": 62,
-   "gate: cfg condition other than test": 80,
    "no answer: file-not-indexed": 3294
   },
   "libraryPassingCfg": 22556,

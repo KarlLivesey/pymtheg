@@ -10,33 +10,34 @@
  "sourceOnly": {
   "links": 13361,
   "level2": 6072,
+  "level2NoneSeen": 6072,
   "assumed": 97,
   "proven": 5975,
   "toolchainDecided": 0,
+  "toolchainSeen": 0,
   "libraryModuleLinks": 0,
   "level2Percent": 45.45,
   "withModuleLinksPercent": 45.45
  },
  "route": {
   "links": 13361,
-  "level2": 6136,
+  "level2": 7979,
+  "level2NoneSeen": 6136,
   "assumed": 97,
   "proven": 5975,
-  "toolchainDecided": 64,
+  "toolchainDecided": 1907,
+  "toolchainSeen": 1843,
   "libraryModuleLinks": 0,
-  "level2Percent": 45.92,
-  "withModuleLinksPercent": 45.92,
-  "toolchainDecidedPercent": 0.48
+  "level2Percent": 59.72,
+  "level2NoneSeenPercent": 45.92,
+  "withModuleLinksPercent": 59.72,
+  "toolchainDecidedPercent": 14.27
  },
  "decided": {
-  "definite:definite": 1438,
-  "definite:unresolved": 64,
-  "withheld:selected-receiver": 1390,
+  "definite:definite": 1451,
+  "definite:unresolved": 1903,
   "withheld:import-namespaces": 3,
-  "withheld:selected-binding": 18,
-  "withheld:cfg-link": 38,
-  "withheld:opaque-shadow": 374,
-  "withheld:dependency-on-trace": 36
+  "definite:candidates": 4
  },
  "join": {
   "none:file-not-indexed": 2506,
@@ -52,7 +53,7 @@
   "filter:collision": 5
  },
  "agreement": {
-  "confirmed": 1438,
+  "confirmed": 1451,
   "differs": 0,
   "percent": 100
  },
@@ -62,34 +63,35 @@
   "linksAfter": 13361,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 1859,
-  "outcomeDataDiffers": 0
+  "outcomes": 3,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
  },
  "design": {
-  "decided": 64,
+  "decided": 1907,
   "path": {
-   "decided": 39,
-   "kept": 3
+   "decided": 452,
+   "kept": 169
   },
   "receiver": {
-   "decided": 25,
-   "keptNames": 24,
-   "keptTraceable": 18
+   "decided": 1455,
+   "keptNames": 1277,
+   "keptTraceable": 914
   }
  },
  "analyzerRun": {
-  "wallS": 17.2,
-  "cpuS": 29.8,
-  "peakMiB": 1099
+  "wallS": 14.2,
+  "cpuS": 25.9,
+  "peakMiB": 1101
  },
  "index": {
   "sourceOnly": {
-   "wallS": 14.1,
-   "cpuS": 19.7
+   "wallS": 11,
+   "cpuS": 17.4
   },
   "route": {
-   "wallS": 52.1,
-   "cpuS": 20.9
+   "wallS": 40.6,
+   "cpuS": 18.8
   }
  },
  "errors": {
@@ -103,16 +105,11 @@
    "no identity: library item": 2823,
    "gate: trait-method declaration": 250,
    "no identity: generated item": 86,
-   "credited": 64,
-   "other: withheld:selected-receiver": 1390,
+   "credited": 1907,
    "no answer: no-occurrence-at-site": 193,
    "no identity: local binding": 425,
    "gate: an import of a name bound in several namespaces": 3,
-   "other: withheld:selected-binding": 18,
-   "gate: cfg condition other than test": 25,
-   "no answer: no-name-site": 13,
-   "gate: a name an opaque item may shadow (confirm-only)": 374,
-   "other: withheld:dependency-on-trace": 36
+   "no answer: no-name-site": 13
   },
   "libraryPassingCfg": 2721,
   "notIndexed": {

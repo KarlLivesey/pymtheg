@@ -10,33 +10,32 @@
  "sourceOnly": {
   "links": 12911,
   "level2": 6414,
+  "level2NoneSeen": 6414,
   "assumed": 301,
   "proven": 6113,
   "toolchainDecided": 0,
+  "toolchainSeen": 0,
   "libraryModuleLinks": 0,
   "level2Percent": 49.68,
   "withModuleLinksPercent": 49.68
  },
  "route": {
   "links": 12911,
-  "level2": 6639,
+  "level2": 6984,
+  "level2NoneSeen": 6639,
   "assumed": 301,
   "proven": 6113,
-  "toolchainDecided": 225,
+  "toolchainDecided": 570,
+  "toolchainSeen": 345,
   "libraryModuleLinks": 0,
-  "level2Percent": 51.42,
-  "withModuleLinksPercent": 51.42,
-  "toolchainDecidedPercent": 1.74
+  "level2Percent": 54.09,
+  "level2NoneSeenPercent": 51.42,
+  "withModuleLinksPercent": 54.09,
+  "toolchainDecidedPercent": 4.41
  },
  "decided": {
-  "definite:definite": 1615,
-  "withheld:cfg-link": 28,
-  "withheld:opaque-shadow": 88,
-  "definite:unresolved": 225,
-  "withheld:selected-receiver": 15,
-  "withheld:dependency-on-trace": 29,
-  "withheld:selected-binding": 209,
-  "withheld:trace-incomplete": 4,
+  "definite:definite": 1643,
+  "definite:unresolved": 570,
   "withheld:import-namespaces": 1
  },
  "join": {
@@ -57,7 +56,7 @@
   "filter:collision": 2
  },
  "agreement": {
-  "confirmed": 1615,
+  "confirmed": 1643,
   "differs": 0,
   "percent": 100
  },
@@ -67,34 +66,35 @@
   "linksAfter": 12911,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 374,
-  "outcomeDataDiffers": 0
+  "outcomes": 1,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
  },
  "design": {
-  "decided": 225,
+  "decided": 570,
   "path": {
-   "decided": 223,
-   "kept": 223
+   "decided": 516,
+   "kept": 512
   },
   "receiver": {
-   "decided": 2,
-   "keptNames": 2,
-   "keptTraceable": 0
+   "decided": 54,
+   "keptNames": 54,
+   "keptTraceable": 28
   }
  },
  "analyzerRun": {
-  "wallS": 41.1,
-  "cpuS": 47,
-  "peakMiB": 935
+  "wallS": 35.9,
+  "cpuS": 41.4,
+  "peakMiB": 929
  },
  "index": {
   "sourceOnly": {
-   "wallS": 11.7,
-   "cpuS": 15.9
+   "wallS": 9.9,
+   "cpuS": 14.6
   },
   "route": {
-   "wallS": 131.7,
-   "cpuS": 19
+   "wallS": 83.8,
+   "cpuS": 15.7
   }
  },
  "errors": {
@@ -111,15 +111,10 @@
    "no answer: no-occurrence-at-site": 79,
    "no answer: no-name-site": 30,
    "no identity: declaration without a graph symbol": 131,
-   "gate: a name an opaque item may shadow (confirm-only)": 88,
-   "credited": 225,
-   "other: withheld:selected-receiver": 15,
+   "credited": 570,
    "no identity: generated item": 20,
-   "other: withheld:dependency-on-trace": 29,
-   "other: withheld:selected-binding": 209,
    "gate: kind/namespace": 5,
    "no answer: file-not-indexed": 2308,
-   "other: withheld:trace-incomplete": 4,
    "no answer: kind-not-joined": 2,
    "gate: an import of a name bound in several namespaces": 1
   },
