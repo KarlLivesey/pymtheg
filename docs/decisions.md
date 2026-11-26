@@ -2516,7 +2516,9 @@ stays: an identical key counts as agreement, any other as unverified, and the
 item is counted as having two keys); narrowing a candidate set except to a
 library target it already holds; fields, locals, blanket impls (no nameable
 owner) and crate roots; trait-method declarations (dispatch); answers from a
-partial index; an answer on a link under a cfg condition other than `test`.
+partial index. (The rule against answers on a link under a cfg condition
+other than `test` was replaced on 24 November 2026: library answers are per
+configuration and labelled, as in "D17 and D21 clarified".)
 **A cfg twin inside the dependency** is the dependency's own business: the
 SCIP data names the external item by its path and carries no cfg
 information about the dependency's source, so the twin cannot be seen. The
