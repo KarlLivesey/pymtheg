@@ -255,10 +255,12 @@ export async function graphCommand(
     );
     // C-50 review: a stop that arrived once the command had finished (for
     // an index, once its completion was written) does not undo it; the
-    // result stands, and the command says so.
+    // result stands, and the command says so. Only an index whose sync is
+    // complete is said to be complete (Sol review: a run that wrote no
+    // completion is not).
     if (signal.aborted)
       process.stderr.write(
-        positional[0] === "index"
+        positional[0] === "index" && response.sync.complete
           ? "Graph: the stop arrived after the index was complete; the result stands.\n"
           : "Graph: the stop arrived after the command had finished; the result stands.\n",
       );

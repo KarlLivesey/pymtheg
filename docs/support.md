@@ -1023,22 +1023,21 @@ fresh or incremental index. [C-36](changes/C-36.md)
 SIGHUP or SIGQUIT stops them in every language. What a stop guarantees,
 for every command:
 
-- **What the command does.** A stop that takes effect before the graph
-  worker's last checkpoint (for a `graph index` that ends with the index
-  complete, the last one before its completion is written, or before an
-  already complete index is confirmed; for every other run, including a
-  `graph index` that writes no completion, and for a command that syncs the
-  index before answering, for example `graph file` or `link list`, the one
-  at the end of its last request to the worker) ends the command with exit code 130
-  and no result: no index report, no answer, no link change. A stop that
-  arrives after that checkpoint is too late: the command may finish as it
-  would have without the stop, with the same result, and exits as the run
-  would have without it. A `graph` command then says on stderr, if the
-  stop came before it printed, that the stop arrived late and the result
-  stands; a `link` command prints no such line, and one that runs a
-  further in-place query after its sync (for example `link list --symbol`
-  or `link touched`) stops at the check after that query, with exit code 130 and
-  no answer, if the stop came before that check.
+- **Where a stop takes effect.** A worker request stopped at a
+  cancellation checkpoint returns a cancellation error. The worker checks
+  before posting a result, except when a `graph index` response has
+  `sync.complete: true`. A run that publishes a matching completion checks
+  just before the write. An unchanged run can verify an existing
+  completion and return without a write. A successful graph result keeps
+  its exit code after the last applicable check. If the CLI handles the
+  stop before rendering an error, it uses exit code 130. A link command can
+  still stop at a later in-place graph request's checkpoint. Direct
+  link-store reads after that checkpoint can finish and return an answer.
+  A `graph` command whose result stands after a stop that came before it
+  printed says so on stderr:
+  that the stop arrived after the index was complete, for an index whose
+  sync is complete, and otherwise that it arrived after the command had
+  finished.
 - **What state the index is left in** depends only on the sync, whatever
   the command then does. A sync that wrote its completion leaves the index
   as it wrote it: `graph status` reports it as it would without the stop.
@@ -1052,16 +1051,11 @@ for every command:
   completion (a file failed in a way that can be retried, the report
   records an error, or a file changed during the run).
 - **No process the command started is left running**, in every case.
-- **A signal after the command has finished** and removed its handlers is
-  not handled: it ends the CLI by that signal ([C-50](changes/C-50.md),
-  "Not built").
-
-A wording oddity, not a fault: a late stop of `graph index` is always
-reported on stderr as arriving "after the index was complete". When files
-failed and the stop came after the completion write, the report on stdout
-says "Graph index: incomplete" (files failed); and a stop that arrives as
-the worker posts the result of an index that wrote no completion gets the
-same stderr line while the index is incomplete.
+- **A signal after the command has finished** does not cut its output
+  short: the CLI keeps its signal handlers until stdout and stderr have
+  drained, notes such a signal, and then exits with the command's own
+  code. Only once the output has drained and the handlers are removed can
+  a signal end the CLI by that signal; the output is whole by then.
 
 Inside a language module's synchronous code, or a synchronous stretch the
 module marks after an await (Go marks its notes pass and its parse, Rust

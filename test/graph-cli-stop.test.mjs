@@ -7,7 +7,7 @@
 // that stops it where each case needs, until the signal's handshake.
 import assert from "node:assert/strict";
 import { execFile, spawn, spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -154,3 +154,96 @@ for (const [what, args, init] of [
     assert.doesNotMatch(run.stderr, /the stop arrived/);
     assert.equal(status(root), true);
   });
+
+// Sol review: a stop that arrives as the worker posts its result, after its
+// last checkpoint. The result stands with the run's own exit code, and the
+// late-stop line says the index was complete only when its sync is.
+test("a stop after the last checkpoint of an index that ends complete: exit 0, the index said complete", async (t) => {
+  const root = await project(t);
+  const run = await interrupted(
+    ["graph", "index", "--root", root, "--json"],
+    { PYM_TEST_STOP_POINT: "before-post" },
+    "stop point before-post",
+  );
+  assert.equal(run.code, 0, run.stderr);
+  assert.equal(JSON.parse(run.stdout).sync.complete, true);
+  assert.match(run.stderr, /the stop arrived after the index was complete/);
+});
+
+test(
+  "a stop after the last checkpoint of an index that writes no completion: its own exit code, not said complete",
+  { skip: process.getuid?.() === 0 && "root reads a mode-000 file" },
+  async (t) => {
+    const root = await project(t);
+    // A file that cannot be read: a retryable failure, so no completion.
+    const locked = join(root, "src", "locked.ts");
+    await writeFile(locked, "export const locked = 1;\n");
+    await chmod(locked, 0);
+    t.after(() => chmod(locked, 0o644));
+    const run = await interrupted(
+      ["graph", "index", "--root", root, "--json"],
+      { PYM_TEST_STOP_POINT: "before-post" },
+      "stop point before-post",
+    );
+    const answer = JSON.parse(run.stdout);
+    assert.equal(answer.sync.complete, false);
+    assert.equal(run.code, answer.exitCode, run.stderr);
+    assert.notEqual(run.code, 0);
+    assert.doesNotMatch(run.stderr, /after the index was complete/);
+    assert.match(run.stderr, /the stop arrived after the command had finished/);
+  },
+);
+
+// Sol review: a signal once the command has finished must not cut its
+// output short. A large answer is handed to stdout while the reader holds
+// back; SIGTERM then arrives while it drains. The reader gets the whole,
+// parseable answer and the command's own exit code.
+test("a signal while a large answer drains to a reader that holds back: the answer is whole, and the exit code the command's", async (t) => {
+  const root = await project(t);
+  const functions = Array.from(
+    { length: 4000 },
+    (_, i) =>
+      `export function function_with_a_long_descriptive_name_${i}(n: number): number { return n + ${i}; }\n`,
+  ).join("");
+  await writeFile(join(root, "src", "big.ts"), functions);
+  await execBounded([cli, "graph", "index", "--root", root]);
+  const child = spawn(
+    process.execPath,
+    [
+      "--import",
+      preload,
+      cli,
+      "graph",
+      "file",
+      "src/big.ts",
+      "--no-sync",
+      "--json",
+      "--root",
+      root,
+    ],
+    {
+      env: { ...process.env, PYM_TEST_SAY_WRITTEN: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  t.after(() => endChild(child));
+  const closed = closing(child, "the CLI to exit");
+  // The reader holds back: nothing reads stdout until the signal is sent.
+  child.stdout.pause();
+  let stderr = "";
+  createInterface({ input: child.stderr }).on("line", (line) => {
+    stderr += line + "\n";
+    if (line !== "stdout written") return;
+    child.kill("SIGTERM");
+    let stdout = "";
+    child.stdout.setEncoding("utf8").on("data", (text) => (stdout += text));
+    child.stdout.once("end", () => (child.received = stdout));
+    child.stdout.resume();
+  });
+  const [code, signal] = await closed.wait();
+  assert.match(stderr, /^stdout written$/m, "the large answer was written");
+  assert.equal(signal, null, `the CLI died by ${signal}: ${stderr}`);
+  const answer = JSON.parse(child.received);
+  assert.equal(code, answer.exitCode);
+  assert.equal(code, 0);
+});

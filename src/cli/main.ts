@@ -68,7 +68,18 @@ function writeReport() {
     process.stderr.write(renderInvocationFailure(report));
   else process.stdout.write(renderText(report, snapshot));
 }
-const onSignal = (): void => cancel.abort();
+// C-50 review (Sol): once the command has finished, a signal must not cut
+// its output short. The handlers stay until stdout and stderr have drained;
+// a signal in that time is noted, and the CLI then exits with the
+// command's own code.
+let finished = false;
+let lateSignal = false;
+const onSignal = (): void => {
+  if (finished) lateSignal = true;
+  else cancel.abort();
+};
+const drained = (stream: NodeJS.WriteStream) =>
+  new Promise<void>((resolve) => stream.write("", () => resolve()));
 process.on("SIGINT", onSignal);
 process.on("SIGTERM", onSignal);
 // C-54: a closed terminal (SIGHUP) ends the command the same orderly way, so
@@ -1115,6 +1126,9 @@ try {
     process.exitCode = exitStatus(report);
   }
 } finally {
+  finished = true;
+  await drained(process.stdout);
+  await drained(process.stderr);
   process.removeListener("SIGINT", onSignal);
   process.removeListener("SIGTERM", onSignal);
   process.removeListener("SIGHUP", onSignal);

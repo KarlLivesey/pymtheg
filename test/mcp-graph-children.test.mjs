@@ -370,6 +370,16 @@ test("C-54: a worker that never answers the abort is terminated when the cancel'
 
 test("C-54: a full registry refuses to start a child, and says so", async () => {
   const taken = [];
+  // Sol review: the child carries a marker and its own watchdog, the wait
+  // is bounded, and whatever the test found the child is killed (owned
+  // kill), so a refusal that does not kill it fails instead of waiting on
+  // the child's long timeout.
+  const root = await mkdtemp(join(tmpdir(), "pym-full-registry-"));
+  const marker = join(root, "refused-child");
+  const killRefused = () => {
+    for (const entry of readdirSync("/proc"))
+      if (/^\d+$/.test(entry)) killOwned(Number(entry), marker);
+  };
   try {
     for (let i = 0; i < CHILD_GROUP_SLOTS; i++) {
       const pid = 2 ** 30 + i;
@@ -377,15 +387,25 @@ test("C-54: a full registry refuses to start a child, and says so", async () => 
       if (slot === "full") break;
       taken.push([slot, pid]);
     }
-    const result = await runProcess(
-      process.execPath,
-      ["-e", "setInterval(() => {}, 1000)"],
-      { cwd: tmpdir(), timeoutMs: 2 ** 31 - 1 },
+    const result = await bounded(
+      runProcess(
+        process.execPath,
+        [
+          "-e",
+          "setTimeout(() => process.exit(9), 10 * 60_000); setInterval(() => {}, 1000)",
+          marker,
+        ],
+        { cwd: tmpdir(), timeoutMs: 2 ** 31 - 1 },
+      ),
+      "the refused child to end",
+      killRefused,
     );
     assert.equal(result.kind, "spawn_failed");
     assert.match(result.stderr, /child-process registry is full/);
   } finally {
     for (const [slot, pid] of taken) forgetChildGroup(slot, pid);
+    killRefused();
+    await rm(root, { recursive: true, force: true });
   }
 });
 

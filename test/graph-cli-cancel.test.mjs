@@ -42,27 +42,33 @@ async function scenario(name) {
   let out = "";
   child.stdout.on("data", (chunk) => (out += chunk));
   let guard;
-  const ended = await Promise.race([
-    new Promise((resolve) => child.on("exit", () => resolve(true))),
-    new Promise(
-      (resolve) => (guard = setTimeout(resolve, HANG_GUARD_MS, false)),
-    ),
-  ]);
-  clearTimeout(guard);
+  let ended = false;
+  try {
+    ended = await Promise.race([
+      new Promise((resolve) => child.on("exit", () => resolve(true))),
+      new Promise(
+        (resolve) => (guard = setTimeout(resolve, HANG_GUARD_MS, false)),
+      ),
+    ]);
+  } finally {
+    clearTimeout(guard);
+    // Sol review: whatever the scenario printed, nothing it started is left
+    // running, before any output is parsed (a partial line once threw
+    // first). Only processes this test started are killed: each carries the
+    // scenario's scratch path on its command line (test/owned-processes.mjs);
+    // the pids are read from the raw output.
+    if (!ended) killOwned(child.pid, scratch, { group: true });
+    for (const [, pid] of out.matchAll(/"pid":(\d+)/g)) {
+      killOwned(Number(pid), scratch, { group: true });
+      killOwned(Number(pid), scratch);
+    }
+    await rm(scratch, { recursive: true, force: true });
+  }
+  assert.ok(ended, `the ${name} scenario did not finish: ${out}`);
   const facts = out
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line));
-  // Whatever the scenario found, nothing it started is left running. Only
-  // processes this test started are killed: each carries the scenario's
-  // scratch path on its command line (test/owned-processes.mjs).
-  if (!ended) killOwned(child.pid, scratch, { group: true });
-  for (const { pid } of facts.filter((f) => f.pid !== undefined)) {
-    killOwned(pid, scratch, { group: true });
-    killOwned(pid, scratch);
-  }
-  await rm(scratch, { recursive: true, force: true });
-  assert.ok(ended, `the ${name} scenario did not finish: ${out}`);
   return Object.assign({}, ...facts.filter((f) => !f.pid));
 }
 
