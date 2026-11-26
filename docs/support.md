@@ -1020,34 +1020,32 @@ fresh or incremental index. [C-36](changes/C-36.md)
 
 **CLI cancellation (C-50).** `pymtheg graph` and the graph work of
 `pymtheg link` that may sync run in a worker thread. SIGINT, SIGTERM,
-SIGHUP or SIGQUIT stops the run in every language. The outcomes:
+SIGHUP or SIGQUIT stops them in every language. What a stop guarantees,
+for every command:
 
-- **Stopped before the index was fully written:** exit code 130 and no index
-  report. (A run that writes no completion, because a file failed in a way
-  that can be retried or an error occurred, prints its `graph complete`
-  progress line anyway, so that line may appear before a stop.) A run stopped after it began writing leaves the index
-  incomplete in `graph status`, and the next index repairs it. A run stopped
-  before it wrote anything leaves the status as it was before the run: for
-  example, a re-index of an unchanged, already complete index stopped during
-  its inventory stays complete.
-- **`graph index` stopped after the index's completion was written:** the
-  run's result stands. The command reports it and exits as the run would
-  have without the stop (0, or 2 when files failed), and says on stderr
-  that the stop arrived after the index was complete.
-- **A command that syncs and then answers** (`graph file`, `graph symbol`
-  and the other queries without `--no-sync`; `link list`, with or without
-  `--symbol`, `link check` and `link touched`, each without `--no-sync`),
-  **stopped after its sync's completion write but before it answers:** exit
-  code 130 and no answer, only the command's error (the JSON error, or a
-  `Graph error` or `Link error` line), and no line saying the stop arrived
-  late; the index the sync wrote stands, and `graph status` reports it as it
-  would without the stop.
-- **A `graph` command other than `index` whose stop arrives after its last
-  checkpoint but before it prints:** it answers and exits as it would
-  without the stop, and says on stderr that the stop arrived after the
-  command had finished and the result stands. A stop after a command has
-  printed and finished is not handled (it ends the CLI by that signal; C-50,
-  "Not built").
+- **A stop that takes effect before the graph worker's last checkpoint**
+  (for `graph index`, the one just before its completion is written; for a
+  `link` command, the one at the end of its last request to the worker; a
+  `--no-sync` link command uses no worker, see below) ends the command with
+  exit code 130 and no result: no index report, no query answer, no link
+  change. Progress lines already printed, `graph complete: N/N` included,
+  may appear before it. The store: a run stopped before it wrote anything
+  leaves the status as it was; one stopped after it began writing, before
+  its completion was written, is left incomplete; a completion already
+  written stands (a query's sync may have written one before the stop).
+- **A stop that arrives after that checkpoint is too late to stop the
+  command:** it may finish exactly as it would have without the stop, with
+  the same result, the same exit code and any change made. A `graph`
+  command then says on stderr, if the stop arrived before it printed, that
+  the stop arrived late and the result stands. A `link` command prints no
+  such line; one that runs a further in-place query after its sync (`link
+  list --symbol`, `link touched`) stops at the check after that query if
+  the stop came before that check, with exit code 130 and no answer.
+- **A signal after the command has finished** and removed its handlers is
+  not handled: it ends the CLI by that signal ([C-50](changes/C-50.md), "Not
+  built").
+- **In every case** no process the command started is left running, and
+  the next index repairs an incomplete store to equal a cold index.
 
 Inside a language module's synchronous code, or a synchronous stretch the
 module marks after an await (Go marks its notes pass and its parse, Rust
