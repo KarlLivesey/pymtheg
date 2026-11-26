@@ -26,7 +26,7 @@ const [distArg, scratch, id, seedArg, countArg, outArg, ...flags] =
   process.argv.slice(2);
 if (!outArg)
   throw Error(
-    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--scoped-mix] [--more-go] [--gomod-meaning] [--no-edit-runs] [--mcp]",
+    "usage: random-edits.mjs <dist> <scratch> <repo id> <seed> <count> <out.json> [--resume] [--store-dir DIR] [--cache-pages N] [--command] [--scoped-mix] [--more-go] [--gomod-meaning] [--no-edit-runs] [--mcp] [--readable]",
   );
 const dist = resolve(distArg);
 const expectedSteps = Number(countArg);
@@ -72,6 +72,16 @@ const noEditRuns = flags.includes("--no-edit-runs");
 const mcp = flags.includes("--mcp");
 // C-36: --scoped-mix weights Rust edits to those that can keep the surface.
 const scopedMix = flags.includes("--scoped-mix");
+// --readable: a TypeScript edit whose result does not parse cleanly is
+// drawn again (from the same seeded sequence), so the tree stays readable and
+// no file's failure withholds the library targets of its program.
+const readable = flags.includes("--readable");
+const parsesCleanly = await (async () => {
+  if (!readable) return () => true;
+  const ts = (await import(join(dist, "../node_modules/typescript/lib/typescript.js"))).default;
+  return (path, text) =>
+    !(ts.createSourceFile(path, text, ts.ScriptTarget.Latest).parseDiagnostics ?? []).length;
+})();
 if (command && !temporary) throw Error("--command requires --store-dir");
 const cacheAt = flags.indexOf("--cache-pages");
 const cachePages = cacheAt < 0 ? undefined : Number(flags[cacheAt + 1]);
@@ -693,12 +703,16 @@ const sourceOf = (file) =>
   readFileSync(join(scratch, "pins", name, file), "utf8");
 for (let step = 0; step < expectedSteps; step++) {
   let file = pick(files);
-  const original = sourceOf(file);
+  let original = sourceOf(file);
   let edit;
   let at = 0;
   if (repo.language === "go") edit = goEdit(step, file, original);
   else if (repo.language === "rust") edit = rustEdit(step, file, original);
-  else {
+  else for (let draw = 0; ; draw++) {
+    if (draw) {
+      file = pick(files);
+      original = sourceOf(file);
+    }
     const lines = original.split("\n");
     let kind = pick(kinds);
     at = Math.floor(random() * lines.length);
@@ -719,6 +733,7 @@ for (let step = 0; step < expectedSteps; step++) {
     if (kind === "duplicate") lines.splice(at, 0, lines[at] ?? "");
     if (kind === "delete") lines.splice(at, 1);
     edit = { file, kind, text: text ?? lines.join("\n") };
+    if (parsesCleanly(file, edit.text) || draw >= 100) break;
   }
   file = edit.file;
   const { kind, text } = edit;
@@ -735,6 +750,19 @@ for (let step = 0; step < expectedSteps; step++) {
   await incremental(join(base, `step-${step}.json`));
   const cold = temporary ?? join(base, `cold-${step}.sqlite`);
   clearStore(cold);
+  // What the compared stores hold, so an "equal" over empty sets shows.
+  const held = (() => {
+    const db = new DatabaseSync(graph, { readOnly: true });
+    try {
+      return {
+        links: db.prepare("SELECT count(*) AS n FROM graph_links").get().n,
+        library: db.prepare("SELECT count(*) AS n FROM graph_links WHERE resolution='library'").get().n,
+        merged: db.prepare("SELECT count(*) AS n FROM graph_links WHERE json_extract(body,'$.data.mergedGlobal')=1").get().n,
+      };
+    } finally {
+      db.close();
+    }
+  })();
   let differences;
   let coldRows;
   try {
@@ -785,6 +813,7 @@ for (let step = 0; step < expectedSteps; step++) {
     line: at + 1,
     equal: differences.length === 0,
     differences,
+    held,
     wallMs: measured.wallMs,
     failed: measured.report?.failedCount,
     resolvedFiles:
@@ -800,7 +829,7 @@ for (let step = 0; step < expectedSteps; step++) {
     ...(noEdit ? { noEdit } : {}),
   });
   console.log(
-    `${id} step ${step} ${kind} ${file}:${at + 1}: ${differences.length ? "DIFFERENT " + JSON.stringify(differences).slice(0, 1500) : "equal"}`,
+    `${id} step ${step} ${kind} ${file}:${at + 1}: ${differences.length ? "DIFFERENT " + JSON.stringify(differences).slice(0, 1500) : "equal"} (links ${held.links}, library ${held.library}, merged ${held.merged})`,
   );
   report();
   if (differences.length)

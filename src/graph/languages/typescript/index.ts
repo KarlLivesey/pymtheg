@@ -126,7 +126,7 @@ import {
  * facts; resolve maps those facts to symbol IDs. See docs/changes/W2-D.md.
  */
 // Bump the leading number whenever extraction or resolution semantics change.
-const MODULE_VERSION = `50+typescript-${ts.version}`;
+const MODULE_VERSION = `51+typescript-${ts.version}`;
 
 /** Observation counters for tests (programs built, files extracted). Not a correctness input. */
 export const statistics = {
@@ -564,6 +564,7 @@ function withoutTaint(result: ParseResult): ParseResult {
         return link;
       delete data.targets;
       delete data.libraryFacts;
+      delete data.mergedGlobal;
       data.reason = "taint-budget-exhausted";
       return { ...link, data };
     }),
@@ -646,6 +647,7 @@ function withWorkspaceAssumptions(
           if (previous) return previous;
           delete data.targets;
           delete data.libraryFacts;
+          delete data.mergedGlobal;
           data.reason = "workspace-build-output-missing";
           return { ...link, data };
         }
@@ -843,6 +845,7 @@ export function mergeTied(
         "reason",
         "assumes",
         "cause",
+        "mergedGlobal",
       ]);
       merged.reason = "invalid-code";
       const list = [...causes].sort();
@@ -886,6 +889,8 @@ export function mergeTied(
       "libraryFacts",
       "reason",
       "assumes",
+      // Decided below, for the link as a whole, never per program.
+      "mergedGlobal",
     ]);
     if (targets.size)
       merged.targets = byKey([...targets.entries()]).map(([, t]) => ({
@@ -904,6 +909,15 @@ export function mergeTied(
       if (!everyVariantSame) merged.tiedReasons = reasons;
     }
     if (!sameTargets || reasons.length) merged.projects = [...projects];
+    // C-42: one merged global only when every program gives the same set
+    // and marks it; a program that does not mark it leaves no mark
+    // anywhere in the stored data, `byProject` included (review round 3).
+    if (
+      sameTargets &&
+      !reasons.length &&
+      datas.every((data) => data.mergedGlobal === true)
+    )
+      merged.mergedGlobal = true;
     assume(
       merged,
       ...datas.flatMap(
@@ -930,6 +944,7 @@ export function mergeTied(
         delete merged.unbuiltEntry;
         delete merged.targets;
         delete merged.libraryFacts;
+        delete merged.mergedGlobal;
         merged.reason = "ambiguous-project";
         merged.assumes = assumptions.filter(
           (name) => name !== unbuiltEntryAssumption,
@@ -1107,6 +1122,7 @@ export function typescriptModule(
                 };
                 delete next.targets;
                 delete next.libraryFacts;
+                delete next.mergedGlobal;
                 return { ...link, data: next };
               }
               if (
