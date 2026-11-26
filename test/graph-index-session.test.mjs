@@ -429,3 +429,548 @@ test("each change of trust drops what the session kept: source-only, trusted, re
     rmSync(base, { recursive: true, force: true });
   }
 });
+
+// C-55: Go's decoded inputs are kept by the session between runs; the
+// store's record of written paths says what to read again.
+test("Go's kept inputs are reused for an edit, and dropped when another process indexes in between", async () => {
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go": "package a\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() }\n',
+    "c/c.go": "package c\n\nfunc C() int { return 3 }\n",
+  });
+  try {
+    const registry = await discoverLanguages();
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    // The cold run wrote every file after reading its inputs, and a run
+    // with no scope reads no projection: the first edit reads them again.
+    write("c/c.go", "package c\n\nfunc C() int { return 6 }\n");
+    assert.equal((await index(root, session)).sync.complete, true);
+    // A body edit: everything but the edited file comes from what was kept.
+    write("c/c.go", "package c\n\nfunc C() int { return 4 }\n");
+    resetGraphWork();
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.ok(
+      (graphWork.counts["kept.input.recordsReused"] ?? 0) >= 2,
+      JSON.stringify(graphWork.counts),
+    );
+    assert.ok((graphWork.counts["kept.input.symbolsReused"] ?? 0) > 0);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+    // Another process renames a's function and indexes; then the session
+    // indexes an edit of c alone.
+    write("a/a.go", "package a\n\nfunc Hello2() int { return 1 }\n");
+    write(
+      "b/b.go",
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello2() }\n',
+    );
+    const other = spawnSync(
+      process.execPath,
+      [
+        new URL("./fixtures/graph-session/go-index-child.mjs", import.meta.url)
+          .pathname,
+        root,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(other.status, 0, other.stderr);
+    // The session's edit of c calls the renamed function: with a stale
+    // a.go record or stale symbols the call would not resolve as cold.
+    write(
+      "c/c.go",
+      'package c\n\nimport "example.com/m/a"\n\nfunc C() int { return a.Hello2() }\n',
+    );
+    resetGraphWork();
+    const dropped = session.counts.dropped;
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.equal(session.counts.dropped, dropped + 1, "the session dropped");
+    assert.equal(graphWork.counts["kept.input.recordsReused"] ?? 0, 0);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("over the kept-input limit nothing is kept; the next run reads everything afresh; both equal cold", async () => {
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go": "package a\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() }\n',
+  });
+  try {
+    const registry = await discoverLanguages();
+    // One byte: whatever a run reads is over the limit.
+    const session = new IndexSession({ registry, keptInputBytes: 1 });
+    resetGraphWork();
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.ok((graphWork.counts["kept.input.overLimit"] ?? 0) >= 1);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+    write(
+      "b/b.go",
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() + 1 }\n',
+    );
+    resetGraphWork();
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.equal(graphWork.counts["kept.input.recordsReused"] ?? 0, 0);
+    assert.equal(graphWork.counts["kept.input.symbolsReused"] ?? 0, 0);
+    assert.ok((graphWork.counts["kept.input.recordsRead"] ?? 0) >= 2);
+    assert.deepEqual(await differencesFromCold(base, root, registry), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+/** Production modules, with Go's resolver recording the files it is given. */
+async function recordingGo() {
+  const production = await discoverLanguages();
+  const seen = [];
+  const registry = new LanguageRegistry(
+    production.modules.map((module) =>
+      module.id !== "go"
+        ? module
+        : {
+            ...module,
+            resolve(context) {
+              seen.push(context.files.map((file) => file.path));
+              return module.resolve(context);
+            },
+          },
+    ),
+  );
+  return { registry, production, seen };
+}
+const storedPaths = (root) => {
+  const db = new DatabaseSync(graphAt(root), { readOnly: true });
+  try {
+    return db
+      .prepare("SELECT path FROM graph_files ORDER BY path")
+      .all()
+      .map((row) => row.path);
+  } finally {
+    db.close();
+  }
+};
+
+test("kept Go inputs keep the store's order for paths outside the Basic Multilingual Plane", async () => {
+  // U+FFFD sorts after U+1F600 by UTF-16 code units and before it by UTF-8
+  // bytes, the order of the store's projection query (SQL ORDER BY path).
+  // Go's resolver must be given the projection in that order in a session
+  // too, whatever it does with it.
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "p/x\uFFFD.go":
+      "package p\n\ntype T struct{ X int }\n\nfunc F() int { return 1 }\n",
+    "p/x\u{1F600}.go": "package p\n\nfunc G() int { return F() + T{}.X }\n",
+    "p/y.go":
+      "package p\n\ntype U struct{ T }\n\nfunc H() int { return U{}.X }\n",
+  });
+  try {
+    const { registry, production, seen } = await recordingGo();
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    const stored = storedPaths(root);
+    // The paths do tell the two orders apart.
+    assert.notDeepEqual([...stored].sort(), stored);
+    for (const [step, body] of ["2", "3", "4"].entries()) {
+      write(
+        "p/x\uFFFD.go",
+        `package p\n\ntype T struct{ X int }\n\nfunc F() int { return ${body} }\n`,
+      );
+      seen.length = 0;
+      resetGraphWork();
+      assert.equal(
+        (await index(root, session)).sync.complete,
+        true,
+        `step ${step}`,
+      );
+      if (step > 0)
+        assert.ok(
+          (graphWork.counts["kept.input.projectionReused"] ?? 0) >= 1,
+          `step ${step}: the projection is kept`,
+        );
+      assert.deepEqual(seen, [storedPaths(root)], `step ${step}`);
+      assert.deepEqual(
+        await differencesFromCold(base, root, production),
+        [],
+        `step ${step}`,
+      );
+    }
+    assert.ok((graphWork.counts["kept.input.recordsReused"] ?? 0) >= 1);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a session's Go inputs follow added, renamed and rewritten files; each step equals cold", async () => {
+  // Each step can only equal cold if the session re-reads what it wrote:
+  // the paths this run wrote before its reads, the stale paths of kept
+  // symbols, and the stale paths of the kept projection (C-55 review).
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go":
+      "package a\n\ntype Base struct{ X int }\n\ntype Other struct{ Y int }\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.Base }\n\nfunc B() int { return a.Hello() + S{}.X }\n',
+    "c/c.go": "package c\n\nfunc C() int { return 3 }\n",
+  });
+  const remove = (path) => rmSync(join(root, path));
+  const steps = [
+    [
+      "add a/hello.go declaring World",
+      () => write("a/hello.go", "package a\n\nfunc World() int { return 2 }\n"),
+    ],
+    [
+      "case-rename it",
+      () => {
+        remove("a/hello.go");
+        write("a/Hello.go", "package a\n\nfunc World() int { return 2 }\n");
+      },
+    ],
+    [
+      "use a.World() from c/c.go",
+      () =>
+        write(
+          "c/c.go",
+          'package c\n\nimport "example.com/m/a"\n\nfunc C() int { return a.World() }\n',
+        ),
+    ],
+    [
+      "rename the file",
+      () => {
+        remove("a/Hello.go");
+        write("a/world.go", "package a\n\nfunc World() int { return 2 }\n");
+      },
+    ],
+    [
+      "rename World's signature",
+      () =>
+        write("a/world.go", "package a\n\nfunc Planet() int { return 2 }\n"),
+    ],
+    [
+      "edit the caller to match",
+      () =>
+        write(
+          "c/c.go",
+          'package c\n\nimport "example.com/m/a"\n\nfunc C() int { return a.Planet() }\n',
+        ),
+    ],
+    [
+      "change b's embedded type",
+      () =>
+        write(
+          "b/b.go",
+          'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.Other }\n\nfunc B() int { return a.Hello() + S{}.Y }\n',
+        ),
+    ],
+    [
+      "a body edit of b",
+      () =>
+        write(
+          "b/b.go",
+          'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.Other }\n\nfunc B() int { return a.Hello() + S{}.Y + 1 }\n',
+        ),
+    ],
+    [
+      "break a/world.go's syntax",
+      () => write("a/world.go", "package a\n\nfunc Planet( int { return 2 }\n"),
+    ],
+    [
+      "mend it",
+      () =>
+        write("a/world.go", "package a\n\nfunc Planet() int { return 2 }\n"),
+    ],
+    [
+      "embed a.Base in a type local to c's function",
+      () =>
+        write(
+          "c/c.go",
+          'package c\n\nimport "example.com/m/a"\n\nfunc C() int {\n\ttype L struct{ a.Base }\n\treturn a.Planet() + L{}.X\n}\n',
+        ),
+    ],
+    [
+      "change the local type's embedded type",
+      () =>
+        write(
+          "c/c.go",
+          'package c\n\nimport "example.com/m/a"\n\nfunc C() int {\n\ttype L struct{ a.Other }\n\treturn a.Planet() + L{}.Y\n}\n',
+        ),
+    ],
+  ];
+  try {
+    const registry = await discoverLanguages();
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    let reused = 0;
+    for (const [name, edit] of steps) {
+      edit();
+      resetGraphWork();
+      assert.equal((await index(root, session)).sync.complete, true, name);
+      reused += graphWork.counts["kept.input.symbolsReused"] ?? 0;
+      assert.deepEqual(
+        await differencesFromCold(base, root, registry),
+        [],
+        name,
+      );
+    }
+    assert.ok(reused > 0, "kept inputs were used");
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("the kept-input limit is exact at its boundary", async () => {
+  // The count itself is checked against the stored rows below.
+  const files = {
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go":
+      'package a\n\n// Grüße, 世界, \u{1F600}\nfunc Hello() string { return "héllo \u{1F600}" }\n',
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() string { return a.Hello() }\n',
+  };
+  const firstRun = async (limit) => {
+    const { base, root } = tree(files);
+    try {
+      const session = new IndexSession({
+        registry: await discoverLanguages(),
+        ...(limit === undefined ? {} : { keptInputBytes: limit }),
+      });
+      resetGraphWork();
+      assert.equal((await index(root, session)).sync.complete, true);
+      return { ...graphWork.counts };
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  };
+  const total = (await firstRun())["kept.input.bytes"];
+  assert.ok(total > 0);
+  assert.equal((await firstRun(total))["kept.input.overLimit"] ?? 0, 0);
+  assert.equal((await firstRun(total - 1))["kept.input.overLimit"], 1);
+});
+
+test("kept analysis input reads a wanted path it never kept", async () => {
+  const { KeptInputs } = await import("../dist/graph/kept-input.js");
+  const record = (path) => ({
+    path,
+    module: "go",
+    result: { status: "parsed", symbols: [], links: [], diagnostics: [] },
+  });
+  const reads = [];
+  const read = async (paths) => {
+    reads.push([...paths]);
+    return paths.map(record);
+  };
+  const first = new KeptInputs(undefined, () => new Set());
+  await first.analysisInput(["a.go"], read, 0);
+  const kept = first.result(() => new Set());
+  assert.ok(kept);
+  // Nothing written since: a.go comes from what was kept, b.go (never
+  // kept, never written) is read as a fresh read would give it.
+  reads.length = 0;
+  const second = new KeptInputs(kept, () => new Set());
+  const input = await second.analysisInput(["a.go", "b.go"], read, 0);
+  assert.deepEqual(reads, [["b.go"]]);
+  assert.deepEqual(
+    input.map((file) => file.path),
+    ["a.go", "b.go"],
+  );
+});
+
+test("kept inputs re-read this run's writes and paths written after the last read", async () => {
+  // Each rule directly (C-55 review): end to end through Go, a scoped run
+  // proves the edited file's embeds unchanged, and Go writes its records
+  // after its analysis read, so some of these rules change no Go result.
+  const { KeptInputs } = await import("../dist/graph/kept-input.js");
+  let generation = 0;
+  const reads = { records: [], symbols: [], projection: [] };
+  const record = (path) => ({
+    path,
+    module: "go",
+    result: {
+      status: "parsed",
+      symbols: [],
+      links: [],
+      diagnostics: [],
+      data: { generation },
+    },
+  });
+  const io = {
+    records: async (paths) => {
+      reads.records.push([...paths]);
+      return paths.map(record);
+    },
+    resolver: {
+      allPaths: async () => ["a.go", "b.go"],
+      symbols: async (paths) => {
+        reads.symbols.push([...paths]);
+        return new Map(
+          paths.map((path) => [path, [{ id: `${path}:${generation}` }]]),
+        );
+      },
+      projection: async (paths) => {
+        reads.projection.push([...paths]);
+        return paths.map(record);
+      },
+    },
+  };
+  const run = async (previous, writtenThisRun, writtenAfter = new Set()) => {
+    reads.records = [];
+    reads.symbols = [];
+    reads.projection = [];
+    const inputs = new KeptInputs(previous, () => new Set(writtenThisRun));
+    const records = await inputs.analysisInput(["a.go", "b.go"], io.records, 0);
+    const resolver = await inputs.resolverInput(["embeds"], io.resolver, 0);
+    return {
+      records,
+      resolver,
+      kept: inputs.result(() => new Set(writtenAfter)),
+    };
+  };
+  const generations = (list) => list.map((file) => file.result.data.generation);
+  // A first run reads everything; b.go is written after its reads.
+  const first = await run(undefined, [], ["b.go"]);
+  assert.deepEqual(reads.records, [["a.go", "b.go"]]);
+  // This run wrote a.go before its reads; b.go was written after the last
+  // run's reads. Both must be read again, nothing else.
+  generation = 1;
+  const second = await run(first.kept, ["a.go"]);
+  assert.deepEqual(reads.records, [["a.go", "b.go"]], "records: both");
+  assert.deepEqual(reads.symbols, [["a.go", "b.go"]], "symbols: both");
+  assert.deepEqual(reads.projection, [["a.go", "b.go"]], "projection: both");
+  assert.deepEqual(generations(second.records), [1, 1]);
+  assert.deepEqual(generations(second.resolver.projection), [1, 1]);
+  assert.deepEqual(
+    second.resolver.symbols.map((symbol) => symbol.id),
+    ["a.go:1", "b.go:1"],
+  );
+  // Nothing written: everything comes from what was kept.
+  generation = 2;
+  await run(second.kept, []);
+  assert.deepEqual(reads.records, [[]]);
+  assert.deepEqual(reads.symbols, [[]]);
+  assert.deepEqual(reads.projection, [[]]);
+});
+
+test("kept inputs count the UTF-8 bytes of the stored rows they were read from", async () => {
+  // Non-ASCII in every kept kind: source text (records), identifiers
+  // (symbol bodies), and an embedded type's name (projection links).
+  const { base, root } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go":
+      'package a\n\n// Grüße, 世界, \u{1F600}\ntype 世界 struct{ Ä int }\n\nfunc Hëllo() string { return "héllo \u{1F600}" }\n',
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\ntype S struct{ a.世界 }\n\nfunc B() string { return a.Hëllo() }\n',
+  });
+  const store = new SqliteGraphStore(join(base, "graph.sqlite"));
+  try {
+    await indexProject(root, await discoverLanguages(), store);
+    const { KeptInputs } = await import("../dist/graph/kept-input.js");
+    const kinds = ["embeds"];
+    const all = store.fileSummaries().map((file) => file.path);
+    const go = store
+      .fileSummaries()
+      .filter((file) => file.module === "go")
+      .map((file) => file.path);
+    const inputs = new KeptInputs(undefined, () => new Set());
+    await inputs.analysisInput(go, async (paths) => store.filesAt(paths), 0);
+    await inputs.resolverInput(
+      kinds,
+      {
+        allPaths: async () => all,
+        symbols: async (paths) => store.symbolsOfFiles(paths),
+        projection: async (paths) => store.resolutionFiles(kinds, paths),
+      },
+      0,
+    );
+    const counted = inputs.result(() => new Set()).bytes;
+    // The same rows, measured here from the database.
+    const db = new DatabaseSync(join(base, "graph.sqlite"), { readOnly: true });
+    let expected = 0;
+    let units = 0;
+    const add = (text) => {
+      expected += Buffer.byteLength(text ?? "");
+      units += (text ?? "").length;
+    };
+    try {
+      for (const path of go)
+        add(
+          db.prepare("SELECT body FROM graph_files WHERE path=?").get(path)
+            .body,
+        );
+      for (const path of all)
+        for (const row of db
+          .prepare("SELECT body FROM graph_symbols WHERE file=?")
+          .all(path))
+          add(row.body);
+      for (const row of db
+        .prepare(
+          `SELECT body -> '$.result.data' AS facts,
+            body -> '$.result.diagnostics' AS diagnostics,
+            (SELECT json_group_array(json(value) ORDER BY key)
+             FROM json_each(f.body,'$.result.links')
+             WHERE value ->> '$.kind' IN (SELECT value FROM json_each(?))) AS links
+          FROM graph_files f`,
+        )
+        .all(JSON.stringify(kinds))) {
+        add(row.facts);
+        add(row.diagnostics);
+        add(row.links);
+      }
+    } finally {
+      db.close();
+    }
+    assert.notEqual(expected, units, "the rows hold non-ASCII text");
+    assert.equal(counted, expected);
+  } finally {
+    store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("Go's analysis gets only frozen records in every session run", async () => {
+  // Held records (parsed this run) included: a session's first run and
+  // edit runs, an added file among them.
+  const production = await discoverLanguages();
+  let unfrozen = 0;
+  let seen = 0;
+  const registry = new LanguageRegistry(
+    production.modules.map((module) =>
+      module.id !== "go"
+        ? module
+        : {
+            ...module,
+            analyze(context) {
+              for (const file of context.files) {
+                seen++;
+                if (!Object.isFrozen(file) || !Object.isFrozen(file.result))
+                  unfrozen++;
+              }
+              return module.analyze(context);
+            },
+          },
+    ),
+  );
+  const { base, root, write } = tree({
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "a/a.go": "package a\n\nfunc Hello() int { return 1 }\n",
+    "b/b.go":
+      'package b\n\nimport "example.com/m/a"\n\nfunc B() int { return a.Hello() }\n',
+    "c/c.go": "package c\n\nfunc C() int { return 3 }\n",
+  });
+  try {
+    const session = new IndexSession({ registry });
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("c/c.go", "package c\n\nfunc C() int { return 4 }\n");
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("d/d.go", "package d\n\nfunc D() int { return 5 }\n");
+    assert.equal((await index(root, session)).sync.complete, true);
+    write("a/a.go", "package a\n\nfunc Hello() int { return 2 }\n");
+    assert.equal((await index(root, session)).sync.complete, true);
+    assert.ok(seen > 0);
+    assert.equal(unfrozen, 0, `${unfrozen} of ${seen} records unfrozen`);
+    assert.deepEqual(await differencesFromCold(base, root, production), []);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
