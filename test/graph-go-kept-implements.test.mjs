@@ -67,6 +67,12 @@ const files = {
   // embedded type changes the decisions, and only `surface.functions`.
   "emb/emb.go":
     "package emb\n\ntype I interface{ M() }\n\ntype Base struct{}\n\nfunc (Base) M() {}\n\ntype W struct{ Base }\n",
+  // The second review's reproduction: renaming `helper` to `X` in another
+  // file changes only that file's `surface.functions`, and T's promoted
+  // `Read` with it.
+  "rd/a.go":
+    "package rd\n\ntype Reader interface{ Read() int }\n\ntype X struct{}\n\nfunc (X) Read() int { return 1 }\n\ntype T struct{ X }\n",
+  "rd/b.go": "package rd\n\nfunc helper() {}\n",
   // Two init functions share an identity: an anonymous struct in the first
   // renumbers the second's (C-56a).
   "dot/init.go":
@@ -105,6 +111,17 @@ test("a session reuses Go's implements decisions across body edits, proven equal
       false,
     ],
     ["remove it again", () => write("emb/emb.go", files["emb/emb.go"]), false],
+    [
+      "rename helper to X in another file (T's promoted Read)",
+      () => write("rd/b.go", "package rd\n\nfunc X() {}\n"),
+      false,
+    ],
+    ["rename it back", () => write("rd/b.go", files["rd/b.go"]), false],
+    [
+      "a body edit of the file holding the implementers (a scoped run)",
+      () => write("rd/a.go", files["rd/a.go"].replace("return 1", "return 2")),
+      true,
+    ],
     [
       "an anonymous struct in the first of two init (renumbers the second's)",
       () =>
