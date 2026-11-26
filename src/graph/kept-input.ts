@@ -4,8 +4,9 @@
  * (see docs/changes/C-55.md). The indexer keeps, per stored path, what the
  * store's reads returned: the analysis records (`filesAt`), the resolver
  * projection (`resolutionFiles`) and the symbols. A later run re-reads only
- * the paths written since (the store's record of `replaceFile` and
- * `removeFile` calls) and assembles each input in the store's own order.
+ * the paths written since (the store's record of `replaceFile` calls;
+ * removals need none, as inputs are assembled only for paths stored now)
+ * and assembles each input in the store's own order.
  *
  * A module must not change its inputs in place (`keepsInput`). Under the
  * test suite (PYMTHEG_TEST) everything kept is deep-frozen before any module

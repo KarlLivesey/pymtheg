@@ -1,0 +1,629 @@
+[
+ {
+  "pin": "changesets/changesets",
+  "links": [
+   12614,
+   12614
+  ],
+  "level2": [
+   11001,
+   11001
+  ],
+  "level2WithRule": [
+   11001,
+   11003
+  ],
+  "merged": 2,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 1653,
+    "links": 12614,
+    "libraryRows": 7567
+   },
+   {
+    "symbols": 1653,
+    "links": 12614,
+    "libraryRows": 7567
+   }
+  ]
+ },
+ {
+  "pin": "colinhacks/zod",
+  "links": [
+   80898,
+   80898
+  ],
+  "level2": [
+   76709,
+   76709
+  ],
+  "level2WithRule": [
+   76709,
+   77129
+  ],
+  "merged": 420,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 12135,
+    "links": 80898,
+    "libraryRows": 29769
+   },
+   {
+    "symbols": 12135,
+    "links": 80898,
+    "libraryRows": 29769
+   }
+  ]
+ },
+ {
+  "pin": "dexie/Dexie.js",
+  "links": [
+   36418,
+   36418
+  ],
+  "level2": [
+   20546,
+   20546
+  ],
+  "level2WithRule": [
+   20546,
+   20928
+  ],
+  "merged": 382,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 5841,
+    "links": 36418,
+    "libraryRows": 8267
+   },
+   {
+    "symbols": 5841,
+    "links": 36418,
+    "libraryRows": 8267
+   }
+  ]
+ },
+ {
+  "pin": "excalidraw/excalidraw",
+  "links": [
+   104294,
+   104294
+  ],
+  "level2": [
+   98517,
+   98517
+  ],
+  "level2WithRule": [
+   98517,
+   99323
+  ],
+  "merged": 806,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 13405,
+    "links": 104294,
+    "libraryRows": 40475
+   },
+   {
+    "symbols": 13405,
+    "links": 104294,
+    "libraryRows": 40475
+   }
+  ]
+ },
+ {
+  "pin": "honojs/hono",
+  "links": [
+   72314,
+   72314
+  ],
+  "level2": [
+   65991,
+   65991
+  ],
+  "level2WithRule": [
+   65991,
+   67936
+  ],
+  "merged": 1945,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 5773,
+    "links": 72314,
+    "libraryRows": 34386
+   },
+   {
+    "symbols": 5773,
+    "links": 72314,
+    "libraryRows": 34386
+   }
+  ]
+ },
+ {
+  "pin": "mermaid-js/mermaid",
+  "links": [
+   125395,
+   125395
+  ],
+  "level2": [
+   112136,
+   112136
+  ],
+  "level2WithRule": [
+   112136,
+   112537
+  ],
+  "merged": 401,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 23639,
+    "links": 125395,
+    "libraryRows": 61163
+   },
+   {
+    "symbols": 23639,
+    "links": 125395,
+    "libraryRows": 61163
+   }
+  ]
+ },
+ {
+  "pin": "nestjs/nest",
+  "links": [
+   165226,
+   165226
+  ],
+  "level2": [
+   155594,
+   155594
+  ],
+  "level2WithRule": [
+   155594,
+   156030
+  ],
+  "merged": 436,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 19464,
+    "links": 165226,
+    "libraryRows": 79673
+   },
+   {
+    "symbols": 19464,
+    "links": 165226,
+    "libraryRows": 79673
+   }
+  ]
+ },
+ {
+  "pin": "oclif/core",
+  "links": [
+   14182,
+   14182
+  ],
+  "level2": [
+   13489,
+   13489
+  ],
+  "level2WithRule": [
+   13489,
+   13625
+  ],
+  "merged": 136,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 2723,
+    "links": 14182,
+    "libraryRows": 6498
+   },
+   {
+    "symbols": 2723,
+    "links": 14182,
+    "libraryRows": 6498
+   }
+  ]
+ },
+ {
+  "pin": "pingdotgg/t3code",
+  "links": [
+   162039,
+   162039
+  ],
+  "level2": [
+   148911,
+   148911
+  ],
+  "level2WithRule": [
+   148911,
+   149251
+  ],
+  "merged": 340,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 30346,
+    "links": 162039,
+    "libraryRows": 90628
+   },
+   {
+    "symbols": 30346,
+    "links": 162039,
+    "libraryRows": 90628
+   }
+  ]
+ },
+ {
+  "pin": "pmndrs/zustand",
+  "links": [
+   7092,
+   7092
+  ],
+  "level2": [
+   5871,
+   5871
+  ],
+  "level2WithRule": [
+   5871,
+   5886
+  ],
+  "merged": 15,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 598,
+    "links": 7092,
+    "libraryRows": 3347
+   },
+   {
+    "symbols": 598,
+    "links": 7092,
+    "libraryRows": 3347
+   }
+  ]
+ },
+ {
+  "pin": "puppeteer/puppeteer",
+  "links": [
+   58189,
+   58189
+  ],
+  "level2": [
+   45437,
+   45437
+  ],
+  "level2WithRule": [
+   45437,
+   46085
+  ],
+  "merged": 648,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 8412,
+    "links": 58189,
+    "libraryRows": 24140
+   },
+   {
+    "symbols": 8412,
+    "links": 58189,
+    "libraryRows": 24140
+   }
+  ]
+ },
+ {
+  "pin": "react-hook-form/react-hook-form",
+  "links": [
+   48865,
+   48865
+  ],
+  "level2": [
+   37254,
+   37254
+  ],
+  "level2WithRule": [
+   37254,
+   37360
+  ],
+  "merged": 106,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 3382,
+    "links": 48865,
+    "libraryRows": 27076
+   },
+   {
+    "symbols": 3382,
+    "links": 48865,
+    "libraryRows": 27076
+   }
+  ]
+ },
+ {
+  "pin": "reduxjs/redux-toolkit",
+  "links": [
+   57052,
+   57052
+  ],
+  "level2": [
+   45851,
+   45851
+  ],
+  "level2WithRule": [
+   45851,
+   46137
+  ],
+  "merged": 286,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 7918,
+    "links": 57052,
+    "libraryRows": 23704
+   },
+   {
+    "symbols": 7918,
+    "links": 57052,
+    "libraryRows": 23704
+   }
+  ]
+ },
+ {
+  "pin": "trpc/trpc",
+  "links": [
+   107126,
+   107126
+  ],
+  "level2": [
+   96256,
+   96256
+  ],
+  "level2WithRule": [
+   96256,
+   96924
+  ],
+  "merged": 668,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 17804,
+    "links": 107126,
+    "libraryRows": 48645
+   },
+   {
+    "symbols": 17804,
+    "links": 107126,
+    "libraryRows": 48645
+   }
+  ]
+ },
+ {
+  "pin": "vitejs/vite",
+  "links": [
+   55530,
+   55530
+  ],
+  "level2": [
+   46319,
+   46319
+  ],
+  "level2WithRule": [
+   46319,
+   46495
+  ],
+  "merged": 176,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 10186,
+    "links": 55530,
+    "libraryRows": 25037
+   },
+   {
+    "symbols": 10186,
+    "links": 55530,
+    "libraryRows": 25037
+   }
+  ]
+ },
+ {
+  "pin": "vitest-dev/vitest",
+  "links": [
+   116096,
+   116096
+  ],
+  "level2": [
+   95780,
+   95780
+  ],
+  "level2WithRule": [
+   95780,
+   96268
+  ],
+  "merged": 488,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 17973,
+    "links": 116096,
+    "libraryRows": 24175
+   },
+   {
+    "symbols": 17973,
+    "links": 116096,
+    "libraryRows": 24175
+   }
+  ]
+ },
+ {
+  "pin": "withastro/astro",
+  "links": [
+   152386,
+   152386
+  ],
+  "level2": [
+   131949,
+   131949
+  ],
+  "level2WithRule": [
+   131949,
+   136177
+  ],
+  "merged": 4228,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 26243,
+    "links": 152386,
+    "libraryRows": 79661
+   },
+   {
+    "symbols": 26243,
+    "links": 152386,
+    "libraryRows": 79661
+   }
+  ]
+ },
+ {
+  "pin": "yargs/yargs",
+  "links": [
+   12201,
+   12201
+  ],
+  "level2": [
+   6426,
+   6426
+  ],
+  "level2WithRule": [
+   6426,
+   6525
+  ],
+  "merged": 99,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 1180,
+    "links": 12201,
+    "libraryRows": 2735
+   },
+   {
+    "symbols": 1180,
+    "links": 12201,
+    "libraryRows": 2735
+   }
+  ]
+ },
+ {
+  "pin": "vercel/turborepo",
+  "links": [
+   53377,
+   53377
+  ],
+  "level2": [
+   37991,
+   37991
+  ],
+  "level2WithRule": [
+   37991,
+   38347
+  ],
+  "merged": 356,
+  "changedLinks": 0,
+  "onlyMain": 0,
+  "onlyHead": 0,
+  "symbolsOnlyMain": 0,
+  "symbolsOnlyHead": 0,
+  "rows": [
+   {
+    "symbols": 59426,
+    "links": 53377,
+    "libraryRows": 96246
+   },
+   {
+    "symbols": 59426,
+    "links": 53377,
+    "libraryRows": 96246
+   }
+  ]
+ }
+]
