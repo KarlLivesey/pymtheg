@@ -3346,6 +3346,17 @@ for (const [seed, named] of [
             "none-seen",
             JSON.stringify(read?.data.toolchain),
           );
+          // Not vacuous: every review shape's site is decided, so the label
+          // checks above ran on each of them.
+          const undecided = expectations
+            .map(([name]) => name)
+            .filter(
+              (name) =>
+                !dump.links.some(
+                  (l) => l.targetName === name && l.data?.toolchain,
+                ),
+            );
+          assert.deepEqual(undecided, [], "undecided review shapes");
         }
         // A changed configuration re-answers: the same store, the crate's
         // default features now empty (fast off), must answer as `slow` did.

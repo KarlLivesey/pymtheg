@@ -36,6 +36,8 @@
  "decided": {
   "definite:definite": 593,
   "definite:unresolved": 7114,
+  "label:seen": 6927,
+  "label:none-seen": 187,
   "withheld:import-namespaces": 1
  },
  "join": {
@@ -83,18 +85,18 @@
   }
  },
  "analyzerRun": {
-  "wallS": 23.5,
-  "cpuS": 43.2,
-  "peakMiB": 1154
+  "wallS": 22.1,
+  "cpuS": 41.5,
+  "peakMiB": 1147
  },
  "index": {
   "sourceOnly": {
-   "wallS": 32.8,
-   "cpuS": 48.5
+   "wallS": 31.3,
+   "cpuS": 45.1
   },
   "route": {
-   "wallS": 83,
-   "cpuS": 47.9
+   "wallS": 78.9,
+   "cpuS": 45.5
   }
  },
  "errors": {
