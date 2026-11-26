@@ -1901,6 +1901,30 @@ test("every node:* unit is one package for the conflict test", async () => {
   assert.equal(link.data.mergedGlobal, undefined);
 });
 
+// C-42 review round 6: a set whose units are all one unit key (only
+// node:* units) has no other unit to conflict with: it stays marked though
+// @types/node has a diagnostic (here a missing type, against env-b's
+// `thing`), while a set of @types/node and env-b is unmarked by it.
+test("a set of node:* units alone stays marked despite a diagnostic in @types/node", async () => {
+  const files = {
+    "tsconfig.json": config({ lib: ["es2022"], types: ["node", "env-b"] }),
+    ...typesPackage(
+      "@types/node",
+      'declare module "process" { global { var thing: Missing; function helper(): void; function other(): void; } }\ndeclare module "console" { global { function helper(): void; } }\n',
+    ),
+    ...typesPackage(
+      "env-b",
+      "declare var thing: number;\ndeclare function other(): void;\n",
+    ),
+    "src/main.ts": "helper();\nother();\nexport {};\n",
+  };
+  const nodeOnly = await globalsCase(files, "src/main.ts", "helper");
+  assert.deepEqual(units(nodeOnly).sort(), ["node:console", "node:process"]);
+  assert.equal(nodeOnly.data.mergedGlobal, true);
+  const withEnvB = await globalsCase(files, "src/main.ts", "other");
+  assert.equal(withEnvB.data.mergedGlobal, undefined);
+});
+
 test("two units that differ from the first declaration are unmarked with each other too (deny by default)", async () => {
   const link = await globalsCase(
     {

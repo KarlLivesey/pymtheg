@@ -309,7 +309,7 @@ export async function missingPackages(root) {
  * (`packages:` then `- "packages/*"` lines, indented or not) or flow style
  * (`packages: ["packages/*", apps/*]`, also over several lines). Quotes and
  * trailing comments are removed, on every line (the first of a flow list
- * too). Lines may end in CRLF.
+ * too). Lines may end in CRLF, and a UTF-8 byte order mark is ignored.
  */
 export function workspacePatterns(yaml) {
   const uncomment = (text) => text.replace(/(^|\s)#.*$/, "");
@@ -318,7 +318,7 @@ export function workspacePatterns(yaml) {
       .trim()
       .replace(/^(['"])(.*)\1$/, "$2")
       .trim();
-  const lines = yaml.split(/\r?\n/);
+  const lines = yaml.replace(/^\uFEFF/, "").split(/\r?\n/);
   const start = lines.findIndex((line) => /^packages\s*:/.test(line));
   if (start < 0) return [];
   const rest = uncomment(lines[start].replace(/^packages\s*:\s*/, ""));

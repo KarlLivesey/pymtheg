@@ -21,10 +21,12 @@ first ones. `audit.jsonl` was drawn on round 1's list.
 - `measure-fields.patch`: the measurement build. Applied to this branch, it
   makes the module record why a set of two or more library units is not
   marked (`notMarked`, in the order the mark's conditions are tested) in
-  the link's data, and log every diagnostic that makes a unit conflict
+  the link's data, and log the diagnostics that make a unit conflict, the
+  first 40 per program
   (`PYM_CONFLICT_LOG`); nothing else changes. Its run's marked count and
   Level 2 equal the candidate's.
-- `conflict-diagnostics.json`: from that log, per pin, the diagnostics that
+- `conflict-diagnostics.json`: from that log, per pin with an
+  environment-only conflict, the diagnostics that
   made a unit conflict, by code and units, with one example each.
 - `compare.mjs`, `compare-installed.json`: every link and symbol on main
   against the C-42 build, per pin. Level 2 is given without and with the
