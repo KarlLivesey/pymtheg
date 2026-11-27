@@ -103,7 +103,19 @@ export function liveChildGroups(buffer?: SharedArrayBuffer): number[] {
 }
 
 /** SIGKILL to a process group (to the process itself on Windows). */
+/**
+ * Whether `pid` can name one other process or process group: an integer
+ * above 1. `process.kill(-0)` is `kill(0)`, which signals the caller's own
+ * process group, `-1` signals every process the caller may signal, and 1 is
+ * init; a pid read from a file that is still empty is `Number("")`, 0.
+ */
+export function isProcessId(pid: unknown): pid is number {
+  return Number.isInteger(pid) && (pid as number) > 1;
+}
+
 export function killGroup(pid: number): boolean {
+  // C-50 review: never the caller's own group (see isProcessId).
+  if (!isProcessId(pid)) return false;
   try {
     process.kill(process.platform === "win32" ? pid : -pid, "SIGKILL");
     return true;

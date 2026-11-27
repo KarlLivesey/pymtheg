@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "../shared/quiet-warnings.js";
 import type { ObservedGraph } from "./schema.js";
 import { errorMessage } from "../shared/error-message.js";
 import { declarationTypeInventory } from "../studio/declaration-type-inventory.js";

@@ -9,6 +9,7 @@ import {
 } from "./macro-rules.js";
 import type { Node } from "web-tree-sitter";
 import { fileURLToPath } from "node:url";
+import { synchronousStretch } from "../../sections.js";
 import { createTagsParser } from "../../tree-sitter.js";
 import type { Json, ParseResult, SourceInput } from "../../types.js";
 
@@ -3108,7 +3109,8 @@ export async function parseRust(source: SourceInput): Promise<ParseResult> {
   try {
     const helper = await parser();
     pending = source;
-    const result = helper.parse(source.text);
+    // C-50: synchronous work after an await is inside the module call.
+    const result = synchronousStretch(() => helper.parse(source.text));
     if (
       result.status === "failed" &&
       !result.diagnostics[0]?.message.startsWith("line ")

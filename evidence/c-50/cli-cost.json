@@ -1,0 +1,352 @@
+[
+ {
+  "pin": "hono",
+  "round": 0,
+  "build": "main",
+  "edited": "adapters/aws-lambda/src/conninfo.test.ts",
+  "cold": {
+   "exit": 0,
+   "wallS": 74.54,
+   "cpuS": 103,
+   "peakMiB": 1671,
+   "responseBytes": 3723
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 56.55,
+   "cpuS": 88.8,
+   "peakMiB": 1836,
+   "responseBytes": 3723
+  }
+ },
+ {
+  "pin": "hono",
+  "round": 0,
+  "build": "head",
+  "edited": "adapters/aws-lambda/src/conninfo.test.ts",
+  "cold": {
+   "exit": 0,
+   "wallS": 60.69,
+   "cpuS": 95.8,
+   "peakMiB": 1521,
+   "responseBytes": 3723
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 45.47,
+   "cpuS": 77.9,
+   "peakMiB": 1871,
+   "responseBytes": 3723
+  }
+ },
+ {
+  "pin": "hono",
+  "round": 1,
+  "build": "main",
+  "edited": "adapters/aws-lambda/src/conninfo.test.ts",
+  "cold": {
+   "exit": 0,
+   "wallS": 59.3,
+   "cpuS": 90.9,
+   "peakMiB": 1659,
+   "responseBytes": 3723
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 55.05,
+   "cpuS": 86.8,
+   "peakMiB": 1727,
+   "responseBytes": 3729
+  }
+ },
+ {
+  "pin": "hono",
+  "round": 1,
+  "build": "head",
+  "edited": "adapters/aws-lambda/src/conninfo.test.ts",
+  "cold": {
+   "exit": 0,
+   "wallS": 60.13,
+   "cpuS": 91.9,
+   "peakMiB": 1674,
+   "responseBytes": 3729
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 55.01,
+   "cpuS": 85.9,
+   "peakMiB": 1944,
+   "responseBytes": 3723
+  }
+ },
+ {
+  "pin": "hono",
+  "equal": false,
+  "differences": [
+   {
+    "table": "graph_contexts",
+    "rows": 1426
+   }
+  ]
+ },
+ {
+  "pin": "vitest",
+  "round": 0,
+  "build": "main",
+  "edited": "docs/.vitepress/blog.data.ts",
+  "cold": {
+   "exit": 2,
+   "wallS": 187.98,
+   "cpuS": 258.5,
+   "peakMiB": 3327,
+   "responseBytes": 28314
+  },
+  "edit": {
+   "exit": 2,
+   "wallS": 160.13,
+   "cpuS": 232.3,
+   "peakMiB": 3183,
+   "responseBytes": 28314
+  }
+ },
+ {
+  "pin": "vitest",
+  "round": 0,
+  "build": "head",
+  "edited": "docs/.vitepress/blog.data.ts",
+  "cold": {
+   "exit": 2,
+   "wallS": 179.04,
+   "cpuS": 253,
+   "peakMiB": 3430,
+   "responseBytes": 28314
+  },
+  "edit": {
+   "exit": 2,
+   "wallS": 155.8,
+   "cpuS": 225.4,
+   "peakMiB": 3063,
+   "responseBytes": 28314
+  }
+ },
+ {
+  "pin": "vitest",
+  "round": 1,
+  "build": "main",
+  "edited": "docs/.vitepress/blog.data.ts",
+  "cold": {
+   "exit": 2,
+   "wallS": 171.54,
+   "cpuS": 242,
+   "peakMiB": 3375,
+   "responseBytes": 28314
+  },
+  "edit": {
+   "exit": 2,
+   "wallS": 144.54,
+   "cpuS": 219.1,
+   "peakMiB": 3223,
+   "responseBytes": 28314
+  }
+ },
+ {
+  "pin": "vitest",
+  "round": 1,
+  "build": "head",
+  "edited": "docs/.vitepress/blog.data.ts",
+  "cold": {
+   "exit": 2,
+   "wallS": 157.82,
+   "cpuS": 229.6,
+   "peakMiB": 3329,
+   "responseBytes": 28314
+  },
+  "edit": {
+   "exit": 2,
+   "wallS": 160.49,
+   "cpuS": 229.4,
+   "peakMiB": 3003,
+   "responseBytes": 28314
+  }
+ },
+ {
+  "pin": "vitest",
+  "equal": false,
+  "differences": [
+   {
+    "table": "graph_contexts",
+    "rows": 6845
+   }
+  ]
+ },
+ {
+  "pin": "dioxus",
+  "round": 0,
+  "build": "main",
+  "edited": "examples/01-app-demos/bluetooth-scanner/src/main.rs",
+  "cold": {
+   "exit": 0,
+   "wallS": 518.83,
+   "cpuS": 594.8,
+   "peakMiB": 3031,
+   "responseBytes": 21391
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 416.96,
+   "cpuS": 487.5,
+   "peakMiB": 3219,
+   "responseBytes": 21391
+  }
+ },
+ {
+  "pin": "dioxus",
+  "round": 0,
+  "build": "head",
+  "edited": "examples/01-app-demos/bluetooth-scanner/src/main.rs",
+  "cold": {
+   "exit": 0,
+   "wallS": 566.99,
+   "cpuS": 630.3,
+   "peakMiB": 2964,
+   "responseBytes": 21391
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 543.62,
+   "cpuS": 599.2,
+   "peakMiB": 2876,
+   "responseBytes": 21391
+  }
+ },
+ {
+  "pin": "dioxus",
+  "round": 1,
+  "build": "main",
+  "edited": "examples/01-app-demos/bluetooth-scanner/src/main.rs",
+  "cold": {
+   "exit": 0,
+   "wallS": 559,
+   "cpuS": 632.7,
+   "peakMiB": 3123,
+   "responseBytes": 21391
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 468.51,
+   "cpuS": 535.2,
+   "peakMiB": 2986,
+   "responseBytes": 21391
+  }
+ },
+ {
+  "pin": "dioxus",
+  "round": 1,
+  "build": "head",
+  "edited": "examples/01-app-demos/bluetooth-scanner/src/main.rs",
+  "cold": {
+   "exit": 0,
+   "wallS": 534.72,
+   "cpuS": 603.1,
+   "peakMiB": 3113,
+   "responseBytes": 21395
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 504.97,
+   "cpuS": 557.5,
+   "peakMiB": 2895,
+   "responseBytes": 21391
+  }
+ },
+ {
+  "pin": "dioxus",
+  "equal": true,
+  "differences": []
+ },
+ {
+  "pin": "cli",
+  "round": 0,
+  "build": "main",
+  "edited": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalBad.go",
+  "cold": {
+   "exit": 0,
+   "wallS": 149.68,
+   "cpuS": 156.8,
+   "peakMiB": 1601,
+   "responseBytes": 26443
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 11.79,
+   "cpuS": 15.7,
+   "peakMiB": 663,
+   "responseBytes": 26440
+  }
+ },
+ {
+  "pin": "cli",
+  "round": 0,
+  "build": "head",
+  "edited": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalBad.go",
+  "cold": {
+   "exit": 0,
+   "wallS": 131.64,
+   "cpuS": 146,
+   "peakMiB": 1622,
+   "responseBytes": 26443
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 14.01,
+   "cpuS": 17.6,
+   "peakMiB": 663,
+   "responseBytes": 26441
+  }
+ },
+ {
+  "pin": "cli",
+  "round": 1,
+  "build": "main",
+  "edited": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalBad.go",
+  "cold": {
+   "exit": 0,
+   "wallS": 132.08,
+   "cpuS": 142.4,
+   "peakMiB": 1568,
+   "responseBytes": 26443
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 10.93,
+   "cpuS": 14.6,
+   "peakMiB": 673,
+   "responseBytes": 26440
+  }
+ },
+ {
+  "pin": "cli",
+  "round": 1,
+  "build": "head",
+  "edited": ".github/codeql/queries/examples/UnsanitizedResponseToTerminalBad.go",
+  "cold": {
+   "exit": 0,
+   "wallS": 127.78,
+   "cpuS": 140.2,
+   "peakMiB": 1619,
+   "responseBytes": 26443
+  },
+  "edit": {
+   "exit": 0,
+   "wallS": 11.51,
+   "cpuS": 15.6,
+   "peakMiB": 691,
+   "responseBytes": 26440
+  }
+ },
+ {
+  "pin": "cli",
+  "equal": true,
+  "differences": []
+ }
+]

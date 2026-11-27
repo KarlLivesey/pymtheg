@@ -2,6 +2,7 @@
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { synchronousStretch } from "../../sections.js";
 import { createTagsParser } from "../../tree-sitter.js";
 import type {
   AnalyzedFile,
@@ -90,7 +91,8 @@ async function parse(source: SourceInput): Promise<ParseResult> {
   const tags = await parser();
   pending = source;
   try {
-    return tags.parse(source.text);
+    // C-50: synchronous work after an await is inside the module call.
+    return synchronousStretch(() => tags.parse(source.text));
   } finally {
     pending = undefined;
   }
@@ -356,15 +358,21 @@ async function analyze(
   // Over-cap candidate sets (left unresolved) and real builtin calls are only known
   // project-wide; record them on the links themselves.
   count("analyze.go.decisionFiles", scope?.size ?? files.length);
+  // C-50: project-wide synchronous work after the toolchain's await is
+  // inside the module call, so a cancel can end it.
   const notes = await stage("analyze.go.notes", () =>
-    linkNotes(
-      context.projectId,
-      ID,
-      files.map((file) =>
-        next.has(file.path) ? { ...file, result: next.get(file.path)! } : file,
+    synchronousStretch(() =>
+      linkNotes(
+        context.projectId,
+        ID,
+        files.map((file) =>
+          next.has(file.path)
+            ? { ...file, result: next.get(file.path)! }
+            : file,
+        ),
+        contextFiles,
+        scope,
       ),
-      contextFiles,
-      scope,
     ),
   );
   for (const [path, group] of notes) {

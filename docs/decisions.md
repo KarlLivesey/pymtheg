@@ -3244,6 +3244,27 @@ proven (D23; `coverage-rules.mjs` `mergedGlobalLevel2`). A member call whose
 signature selection is proven is narrowed first to one declaration, as for
 any merged member. [C-42](changes/C-42.md)
 
+### C-50 The CLI's graph command runs in a worker
+
+The CLI runs `graph` commands and `link` graph requests that may sync in a
+worker thread. Link graph queries with sync disabled run in place. The main thread relays progress and handles SIGINT,
+SIGTERM, SIGHUP and SIGQUIT. A cancel that finds the worker
+inside a language module's synchronous code terminates it; the store is
+left as a killed run leaves it, and the next index repairs it. Anywhere
+else, the run's processes are killed at once (as C-48's server does) and
+the cancel is acknowledged at the command's next checkpoint, as before. The worker and the coordinator use a cancel flag and a section in
+shared memory (the shape of C-48), so no clock decides which. The section
+is a module's synchronous call, and any synchronous stretch the module marks
+after an await (`synchronousStretch`; Go marks its link notes and parse,
+Rust its parse);
+an unmarked stretch is cancelled cooperatively, at the module's next await.
+Child process groups go into C-54's registry and are killed when the worker
+exits. **Rules out:** a CLI graph or link run that only SIGKILL can stop, also
+while its output drains (a second signal then ends it with 130;
+`test/graph-cli-stop.test.mjs`); a
+wall-clock deadline in place of deterministic bounds.
+[C-50](changes/C-50.md)
+
 ### C-47b An expanding generic type ends at the judge's bound
 
 **Decided (C-47b):** a generic type that binds a larger value at every

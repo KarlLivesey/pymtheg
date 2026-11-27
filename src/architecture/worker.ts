@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "../shared/quiet-warnings.js";
 import { errorMessage } from "../shared/error-message.js";
 import { prepareHeadingIdentities } from "./heading-identities.js";
 import { parentPort, workerData } from "node:worker_threads";

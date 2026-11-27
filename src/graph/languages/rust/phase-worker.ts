@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "../../../shared/quiet-warnings.js";
 import { parentPort, workerData } from "node:worker_threads";
 import { rustPhases } from "./index.js";
 import type { PhaseMessage, PhaseRequest } from "./phase-runner.js";

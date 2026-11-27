@@ -17,7 +17,9 @@ import {
   type GraphSummary,
   type ResolvedCodeLink,
   type SymbolSummary,
+  useGraphRunner,
 } from "../architecture/code-links.js";
+import { runGraphInWorker } from "./graph-runner.js";
 
 export const linkUsage = `pymtheg link SUBCOMMAND [--root DIRECTORY] [--json] [--no-sync]
   requirement ID --title TITLE [--text TEXT] [--kind requirement|decision|component|risk|milestone|test]
@@ -71,6 +73,10 @@ export async function linkCommand(
 ): Promise<number> {
   const json = args.includes("--json");
   const sub = args[0] ?? "";
+  // C-50: graph syncs and queries run in the cancellable worker.
+  useGraphRunner((request, own) =>
+    runGraphInWorker(request, { signal: own ?? signal }),
+  );
   try {
     const positional: string[] = [];
     const values = new Map<string, string>();

@@ -10,6 +10,8 @@ import "./isolated-config.mjs";
 // These tests need the user's `go`; without one on PATH they are skipped.
 import assert from "node:assert/strict";
 import { toolchainWorkDirectory } from "../dist/project/local-trust.js";
+import { isProcessId } from "../dist/backends/child-groups.js";
+import { bounded } from "./owned-processes.mjs";
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
@@ -507,8 +509,9 @@ test(
         controller.abort();
         // C-54: the route rethrows the signal's own reason, so the index is
         // cancelled as a whole (it was recorded as an analysis error before).
+        // C-50 review: bounded, so a route that never answers fails here.
         await assert.rejects(
-          running,
+          bounded(running, "the index to answer the abort"),
           (error) => error === controller.signal.reason,
         );
         await until(
@@ -526,9 +529,9 @@ test(
       }
     } finally {
       // A writer unblocks any reader left behind, so cleanup cannot hang.
-      for (const pid of processesWith(dir))
+      for (const pid of processesWith(dir).map(Number).filter(isProcessId))
         try {
-          process.kill(Number(pid), "SIGKILL");
+          process.kill(pid, "SIGKILL");
         } catch {
           /* gone */
         }
@@ -571,7 +574,8 @@ test(
         "the helper to start",
       );
       fire();
-      const result = await running;
+      // C-50 review: bounded, so a helper that never ends fails here.
+      const result = await bounded(running, "the timed-out helper to end");
       assert.match(result.unavailable ?? "", /timed_out/);
       await until(
         () => processesWith(root).length === 0,
@@ -582,9 +586,9 @@ test(
         [],
       );
     } finally {
-      for (const pid of processesWith(dir))
+      for (const pid of processesWith(dir).map(Number).filter(isProcessId))
         try {
-          process.kill(Number(pid), "SIGKILL");
+          process.kill(pid, "SIGKILL");
         } catch {
           /* gone */
         }

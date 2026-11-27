@@ -68,7 +68,38 @@ function writeReport() {
     process.stderr.write(renderInvocationFailure(report));
   else process.stdout.write(renderText(report, snapshot));
 }
-const onSignal = (): void => cancel.abort();
+// C-50 review (Sol): once the command has finished, one signal must not cut
+// its output short, and the user can always get out. The handlers stay
+// until stdout and stderr have drained: a first signal in that time is
+// noted and the drain goes on; a second ends the CLI at once with exit code
+// 130 (the output may then be cut short). A closed stdout or stderr (EPIPE,
+// or the stream closing) ends the drain for that stream, raises no error
+// and leaves the command's own exit code.
+let finished = false;
+// Every signal, the stop taken while the command ran included: the second
+// ends the drain (while the command runs, a second does nothing more).
+let signals = 0;
+const onSignal = (): void => {
+  signals++;
+  if (!finished) return cancel.abort();
+  if (signals >= 2) process.exit(130);
+};
+for (const stream of [process.stdout, process.stderr])
+  stream.on("error", () => {
+    /* A closed pipe: nothing more reaches it; the exit code stands. */
+  });
+const drained = (stream: NodeJS.WriteStream) =>
+  new Promise<void>((resolve) => {
+    if (stream.destroyed || stream.writableEnded) return resolve();
+    const done = () => {
+      stream.off("close", done);
+      stream.off("error", done);
+      resolve();
+    };
+    stream.once("close", done);
+    stream.once("error", done);
+    stream.write("", () => done());
+  });
 process.on("SIGINT", onSignal);
 process.on("SIGTERM", onSignal);
 // C-54: a closed terminal (SIGHUP) ends the command the same orderly way, so
@@ -1115,6 +1146,10 @@ try {
     process.exitCode = exitStatus(report);
   }
 } finally {
+  finished = true;
+  if (signals >= 2) process.exit(130);
+  await drained(process.stdout);
+  await drained(process.stderr);
   process.removeListener("SIGINT", onSignal);
   process.removeListener("SIGTERM", onSignal);
   process.removeListener("SIGHUP", onSignal);

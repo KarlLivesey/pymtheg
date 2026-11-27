@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import { isProcessId } from "../backends/child-groups.js";
 import { spawn, type ChildProcess } from "node:child_process";
 import { rm } from "node:fs/promises";
 
@@ -13,9 +14,9 @@ function send(value: unknown) {
   if (process.connected) process.send?.(value, () => {});
 }
 function killParser() {
-  if (parser?.pid) {
+  if (isProcessId(parser?.pid)) {
     try {
-      process.kill(-parser.pid, "SIGKILL");
+      process.kill(-parser!.pid!, "SIGKILL");
     } catch {
       /* already exited */
     }

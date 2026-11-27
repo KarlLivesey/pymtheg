@@ -475,9 +475,11 @@ makes that whole manifest unknown). Private items are ordinary symbols.
   not compile, E0583). A glob imports only what its own module can see, so a
   private `use` in a globbed child is never resolved through the parent's
   glob ([C-24](changes/C-24.md)).
-- **Cancellation:** the graph CLI can interrupt Rust analysis and resolution
-  with SIGINT or SIGTERM. Interrupted syncs leave an incomplete index and can
-  be retried. When an import path reaches the resolver's depth boundary, an
+- **Cancellation:** the graph CLI can interrupt analysis and resolution in
+  every language, Rust included, with SIGINT, SIGTERM, SIGHUP or SIGQUIT;
+  the `graph` and `link` commands then exit 130 (see "CLI cancellation"
+  under Graph commands). Interrupted syncs leave an incomplete index and
+  can be retried. When an import path reaches the resolver's depth boundary, an
   unresolved link can report `import-lookup-depth-unverified`.
 - **Definite:** module declarations and file modules; free-function, type, pattern
   and value paths from proven bindings written in the source; imports, including
@@ -1041,6 +1043,64 @@ caller, and the scoped path is used only when the edited file's decisions
 meet no cut. The same file tree therefore produces the same graph after a
 fresh or incremental index. [C-36](changes/C-36.md)
 
+**CLI cancellation (C-50).** `pymtheg graph` and the graph work of
+`pymtheg link` that may sync run in a worker thread. SIGINT, SIGTERM,
+SIGHUP or SIGQUIT stops them in every language. What a stop guarantees,
+for every command:
+
+- **Where a stop takes effect.** A worker request stopped at a
+  cancellation checkpoint returns a cancellation error. The worker checks
+  before posting a result, except when a `graph index` response has
+  `sync.complete: true`. A run that publishes a matching completion checks
+  just before the write. An unchanged run can verify an existing
+  completion and return without a write. A successful graph result keeps
+  its exit code after the last applicable check. If the CLI handles the
+  stop before rendering an error, it uses exit code 130. A link command can
+  still stop at a later in-place graph request's checkpoint. Direct
+  link-store reads after that checkpoint can finish and return an answer.
+  If the CLI has handled a stop by the abort check after writing a `graph`
+  result, it prints a late-stop message on stderr. For an index result
+  with `sync.complete: true`, the message says the index was complete.
+  Otherwise it says the command had finished.
+- **What state the index is left in** depends only on the sync, whatever
+  the command then does. A sync that wrote its completion leaves the index
+  as it wrote it: `graph status` reports it as it would without the stop.
+  A sync stopped after it began writing and before its completion leaves
+  the index reporting incomplete; one stopped before it began writing
+  leaves the status as it was. A first run stopped before store creation
+  leaves the index missing. A created store without a matching completion
+  reports incomplete. The next index repairs an incomplete store
+  to equal a cold index.
+- **Progress lines** already printed may appear before a stop, `graph
+  complete: N/N` included: a run prints that line even when it writes no
+  completion (a file failed in a way that can be retried, the report
+  records an error, or a file changed during the run).
+- **No process the command started is left running**, in every case.
+- **A signal after the command has finished** does not cut its output
+  short by one signal: the CLI keeps its signal handlers until stdout and
+  stderr have drained, notes the signal, and exits with the command's own
+  code. A second signal (a stop taken while the command ran counts as the
+  first) ends the CLI at once with exit code 130, and the output may then
+  be cut short. A closed stdout or stderr (EPIPE, or the stream closing)
+  ends the drain for that stream without an error, and the command's exit
+  code stands. Once the output has drained and the handlers are removed, a
+  signal can end the CLI by that signal; the output is whole by then.
+
+Inside a language module's synchronous code, or a synchronous stretch the
+module marks after an await (Go marks its notes pass and its parse, Rust
+its parse), the worker is terminated. Anywhere else the run's processes
+are killed, the module's abort signal fires, and the command stops at its
+next checkpoint. Every checkpoint reads the coordinator's cancel flag, so
+none passes once it is set. A signal that arrives after the last one (just
+before the result is posted) may still see the result. A module that
+ignores the signal while its promise is awaited holds the run until that
+promise settles; a second signal does nothing more. A link query that does
+not sync runs in place: a signal during it is handled when it returns,
+and the command exits 130; a signal after the command's last in-place
+query may still see its answer. A graph run that exhausts the worker's heap ends
+with exit code 3 and `Graph error: Worker terminated due to reaching memory
+limit`, leaving the store as a killed run does. [C-50](changes/C-50.md)
+
 **Toolchain processes (C-54).** Every child process the graph starts runs
 in its own process group, recorded in memory the server owns. Cancelling a
 `code_graph` or `requirement_links` job ends the processes it started; a
@@ -1048,7 +1108,8 @@ server that exits ends them too, and the CLI (and `pymtheg mcp`) turns
 SIGINT, SIGTERM, SIGHUP and SIGQUIT into an orderly end that does the same;
 a cancel kills the job's children at once, whatever its worker does. Only a
 death the process cannot observe (SIGKILL, a crash of the runtime) leaves
-children running. On Windows the recorded
+children running. Closing the MCP server's stdin during a Go toolchain
+run leaves one Go build directory behind. On Windows the recorded
 process is killed, not its children. [C-54](changes/C-54.md)
 
 **Go toolchain route (opt-in, decisions D17 and D22).** On a checkout trusted

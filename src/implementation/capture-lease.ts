@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import { isProcessId } from "../backends/child-groups.js";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
@@ -155,7 +156,7 @@ export async function captureLease(
   });
   child.on("error", fail);
   child.on("close", () => {
-    if (parserPid) {
+    if (isProcessId(parserPid)) {
       try {
         process.kill(-parserPid, "SIGKILL");
       } catch {}

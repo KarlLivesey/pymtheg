@@ -5,6 +5,11 @@ import "./isolated-config.mjs";
 // on; a fake `go` starts a child in its process group that can never finish
 // while it "builds" the helper, writes both pids (the readiness handshake)
 // and waits. No test asserts a time.
+//
+// C-50 review: every wait has a bound that ends the test, and whatever a
+// test found, every process it started is killed in its `finally` (the
+// spawned CLI or server through its own handle, the fake go's group by
+// owned kill), so a failing test ends and leaves nothing running.
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { Worker } from "node:worker_threads";
@@ -27,11 +32,12 @@ import { LinkJobs } from "../dist/mcp/links-jobs.js";
 import {
   CHILD_GROUP_SLOTS,
   forgetChildGroup,
-  killGroup,
+  isProcessId,
   recordChildGroup,
 } from "../dist/backends/child-groups.js";
 import { runProcess } from "../dist/backends/process.js";
 import { controlledClock } from "./controlled-clock.mjs";
+import { bounded, endChild, killOwned } from "./owned-processes.mjs";
 import { initializeWorkspace } from "../dist/project/workspace.js";
 import {
   toolchainWorkDirectory,
@@ -59,7 +65,9 @@ if (a[0] === "env") {
 }
 if (a[0] === "build") {
   const child = cp.spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
-  fs.writeFileSync(${JSON.stringify(join(dir, "ready.json"))}, JSON.stringify({ go: process.pid, child: child.pid }));
+  // Written whole, then renamed: a reader that sees ready.json sees it all.
+  fs.writeFileSync(${JSON.stringify(join(dir, "ready.json.tmp"))}, JSON.stringify({ go: process.pid, child: child.pid }));
+  fs.renameSync(${JSON.stringify(join(dir, "ready.json.tmp"))}, ${JSON.stringify(join(dir, "ready.json"))});
   setInterval(() => {}, 1000);
   return;
 }
@@ -70,8 +78,19 @@ process.exit(2);
   return realpathSync(go);
 }
 
+/**
+ * The pid in a ready file, once it holds one: an integer above 1, never a
+ * number read from a file that exists but is still empty (`Number("")` is
+ * 0, and `killGroup(0)` once signalled this test run's own group).
+ */
+function readPid(path) {
+  if (!existsSync(path)) return undefined;
+  const pid = Number(readFileSync(path, "utf8"));
+  return isProcessId(pid) ? pid : undefined;
+}
 /** Whether a process is running (a zombie is not). */
 function running(pid) {
+  if (!isProcessId(pid)) return false;
   try {
     process.kill(pid, 0);
   } catch {
@@ -111,16 +130,24 @@ async function trustedProject(root) {
 }
 /**
  * Kills the fake toolchain's process group, whatever the test did, so a
- * failing test leaves nothing running. The fake go is the leader of its group.
+ * failing test leaves nothing running. The fake go is the leader of its
+ * group, and its child is in that group. C-50 review: it is found by its
+ * command line (its script is in the ready file's folder), not only through
+ * the ready file, so a fake go that never became ready is killed too.
  */
 function killFake(ready) {
-  if (!existsSync(ready)) return;
+  const marker = dirname(ready);
+  const gos = new Set();
   try {
-    const { go } = JSON.parse(readFileSync(ready, "utf8"));
-    killGroup(go);
+    gos.add(JSON.parse(readFileSync(ready, "utf8")).go);
   } catch {
-    /* not written whole */
+    /* never written whole */
   }
+  for (const entry of readdirSync("/proc"))
+    if (/^\d+$/.test(entry)) gos.add(Number(entry));
+  // Only the fake go this test started (test/owned-processes.mjs).
+  for (const go of gos)
+    if (!killOwned(go, marker, { group: true })) killOwned(go, marker);
 }
 const buildFolders = (project) => {
   const dir = join(toolchainWorkDirectory(project), "go");
@@ -131,9 +158,10 @@ const buildFolders = (project) => {
 
 test("C-54: cancelling an MCP index ends the Go toolchain and the child it started, and its folder is removed", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-mcp-children-"));
+  let jobs;
   try {
     const { project, ready } = await trustedProject(root);
-    const jobs = new GraphJobs(project);
+    jobs = new GraphJobs(project);
     const job = jobs.start({ command: "index" });
     await until(
       () => existsSync(ready) || job.state !== "running",
@@ -145,7 +173,7 @@ test("C-54: cancelling an MCP index ends the Go toolchain and the child it start
     );
     const pids = JSON.parse(readFileSync(ready, "utf8"));
     assert.ok(running(pids.go) && running(pids.child));
-    await jobs.cancel(job.id);
+    await bounded(jobs.cancel(job.id), "the cancel", () => jobs.close());
     assert.equal(job.state, "cancelled");
     await until(
       () => !running(pids.go) && !running(pids.child),
@@ -153,8 +181,10 @@ test("C-54: cancelling an MCP index ends the Go toolchain and the child it start
     );
     // The worker answered the abort after the route removed its folder.
     assert.deepEqual(buildFolders(project), []);
-    await jobs.close();
   } finally {
+    // C-50 review: closed whatever the assertions found, so a failed
+    // assertion ends the test instead of leaving its worker running.
+    await jobs?.close();
     killFake(join(root, "tools", "ready.json"));
     await rm(root, { recursive: true, force: true });
   }
@@ -162,6 +192,7 @@ test("C-54: cancelling an MCP index ends the Go toolchain and the child it start
 
 test("C-54: a server that exits with a job running kills its toolchain processes", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-mcp-children-"));
+  let server;
   try {
     const { project, ready } = await trustedProject(root);
     // The server script is a file: a worker inherits the process's flags,
@@ -176,7 +207,7 @@ const job = jobs.start({ command: "index" });
 const wait = () => existsSync(${JSON.stringify(ready)}) ? process.exit(0) : job.state !== "running" ? (console.error("job " + job.state + ": " + JSON.stringify(job.error)), process.exit(3)) : setTimeout(wait, 5);
 wait();`,
     );
-    const server = spawn(
+    server = spawn(
       process.execPath,
       [
         "--import",
@@ -185,7 +216,10 @@ wait();`,
       ],
       { stdio: ["ignore", "inherit", "inherit"], env: process.env },
     );
-    const code = await new Promise((resolve) => server.once("exit", resolve));
+    const exit = new Promise((resolve) => server.once("exit", resolve));
+    const code = await bounded(exit, "the server to exit", () =>
+      endChild(server),
+    );
     assert.equal(code, 0);
     const pids = JSON.parse(readFileSync(ready, "utf8"));
     await until(
@@ -193,6 +227,7 @@ wait();`,
       "a toolchain process outlived the server",
     );
   } finally {
+    endChild(server);
     killFake(join(root, "tools", "ready.json"));
     await rm(root, { recursive: true, force: true });
   }
@@ -201,9 +236,10 @@ wait();`,
 for (const signal of ["SIGTERM", "SIGINT", "SIGHUP", "SIGQUIT"])
   test(`C-54: a CLI graph index stopped by ${signal} kills its toolchain children`, async () => {
     const root = await mkdtemp(join(tmpdir(), "pym-cli-children-"));
+    let cli;
     try {
       const { project, ready } = await trustedProject(root);
-      const cli = spawn(
+      cli = spawn(
         process.execPath,
         [
           fileURLToPath(new URL("../dist/cli/main.js", import.meta.url)),
@@ -232,7 +268,9 @@ for (const signal of ["SIGTERM", "SIGINT", "SIGHUP", "SIGQUIT"])
       );
       const pids = JSON.parse(readFileSync(ready, "utf8"));
       cli.kill(signal);
-      const { code } = await exit;
+      const { code } = await bounded(exit, `the CLI to exit on ${signal}`, () =>
+        endChild(cli),
+      );
       // An interrupted graph command exits 130.
       assert.equal(code, 130);
       await until(
@@ -240,6 +278,7 @@ for (const signal of ["SIGTERM", "SIGINT", "SIGHUP", "SIGQUIT"])
         "a toolchain process outlived the CLI",
       );
     } finally {
+      endChild(cli);
       killFake(join(root, "tools", "ready.json"));
       await rm(root, { recursive: true, force: true });
     }
@@ -247,9 +286,10 @@ for (const signal of ["SIGTERM", "SIGINT", "SIGHUP", "SIGQUIT"])
 
 test("C-54: cancelling a requirement-link job that indexes ends the Go toolchain and its child", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-links-children-"));
+  let jobs;
   try {
     const { project, ready } = await trustedProject(root);
-    const jobs = new LinkJobs(project);
+    jobs = new LinkJobs(project);
     // A list by symbol syncs the graph first: the Go route runs.
     const job = jobs.start("list", { symbol: "F" });
     await until(
@@ -261,14 +301,16 @@ test("C-54: cancelling a requirement-link job that indexes ends the Go toolchain
       `job ${job.state}: ${JSON.stringify(job.error)}`,
     );
     const pids = JSON.parse(readFileSync(ready, "utf8"));
-    await jobs.cancel(job.id);
+    await bounded(jobs.cancel(job.id), "the cancel", () => jobs.close());
     assert.equal(job.state, "cancelled");
     await until(
       () => !running(pids.go) && !running(pids.child),
       "a toolchain process outlived the link job",
     );
-    await jobs.close();
   } finally {
+    // C-50 review: closed whatever the assertions found, so a failed
+    // assertion ends the test instead of leaving its worker running.
+    await jobs?.close();
     killFake(join(root, "tools", "ready.json"));
     await rm(root, { recursive: true, force: true });
   }
@@ -277,12 +319,13 @@ test("C-54: cancelling a requirement-link job that indexes ends the Go toolchain
 test("C-54: a worker that never answers the abort is terminated when the cancel's grace ends, and its child is killed", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-silent-children-"));
   const ready = join(root, "ready.txt");
+  let jobs;
   try {
     const project = join(root, "project");
     mkdirSync(project);
     await initializeWorkspace(project, undefined, { trust: "source-only" });
     const clock = controlledClock();
-    const jobs = new GraphJobs(realpathSync(project), {
+    jobs = new GraphJobs(realpathSync(project), {
       launch: (control, childGroups) =>
         new Worker(
           new URL(
@@ -302,26 +345,41 @@ test("C-54: a worker that never answers the abort is terminated when the cancel'
       graceMs: 30_000,
     });
     const job = jobs.start({ command: "index" });
-    await until(() => existsSync(ready), "the child did not start");
-    const pid = Number(readFileSync(ready, "utf8"));
+    await until(() => readPid(ready), "the child did not start");
+    const pid = readPid(ready);
     const cancelling = jobs.cancel(job.id);
     // The child is killed at once, before any grace ends.
     await until(() => !running(pid), "the child outlived the cancel's kill");
     // The worker does not answer; only the grace ends the wait.
     await until(() => clock.pending > 0, "the cancel set no grace");
     assert.equal(clock.fireNext(), 30_000);
-    await cancelling;
+    await bounded(cancelling, "the cancel", () => jobs.close());
     assert.equal(job.state, "cancelled");
     await until(() => !running(pid), "the child outlived the cancel");
-    await jobs.close();
   } finally {
-    if (existsSync(ready)) killGroup(Number(readFileSync(ready, "utf8")));
+    // C-50 review: closed whatever the assertions found, so a failed
+    // assertion ends the test instead of leaving its worker running.
+    await jobs?.close();
+    // Only the child this test started: its command line holds the ready
+    // file's path (test/owned-processes.mjs).
+    const pid = readPid(ready);
+    if (pid) killOwned(pid, ready, { group: true });
     await rm(root, { recursive: true, force: true });
   }
 });
 
 test("C-54: a full registry refuses to start a child, and says so", async () => {
   const taken = [];
+  // Sol review: the child carries a marker and its own watchdog, the wait
+  // is bounded, and whatever the test found the child is killed (owned
+  // kill), so a refusal that does not kill it fails instead of waiting on
+  // the child's long timeout.
+  const root = await mkdtemp(join(tmpdir(), "pym-full-registry-"));
+  const marker = join(root, "refused-child");
+  const killRefused = () => {
+    for (const entry of readdirSync("/proc"))
+      if (/^\d+$/.test(entry)) killOwned(Number(entry), marker);
+  };
   try {
     for (let i = 0; i < CHILD_GROUP_SLOTS; i++) {
       const pid = 2 ** 30 + i;
@@ -329,23 +387,34 @@ test("C-54: a full registry refuses to start a child, and says so", async () => 
       if (slot === "full") break;
       taken.push([slot, pid]);
     }
-    const result = await runProcess(
-      process.execPath,
-      ["-e", "setInterval(() => {}, 1000)"],
-      { cwd: tmpdir(), timeoutMs: 2 ** 31 - 1 },
+    const result = await bounded(
+      runProcess(
+        process.execPath,
+        [
+          "-e",
+          "setTimeout(() => process.exit(9), 10 * 60_000); setInterval(() => {}, 1000)",
+          marker,
+        ],
+        { cwd: tmpdir(), timeoutMs: 2 ** 31 - 1 },
+      ),
+      "the refused child to end",
+      killRefused,
     );
     assert.equal(result.kind, "spawn_failed");
     assert.match(result.stderr, /child-process registry is full/);
   } finally {
     for (const [slot, pid] of taken) forgetChildGroup(slot, pid);
+    killRefused();
+    await rm(root, { recursive: true, force: true });
   }
 });
 
 test("C-54: an MCP server ended by SIGHUP (a closed terminal) kills its jobs' toolchain processes", async () => {
   const root = await mkdtemp(join(tmpdir(), "pym-mcp-sighup-"));
+  let server;
   try {
     const { project, ready } = await trustedProject(root);
-    const server = spawn(
+    server = spawn(
       process.execPath,
       [
         fileURLToPath(new URL("../dist/cli/main.js", import.meta.url)),
@@ -354,7 +423,10 @@ test("C-54: an MCP server ended by SIGHUP (a closed terminal) kills its jobs' to
       ],
       { stdio: ["pipe", "pipe", "inherit"], env: process.env },
     );
-    const exit = new Promise((resolve) => server.once("exit", resolve));
+    let exited = false;
+    const exit = new Promise((resolve) =>
+      server.once("exit", () => resolve((exited = true))),
+    );
     // Newline-delimited JSON-RPC (the MCP stdio transport).
     let id = 0;
     const send = (method, params) =>
@@ -375,15 +447,20 @@ test("C-54: an MCP server ended by SIGHUP (a closed terminal) kills its jobs' to
       arguments: { action: "index", wait: false },
     });
     server.stdout.resume();
-    await until(() => existsSync(ready), "the fake go did not start");
+    await until(() => existsSync(ready) || exited, "the fake go did not start");
+    assert.ok(
+      existsSync(ready),
+      "the server ended before the fake go was ready",
+    );
     const pids = JSON.parse(readFileSync(ready, "utf8"));
     server.kill("SIGHUP");
-    await exit;
+    await bounded(exit, "the server to exit on SIGHUP", () => endChild(server));
     await until(
       () => !running(pids.go) && !running(pids.child),
       "a toolchain process outlived the server",
     );
   } finally {
+    endChild(server);
     killFake(join(root, "tools", "ready.json"));
     await rm(root, { recursive: true, force: true });
   }

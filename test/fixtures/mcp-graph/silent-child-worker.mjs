@@ -11,7 +11,9 @@ await runProcess(
   process.execPath,
   [
     "-e",
-    `require("fs").writeFileSync(${JSON.stringify(workerData.ready)}, String(process.pid)); setInterval(() => {}, 1000);`,
+    // Written under a temporary name and renamed, so the file never exists
+    // empty (an empty pid read as 0 once killed the test run's own group).
+    `const fs = require("fs"); const ready = ${JSON.stringify(workerData.ready)}; fs.writeFileSync(ready + ".tmp", String(process.pid)); fs.renameSync(ready + ".tmp", ready); setInterval(() => {}, 1000);`,
   ],
   { cwd: workerData.root, timeoutMs: 2 ** 31 - 1 },
 );

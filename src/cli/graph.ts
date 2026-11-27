@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
-import {
-  executeGraph,
-  type GraphCommand,
-  type GraphResponse,
-} from "../graph/commands.js";
+import { type GraphCommand, type GraphResponse } from "../graph/commands.js";
+import { runGraphInWorker } from "./graph-runner.js";
 import type { Located } from "../graph/command-locations.js";
 import type { GraphLibrary, GraphLink, GraphSymbol } from "../graph/types.js";
 const quote = (value: unknown) => JSON.stringify(value);
@@ -225,7 +222,9 @@ export async function graphCommand(
         throw Error("Unknown graph option " + arg);
       else positional.push(arg);
     }
-    const response = await executeGraph(
+    // C-50: the command runs in a worker. An abort terminates it only inside
+    // a module section; elsewhere the worker is asked to cancel.
+    const response = await runGraphInWorker(
       {
         command: positional[0] as GraphCommand,
         args: positional.slice(1),
@@ -254,6 +253,17 @@ export async function graphCommand(
     process.stdout.write(
       json ? JSON.stringify(response) + "\n" : formatGraph(response),
     );
+    // C-50 review: a stop that arrived once the command had finished (for
+    // an index, once its completion was written) does not undo it; the
+    // result stands, and the command says so. Only an index whose sync is
+    // complete is said to be complete (Sol review: a run that wrote no
+    // completion is not).
+    if (signal.aborted)
+      process.stderr.write(
+        positional[0] === "index" && response.sync.complete
+          ? "Graph: the stop arrived after the index was complete; the result stands.\n"
+          : "Graph: the stop arrived after the command had finished; the result stands.\n",
+      );
     return response.exitCode;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

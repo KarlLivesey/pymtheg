@@ -12,8 +12,11 @@
  * each captured file. At a checkpoint the worker counts it and, if the flag
  * is set, aborts the request and answers `cancelled`; it then stays alive
  * with its session. While it is inside a language module's call (section
- * 1) it may pass no checkpoint for long, so the parent terminates it there,
- * as before C-48, and the session ends with it.
+ * 1), or in a synchronous stretch the module marks after an await
+ * (`synchronousStretch`, src/graph/sections.ts), it may pass no checkpoint
+ * for long, so the parent terminates it there, as before C-48, and the
+ * session ends with it, unless a toolchain process group is live: then the
+ * cancel takes the grace path (graph-jobs.ts `cancel`).
  */
 import { operationError } from "./operation-errors.js";
 import { parentPort, workerData } from "node:worker_threads";
@@ -126,7 +129,7 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
         session,
         progress: (progress) =>
           parentPort!.postMessage({ kind: "progress", id, progress }),
-        onModuleCall: (inside) =>
+        onModuleCall: (inside) => {
           Atomics.store(
             control,
             CONTROL.section,
@@ -135,7 +138,13 @@ export function serveGraphRequests(options: GraphWorkerOptions = {}): void {
               : inside === "awaiting"
                 ? SECTION.awaiting
                 : SECTION.core,
-          ),
+          );
+          // C-50 review: entering module code (a call, or a stretch the
+          // module marks while awaited) after a cancel is refused: the
+          // server took that cancel while the section was not the module's
+          // (the grace path), so it would not end a stretch begun now.
+          if (inside === true) signal.throwIfAborted();
+        },
       });
       const view = new GraphView(response);
       if (view.bytes() > agentLimits.graphResultBytes)

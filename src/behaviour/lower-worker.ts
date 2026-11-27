@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+import "../shared/quiet-warnings.js";
 import { parentPort, workerData } from "node:worker_threads";
 import { lower } from "./model.js";
 import type { ProjectIR } from "../semantic/core.js";

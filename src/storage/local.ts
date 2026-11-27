@@ -5,7 +5,7 @@ import { lstatSync, mkdirSync, statfsSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { DatabaseSync, DatabaseSyncOptions } from "node:sqlite";
 /** Loaded at first use, after the CLI has filtered node:sqlite's ExperimentalWarning
- * (src/cli/quiet-warnings.ts); a static import would load it before any code runs. */
+ * (src/shared/quiet-warnings.ts); a static import would load it before any code runs. */
 const sqlite = (): typeof import("node:sqlite") =>
   process.getBuiltinModule("node:sqlite");
 
