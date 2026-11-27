@@ -3674,9 +3674,11 @@ See [C-56a](changes/C-56a.md).
 ### Go's implements pass is a plain value; both index builds use stored ids (C-56b)
 
 **Decided (C-56b):** Go's implements pass returns its decisions as a value
-of symbol ids and flags (complete interfaces, possible implementers,
-implementers with pointer-receiver and signature-identity flags, in the
-order made), and a separate step turns them into the run's dispatch sets
+of symbol ids and flags (interfaces with a known, nonempty source-only
+method set; type/interface pairs that remain possible; and pairs that pass
+the source-only structural check, each with a pointer-receiver flag and a
+signature-identity annotation of `identical`, `different` or `unknown`;
+structural matches, not verified implementations; in the order made), and a separate step turns them into the run's dispatch sets
 and `implements` links. The notes pass computes its symbols' ids under the
 store's project id, so both builds of Go's global index name each
 declaration by its stored id. Under the test suite the decisions cross
