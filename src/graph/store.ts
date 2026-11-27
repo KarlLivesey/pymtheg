@@ -398,6 +398,22 @@ export class SqliteGraphStore implements GraphStorage {
         interleaved: boolean;
         /** The completion record in the run's baseline snapshot (C-45). */
         commandState: unknown;
+        /**
+         * C-62: the run generation, as its baseline read it and, once it
+         * has claimed the store, as its claim set it.
+         */
+        generation: number;
+        /**
+         * C-62: checks, under the write lock of the run's first write after
+         * it is set, that what the run captured is still what is on disk.
+         */
+        verify?: (() => boolean) | undefined;
+        /**
+         * C-62 (Sol review): what the run's claim replaced, kept until its
+         * capture check passes, and the data version after the claim's
+         * commit. A refused check restores it, if nothing else committed.
+         */
+        claimed?: { version: number; meta: [string, string][] } | undefined;
       } = {
     state: "idle",
   };
@@ -477,6 +493,8 @@ export class SqliteGraphStore implements GraphStorage {
       } catch {
         // The original error is reported.
       }
+    // C-62: a claim whose first rows never committed is undone.
+    this.undoClaim();
   }
   /** A write that fails before it reaches SQL undoes the open batch too. */
   private failedWrite(): void {
@@ -521,18 +539,60 @@ export class SqliteGraphStore implements GraphStorage {
           (!run.takeOver && this.indexRunMark() !== undefined)
         )
           throw new GraphIndexTakenOver();
+        // C-62 (Sol review): the claim commits on its own, before the
+        // capture check. A verified no-edit run that reads after it finds
+        // no completion and indexes; one that read before it read the disk
+        // before this run's check, which then sees any change since its
+        // capture. What the claim replaces is kept for an exact undo.
+        const meta = this.db
+          .prepare(
+            "SELECT key, value FROM graph_meta WHERE key IN ('command-complete','analysis-complete','index-generation','index-run') ORDER BY key",
+          )
+          .all()
+          .map((row) => [row.key as string, row.value as string]) as [
+          string,
+          string,
+        ][];
         this.db
           .prepare(
             "INSERT INTO graph_meta VALUES ('index-run',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
           )
           .run(run.id);
+        // C-62: the claim starts a new generation; only the run holding the
+        // newest one publishes (finishIndexRun, completeGraphCommandState).
+        this.db
+          .prepare(
+            "INSERT INTO graph_meta VALUES ('index-generation','1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1",
+          )
+          .run();
+        run.generation = this.indexGeneration();
         this.db
           .prepare(
             "DELETE FROM graph_meta WHERE key IN ('command-complete','analysis-complete')",
           )
           .run();
+        const claimVersion = this.commandDataVersion();
+        this.db.exec("COMMIT");
+        count("index.claimCommits");
+        run.state = "written";
+        run.version = claimVersion;
+        run.claimed = { version: claimVersion, meta };
+        this.claimCommitted();
+        // The transaction for the run's first rows, begun as any is.
+        this.db.exec("PRAGMA temp_store=MEMORY");
+        try {
+          this.db.exec("BEGIN IMMEDIATE");
+        } finally {
+          this.db.exec("PRAGMA temp_store=DEFAULT");
+        }
+        // Another connection may have committed between the two.
+        if (this.indexRunMark() !== run.id) throw new GraphIndexTakenOver();
+        this.checkClaimedCapture();
+        if (this.commandDataVersion() !== run.version) run.interleaved = true;
       } else if (run.state === "written") {
         if (this.indexRunMark() !== run.id) throw new GraphIndexTakenOver();
+        if (run.claimed) this.checkClaimedCapture();
+        else this.verifyCapture();
         // A writer that is not an index run: this run's result is no longer
         // its own, so it publishes no completion.
         if (this.commandDataVersion() !== run.version) run.interleaved = true;
@@ -570,6 +630,7 @@ export class SqliteGraphStore implements GraphStorage {
   /** Commits the open write transaction and records it for the run. */
   private commitTransaction(): void {
     this.batchOpen = undefined;
+    count("store.writeCommits");
     const run = this.indexRun;
     try {
       // Read under the write lock, before the commit: this connection's own
@@ -580,11 +641,99 @@ export class SqliteGraphStore implements GraphStorage {
       if (run.state !== "idle") {
         run.state = "written";
         run.version = version!;
+        // The run's first rows are committed: its claim stands.
+        run.claimed = undefined;
       }
     } catch (error) {
       this.rollback();
       throw error;
     }
+  }
+  /**
+   * C-62: runs the current run's capture check once, under the write lock.
+   * A capture that no longer matches the disk is not published: the
+   * transaction rolls back and the run writes nothing more.
+   */
+  private verifyCapture(): void {
+    const run = this.indexRun;
+    if (run.state === "idle" || !run.verify) return;
+    const verify = run.verify;
+    run.verify = undefined;
+    if (!verify()) throw new GraphIndexStale();
+  }
+  /**
+   * C-62 (Sol review): the capture check of a run that has just claimed,
+   * under the write lock of the transaction that would hold its first
+   * rows. A refusal fails that transaction, which undoes the claim
+   * (`undoClaim`).
+   */
+  private checkClaimedCapture(): void {
+    const run = this.indexRun;
+    if (run.state === "idle" || !run.claimed) return;
+    this.verifyCapture();
+  }
+  /**
+   * C-62: a run whose claim committed and whose first rows did not (its
+   * capture check refused, or its first write or batch failed) undoes the
+   * claim, in a transaction of its own right after the failure, but only
+   * when nothing else has committed since the claim: the data version is
+   * the one after the claim's commit, and the mark is still this run's.
+   * The completion records, the generation and any earlier mark the claim
+   * replaced are put back and this run's mark removed, so the store is as
+   * it was before the run. Otherwise nothing is undone: another run owns
+   * what is there, or the store reports incomplete for the next index.
+   */
+  private undoClaim(): void {
+    const run = this.indexRun;
+    if (run.state === "idle" || !run.claimed) return;
+    const claimed = run.claimed;
+    run.claimed = undefined;
+    try {
+      this.db.exec("BEGIN IMMEDIATE");
+      if (
+        this.commandDataVersion() === claimed.version &&
+        this.indexRunMark() === run.id
+      ) {
+        this.db
+          .prepare(
+            "DELETE FROM graph_meta WHERE key IN ('index-run','command-complete','analysis-complete','index-generation')",
+          )
+          .run();
+        const put = this.db.prepare("INSERT INTO graph_meta VALUES (?, ?)");
+        for (const [key, value] of claimed.meta) put.run(key, value);
+        this.db.exec("COMMIT");
+        count("index.claimsUndone");
+        run.state = "pending";
+      } else this.db.exec("ROLLBACK");
+    } catch {
+      if (this.db.isTransaction)
+        try {
+          this.db.exec("ROLLBACK");
+        } catch {
+          // The original failure is reported.
+        }
+    }
+  }
+  /**
+   * C-62: called once a run's claim has committed, before the transaction
+   * that holds its capture check and first rows begins. Nothing here;
+   * tests stop a run at this point.
+   */
+  protected claimCommitted(): void {}
+  /** C-62: the number of index runs that have claimed this store. */
+  private indexGeneration(): number {
+    const value = this.db
+      .prepare("SELECT value FROM graph_meta WHERE key='index-generation'")
+      .get()?.value;
+    return value === undefined ? 0 : Number(value);
+  }
+  /**
+   * C-62: the check the run's first write after this call makes under the
+   * write lock, before anything is published: that the walk and the files
+   * the run writes are still as it captured them.
+   */
+  verifyIndexCapture(verify: () => boolean): void {
+    if (this.indexRun.state !== "idle") this.indexRun.verify = verify;
   }
   private indexRunMark(): string | undefined {
     return this.db
@@ -1400,9 +1549,18 @@ export class SqliteGraphStore implements GraphStorage {
     this.beforeWrite();
     const entered = this.enterTurnstile();
     try {
-      this.db
-        .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
-        .run();
+      // C-62: one statement, so no run claims between the check and the
+      // delete: a run overtaken by a newer one removes nothing of its.
+      if (this.finishedGeneration === undefined)
+        this.db
+          .prepare("DELETE FROM graph_meta WHERE key='command-complete'")
+          .run();
+      else
+        this.db
+          .prepare(
+            "DELETE FROM graph_meta WHERE key='command-complete' AND COALESCE((SELECT CAST(value AS INTEGER) FROM graph_meta WHERE key='index-generation'),0)=?",
+          )
+          .run(this.finishedGeneration);
     } finally {
       if (entered) this.leaveTurnstile();
     }
@@ -1434,9 +1592,11 @@ export class SqliteGraphStore implements GraphStorage {
     let indexedBefore: boolean;
     let recorded: boolean;
     let commandState: unknown;
+    let generation: number;
     this.db.exec("BEGIN");
     try {
       version = this.commandDataVersion();
+      generation = this.indexGeneration();
       takeOver = this.unfinishedIndexRun();
       completed = takeOver ? new Map() : this.readCompletedAnalysis();
       // The record that a run finished completely is kept across later runs,
@@ -1463,6 +1623,7 @@ export class SqliteGraphStore implements GraphStorage {
       recorded,
       interleaved: false,
       commandState,
+      generation,
     };
     if (!takeOver) return false;
     this.transaction(() => {});
@@ -1546,9 +1707,12 @@ export class SqliteGraphStore implements GraphStorage {
       // commits after the version taken under its last write lock (or at
       // its beginning if it wrote nothing); the completion checks it under
       // its own write lock.
-      if (run.state !== "idle")
+      if (run.state !== "idle") {
         this.finishedVersion =
           incomplete || run.interleaved ? Number.NaN : run.version;
+        this.finishedGeneration = run.generation;
+        this.finishedWrote = run.state === "written";
+      }
     } finally {
       this.indexRun = { state: "idle" };
     }
@@ -1558,6 +1722,25 @@ export class SqliteGraphStore implements GraphStorage {
    * current. A completion record is written only while it still is (C-22).
    */
   private finishedVersion: number | undefined;
+  /**
+   * C-62: the run generation this connection's last finished run held. A
+   * newer run has claimed the store when it differs: then this connection
+   * publishes nothing, not even the interleaved mark, which would replace
+   * the newer run's own.
+   */
+  private finishedGeneration: number | undefined;
+  /**
+   * C-62 (Opus review): whether this connection's last finished run wrote
+   * anything. One that wrote nothing, overtaken by another run's completion
+   * published after its baseline, leaves that completion as it is.
+   */
+  private finishedWrote = false;
+  private overtaken(): boolean {
+    return (
+      this.finishedGeneration !== undefined &&
+      this.indexGeneration() !== this.finishedGeneration
+    );
+  }
   private finishedRunCurrent(): boolean {
     return (
       this.finishedVersion === undefined ||
@@ -1594,11 +1777,27 @@ export class SqliteGraphStore implements GraphStorage {
     try {
       // Lock publication so another connection cannot commit between validation and publication.
       this.transaction(() => {
+        // C-62: a newer run claimed the store since this run: it owns the
+        // result and the mark, so this run publishes nothing.
+        if (this.overtaken()) return;
         if (
           !this.finishedRunCurrent() ||
           (expectedVersion !== undefined &&
             this.commandDataVersion() !== expectedVersion)
         ) {
+          // C-62 (Opus review): a run that wrote nothing, after whose
+          // baseline another run published its completion (a completion
+          // and no run's mark): the store is that run's, complete. This run
+          // publishes nothing and marks nothing.
+          if (
+            !this.finishedWrote &&
+            this.db
+              .prepare(
+                "SELECT 1 FROM graph_meta WHERE key='command-complete' AND NOT EXISTS(SELECT 1 FROM graph_meta WHERE key='index-run')",
+              )
+              .get()
+          )
+            return;
           // Another connection committed after the run's last write: what
           // is stored is no longer only the run's. Marked unfinished, in the
           // same locked transaction, so the next run redoes everything
@@ -1985,5 +2184,19 @@ export class GraphIndexTakenOver extends Error {
       "Another graph index run started on this store and took it over (or the store changed while this run was reading it); this run stopped without writing more. Run `pymtheg graph index` again if the other run did not finish.",
     );
     this.name = "GraphIndexTakenOver";
+  }
+}
+
+/**
+ * C-62: what the run captured (its walk, or a file it would write) is no
+ * longer what is on disk when it would first publish: another run may have
+ * found the newer tree current, so this run writes nothing.
+ */
+export class GraphIndexStale extends GraphIndexTakenOver {
+  constructor() {
+    super();
+    this.message =
+      "The project changed after this graph index run read it, before the run wrote anything; it stopped without writing. Run `pymtheg graph index` again.";
+    this.name = "GraphIndexStale";
   }
 }

@@ -3277,6 +3277,25 @@ changed a renamed file's keys. And a dropped base was taken as read.
 **Rules out:** a per-call memo shared by different callees of that call;
 key hashes of text that depends on other files. [C-60](changes/C-60.md)
 
+### C-62 An overtaken index run writes nothing
+
+**Decided (C-62):** an index run's baseline (data version, mark,
+completion) is read before its directory walk, so any other connection's
+commit after it stops the run at its first write. That first write also
+checks, under its write lock, that the walk and the text of every file the
+run writes and every context file are still on disk as captured, and
+writes nothing if not: another run, even one that wrote nothing because it
+found the tree current, may have seen the newer tree. A claim increments a
+run generation; a run publishes its completion, or the interleaved mark,
+only while no newer run has claimed. A run with no edit still reads the
+baseline only, and claims and writes nothing (C-38A). In an index session
+an overtaken run keeps nothing: a session keeps a run's values only once
+its completion is written, and drops what it had when the store's
+completion record is another run's (C-45, C-55). **Why:** three shapes
+reproduced on C-38A let an overtaken run overwrite a newer run's rows or
+replace its mark. **Rules out:** leases, timeouts or any wall-clock rule;
+trusting a capture that the disk no longer matches. [C-62](changes/C-62.md)
+
 ### C-13 TypeScript program budget and compiler exceptions
 
 **Decided (C-13):** one TypeScript program is given at most 50,000,000

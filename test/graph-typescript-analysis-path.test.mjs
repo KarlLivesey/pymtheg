@@ -228,3 +228,117 @@ test("a one-file TypeScript project: a first index, a body edit, and a no-edit i
     ],
   });
 });
+
+// C-62 (a leftover of C-38A's review): a TypeScript store written before
+// the `index-completed` record existed, whether its last run finished or
+// not, reports `no previous index` once, on its next index, which writes
+// the record; later ones report `full`.
+test("a TypeScript store from before the index-completed record reports `no previous index` once", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const root = await mkdtemp(join(tmpdir(), "c62-path-"));
+  const write = (path, text) =>
+    mkdir(dirname(join(root, path)), { recursive: true }).then(() =>
+      writeFile(join(root, path), text),
+    );
+  const graph = join(root, ".pymtheg/rebuildable/graph.sqlite");
+  const registry = new LanguageRegistry([typescript]);
+  const index = async () => {
+    const response = await executeGraph(
+      { command: "index", root },
+      { registry },
+    );
+    assert.equal(response.status, "ok");
+    return response.sync.report?.analysisPaths;
+  };
+  /** The store as an older build left it: no record; maybe a run unfinished. */
+  const older = (unfinished) => {
+    const db = new DatabaseSync(graph);
+    db.exec("DELETE FROM graph_meta WHERE key='index-completed'");
+    if (unfinished)
+      db.exec(
+        "INSERT INTO graph_meta VALUES ('index-run','interleaved') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      );
+    db.close();
+  };
+  try {
+    await write(
+      "tsconfig.json",
+      JSON.stringify({ compilerOptions: { strict: true }, include: ["src"] }),
+    );
+    await write("src/f.ts", "export const f = 1;\n");
+    assert.deepEqual(await index(), [
+      { module: "typescript", path: "full", note: "no previous index" },
+    ]);
+    for (const unfinished of [false, true]) {
+      older(unfinished);
+      await write("src/f.ts", `export const f = ${unfinished ? 2 : 4};\n`);
+      assert.deepEqual(
+        await index(),
+        [{ module: "typescript", path: "full", note: "no previous index" }],
+        `once (last run ${unfinished ? "unfinished" : "finished"})`,
+      );
+      await write("src/f.ts", `export const f = ${unfinished ? 3 : 5};\n`);
+      assert.deepEqual(await index(), [{ module: "typescript", path: "full" }]);
+    }
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// Opus review: a store with Go files beside TypeScript ones, written before
+// the record existed. Its last run finished: Go's completed analysis counts
+// as a finished run, so the next index reports no note. Its last run did
+// not finish: `no previous index` once.
+test("a Go and TypeScript store from before the index-completed record: no note if its last run finished, `no previous index` once if not", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const { discoverLanguages } = await import("../dist/graph/index.js");
+  const root = await mkdtemp(join(tmpdir(), "c62-path-go-"));
+  const write = (path, text) =>
+    mkdir(dirname(join(root, path)), { recursive: true }).then(() =>
+      writeFile(join(root, path), text),
+    );
+  const graph = join(root, ".pymtheg/rebuildable/graph.sqlite");
+  const registry = await discoverLanguages();
+  const index = async () => {
+    const response = await executeGraph(
+      { command: "index", root },
+      { registry },
+    );
+    return (response.sync.report?.analysisPaths ?? []).filter(
+      (path) => path.module === "typescript",
+    );
+  };
+  const older = (unfinished) => {
+    const db = new DatabaseSync(graph);
+    db.exec("DELETE FROM graph_meta WHERE key='index-completed'");
+    if (unfinished)
+      db.exec(
+        "INSERT INTO graph_meta VALUES ('index-run','interleaved') ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+      );
+    db.close();
+  };
+  try {
+    await write(
+      "tsconfig.json",
+      JSON.stringify({ compilerOptions: { strict: true }, include: ["src"] }),
+    );
+    await write("src/f.ts", "export const f = 1;\n");
+    await write("go.mod", "module example.com/m\n\ngo 1.22\n");
+    await write("a/a.go", "package a\n\nfunc A() int { return 1 }\n");
+    assert.deepEqual(await index(), [
+      { module: "typescript", path: "full", note: "no previous index" },
+    ]);
+    older(false);
+    await write("src/f.ts", "export const f = 2;\n");
+    assert.deepEqual(await index(), [{ module: "typescript", path: "full" }]);
+    older(true);
+    await write("src/f.ts", "export const f = 3;\n");
+    assert.deepEqual(await index(), [
+      { module: "typescript", path: "full", note: "no previous index" },
+    ]);
+    await write("src/f.ts", "export const f = 4;\n");
+    assert.deepEqual(await index(), [{ module: "typescript", path: "full" }]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
