@@ -493,6 +493,8 @@ export class SqliteGraphStore implements GraphStorage {
       } catch {
         // The original error is reported.
       }
+    // C-62: a claim whose first rows never committed is undone.
+    this.undoClaim();
   }
   /** A write that fails before it reaches SQL undoes the open batch too. */
   private failedWrite(): void {
@@ -639,6 +641,8 @@ export class SqliteGraphStore implements GraphStorage {
       if (run.state !== "idle") {
         run.state = "written";
         run.version = version!;
+        // The run's first rows are committed: its claim stands.
+        run.claimed = undefined;
       }
     } catch (error) {
       this.rollback();
@@ -659,25 +663,34 @@ export class SqliteGraphStore implements GraphStorage {
   }
   /**
    * C-62 (Sol review): the capture check of a run that has just claimed,
-   * under the write lock of the transaction that would hold its first rows.
-   * If the disk no longer matches, the claim is undone in this same
-   * transaction, but only when nothing else has committed since the claim
-   * (the data version is the one after the claim's commit, and the mark is
-   * still this run's): the completion records and the generation the claim
-   * replaced are put back, and the mark removed, so the store is as it was
-   * before the run. Otherwise nothing is undone: another run owns what is
-   * there, or the store reports incomplete for the next index to repair.
+   * under the write lock of the transaction that would hold its first
+   * rows. A refusal fails that transaction, which undoes the claim
+   * (`undoClaim`).
    */
   private checkClaimedCapture(): void {
+    const run = this.indexRun;
+    if (run.state === "idle" || !run.claimed) return;
+    this.verifyCapture();
+  }
+  /**
+   * C-62: a run whose claim committed and whose first rows did not (its
+   * capture check refused, or its first write or batch failed) undoes the
+   * claim, in a transaction of its own right after the failure, but only
+   * when nothing else has committed since the claim: the data version is
+   * the one after the claim's commit, and the mark is still this run's.
+   * The completion records, the generation and any earlier mark the claim
+   * replaced are put back and this run's mark removed, so the store is as
+   * it was before the run. Otherwise nothing is undone: another run owns
+   * what is there, or the store reports incomplete for the next index.
+   */
+  private undoClaim(): void {
     const run = this.indexRun;
     if (run.state === "idle" || !run.claimed) return;
     const claimed = run.claimed;
     run.claimed = undefined;
     try {
-      this.verifyCapture();
-    } catch (error) {
+      this.db.exec("BEGIN IMMEDIATE");
       if (
-        error instanceof GraphIndexStale &&
         this.commandDataVersion() === claimed.version &&
         this.indexRunMark() === run.id
       ) {
@@ -691,9 +704,14 @@ export class SqliteGraphStore implements GraphStorage {
         this.db.exec("COMMIT");
         count("index.claimsUndone");
         run.state = "pending";
-        throw error;
-      }
-      throw error;
+      } else this.db.exec("ROLLBACK");
+    } catch {
+      if (this.db.isTransaction)
+        try {
+          this.db.exec("ROLLBACK");
+        } catch {
+          // The original failure is reported.
+        }
     }
   }
   /**

@@ -1032,8 +1032,8 @@ other run after that stops it at its first write. Its claim (its mark, and
 the completion records removed) commits on its own; only then does the
 transaction of its first rows check that the disk still matches what it
 captured (the walk, or a file the run would write), since another run may
-have found the newer tree current without writing. A run whose check fails
-undoes its claim, putting back exactly what the claim replaced, if nothing
+have found the newer tree current without writing. A run whose check fails,
+or whose first write fails, undoes its claim, putting back exactly what the claim replaced, if nothing
 else has committed since; otherwise the store reports incomplete until the
 next index. A run publishes its completion only while no newer run has
 claimed the store, and a run that wrote nothing leaves a completion another
