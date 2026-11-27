@@ -1,0 +1,18 @@
+[
+ {
+  "id": "honojs/hono",
+  "language": "typescript",
+  "url": "https://github.com/honojs/hono.git",
+  "commit": "676c8f80fcafc49e6e74c847a8f0d9c44cc7faee",
+  "category": "web / server framework",
+  "why": "Server framework with runtime-specific adapters and routing types."
+ },
+ {
+  "id": "changesets/changesets",
+  "language": "typescript",
+  "url": "https://github.com/changesets/changesets.git",
+  "commit": "9a035ec36045aeb6141dd0bbac9ab9e3c69ac0bc",
+  "category": "CLI tool",
+  "why": "Release-management CLI with multiple published packages and fixture projects."
+ }
+]
