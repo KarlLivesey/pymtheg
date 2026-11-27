@@ -2981,7 +2981,14 @@ follows the random project id). A glob imports only names its own module
 can see, so a private `use` in the globbed module is never resolved
 through the glob. A module chosen only by `cfg_attr(…, path = …)`, with no
 plain module file in the checkout, is exactly its captured alternatives: a
-build enabling none of them does not compile (E0583).
+build enabling none of them does not compile (E0583). Each alternative is
+the module only under its own predicate, and the plain file only when none
+applies (C-57): everything declared in one is conditional the same way, no
+offset in one alternative is compared with another's, a failed
+alternative is cited only where its predicate can hold, and a site is
+looked up only in the places of its file where its own conditions can hold
+(a file both alternatives declare, or inline modules of one name under
+opposite cfgs).
 With no lockfile, a dependency declared by registry version requirement
 alone resolves from the default registry, together with the facade's own
 registry dependencies, unless the root manifest patches or replaces the
@@ -3009,7 +3016,9 @@ external effect assumption. [C-18](changes/C-18.md)
 ### C-34 Fixed impl items in Rust macro transcribers
 
 A resolved `macro_rules!` definition can bound its lexical output to no
-names when every arm consists of fixed `impl` items and the invocation
+names when it is the only definition that can reach the invocation (C-57: a
+macro two `cfg_attr(path)` alternatives define is not resolved, so neither
+bounds the output) and every arm consists of fixed `impl` items and the invocation
 passes only identifiers and commas. The written impl bodies delimit the
 associated items. Repetitions cannot supply an item boundary or join tokens
 with a separator other than a comma. Inside a body, `inline`, `allow` and

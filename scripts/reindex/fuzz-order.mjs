@@ -65,6 +65,9 @@ export const SHAPES = [
   "serde-helper-alias",
   "cfg-siblings",
   "glob-chain-method",
+  // C-57: a #[macro_use] module whose file cfg_attr(path) alternatives
+  // choose, each defining the same macro differently.
+  "cfg-attr-path-macro",
 ];
 
 /**
@@ -98,6 +101,9 @@ export function generate(r) {
     cfgVariant: false,
     // The review's glob chain: callers of `r.area()` through a prelude.
     chain: null,
+    // C-57: leading comments of the two alternative files (they move the
+    // macros' offsets, which must never decide between the files).
+    choice: null,
   };
   for (const shape of shapes) {
     const a = r.int(n);
@@ -128,6 +134,8 @@ export function generate(r) {
       model.cfgSiblings = true;
       model.cfgVariant = r.chance(0.5);
       modules[a].fns[0].calls.push("crate::imp::run()");
+    } else if (shape === "cfg-attr-path-macro") {
+      model.choice = { leadA: "", leadB: "" };
     } else if (shape === "glob-chain-method") {
       model.chain = {
         others: r.int(8),
@@ -206,6 +214,16 @@ export function render(model) {
     }
     for (const m of chain) lib += `pub mod ${m};\n`;
   }
+  if (model.choice) {
+    lib +=
+      '\n#[macro_use]\n#[cfg_attr(feature = "a", path = "choice_a.rs")]\n#[cfg_attr(not(feature = "a"), path = "choice_b.rs")]\nmod choice;\n\npub struct ChoiceT;\npub trait ChoiceMarker {\n    fn mark();\n}\npick!(ChoiceT);\n\npub fn choice_check(_: Option<()>) -> usize {\n    std::mem::size_of::<Option<()>>()\n}\n';
+    files["app/src/choice_a.rs"] =
+      model.choice.leadA +
+      "macro_rules! pick {\n    ($ty:ident) => {\n        pub struct Option<T>(T);\n    };\n}\n";
+    files["app/src/choice_b.rs"] =
+      model.choice.leadB +
+      "macro_rules! pick {\n    ($ty:ident) => {\n        impl ChoiceMarker for $ty {\n            fn mark() {}\n        }\n    };\n}\n";
+  }
   files["app/src/lib.rs"] = lib;
   for (const m of model.modules) {
     let text = m.lead;
@@ -251,6 +269,7 @@ export function edit(model, r) {
       ? ["chain-doc", "chain-doc", "chain-call", "chain-other", "chain-trait"]
       : []),
     ...(model.cfgSiblings ? ["cfg-variant"] : []),
+    ...(model.choice ? ["choice-lead-a", "choice-lead-b"] : []),
   ];
   const kind = r.pick(kinds);
   const j = r.int(n);
@@ -327,6 +346,18 @@ export function edit(model, r) {
       break;
     case "cfg-variant":
       model.cfgVariant = !model.cfgVariant;
+      break;
+    // C-57: a comment long enough to move one file's macro past the
+    // other's offset, or back.
+    case "choice-lead-a":
+      model.choice.leadA = model.choice.leadA
+        ? ""
+        : `// ${"moved ".repeat(20 + r.int(40))}\n`;
+      break;
+    case "choice-lead-b":
+      model.choice.leadB = model.choice.leadB
+        ? ""
+        : `// ${"moved ".repeat(20 + r.int(40))}\n`;
       break;
   }
   return kind;

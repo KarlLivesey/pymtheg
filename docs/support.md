@@ -472,7 +472,15 @@ makes that whole manifest unknown). Private items are ordinary symbols.
 - **cfg-chosen module files:** a `mod` declared only with
   `cfg_attr(…, path = …)` alternatives, with no plain module file in the
   checkout, is exactly those alternatives (a build enabling none of them does
-  not compile, E0583). A glob imports only what its own module can see, so a
+  not compile, E0583). Each alternative is the module only under its own
+  predicate, and the plain file only when none applies
+  ([C-57](changes/C-57.md)): what one declares is conditional the same way,
+  and a site is looked up only in the places of its file where its own
+  conditions can hold.
+  A name or macro two mutually exclusive alternatives define is never one
+  definite target, no offset in one alternative decides against another, and
+  a failed alternative is cited only where its predicate can hold where the
+  access is. A glob imports only what its own module can see, so a
   private `use` in a globbed child is never resolved through the parent's
   glob ([C-24](changes/C-24.md)).
 - **Cancellation:** the graph CLI can interrupt Rust analysis and resolution

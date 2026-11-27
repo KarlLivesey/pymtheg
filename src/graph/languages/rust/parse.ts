@@ -1078,13 +1078,21 @@ async function createHelper(): Promise<Helper> {
         paths: string[];
         pathExplicit: boolean;
         pathOpaque: boolean;
+        pathAlternatives?: { path: string; conditions: string[] }[];
       } {
         const paths: string[] = [];
+        // C-57: each `cfg_attr(…, path = …)` alternative keeps the predicate
+        // that selects it; the resolver makes the file conditional on it.
+        const alternatives: { path: string; conditions: string[] }[] = [];
         let path = "",
           pathExplicit = false,
           pathOpaque = false,
           firstCertainPath = false;
-        const read = (m: Meta, conditional: boolean): void => {
+        const read = (
+          m: Meta,
+          conditional: boolean,
+          guards: readonly string[],
+        ): void => {
           if (m.name !== "path" || firstCertainPath) return;
           if (!conditional) firstCertainPath = true;
           let value: string | undefined;
@@ -1102,6 +1110,8 @@ async function createHelper(): Promise<Helper> {
             return;
           }
           paths.push(value);
+          if (conditional)
+            alternatives.push({ path: value, conditions: [...guards] });
           if (!conditional) {
             if (paths.length === 1 && !pathOpaque) {
               path = value;
@@ -1113,8 +1123,15 @@ async function createHelper(): Promise<Helper> {
           read(
             app.meta,
             app.guards.some((c) => !implies(explicitConditionsOn(n), c)),
+            app.guards,
           );
-        return { path, paths: [...new Set(paths)], pathExplicit, pathOpaque };
+        return {
+          path,
+          paths: [...new Set(paths)],
+          pathExplicit,
+          pathOpaque,
+          ...(alternatives.length ? { pathAlternatives: alternatives } : {}),
+        };
       }
       const argumentSyntaxCache = new Map<number, string>();
       function argumentSyntax(type: Node | null): string {
