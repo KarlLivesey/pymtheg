@@ -95,6 +95,19 @@ const files = {
   // inside a function body implements I (Sol's review, restic's Hasher).
   "bod/b.go":
     "package bod\n\ntype I interface{ M() }\n\ntype X struct{}\n\nfunc (X) M() {}\n\nfunc F() {}\n",
+  // A directory with no Go file: the notes build (given only Go files) and
+  // the resolution build (given every file) see different directories, so
+  // each keeps its own value; a body edit must still reuse both.
+  "web/app.ts": "export const app = 1;\n",
+  // Sol's second review: a non-Go file decides whether `io` is the
+  // standard library or a checkout directory, which changes which alias
+  // lookups fill the memo before a later one reaches the depth limit.
+  "testdata/pkg/a.go":
+    "package p\ntype Container struct { Variant }\ntype T struct{}\nfunc (T) M() {}\n",
+  "testdata/pkg/b_linux.go":
+    'package p\nimport "io"\ntype Variant = io.Reader\n',
+  "testdata/pkg/c_windows.go":
+    "package p\ntype Outer interface { A0 }\ntype Variant = X\ntype A0 = A1\ntype A1 = A2\ntype A2 = A3\ntype A3 = A4\ntype A4 = A5\ntype A5 = A6\ntype A6 = A7\ntype A7 = A8\ntype A8 = A9\ntype A9 = X\ntype X = Base\ntype Base interface { M() }\n",
   // (c) A failed file (no surface), moved into the implementers' package.
   "zz/broken.go": "package box\n\nfunc Broken( {\n",
   // Two init functions share an identity: an anonymous struct in the first
@@ -186,6 +199,16 @@ test("a session reuses Go's implements decisions across body edits, proven equal
     [
       "the embed changed back",
       () => write("emb2/e.go", files["emb2/e.go"]),
+      false,
+    ],
+    [
+      "a TypeScript file appears in testdata/src/io (a directory, no Go file)",
+      () => write("testdata/src/io/fixture.ts", "export const fixture = 1;\n"),
+      false,
+    ],
+    [
+      "the TypeScript file goes again",
+      () => rmSync(join(root, "testdata/src/io/fixture.ts")),
       false,
     ],
     [

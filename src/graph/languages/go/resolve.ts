@@ -480,9 +480,16 @@ export function linkNotes(
     symbols,
     links,
     ...(resolutionFiles ? { resolutionFiles } : {}),
-    // C-56: shared with the resolution build: a value is used only under
-    // the key of the inputs it was made from.
-    ...(kept ? { kept } : {}),
+    // C-56: the notes build's own values (it is given only Go files, so its
+    // directory facts differ from the resolution build's).
+    ...(kept
+      ? {
+          kept: {
+            get: (name, key) => kept.get(`notes:${name}`, key),
+            set: (name, key, value) => kept.set(`notes:${name}`, key, value),
+          },
+        }
+      : {}),
   });
   resolver.run();
   const output = new Map<string, Map<number, LinkNote>>();
@@ -3402,9 +3409,11 @@ class GoResolver {
   private implementsLinks(added: AddedLink[]): void {
     // C-56: a session keeps the decisions under a key of everything they
     // are made from; a different key returns nothing, and they are made
-    // again. The normal notes and resolution builds share one value when
-    // their inputs agree; the resolver that ignores lossy packages keeps
-    // its own (review: its decisions differ).
+    // again. Each build keeps its own: the notes build sees only Go files,
+    // the resolution build every stored file, so their directory facts (in
+    // the key) differ wherever a directory holds no Go file. The resolver
+    // that ignores lossy packages keeps its own as well (its decisions
+    // differ).
     const kept = this.context.kept;
     const name = this.ignoreLossy ? IMPLEMENTS_LOSSLESS : IMPLEMENTS;
     const key = kept ? this.implementsKey() : undefined;
@@ -3525,6 +3534,11 @@ class GoResolver {
           [file.path, file.hash, file.status, file.dependency ?? null] as const,
       )
       .sort((a, b) => compareText(a[0], b[0]));
+    // Facts derived from every file this resolver is given, Go or not
+    // (review: a TypeScript fixture in testdata/src/io makes `io` a checkout
+    // directory, not the standard library).
+    const directories = [...this.fileDirectories].sort(compareText);
+    const vendorRoots = [...this.vendorRoots].sort(compareText);
     return contentHash(
       JSON.stringify([
         "C-56",
@@ -3532,6 +3546,8 @@ class GoResolver {
         GO_MODULE_VERSION,
         this.moduleId,
         contexts,
+        directories,
+        vendorRoots,
         files,
       ]),
     );

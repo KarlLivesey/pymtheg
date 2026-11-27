@@ -3695,8 +3695,11 @@ mode, the Go module version, every context file's path and contents, and
 the complete Go file inventory by path and parse state, with each file's
 package, import, build and test facts, every declaration in source order
 (ordinary functions included, with ids and data), its embeds in order and
-its toolchain status. The normal notes and resolution builds share one
-value; the resolver that ignores lossy packages keeps its own. A different
+its toolchain status, and the directory-presence facts derived from every
+file supplied to the resolver, non-Go files included. Each build (the
+notes pass, given only Go files, and the resolution, given every file)
+keeps its own value, and the resolver that ignores lossy packages its own
+in each; the session's bound is eight values per module (was four). A different
 key returns nothing and the decisions are made again; a value naming an id
 the build does not have is not used. Under the test suite, and with
 `PYMTHEG_CHECK_KEPT=1`, a reused value is made again and must be

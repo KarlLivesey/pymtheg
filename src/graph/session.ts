@@ -90,7 +90,9 @@ export class IndexSession {
   ) {
     this.injectedRegistry = !!options.registry;
     if (options.registry) this.loaded = Promise.resolve(options.registry);
-    this.maxValues = options.maxValuesPerModule ?? 4;
+    // C-56: Go keeps five names (its inputs, and the implements decisions
+    // of two builds in two resolver modes).
+    this.maxValues = options.maxValuesPerModule ?? 8;
     if (options.keptInputBytes !== undefined)
       this.keptInputBytes = options.keptInputBytes;
   }
