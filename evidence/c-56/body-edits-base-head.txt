@@ -1,0 +1,12 @@
+{"build":"base","pin":"cli_cli","step":"body","jobCpuMs":12290,"wallMs":10138,"typeInterfacePairs":992496,"implementsReused":0,"implementsMade":0,"globalIndexCpuMs":3110,"analyzeGoCpuMs":2523,"resolveGoWithInputCpuMs":1592}
+{"build":"base","pin":"cli_cli","step":"body-revert","jobCpuMs":9628,"wallMs":7203,"typeInterfacePairs":992496,"implementsReused":0,"implementsMade":0,"globalIndexCpuMs":3349,"analyzeGoCpuMs":2687,"resolveGoWithInputCpuMs":1570}
+{"build":"base","pin":"restic_restic","step":"body","jobCpuMs":3790,"wallMs":3476,"typeInterfacePairs":69256,"implementsReused":0,"implementsMade":0,"globalIndexCpuMs":1095,"analyzeGoCpuMs":987,"resolveGoWithInputCpuMs":501}
+{"build":"base","pin":"restic_restic","step":"body-revert","jobCpuMs":3118,"wallMs":2021,"typeInterfacePairs":69256,"implementsReused":0,"implementsMade":0,"globalIndexCpuMs":1183,"analyzeGoCpuMs":884,"resolveGoWithInputCpuMs":568}
+{"build":"head","pin":"cli_cli","step":"body","jobCpuMs":11607,"wallMs":9558,"typeInterfacePairs":0,"implementsReused":2,"implementsMade":0,"globalIndexCpuMs":2154,"analyzeGoCpuMs":1977,"resolveGoWithInputCpuMs":1250}
+{"build":"head","pin":"cli_cli","step":"body-revert","jobCpuMs":8029,"wallMs":6778,"typeInterfacePairs":0,"implementsReused":2,"implementsMade":0,"globalIndexCpuMs":2084,"analyzeGoCpuMs":1914,"resolveGoWithInputCpuMs":1133}
+{"build":"head","pin":"restic_restic","step":"body","jobCpuMs":3373,"wallMs":3429,"typeInterfacePairs":0,"implementsReused":2,"implementsMade":0,"globalIndexCpuMs":578,"analyzeGoCpuMs":735,"resolveGoWithInputCpuMs":201}
+{"build":"head","pin":"restic_restic","step":"body-revert","jobCpuMs":2226,"wallMs":1991,"typeInterfacePairs":0,"implementsReused":2,"implementsMade":0,"globalIndexCpuMs":495,"analyzeGoCpuMs":558,"resolveGoWithInputCpuMs":217}
+cli/cli last revert equals cold: yes
+restic/restic last revert equals cold: yes
+cli/cli last revert equals cold: yes
+restic/restic last revert equals cold: yes

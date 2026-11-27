@@ -105,6 +105,9 @@ export interface PredeclaredUse {
   src: string;
 }
 
+/** The Go module's version: stored records and kept values carry it. */
+export const GO_MODULE_VERSION = "33";
+
 export const PREDECLARED_TYPES = new Set([
   "any",
   "bool",

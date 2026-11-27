@@ -3701,3 +3701,27 @@ declaration by its stored id. Under the test suite the decisions cross
 JSON before use. **Why:** C-56 can keep a value, not caches that close over
 a resolver. **Unchanged:** every decision, link, note and stored row.
 See [C-56b](changes/C-56b.md).
+
+### An index session keeps Go's implements decisions (C-56)
+
+**Decided (C-56):** Go's implements decisions (C-56b's value) are kept in
+the index session under C-45's rules. The key is a digest of the resolver
+mode, the Go module version, every context file's path and contents, and
+the complete Go file inventory by path and parse state, with each file's
+package, import, build and test facts, every declaration in source order
+(ordinary functions included, with ids and data), its embeds in order and
+its toolchain status, and the directory-presence facts derived from every
+file supplied to the resolver, non-Go files included. Each build (the
+notes pass, given only Go files, and the resolution, given every file)
+keeps its own value, and the resolver that ignores lossy packages its own
+in each; the session's bound is eight values per module (was four). A different
+key returns nothing and the decisions are made again; a value naming an id
+the build does not have is not used. Under the test suite, and with
+`PYMTHEG_CHECK_KEPT=1`, a reused value is made again and must be
+identical, or the run fails. **Why:** the implements pass weighs about
+0.65 s per build on a cli/cli body edit, and a body edit that changes no
+declaration cannot change its decisions. **Rules out:** a key of file
+surfaces alone (review: it missed a function under another build
+constraint, a function and an alias swapping order, a failed file moving,
+and the resolver mode). **Unchanged:** without a session, and on every key
+miss, the pass runs as before. See [C-56](changes/C-56.md).

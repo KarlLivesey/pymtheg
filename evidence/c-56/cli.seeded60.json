@@ -1,0 +1,1148 @@
+{
+ "id": "cli/cli",
+ "seed": 5622,
+ "expectedSteps": 60,
+ "steps": [
+  {
+   "step": 0,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 218234,
+    "library": 64647,
+    "merged": 0
+   },
+   "wallMs": 50717,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 1,
+   "file": "pkg/cmd/issue/list/http.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 218234,
+    "library": 64647,
+    "merged": 0
+   },
+   "wallMs": 9011,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 2,
+   "file": "pkg/cmd/skills/list/c27_random_2_test.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 218236,
+    "library": 64647,
+    "merged": 0
+   },
+   "wallMs": 28143,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 3,
+   "file": "pkg/cmd/repo/autolink/list/http_test.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 218236,
+    "library": 64647,
+    "merged": 0
+   },
+   "wallMs": 28527,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 4,
+   "file": "pkg/cmd/agent-task/view/view.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217880,
+    "library": 64575,
+    "merged": 0
+   },
+   "wallMs": 37772,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 5,
+   "file": "pkg/cmd/issue/artifact/view/view_test.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217566,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 33508,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 6,
+   "file": "internal/attachments/client_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217602,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 31746,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 7,
+   "file": "pkg/cmd/discussion/client/client_test.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217602,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 11870,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 8,
+   "file": "pkg/cmd/repo/license/license.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217602,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 7744,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 9,
+   "file": "pkg/cmd/project/shared/queries/resolve.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217638,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 31719,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 10,
+   "file": "pkg/cmd/org/list/http_test.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217674,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 30967,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 11,
+   "file": "pkg/cmd/root/extension_registration_test.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217674,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 8315,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 12,
+   "file": "pkg/cmd/pr/create/regexp_writer.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217686,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 31439,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 13,
+   "file": "pkg/cmd/repo/list/http_test.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217686,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 31039,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 14,
+   "file": "pkg/cmd/skills/list/c27_random_2_test.go",
+   "kind": "file-delete",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217684,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 30738,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 15,
+   "file": "pkg/cmd/org/list/http_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217696,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 29022,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 16,
+   "file": "cmd/gh/main.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217696,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 29475,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 17,
+   "file": "internal/telemetry/fake.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217708,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 30870,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 18,
+   "file": "pkg/cmd/agent-task/capi/client_test.go",
+   "kind": "body",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217708,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 8097,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 19,
+   "file": "script/ghmock/graphqlcheck.go",
+   "kind": "interface",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217750,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 30413,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 20,
+   "file": "acceptance/acceptance_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217764,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 30820,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 21,
+   "file": ".github/skills/cli-exercise/tool/internal/fontutil/font_test.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217764,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 8665,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 22,
+   "file": "api/queries_comments.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217764,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 31770,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 23,
+   "file": ".github/codeql/tests/unsanitized-response-to-terminal/vendor/github.com/cli/go-gh/v2/pkg/asciisanitizer/sanitizer.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217764,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 31030,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 24,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217764,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 30242,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 25,
+   "file": "pkg/cmd/project/list/list_test.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217764,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 29863,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 26,
+   "file": "pkg/cmd/pr/ready/ready_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217778,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 31626,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 27,
+   "file": "pkg/cmd/attestation/api/mock_client.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217778,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 10969,
+   "resolvedFiles": 7,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 28,
+   "file": "pkg/cmd/repo/create/http.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217778,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 7375,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 29,
+   "file": "internal/config/migration/multi_account.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217778,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 31363,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 30,
+   "file": "internal/prompter/prompter_mock.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217779,
+    "library": 64503,
+    "merged": 0
+   },
+   "wallMs": 10965,
+   "resolvedFiles": 9,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 31,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217819,
+    "library": 65426,
+    "merged": 0
+   },
+   "wallMs": 55231,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 32,
+   "file": "pkg/cmd/codespace/codespace_selector_test.go",
+   "kind": "import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217820,
+    "library": 65427,
+    "merged": 0
+   },
+   "wallMs": 29007,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 33,
+   "file": "internal/codespaces/states.go",
+   "kind": "import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217821,
+    "library": 65428,
+    "merged": 0
+   },
+   "wallMs": 27754,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 34,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217821,
+    "library": 65428,
+    "merged": 0
+   },
+   "wallMs": 29216,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 35,
+   "file": "pkg/cmd/project/item-add/item_add.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217821,
+    "library": 65428,
+    "merged": 0
+   },
+   "wallMs": 11442,
+   "resolvedFiles": 34,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 36,
+   "file": "pkg/cmd/accessibility/accessibility.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217822,
+    "library": 65428,
+    "merged": 0
+   },
+   "wallMs": 10477,
+   "resolvedFiles": 32,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 37,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217782,
+    "library": 64505,
+    "merged": 0
+   },
+   "wallMs": 53491,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 38,
+   "file": "pkg/cmd/codespace/create_test.go",
+   "kind": "dot",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217783,
+    "library": 64506,
+    "merged": 0
+   },
+   "wallMs": 29401,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 39,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217783,
+    "library": 64506,
+    "merged": 0
+   },
+   "wallMs": 29875,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 40,
+   "file": "pkg/cmd/auth/shared/prompt.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217797,
+    "library": 64506,
+    "merged": 0
+   },
+   "wallMs": 29986,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 41,
+   "file": "pkg/httpmock/c27_random_41.go",
+   "kind": "file-add",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217799,
+    "library": 64506,
+    "merged": 0
+   },
+   "wallMs": 29734,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 42,
+   "file": "internal/skills/lockfile/lockfile.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217799,
+    "library": 64506,
+    "merged": 0
+   },
+   "wallMs": 8957,
+   "resolvedFiles": 2,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 43,
+   "file": "go.mod",
+   "kind": "gomod-module",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217839,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 51963,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 44,
+   "file": "pkg/cmd/pr/checkout/checkout_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217853,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 30453,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 45,
+   "file": "internal/codespaces/rpc/codespace/codespace_host_service.v1.proto.mock.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217853,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 29250,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 46,
+   "file": "pkg/cmd/attestation/test/path.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217867,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 31009,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 47,
+   "file": "script/ghmock/export.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217867,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 28349,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 48,
+   "file": "pkg/cmd/repo/autolink/delete/delete.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217867,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 28523,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 49,
+   "file": "pkg/cmd/skills/search/search_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217881,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 30039,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 50,
+   "file": "pkg/cmd/attestation/verify/attestation_integration_test.go",
+   "kind": "embed",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217895,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 36669,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 51,
+   "file": "pkg/cmd/root/official_extension_stub_test.go",
+   "kind": "add-export",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217896,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 11683,
+   "resolvedFiles": 31,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 52,
+   "file": "pkg/cmd/alias/imports/import_test.go",
+   "kind": "comment",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217896,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 7304,
+   "resolvedFiles": 1,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 53,
+   "file": "go.mod",
+   "kind": "gomod-require",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217896,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 37280,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 54,
+   "file": "pkg/iostreams/content_test.go",
+   "kind": "move",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217896,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 31347,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 55,
+   "file": "pkg/cmd/issue/reopen/reopen.go",
+   "kind": "build",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217896,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 32235,
+   "resolvedFiles": 1128,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 56,
+   "file": "pkg/httpmock/c27_random_41.go",
+   "kind": "file-delete",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217894,
+    "library": 65429,
+    "merged": 0
+   },
+   "wallMs": 33531,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 57,
+   "file": "pkg/cmd/event/client/client.go",
+   "kind": "break",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217668,
+    "library": 65317,
+    "merged": 0
+   },
+   "wallMs": 35229,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 58,
+   "file": "script/ghmock/gitfixture.go",
+   "kind": "signature",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217668,
+    "library": 65317,
+    "merged": 0
+   },
+   "wallMs": 11665,
+   "resolvedFiles": 43,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  },
+  {
+   "step": 59,
+   "file": "pkg/search/result.go",
+   "kind": "import",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 217669,
+    "library": 65318,
+    "merged": 0
+   },
+   "wallMs": 34620,
+   "resolvedFiles": 1127,
+   "noEdit": {
+    "equal": true,
+    "filesWritten": 0
+   }
+  }
+ ],
+ "equal": true
+}

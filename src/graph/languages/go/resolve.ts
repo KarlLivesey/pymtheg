@@ -13,7 +13,8 @@ import type {
   ResolutionResult,
 } from "../../types.js";
 import { count, stageSync } from "../../work.js";
-import { fileFacts } from "../../identity.js";
+import { contentHash, fileFacts } from "../../identity.js";
+import type { KeptState } from "../../session.js";
 import {
   directoryOf,
   directoryOfImport,
@@ -40,6 +41,7 @@ import {
 } from "./constraints.js";
 import {
   BUILTIN_FUNCTIONS,
+  GO_MODULE_VERSION,
   PREDECLARED_TYPES,
   PREDECLARED_VALUES,
   TYPE_KINDS,
@@ -432,6 +434,7 @@ export function linkNotes(
   files: readonly GraphFile[],
   contextFiles: readonly ContextFile[],
   resolutionFiles?: ReadonlySet<string>,
+  kept?: KeptState,
 ): Map<string, Map<number, LinkNote>> {
   const symbols: GraphSymbol[] = [];
   const links: GraphLink[] = [];
@@ -477,6 +480,16 @@ export function linkNotes(
     symbols,
     links,
     ...(resolutionFiles ? { resolutionFiles } : {}),
+    // C-56: the notes build's own values (it is given only Go files, so its
+    // directory facts differ from the resolution build's).
+    ...(kept
+      ? {
+          kept: {
+            get: (name, key) => kept.get(`notes:${name}`, key),
+            set: (name, key, value) => kept.set(`notes:${name}`, key, value),
+          },
+        }
+      : {}),
   });
   resolver.run();
   const output = new Map<string, Map<number, LinkNote>>();
@@ -518,6 +531,14 @@ class FileMemo<T> {
     (this.local ?? this.shared).set(key, value);
   }
 }
+
+/** C-56: the name a build's implements decisions are kept under. */
+const IMPLEMENTS = "go:implements";
+/** C-56: the lossless resolver's own value (its decisions differ). */
+const IMPLEMENTS_LOSSLESS = "go:implements:lossless";
+/** C-56: whether a kept value is made again and compared before use. */
+const checkKept = () =>
+  process.env.PYMTHEG_TEST === "1" || process.env.PYMTHEG_CHECK_KEPT === "1";
 
 /**
  * C-56b: the implements pass's decisions, by symbol id, in the order made:
@@ -1263,6 +1284,7 @@ class GoResolver {
   /** The project without lossy packages (only to name reasons). */
   private shadow(path: string): GoResolver {
     if (!this.shadowResolver) {
+      count("go.shadowResolvers");
       this.shadowResolver = new GoResolver(this.moduleId, this.context, true);
       this.shadowResolver.indexGlobalFacts([]);
     }
@@ -3385,7 +3407,37 @@ class GoResolver {
   }
 
   private implementsLinks(added: AddedLink[]): void {
-    const decisions = this.implementsDecisions();
+    // C-56: a session keeps the decisions under a key of everything they
+    // are made from; a different key returns nothing, and they are made
+    // again. Each build keeps its own: the notes build sees only Go files,
+    // the resolution build every stored file, so their directory facts (in
+    // the key) differ wherever a directory holds no Go file. The resolver
+    // that ignores lossy packages keeps its own as well (its decisions
+    // differ).
+    const kept = this.context.kept;
+    const name = this.ignoreLossy ? IMPLEMENTS_LOSSLESS : IMPLEMENTS;
+    const key = kept ? this.implementsKey() : undefined;
+    const held = key
+      ? (kept!.get(name, key) as ImplementsDecisions | undefined)
+      : undefined;
+    let decisions: ImplementsDecisions;
+    if (held && this.knowsAll(held)) {
+      count("go.implementsReused");
+      decisions = held;
+      // Under the tests, and when asked (seeded edits), the kept value is
+      // made again and must be identical, or the run fails.
+      if (checkKept()) {
+        if (JSON.stringify(this.implementsDecisions()) !== JSON.stringify(held))
+          throw Error(
+            "C-56: the kept implements decisions differ from a recomputation",
+          );
+        count("go.implementsChecked");
+      }
+    } else {
+      count("go.implementsMade");
+      decisions = this.implementsDecisions();
+    }
+    if (key) kept!.set(name, key, decisions);
     // Under the test suite the decisions cross JSON before they are used, so
     // every Go test shows they are plain data, as a kept value must be.
     this.applyImplements(
@@ -3393,6 +3445,121 @@ class GoResolver {
         ? (JSON.parse(JSON.stringify(decisions)) as ImplementsDecisions)
         : decisions,
       added,
+    );
+  }
+
+  /**
+   * C-56: what the implements decisions are made from (review: the first
+   * key, file surfaces, missed a function added under another build
+   * constraint, the order of a function and a same-named alias, a failed
+   * file moving, and the resolver mode). It is a digest of:
+   * - the resolver mode, the Go module version and the module id;
+   * - every context file's path, content hash, status and dependency stamp;
+   * - the complete Go file inventory, each by path and parse state, with
+   *   its package, imports, build constraints, GOOS/GOARCH and test
+   *   membership, every declaration in source order (ordinary functions
+   *   included: kind, name, identity, id and data, which hold signatures,
+   *   fields, receivers and types), its embeds in order (owner, target,
+   *   pointer, coinciding starts) and its toolchain status.
+   * Positions are not in it, only order, so a body edit that changes no
+   * declaration keeps it. Every type id the value can name is a
+   * declaration's id.
+   */
+  private implementsKey(): string {
+    const byFile = new Map<string, GraphSymbol[]>();
+    for (const symbol of this.context.symbols)
+      if (symbol.module === this.moduleId) push2(byFile, symbol.file, symbol);
+    const place = (a: GraphSymbol, b: GraphSymbol) =>
+      a.range.start - b.range.start ||
+      a.range.end - b.range.end ||
+      compareText(a.key, b.key);
+    const files = this.context.files
+      .filter((file) => file.module === this.moduleId)
+      .map((file) => {
+        const data = file.result.data as
+          | { go?: FileFact; toolchain?: unknown }
+          | undefined;
+        const fact = data?.go;
+        const symbols = [...(byFile.get(file.path) ?? [])].sort(place);
+        const position = new Map(
+          symbols.map((symbol, index) => [symbol.key, index]),
+        );
+        const embeds = file.result.links
+          .filter((link) => link.kind === "embeds")
+          .sort(
+            (a, b) =>
+              a.range.start - b.range.start ||
+              a.range.end - b.range.end ||
+              compareText(a.targetName, b.targetName),
+          );
+        return [
+          file.path,
+          file.result.status,
+          fact
+            ? [
+                fact.package ?? null,
+                fact.imports.map((item) => [item.path, item.alias ?? null]),
+                fact.build ?? null,
+                fact.goos ?? null,
+                fact.goarch ?? null,
+                fact.test,
+              ]
+            : null,
+          symbols.map((symbol) => [
+            symbol.kind,
+            symbol.name,
+            symbol.identity,
+            symbol.id,
+            symbol.data ?? null,
+          ]),
+          embeds.map((link, index) => {
+            const embed = link.data as
+              | { t?: unknown; pointer?: boolean }
+              | undefined;
+            return [
+              position.get(link.sourceKey ?? "") ?? null,
+              link.targetName,
+              embed?.t ?? null,
+              embed?.pointer ?? null,
+              link.range.start === embeds[index - 1]?.range.start,
+            ];
+          }),
+          data?.toolchain ?? null,
+        ];
+      })
+      .sort((a, b) => compareText(a[0] as string, b[0] as string));
+    const contexts = this.context.contextFiles
+      .map(
+        (file) =>
+          [file.path, file.hash, file.status, file.dependency ?? null] as const,
+      )
+      .sort((a, b) => compareText(a[0], b[0]));
+    // Facts derived from every file this resolver is given, Go or not
+    // (review: a TypeScript fixture in testdata/src/io makes `io` a checkout
+    // directory, not the standard library).
+    const directories = [...this.fileDirectories].sort(compareText);
+    const vendorRoots = [...this.vendorRoots].sort(compareText);
+    return contentHash(
+      JSON.stringify([
+        "C-56",
+        this.ignoreLossy ? "lossless" : "normal",
+        GO_MODULE_VERSION,
+        this.moduleId,
+        contexts,
+        directories,
+        vendorRoots,
+        files,
+      ]),
+    );
+  }
+
+  /** Every id the decisions name is a symbol of this build. */
+  private knowsAll(decisions: ImplementsDecisions): boolean {
+    const has = (id: string) => this.symbolsById.has(id);
+    return (
+      decisions.complete.every(has) &&
+      decisions.possible.every(([type, iface]) => has(type) && has(iface)) &&
+      decisions.implementers.every(([type, iface]) => has(type) && has(iface))
     );
   }
 
