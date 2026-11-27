@@ -370,6 +370,12 @@ export function resolveRust(
     symbol: GraphSymbol,
     attributes: string[],
     conditions: string[],
+    /**
+     * C-43 review: the conditions of the modules the symbol is declared in
+     * (`#[cfg(..)] mod x;`, through every enclosing declaration). Not stored
+     * on the symbol: only the toolchain route reads them.
+     */
+    moduleConditions: string[],
   ) => void,
   markConditions?: (link: GraphLink, conditions: string[]) => void,
   /** Derived links (R1-K: calls written in macro bodies, at each invocation). */
@@ -4777,11 +4783,46 @@ export function resolveRust(
   // C-36: setup computes every symbol's presence and conditions, as a cold
   // pass does, so the caches it fills are the same whatever the decision
   // scope; only the callbacks are limited to the decided files.
+  /**
+   * C-43 review: the conditions of every module declaration the symbol's
+   * file is reached through (a place's conditions include its parents').
+   * A file no module declaration reaches (`mod x;` written only inside a
+   * macro invocation such as `cfg_if!`) may be conditional in ways the
+   * source cannot see: it is marked `?module-not-declared`. A module path
+   * reached through more than one file at some level of the chain
+   * (`#[cfg(unix)] #[path = ..] mod imp;` beside a `cfg(windows)` twin, or
+   * `#[cfg_attr(unix, path = ..)]` alternatives) is marked `?module-twin`:
+   * the same path names another item in another configuration.
+   */
+  let modulePathFiles: Map<string, Set<string>> | undefined;
+  const moduleGates = (symbol: GraphSymbol): string[] => {
+    const owners = ownerPlace(symbol.file, str(data(symbol).scope));
+    if (!owners.length) return ["?module-not-declared"];
+    if (!modulePathFiles) {
+      modulePathFiles = new Map();
+      for (const place of places) {
+        const key = `${place.crate.root}|${place.scope}`;
+        let set = modulePathFiles.get(key);
+        if (!set) modulePathFiles.set(key, (set = new Set()));
+        set.add(place.file);
+      }
+    }
+    const out = new Set(owners.flatMap((own) => own.conditions ?? []));
+    for (const own of owners)
+      for (let level: Place | null = own; level; level = level.parent)
+        if (
+          (modulePathFiles.get(`${level.crate.root}|${level.scope}`)?.size ??
+            0) > 1
+        )
+          out.add("?module-twin");
+    return [...out];
+  };
   if (markPresence)
     for (const symbol of symbols) {
       const attributes = itemPresence(symbol);
       const gates = conditionsFor(symbol);
-      if (decided(symbol.file)) markPresence(symbol, attributes, gates);
+      if (decided(symbol.file))
+        markPresence(symbol, attributes, gates, moduleGates(symbol));
     }
   const scopedMembers = (s: GraphSymbol) => membersByOwner.get(s.id) ?? [];
   const unknownImpls = new Map<string, GraphSymbol[]>(),

@@ -18,12 +18,16 @@ function selectedModes(modes) {
   const bare = modes.bare.repos;
   const installed = modes.installed.repos;
   const go = modes["go-toolchain"].repos;
-  return { bare, installed, go, pairedInstalled: pairedRepos(bare, installed, "installed"),
-    pairedGo: pairedRepos(bare, go, "go-toolchain"), goUsed: go.filter((repo) => repo.counts && repo.toolchain?.state === "used") };
+  // C-43: the opt-in Rust route, when the sweep measured it.
+  const rust = modes["rust-toolchain"]?.repos ?? [];
+  const used = (repos) => repos.filter((repo) => repo.counts && repo.toolchain?.state === "used");
+  return { bare, installed, go, rust, pairedInstalled: pairedRepos(bare, installed, "installed"),
+    pairedGo: pairedRepos(bare, go, "go-toolchain"), goUsed: used(go),
+    pairedRust: pairedRepos(bare, rust, "rust-toolchain"), rustUsed: used(rust) };
 }
 
 export function scoreTable(modes, base, own = false) {
-  const { bare, pairedInstalled, pairedGo, goUsed } = selectedModes(modes);
+  const { bare, pairedInstalled, pairedGo, goUsed, pairedRust, rustUsed } = selectedModes(modes);
   const render = (module, mode, repos) => {
     const now = score(repos, module, own);
     const then = baselineScore(base.repos, module, own);
@@ -40,7 +44,12 @@ export function scoreTable(modes, base, own = false) {
     const moduleCell = unit.level2 ? `<br>${number(unit.level2)} library module links (${rate(unit)})<br>**${number(withModules.level2)} (${rate(withModules)}) with library module links**` : "";
     const gapCell = (unit.level2 ? `${gap(now)}<br>${gap(withModules)} with library module links` : gap(now)) +
       (merged.level2 ? `<br>${gap(withoutMerged)} without merged environment globals` : "");
-    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split}${mergedCell}${moduleCell} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gapCell} |`;
+    // D17 clarified: with a toolchain route, Level 2 counting only the
+    // route-decided links labelled none-seen (exports that count the label).
+    const noneSeen = { ...now, level2: now.level2 - (now.seen ?? 0) };
+    const labelCell = now.seen !== undefined && mode !== "Source only" && mode !== "Bare"
+      ? `<br>${number(noneSeen.level2)} (${rate(noneSeen)}) counting only none-seen route answers` : "";
+    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split}${labelCell}${mergedCell}${moduleCell} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gapCell} |`;
   };
   return [
     "| Language | Mode | Links now | Level 2 now | Level 2 at 0.1.0 | Links to 90% |",
@@ -48,6 +57,8 @@ export function scoreTable(modes, base, own = false) {
     render("go", "Bare", bare),
     goUsed.length ? render("go", "Opt-in offline toolchain", pairedGo) : "| Go | Opt-in offline toolchain | — | not measured in this sweep | — | — |",
     render("rust", "Source only", bare),
+    // C-43: shown once a sweep has the opt-in Rust mode; earlier sweeps did not run it.
+    ...(modes["rust-toolchain"] ? [rustUsed.length ? render("rust", "Opt-in offline toolchain", pairedRust) : "| Rust | Opt-in offline toolchain | — | not measured in this sweep | — | — |"] : []),
     render("typescript", "Bare", bare),
     render("typescript", "Installed declarations", pairedInstalled),
   ].join("\n");
@@ -131,10 +142,11 @@ export function catalogChanges(modes, catalog, legacy) {
 }
 
 export function runTables(modes) {
-  const { bare, pairedInstalled, pairedGo } = selectedModes(modes);
+  const { bare, pairedInstalled, pairedGo, pairedRust } = selectedModes(modes);
   const bareById = new Map(bare.map((repo) => [repo.id, repo]));
   const picked = { bare: bareById, installed: new Map(pairedInstalled.map((repo) => [repo.id, repo])),
-    "go-toolchain": new Map(pairedGo.map((repo) => [repo.id, repo])) };
+    "go-toolchain": new Map(pairedGo.map((repo) => [repo.id, repo])),
+    "rust-toolchain": new Map(pairedRust.map((repo) => [repo.id, repo])) };
   return ["# Sweep attempts", "", "Peak is the largest recorded resident-memory peak across the attempt's stages. Wall covers checkout, setup, both indexes and queries. Cold columns cover the first index. Level 2 uses the pin language and marks every score carried forward from bare mode.",
     ...Object.entries(modes).flatMap(([mode, { repos }]) => ["", `## ${mode}`, "",
       "| Pin | Outcome | Level 2 | Wall (s) | Peak (MiB) | Cold (s) | Cold peak (MiB) | Detail |",
@@ -150,7 +162,8 @@ export function runTables(modes) {
         const detail = [install && [install.manager, install.version, install.status, install.reason].filter(Boolean).join(" "),
           measuredCommit && `measured at ${inline(measuredCommit)}`,
           stage && [stage, failure.exit != null && `exit ${failure.exit}`, failure.progress, failure.memory].filter(Boolean).join(" · "),
-          toolchain && [toolchain.state, toolchain.reason, toolchain.packages && `${toolchain.packages.clean}/${toolchain.packages.total} clean packages`].filter(Boolean).join(" · "),
+          toolchain && [toolchain.state, toolchain.reason, toolchain.packages && `${toolchain.packages.clean}/${toolchain.packages.total} clean packages`,
+            toolchain.upgradedLinks !== undefined && toolchain.packages === undefined && `${number(toolchain.upgradedLinks)} links upgraded`].filter(Boolean).join(" · "),
           indexErrors?.analysisErrors && `${indexErrors.analysisErrors} analysis error${indexErrors.analysisErrors === 1 ? "" : "s"}`,
           compilerAssertion && `TypeScript compiler assertion (${compilerAssertion})`,
           invalidUtf16Files && `${number(invalidUtf16Files)} files marked failed due to an invalid UTF-16 range`,
@@ -173,7 +186,7 @@ export function renderPlan(input, base, pins, catalog, legacy, archiveName) {
       pins.some(({ id, commit, language }) => baselinePins.get(id)?.commit !== commit || baselinePins.get(id)?.language !== language)) {
     throw Error("Expected the published 0.1.0 breakdown for the same pins");
   }
-  const { bare, installed, go, pairedInstalled, pairedGo, goUsed } = selectedModes(input.modes);
+  const { bare, installed, go, rust, pairedInstalled, pairedGo, goUsed, rustUsed } = selectedModes(input.modes);
   const { samples } = input;
   verifyReview(bare, samples);
   const finished = bare.filter(({ counts }) => counts).length;
@@ -218,6 +231,7 @@ export function renderPlan(input, base, pins, catalog, legacy, archiveName) {
     ...(installedFallback.length ? [`Installed-mode fallbacks include ${installedFallback.join(", ")}.`] : []),
     ...(installedWithoutTypeScript.length ? [`Installed graphs with zero TypeScript links after analysis failed include ${installedWithoutTypeScript.join(", ")}.`] : []),
     `The offline Go toolchain provided facts on ${goUsed.length}/${go.length} Go pins. Go links in other languages' pins use the bare graph.${goUsed.length < go.length ? " Go pins with unusable opt-in attempts also use the bare graph." : ""}`,
+    ...(rust.length ? [`The offline Rust toolchain (rust-analyzer) answered on ${rustUsed.length}/${rust.length} Rust pins. Rust links in other languages' pins, and Rust pins whose attempt was unavailable or partial, use the source-only graph.`] : []),
     `[Per-pin outcomes, fallback details, time and memory](../evidence/${archive}/${replays.size ? "README.md" : "attempts.md"})`, "",
     "## Support items", "",
     "Each missing link belongs to its first stored blocker. Read the direct reason first, then the ordered reasons for an open candidate set, then uncertainty and the reason saved before a configuration override. Split semicolon lists left to right and keep the first occurrence. A link without a reason is grouped by its outcome.",

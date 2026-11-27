@@ -1,0 +1,259 @@
+{
+ "pin": "clap-rs_clap",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 263
+ },
+ "sourceOnly": {
+  "links": 60489,
+  "level2": 20474,
+  "level2NoneSeen": 20474,
+  "assumed": 41,
+  "proven": 20433,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 33.85,
+  "withModuleLinksPercent": 33.85
+ },
+ "route": {
+  "links": 60489,
+  "level2": 39025,
+  "level2NoneSeen": 24116,
+  "assumed": 41,
+  "proven": 20433,
+  "toolchainDecided": 18551,
+  "toolchainSeen": 14909,
+  "libraryModuleLinks": 0,
+  "level2Percent": 64.52,
+  "level2NoneSeenPercent": 39.87,
+  "withModuleLinksPercent": 64.52,
+  "toolchainDecidedPercent": 30.67
+ },
+ "decided": {
+  "definite:unresolved": 18254,
+  "label:seen": 14909,
+  "definite:definite": 5008,
+  "label:none-seen": 3642,
+  "definite:candidates": 297,
+  "withheld:import-namespaces": 28,
+  "kept:source-only-differs": 5
+ },
+ "join": {
+  "answer": 23521,
+  "none:kind-not-joined": 5897,
+  "filter:collision": 528,
+  "unapplied:library": 17445,
+  "none:local": 4553,
+  "unapplied:generated": 941,
+  "filter:import-names-module": 44,
+  "none:no-name-site": 53,
+  "none:no-occurrence-at-site": 2285,
+  "none:trait-declaration": 1234,
+  "filter:kind-incompatible": 11,
+  "answer:trait-associated": 71,
+  "none:file-not-indexed": 3868,
+  "filter:extern-crate": 2
+ },
+ "agreement": {
+  "confirmed": 5008,
+  "differs": 5,
+  "percent": 99.9
+ },
+ "disagreements": [
+  {
+   "file": "clap_builder/src/builder/os_str.rs",
+   "range": [
+    6075,
+    6080
+   ],
+   "kind": "types",
+   "name": "Inner",
+   "sourceOnly": "symbol:a0a46b57be53d2c14baadc40906212d771aecd3311d521cb1b9fa777fe3230a3",
+   "toolchain": "symbol:6ad359fbcb832378ed77ff8e64333672c3ab312edb99d3014311c27dfcf99019"
+  },
+  {
+   "file": "clap_builder/src/builder/str.rs",
+   "range": [
+    5007,
+    5012
+   ],
+   "kind": "types",
+   "name": "Inner",
+   "sourceOnly": "symbol:db33f3b7712dc6b7d575fec0028869a57ca0bad139c4c1f6e900ff4ea6517a1e",
+   "toolchain": "symbol:5415883af7ab4e098afdbadad02596c6ae4da7ecad9df4dca4045968e965019b"
+  },
+  {
+   "file": "clap_builder/src/error/mod.rs",
+   "range": [
+    28049,
+    28058
+   ],
+   "kind": "types",
+   "name": "Backtrace",
+   "sourceOnly": "symbol:323335f97eee0f7cc697ec4c9382831e55b50a15363ce1128e0ac1ea4867c6c3",
+   "toolchain": "symbol:225f6a943b9b2fe7967eafd2113cfa33c5a21c0f1a41a570759ee55c0171c97f"
+  },
+  {
+   "file": "clap_builder/src/error/mod.rs",
+   "range": [
+    28192,
+    28201
+   ],
+   "kind": "types",
+   "name": "Backtrace",
+   "sourceOnly": "symbol:323335f97eee0f7cc697ec4c9382831e55b50a15363ce1128e0ac1ea4867c6c3",
+   "toolchain": "symbol:225f6a943b9b2fe7967eafd2113cfa33c5a21c0f1a41a570759ee55c0171c97f"
+  },
+  {
+   "file": "clap_builder/src/output/textwrap/mod.rs",
+   "range": [
+    1114,
+    1125
+   ],
+   "kind": "calls",
+   "name": "super::wrap",
+   "sourceOnly": "symbol:7cd9c3049b89caa453e388cd82f7bd8952ae4d3dfc5de28aed1569e457d79e4e",
+   "toolchain": "symbol:0b31efea97085719f06143c7b460fb7e945e891ba3db9ddb38545c8fb6246bf9"
+  }
+ ],
+ "check": {
+  "linksBefore": 60489,
+  "linksAfter": 60489,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 33,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 18551,
+  "path": {
+   "decided": 7456,
+   "kept": 907
+  },
+  "receiver": {
+   "decided": 11095,
+   "keptNames": 2836,
+   "keptTraceable": 2061
+  }
+ },
+ "analyzerRun": {
+  "wallS": 46.5,
+  "cpuS": 81.7,
+  "peakMiB": 1671
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 47.9,
+   "cpuS": 62.4
+  },
+  "route": {
+   "wallS": 131.7,
+   "cpuS": 69.8
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 39979,
+  "buckets": {
+   "credited": 18551,
+   "no identity: library item": 12185,
+   "no identity: local binding": 2165,
+   "gate: known error classes": 454,
+   "gate: kind/namespace": 21,
+   "no identity: generated item": 363,
+   "gate: trait-method declaration": 1234,
+   "no answer: no-occurrence-at-site": 2030,
+   "no answer: no-name-site": 50,
+   "gate: an import of a name bound in several namespaces": 28,
+   "no answer: file-not-indexed": 2898
+  },
+  "libraryPassingCfg": 10654,
+  "notIndexed": {
+   "other source": 1113,
+   "tests": 1785
+  },
+  "notIndexedFiles": 56,
+  "notIndexedTop": [
+   {
+    "path": "clap_complete/tests/testsuite/engine.rs",
+    "links": 750,
+    "class": "tests"
+   },
+   {
+    "path": "clap_complete/src/engine/complete.rs",
+    "links": 605,
+    "class": "other source"
+   },
+   {
+    "path": "tests/builder/env.rs",
+    "links": 346,
+    "class": "tests"
+   },
+   {
+    "path": "clap_complete/src/env/shells.rs",
+    "links": 185,
+    "class": "other source"
+   },
+   {
+    "path": "clap_complete/src/engine/custom.rs",
+    "links": 135,
+    "class": "other source"
+   },
+   {
+    "path": "tests/builder/help_env.rs",
+    "links": 125,
+    "class": "tests"
+   },
+   {
+    "path": "tests/builder/utf16.rs",
+    "links": 122,
+    "class": "tests"
+   },
+   {
+    "path": "tests/builder/cargo.rs",
+    "links": 81,
+    "class": "tests"
+   },
+   {
+    "path": "clap_complete/src/env/mod.rs",
+    "links": 78,
+    "class": "other source"
+   },
+   {
+    "path": "tests/derive/occurrences.rs",
+    "links": 54,
+    "class": "tests"
+   },
+   {
+    "path": "src/_tutorial.rs",
+    "links": 40,
+    "class": "other source"
+   },
+   {
+    "path": "src/_derive/_tutorial.rs",
+    "links": 39,
+    "class": "other source"
+   }
+  ]
+ },
+ "c19": {
+  "links": 52417,
+  "level2": 19785,
+  "gainCheckout": 16761,
+  "gainLibrary": 10837,
+  "gatedPercent": 83.1,
+  "gatedLinks": 43561,
+  "percentCheckoutOnly": 69.72,
+  "trait": 1207,
+  "underCfg": 2686,
+  "generated": 316
+ }
+}

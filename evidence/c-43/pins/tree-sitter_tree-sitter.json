@@ -1,0 +1,204 @@
+{
+ "pin": "tree-sitter_tree-sitter",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 101
+ },
+ "sourceOnly": {
+  "links": 54645,
+  "level2": 25212,
+  "level2NoneSeen": 25212,
+  "assumed": 2914,
+  "proven": 22298,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 46.14,
+  "withModuleLinksPercent": 46.14
+ },
+ "route": {
+  "links": 54645,
+  "level2": 31269,
+  "level2NoneSeen": 25574,
+  "assumed": 2914,
+  "proven": 22298,
+  "toolchainDecided": 6057,
+  "toolchainSeen": 5695,
+  "libraryModuleLinks": 0,
+  "level2Percent": 57.22,
+  "level2NoneSeenPercent": 46.8,
+  "withModuleLinksPercent": 57.22,
+  "toolchainDecidedPercent": 11.08
+ },
+ "decided": {
+  "definite:unresolved": 6053,
+  "label:seen": 5695,
+  "definite:definite": 8959,
+  "definite:candidates": 4,
+  "label:none-seen": 362,
+  "withheld:import-namespaces": 5
+ },
+ "join": {
+  "unapplied:library": 21570,
+  "filter:import-names-module": 119,
+  "answer": 15018,
+  "none:no-occurrence-at-site": 134,
+  "none:kind-not-joined": 3962,
+  "none:trait-declaration": 1114,
+  "none:local": 9138,
+  "unapplied:generated": 1104,
+  "none:no-name-site": 52,
+  "none:no-graph-symbol": 53,
+  "none:file-not-indexed": 2274,
+  "filter:collision": 95,
+  "filter:kind-incompatible": 1,
+  "answer:trait-associated": 3
+ },
+ "agreement": {
+  "confirmed": 8959,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 54645,
+  "linksAfter": 54645,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 5,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 6057,
+  "path": {
+   "decided": 1731,
+   "kept": 941
+  },
+  "receiver": {
+   "decided": 4326,
+   "keptNames": 4127,
+   "keptTraceable": 3167
+  }
+ },
+ "analyzerRun": {
+  "wallS": 43.2,
+  "cpuS": 114,
+  "peakMiB": 1650
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 46.3,
+   "cpuS": 67.8
+  },
+  "route": {
+   "wallS": 119.8,
+   "cpuS": 68.4
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 29425,
+  "buckets": {
+   "gate: kind/namespace": 31,
+   "no identity: library item": 13662,
+   "credited": 6057,
+   "no answer: no-occurrence-at-site": 117,
+   "gate: trait-method declaration": 1114,
+   "no identity: local binding": 6173,
+   "no identity: generated item": 745,
+   "no answer: no-name-site": 36,
+   "no identity: declaration without a graph symbol": 53,
+   "no answer: file-not-indexed": 1415,
+   "gate: an import of a name bound in several namespaces": 5,
+   "gate: known error classes": 17
+  },
+  "libraryPassingCfg": 12986,
+  "notIndexed": {
+   "build script": 47,
+   "other source": 916,
+   "tests": 452
+  },
+  "notIndexedFiles": 12,
+  "notIndexedTop": [
+   {
+    "path": "lib/binding_rust/bindings.rs",
+    "links": 414,
+    "class": "other source"
+   },
+   {
+    "path": "crates/cli/src/tests/wasm_language_test.rs",
+    "links": 291,
+    "class": "tests"
+   },
+   {
+    "path": "lib/binding_rust/js_loader.rs",
+    "links": 137,
+    "class": "other source"
+   },
+   {
+    "path": "lib/binding_rust/js_loader/tests.rs",
+    "links": 118,
+    "class": "other source"
+   },
+   {
+    "path": "test/fixtures/rust_wasm_web/src/rust_wasm_web.rs",
+    "links": 102,
+    "class": "tests"
+   },
+   {
+    "path": "lib/binding_rust/wasm_stdlib/memory_import.rs",
+    "links": 78,
+    "class": "other source"
+   },
+   {
+    "path": "lib/binding_rust/wasm_language.rs",
+    "links": 62,
+    "class": "other source"
+   },
+   {
+    "path": "crates/cli/src/tests/helpers/dirs.rs",
+    "links": 59,
+    "class": "tests"
+   },
+   {
+    "path": "lib/binding_rust/wasm_stdlib/memory_import_tests.rs",
+    "links": 51,
+    "class": "other source"
+   },
+   {
+    "path": "crates/cli/src/templates/build.rs",
+    "links": 47,
+    "class": "build script"
+   },
+   {
+    "path": "lib/binding_rust/wasm_stdlib.rs",
+    "links": 43,
+    "class": "other source"
+   },
+   {
+    "path": "crates/cli/src/templates/lib.rs",
+    "links": 13,
+    "class": "other source"
+   }
+  ]
+ },
+ "c19": {
+  "links": 54645,
+  "level2": 23682,
+  "gainCheckout": 13032,
+  "gainLibrary": 15362,
+  "gatedPercent": 90.3,
+  "gatedLinks": 49347,
+  "percentCheckoutOnly": 67.19,
+  "trait": 1114,
+  "underCfg": 1688,
+  "generated": 745
+ }
+}

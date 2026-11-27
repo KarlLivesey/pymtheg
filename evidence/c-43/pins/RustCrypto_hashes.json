@@ -1,0 +1,203 @@
+{
+ "pin": "RustCrypto_hashes",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 145
+ },
+ "sourceOnly": {
+  "links": 12911,
+  "level2": 6414,
+  "level2NoneSeen": 6414,
+  "assumed": 301,
+  "proven": 6113,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 49.68,
+  "withModuleLinksPercent": 49.68
+ },
+ "route": {
+  "links": 12911,
+  "level2": 6984,
+  "level2NoneSeen": 6639,
+  "assumed": 301,
+  "proven": 6113,
+  "toolchainDecided": 570,
+  "toolchainSeen": 345,
+  "libraryModuleLinks": 0,
+  "level2Percent": 54.09,
+  "level2NoneSeenPercent": 51.42,
+  "withModuleLinksPercent": 54.09,
+  "toolchainDecidedPercent": 4.41
+ },
+ "decided": {
+  "definite:definite": 1643,
+  "definite:unresolved": 570,
+  "label:seen": 345,
+  "label:none-seen": 225,
+  "withheld:import-namespaces": 1
+ },
+ "join": {
+  "filter:extern-crate": 24,
+  "unapplied:library": 3827,
+  "none:kind-not-joined": 1359,
+  "answer": 2201,
+  "none:local": 2422,
+  "unapplied:generated": 220,
+  "none:trait-declaration": 121,
+  "none:no-occurrence-at-site": 125,
+  "none:no-name-site": 30,
+  "none:no-graph-symbol": 131,
+  "filter:import-names-module": 33,
+  "answer:trait-associated": 13,
+  "filter:kind-incompatible": 2,
+  "none:file-not-indexed": 2316,
+  "filter:collision": 2
+ },
+ "agreement": {
+  "confirmed": 1643,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 12911,
+  "linksAfter": 12911,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 1,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 570,
+  "path": {
+   "decided": 516,
+   "kept": 512
+  },
+  "receiver": {
+   "decided": 54,
+   "keptNames": 54,
+   "keptTraceable": 28
+  }
+ },
+ "analyzerRun": {
+  "wallS": 39.9,
+  "cpuS": 45.8,
+  "peakMiB": 932
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 12,
+   "cpuS": 16.7
+  },
+  "route": {
+   "wallS": 95.5,
+   "cpuS": 17.3
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 6412,
+  "buckets": {
+   "gate: known error classes": 26,
+   "no identity: library item": 2341,
+   "no identity: local binding": 778,
+   "gate: trait-method declaration": 121,
+   "no answer: no-occurrence-at-site": 79,
+   "no answer: no-name-site": 30,
+   "no identity: declaration without a graph symbol": 131,
+   "credited": 570,
+   "no identity: generated item": 20,
+   "gate: kind/namespace": 5,
+   "no answer: file-not-indexed": 2308,
+   "no answer: kind-not-joined": 2,
+   "gate: an import of a name bound in several namespaces": 1
+  },
+  "libraryPassingCfg": 2317,
+  "notIndexed": {
+   "other source": 2308
+  },
+  "notIndexedFiles": 17,
+  "notIndexedTop": [
+   {
+    "path": "sha2/src/sha512/aarch64_sha3.rs",
+    "links": 578,
+    "class": "other source"
+   },
+   {
+    "path": "sha1/src/compress/aarch64_sha2.rs",
+    "links": 433,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha256/wasm32_simd128.rs",
+    "links": 203,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha256/aarch64_sha2.rs",
+    "links": 202,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha512/riscv_zknh/unroll.rs",
+    "links": 188,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha256/riscv_zknh/unroll.rs",
+    "links": 187,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha512/wasm32_simd128.rs",
+    "links": 148,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha256/soft/compact.rs",
+    "links": 83,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha512/soft/compact.rs",
+    "links": 80,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha256/riscv_zknh/compact.rs",
+    "links": 50,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha512/riscv_zknh/compact.rs",
+    "links": 50,
+    "class": "other source"
+   },
+   {
+    "path": "sha2/src/sha256/riscv_zknh.rs",
+    "links": 21,
+    "class": "other source"
+   }
+  ]
+ },
+ "c19": {
+  "links": 12911,
+  "level2": 6160,
+  "gainCheckout": 1349,
+  "gainLibrary": 2716,
+  "gatedPercent": 78.06,
+  "gatedLinks": 10078,
+  "percentCheckoutOnly": 58.16,
+  "trait": 121,
+  "underCfg": 26,
+  "generated": 20
+ }
+}

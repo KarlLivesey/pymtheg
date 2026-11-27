@@ -1,0 +1,36 @@
+{
+ "main": "47",
+ "branch": "48",
+ "results": [
+  {
+   "pin": "fjall-rs_fjall",
+   "rows": 16871,
+   "tables": {
+    "graph_files": 120,
+    "graph_contexts": 25,
+    "graph_parse_failures": 0,
+    "graph_symbols": 1179,
+    "graph_links": 13401,
+    "graph_candidates": 14,
+    "graph_library_targets": 2131,
+    "project": 1
+   },
+   "differences": []
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "rows": 52511,
+   "tables": {
+    "graph_files": 102,
+    "graph_contexts": 14,
+    "graph_parse_failures": 0,
+    "graph_symbols": 4392,
+    "graph_links": 39819,
+    "graph_candidates": 24,
+    "graph_library_targets": 8159,
+    "project": 1
+   },
+   "differences": []
+  }
+ ]
+}

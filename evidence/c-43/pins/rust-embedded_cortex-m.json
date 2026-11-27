@@ -1,0 +1,200 @@
+{
+ "pin": "rust-embedded_cortex-m",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 76
+ },
+ "sourceOnly": {
+  "links": 5531,
+  "level2": 3347,
+  "level2NoneSeen": 3347,
+  "assumed": 7,
+  "proven": 3340,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 60.51,
+  "withModuleLinksPercent": 60.51
+ },
+ "route": {
+  "links": 5531,
+  "level2": 3606,
+  "level2NoneSeen": 3398,
+  "assumed": 7,
+  "proven": 3340,
+  "toolchainDecided": 259,
+  "toolchainSeen": 208,
+  "libraryModuleLinks": 0,
+  "level2Percent": 65.2,
+  "level2NoneSeenPercent": 61.44,
+  "withModuleLinksPercent": 65.2,
+  "toolchainDecidedPercent": 4.68
+ },
+ "decided": {
+  "definite:unresolved": 256,
+  "label:seen": 208,
+  "withheld:import-namespaces": 11,
+  "definite:definite": 724,
+  "label:none-seen": 51,
+  "definite:candidates": 3
+ },
+ "join": {
+  "unapplied:library": 1508,
+  "filter:import-names-module": 27,
+  "none:kind-not-joined": 1275,
+  "none:local": 365,
+  "none:trait-declaration": 37,
+  "none:no-occurrence-at-site": 385,
+  "filter:extern-crate": 33,
+  "answer": 994,
+  "filter:collision": 27,
+  "none:no-name-site": 9,
+  "unapplied:generated": 20,
+  "none:file-not-indexed": 837
+ },
+ "agreement": {
+  "confirmed": 724,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 5531,
+  "linksAfter": 5531,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 11,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 259,
+  "path": {
+   "decided": 219,
+   "kept": 77
+  },
+  "receiver": {
+   "decided": 40,
+   "keptNames": 21,
+   "keptTraceable": 12
+  }
+ },
+ "analyzerRun": {
+  "wallS": 17,
+  "cpuS": 37.6,
+  "peakMiB": 926
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 7.5,
+   "cpuS": 10.3
+  },
+  "route": {
+   "wallS": 39.9,
+   "cpuS": 11.5
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 2171,
+  "buckets": {
+   "no identity: library item": 736,
+   "gate: kind/namespace": 6,
+   "gate: trait-method declaration": 37,
+   "gate: known error classes": 51,
+   "credited": 259,
+   "gate: an import of a name bound in several namespaces": 11,
+   "no answer: no-occurrence-at-site": 294,
+   "no answer: no-name-site": 5,
+   "no identity: local binding": 99,
+   "no answer: file-not-indexed": 673
+  },
+  "libraryPassingCfg": 635,
+  "notIndexed": {
+   "tests": 324,
+   "other source": 337,
+   "build script": 12
+  },
+  "notIndexedFiles": 56,
+  "notIndexedTop": [
+   {
+    "path": "testsuite/src/lib.rs",
+    "links": 140,
+    "class": "other source"
+   },
+   {
+    "path": "cortex-m/src/peripheral/sau.rs",
+    "links": 97,
+    "class": "other source"
+   },
+   {
+    "path": "cortex-m/src/cmse.rs",
+    "links": 65,
+    "class": "other source"
+   },
+   {
+    "path": "cortex-m-rt/tests/compile-fail/unsafe-init-static.rs",
+    "links": 16,
+    "class": "tests"
+   },
+   {
+    "path": "cortex-m-rt/tests/compile-fail/hard-fault-twice.rs",
+    "links": 12,
+    "class": "tests"
+   },
+   {
+    "path": "cortex-m-rt/tests/compile-fail/non-static-resource.rs",
+    "links": 12,
+    "class": "tests"
+   },
+   {
+    "path": "testsuite/build.rs",
+    "links": 12,
+    "class": "build script"
+   },
+   {
+    "path": "cortex-m-rt/tests/compile-fail/hard-fault-twice-mixed-trampoline.rs",
+    "links": 11,
+    "class": "tests"
+   },
+   {
+    "path": "cortex-m-rt/tests/compile-fail/hard-fault-hidden.rs",
+    "links": 10,
+    "class": "tests"
+   },
+   {
+    "path": "cortex-m-rt/tests/compile-fail/whitelist-1.rs",
+    "links": 9,
+    "class": "tests"
+   },
+   {
+    "path": "cortex-m-rt/tests/compile-fail/whitelist-2.rs",
+    "links": 9,
+    "class": "tests"
+   },
+   {
+    "path": "cortex-m-rt/tests/compile-fail/whitelist-3.rs",
+    "links": 9,
+    "class": "tests"
+   }
+  ]
+ },
+ "c19": {
+  "links": 5531,
+  "level2": 3047,
+  "gainCheckout": 375,
+  "gainLibrary": 1055,
+  "gatedPercent": 76.33,
+  "gatedLinks": 4222,
+  "percentCheckoutOnly": 61.87,
+  "trait": 37,
+  "underCfg": 222,
+  "generated": 0
+ }
+}

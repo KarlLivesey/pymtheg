@@ -121,7 +121,11 @@ test("only this machine's trusted answer turns routes on; committed settings can
     "unanswered",
   );
   // The local answer.
-  assert.deepEqual(graphToolchains(config(), trusted), { go: true });
+  // C-43: both routes, Go and Rust.
+  assert.deepEqual(graphToolchains(config(), trusted), {
+    go: true,
+    rust: true,
+  });
   assert.deepEqual(graphToolchains(config(), { trust: "source-only" }), {});
   assert.equal(trustState(config(), trusted), "trusted");
   // A committed source-only binds over a local trusted.
@@ -135,11 +139,22 @@ test("only this machine's trusted answer turns routes on; committed settings can
   );
   // A committed false turns Go off; a committed path is never used.
   assert.deepEqual(
-    graphToolchains(config({ toolchain: { go: false } }), trusted),
+    graphToolchains(config({ toolchain: { go: false, rust: false } }), trusted),
     {},
   );
+  assert.deepEqual(
+    graphToolchains(config({ toolchain: { go: false } }), trusted),
+    { rust: true },
+  );
   const committedPath = config({ toolchain: { go: "/repo/tools/go" } });
-  assert.deepEqual(graphToolchains(committedPath, trusted), { go: true });
+  assert.deepEqual(graphToolchains(committedPath, trusted), {
+    go: true,
+    rust: true,
+  });
+  assert.deepEqual(
+    committedToolPaths(config({ toolchain: { rust: "/repo/ra" } })),
+    ["rust"],
+  );
   assert.deepEqual(committedToolPaths(committedPath), ["go"]);
   // A tool path, or false, from the local answer.
   assert.deepEqual(
@@ -147,10 +162,13 @@ test("only this machine's trusted answer turns routes on; committed settings can
       ...trusted,
       toolchain: { go: "/opt/go/bin/go" },
     }),
-    { go: "/opt/go/bin/go" },
+    { go: "/opt/go/bin/go", rust: true },
   );
   assert.deepEqual(
-    graphToolchains(config(), { ...trusted, toolchain: { go: false } }),
+    graphToolchains(config(), {
+      ...trusted,
+      toolchain: { go: false, rust: false },
+    }),
     {},
   );
   assert.throws(() => graphConfig({ trust: "yes" }), /graph.trust must be/);
@@ -601,7 +619,8 @@ test("local trusted with a committed toolchain.go false keeps Go off; a committe
       await writeSettings(project, graph);
       const response = await executeGraph({ command: "index", root: project });
       assert.equal(response.trust, trust);
-      assert.equal(response.toolchain, undefined);
+      // Go is off either way (C-43: with "off" the Rust route stays on, with no Rust files).
+      assert.equal(response.toolchain?.go, undefined);
       assert.equal(decided(project), 0);
     }
   });

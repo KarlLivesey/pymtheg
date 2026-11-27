@@ -1,0 +1,113 @@
+{
+ "pin": "alacritty_alacritty",
+ "state": "partial",
+ "reason": "build script of crossfont did not finish",
+ "partialCauses": 2,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 80
+ },
+ "sourceOnly": {
+  "links": 31393,
+  "level2": 15477,
+  "level2NoneSeen": 15477,
+  "assumed": 252,
+  "proven": 15225,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 49.3,
+  "withModuleLinksPercent": 49.3
+ },
+ "route": {
+  "links": 31393,
+  "level2": 15477,
+  "level2NoneSeen": 15477,
+  "assumed": 252,
+  "proven": 15225,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 49.3,
+  "level2NoneSeenPercent": 49.3,
+  "withModuleLinksPercent": 49.3,
+  "toolchainDecidedPercent": 0
+ },
+ "decided": {},
+ "join": {
+  "filter:import-names-module": 104,
+  "unapplied:library": 9986,
+  "none:kind-not-joined": 2997,
+  "answer": 9528,
+  "none:local": 4974,
+  "none:no-occurrence-at-site": 281,
+  "unapplied:generated": 1110,
+  "none:trait-declaration": 747,
+  "none:no-name-site": 70,
+  "none:no-graph-symbol": 428,
+  "filter:kind-incompatible": 2,
+  "none:file-not-indexed": 1102,
+  "answer:trait-associated": 9,
+  "filter:extern-crate": 5,
+  "filter:collision": 5
+ },
+ "agreement": {
+  "confirmed": 0,
+  "differs": 0,
+  "percent": null
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 31393,
+  "linksAfter": 31393,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 0,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 0,
+  "path": {
+   "decided": 0,
+   "kept": 0
+  },
+  "receiver": {
+   "decided": 0,
+   "keptNames": 0,
+   "keptTraceable": 0
+  }
+ },
+ "analyzerRun": {
+  "wallS": 37.8,
+  "cpuS": 95.5,
+  "peakMiB": 1695
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 27.7,
+   "cpuS": 39.6
+  },
+  "route": {
+   "wallS": 102.5,
+   "cpuS": 41.9
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "c19": {
+  "links": 30965,
+  "level2": 14852,
+  "gainCheckout": 6713,
+  "gainLibrary": 7269,
+  "gatedPercent": 89.52,
+  "gatedLinks": 27721,
+  "percentCheckoutOnly": 69.64,
+  "trait": 738,
+  "underCfg": 382,
+  "generated": 830
+ }
+}

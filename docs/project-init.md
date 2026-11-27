@@ -50,8 +50,9 @@ repository.
 
 - **Trusted** lets each language's official tooling run on the project. That
   runs its build scripts and macros, as building it would. Today this turns on
-  the Go toolchain route, with its existing policy: offline by default and cgo
-  off.
+  the Go toolchain route (offline, cgo off) and the Rust toolchain route
+  (rust-analyzer, offline, on a copy of the project; C-43), each with its own
+  policy.
 - **Source only** means Pymtheg starts no program on this repository's behalf, neither a build tool nor Git; it only reads the repository's files and writes its own .pymtheg/ files.
 
 **The answer belongs to you, never to the repository.** It is kept outside
@@ -103,11 +104,11 @@ with its old path removes.
 
 Committed per-language settings may only turn a route off:
 `"graph": {"toolchain": {"go": false}}` keeps Go off even on a trusted
-checkout. A committed `true` adds nothing, and a committed tool path is never
+checkout, and `"rust": false` keeps the Rust route off. A committed `true` adds nothing, and a committed tool path is never
 run, since it could point into the repository (graph answers warn
 `committed-tool-path-ignored`). A tool path, or `false`, can be given in your
-own answer file: `"toolchain": {"go": "/usr/local/go/bin/go"}` in the
-checkout's entry.
+own answer file: `"toolchain": {"go": "/usr/local/go/bin/go"}` (or `"rust"`
+with a rust-analyzer path) in the checkout's entry.
 
 ## Evidence to collect
 

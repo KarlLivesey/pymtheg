@@ -1,0 +1,242 @@
+{
+ "comment": "C-43 review re-run: the 18 pins measured with the reviewed route (expected units from cargo tree, rust-analyzer diagnostics after scip). Source-only and route Level 2 (percent of Rust links) and state per pin; rust-analyzer scip and diagnostics wall seconds and peak memory (GNU time). Observations on a shared server.",
+ "pins": {
+  "BurntSushi_ripgrep": {
+   "state": "used",
+   "sourceOnly": 66.07,
+   "route": 76.6,
+   "scip": {
+    "wallS": 21.9,
+    "peakMiB": 1202
+   },
+   "diagnostics": {
+    "wallS": 13,
+    "peakMiB": 900
+   }
+  },
+  "DioxusLabs_dioxus": {
+   "state": "partial",
+   "reason": "build script of atk-sys did not finish",
+   "sourceOnly": 48.74,
+   "route": 48.74,
+   "scip": {
+    "wallS": 368.4,
+    "peakMiB": 9745
+   },
+   "diagnostics": {
+    "wallS": 360.5,
+    "peakMiB": 9463
+   }
+  },
+  "RustCrypto_hashes": {
+   "state": "used",
+   "sourceOnly": 49.68,
+   "route": 54.09,
+   "scip": {
+    "wallS": 41.3,
+    "peakMiB": 935
+   },
+   "diagnostics": {
+    "wallS": 45.1,
+    "peakMiB": 842
+   }
+  },
+  "actix_actix-web": {
+   "state": "used",
+   "sourceOnly": 41.81,
+   "route": 57.3,
+   "scip": {
+    "wallS": 136,
+    "peakMiB": 3018
+   },
+   "diagnostics": {
+    "wallS": 93.8,
+    "peakMiB": 2438
+   }
+  },
+  "alacritty_alacritty": {
+   "state": "partial",
+   "reason": "build script of crossfont did not finish",
+   "sourceOnly": 49.3,
+   "route": 49.3,
+   "scip": {
+    "wallS": 32.7,
+    "peakMiB": 1682
+   },
+   "diagnostics": {
+    "wallS": 30.7,
+    "peakMiB": 1574
+   }
+  },
+  "cberner_redb": {
+   "state": "used",
+   "sourceOnly": 47.77,
+   "route": 59.83,
+   "scip": {
+    "wallS": 163.6,
+    "peakMiB": 2055
+   },
+   "diagnostics": {
+    "wallS": 63.7,
+    "peakMiB": 1797
+   }
+  },
+  "clap-rs_clap": {
+   "state": "used",
+   "sourceOnly": 33.85,
+   "route": 58.51,
+   "scip": {
+    "wallS": 47.8,
+    "peakMiB": 1667
+   },
+   "diagnostics": {
+    "wallS": 30.9,
+    "peakMiB": 1255
+   }
+  },
+  "crossbeam-rs_crossbeam": {
+   "state": "used",
+   "sourceOnly": 56.15,
+   "route": 75.52,
+   "scip": {
+    "wallS": 36.6,
+    "peakMiB": 1254
+   },
+   "diagnostics": {
+    "wallS": 13.3,
+    "peakMiB": 845
+   }
+  },
+  "fjall-rs_fjall": {
+   "state": "used",
+   "sourceOnly": 45.45,
+   "route": 59.5,
+   "scip": {
+    "wallS": 15.5,
+    "peakMiB": 1099
+   },
+   "diagnostics": {
+    "wallS": 13.3,
+    "peakMiB": 989
+   }
+  },
+  "helix-editor_helix": {
+   "state": "used",
+   "sourceOnly": 44.9,
+   "route": 57.48,
+   "scip": {
+    "wallS": 139.6,
+    "peakMiB": 2449
+   },
+   "diagnostics": {
+    "wallS": 127.6,
+    "peakMiB": 2470
+   }
+  },
+  "ratatui_ratatui": {
+   "state": "used",
+   "sourceOnly": 42.85,
+   "route": 65.64,
+   "scip": {
+    "wallS": 70.9,
+    "peakMiB": 2831
+   },
+   "diagnostics": {
+    "wallS": 54.3,
+    "peakMiB": 2445
+   }
+  },
+  "rust-embedded_cortex-m": {
+   "state": "used",
+   "sourceOnly": 60.51,
+   "route": 64.35,
+   "scip": {
+    "wallS": 14.6,
+    "peakMiB": 929
+   },
+   "diagnostics": {
+    "wallS": 12.1,
+    "peakMiB": 837
+   }
+  },
+  "rust-lang_mdBook": {
+   "state": "used",
+   "sourceOnly": 52.38,
+   "route": 58.99,
+   "scip": {
+    "wallS": 25.8,
+    "peakMiB": 1902
+   },
+   "diagnostics": {
+    "wallS": 27.7,
+    "peakMiB": 1778
+   }
+  },
+  "rustls_rustls": {
+   "state": "used",
+   "sourceOnly": 32.57,
+   "route": 42.24,
+   "scip": {
+    "wallS": 111.5,
+    "peakMiB": 2362
+   },
+   "diagnostics": {
+    "wallS": 34.8,
+    "peakMiB": 2000
+   }
+  },
+  "serde-rs_serde": {
+   "state": "used",
+   "sourceOnly": 27.01,
+   "route": 29.93,
+   "scip": {
+    "wallS": 31.2,
+    "peakMiB": 1145
+   },
+   "diagnostics": {
+    "wallS": 35,
+    "peakMiB": 1160
+   }
+  },
+  "tauri-apps_tauri": {
+   "state": "partial",
+   "reason": "build script of atk-sys did not finish",
+   "sourceOnly": 48.32,
+   "route": 48.32,
+   "scip": {
+    "wallS": 97.9,
+    "peakMiB": 5187
+   },
+   "diagnostics": {
+    "wallS": 233,
+    "peakMiB": 5102
+   }
+  },
+  "tokio-rs_axum": {
+   "state": "used",
+   "sourceOnly": 40.38,
+   "route": 49.39,
+   "scip": {
+    "wallS": 38.1,
+    "peakMiB": 1960
+   },
+   "diagnostics": {
+    "wallS": 43.5,
+    "peakMiB": 1745
+   }
+  },
+  "tree-sitter_tree-sitter": {
+   "state": "used",
+   "sourceOnly": 46.14,
+   "route": 56.54,
+   "scip": {
+    "wallS": 50,
+    "peakMiB": 1646
+   },
+   "diagnostics": {
+    "wallS": 30.9,
+    "peakMiB": 1472
+   }
+  }
+ }
+}

@@ -57,6 +57,18 @@ export function formatGraph(response: GraphResponse): string {
           ? `Toolchain go: unavailable, source-only links: ${toolchain.reason}`
           : "Toolchain go: on, not indexed yet",
     );
+  // C-43: the Rust route (absent when off).
+  const rust = response.toolchain?.rust;
+  if (rust)
+    lines.push(
+      rust.state === "used"
+        ? `Toolchain rust: used (${rust.version}; ${rust.configuration}); ${rust.upgradedLinks} links upgraded (${rust.upgradedSeen ?? 0} labelled seen, ${rust.upgradedNoneSeen ?? 0} none-seen), ${rust.confirmedLinks} confirmed, ${rust.disagreements} kept where source-only differs, ${Object.values(rust.withheld ?? {}).reduce((a, b) => a + b, 0)} withheld by gates, ${rust.libraryAnswers} library answers not applied`
+        : rust.state === "partial"
+          ? `Toolchain rust: partial (${rust.version}), source-only links: ${rust.reason}`
+          : rust.state === "unavailable"
+            ? `Toolchain rust: unavailable, source-only links: ${rust.reason}`
+            : "Toolchain rust: on, not indexed yet",
+    );
   lines.push(`Failed files (${response.failedFiles.length}):`);
   for (const file of response.failedFiles)
     lines.push(

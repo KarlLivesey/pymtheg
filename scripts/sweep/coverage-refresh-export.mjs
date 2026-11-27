@@ -33,7 +33,11 @@ function scan(attempt, repo, audit) {
     if (db.prepare("SELECT value FROM graph_meta WHERE key='schema'").get()?.value !== "4") {
       throw Error("A fresh coverage export requires the schema 4 store");
     }
-    const counts = Object.fromEntries(modules.map((module) => [module, { links: 0, level2: 0, assumed: 0 }]));
+    // D17 clarified: `seen` counts the Level 2 links a toolchain route
+    // decided whose selection label is `seen` (checkout upgrades and
+    // applied library answers), so the scoreboard gives Level 2 counting
+    // only none-seen ones.
+    const counts = Object.fromEntries(modules.map((module) => [module, { links: 0, level2: 0, assumed: 0, seen: 0 }]));
     const byOutcome = new Map(outcomes.map((outcome) => [outcome, 0]));
     const inventory = new Map();
     const shortlist = new Map();
@@ -85,6 +89,8 @@ function scan(attempt, repo, audit) {
       if (outcome === "resolved" || library?.level === 2 || merged) {
         totals.level2++;
         if (Array.isArray(data.assumes) && data.assumes.length) totals.assumed++;
+        if ((data.toolchain?.from !== "definite" && data.toolchain?.selection === "seen") ||
+            (row.evidence === "toolchain-declaring-path" && data.toolchainLibrary?.selection === "seen")) totals.seen++;
         continue;
       }
       const reasons = storedReasons(data);
@@ -140,8 +146,8 @@ function publicRun(repo) {
     module === "typescript" && message.includes("Debug Failure. False expression."));
   const { reason: toolchainReason, ...publicToolchain } = toolchain ?? {};
   if (toolchainReason) {
-    publicToolchain.reason = /^no go\.mod at the project root$|^go\.work workspaces are not supported yet$|^no toolchain report$/.test(toolchainReason)
-      ? toolchainReason : "offline toolchain unavailable";
+    publicToolchain.reason = /^no go\.mod at the project root$|^go\.work workspaces are not supported yet$|^no toolchain report$|^no Cargo\.toml at the project root$|^no Rust files$/.test(toolchainReason)
+      ? toolchainReason : toolchain.state === "partial" ? "offline toolchain index partial" : "offline toolchain unavailable";
   }
   const failureDetails = failure && { stage: failure.stage, ...(failure.code != null && { exit: failure.code }),
     ...(failure.signal && { signal: failure.signal }), wallSeconds: failure.wallSeconds,

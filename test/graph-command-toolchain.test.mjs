@@ -62,12 +62,13 @@ async function settings(root, go) {
     }),
   );
   if (go === null) return;
-  // A tool path is the user's own setting, in the same file.
+  // A tool path is the user's own setting, in the same file. These are
+  // Go-route tests: the Rust route (C-43) stays off.
   const file = trustFile();
   const answers = JSON.parse(await readFile(file, "utf8"));
   const entry = answers.checkouts[await realpath(root)];
-  if (typeof go === "string") entry.toolchain = { go };
-  else delete entry.toolchain;
+  entry.toolchain =
+    typeof go === "string" ? { go, rust: false } : { rust: false };
   await writeFile(file, JSON.stringify(answers));
 }
 const run = (root, command, args = [], extra = {}) =>

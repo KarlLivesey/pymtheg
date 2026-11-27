@@ -1,0 +1,198 @@
+{
+ "pin": "rust-lang_mdBook",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 87
+ },
+ "sourceOnly": {
+  "links": 13866,
+  "level2": 7263,
+  "level2NoneSeen": 7263,
+  "assumed": 404,
+  "proven": 6859,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 52.38,
+  "withModuleLinksPercent": 52.38
+ },
+ "route": {
+  "links": 13866,
+  "level2": 8186,
+  "level2NoneSeen": 7702,
+  "assumed": 404,
+  "proven": 6859,
+  "toolchainDecided": 923,
+  "toolchainSeen": 484,
+  "libraryModuleLinks": 0,
+  "level2Percent": 59.04,
+  "level2NoneSeenPercent": 55.55,
+  "withModuleLinksPercent": 59.04,
+  "toolchainDecidedPercent": 6.66
+ },
+ "decided": {
+  "definite:definite": 2038,
+  "definite:unresolved": 921,
+  "label:none-seen": 439,
+  "label:seen": 484,
+  "definite:candidates": 2
+ },
+ "join": {
+  "unapplied:library": 7316,
+  "none:kind-not-joined": 1201,
+  "none:trait-declaration": 346,
+  "none:local": 1695,
+  "answer": 2961,
+  "none:no-name-site": 45,
+  "unapplied:generated": 78,
+  "filter:import-names-module": 45,
+  "none:no-occurrence-at-site": 37,
+  "filter:kind-incompatible": 1,
+  "filter:extern-crate": 3,
+  "none:file-not-indexed": 105
+ },
+ "agreement": {
+  "confirmed": 2038,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 13866,
+  "linksAfter": 13866,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 0,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 923,
+  "path": {
+   "decided": 229,
+   "kept": 190
+  },
+  "receiver": {
+   "decided": 694,
+   "keptNames": 486,
+   "keptTraceable": 329
+  }
+ },
+ "analyzerRun": {
+  "wallS": 35.8,
+  "cpuS": 127.2,
+  "peakMiB": 1904
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 25.3,
+   "cpuS": 36.2
+  },
+  "route": {
+   "wallS": 108.7,
+   "cpuS": 38.8
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 6570,
+  "buckets": {
+   "gate: trait-method declaration": 346,
+   "no identity: library item": 4595,
+   "no identity: generated item": 38,
+   "no identity: local binding": 495,
+   "credited": 923,
+   "no answer: no-name-site": 43,
+   "gate: kind/namespace": 6,
+   "no answer: no-occurrence-at-site": 26,
+   "gate: known error classes": 3,
+   "no answer: file-not-indexed": 95
+  },
+  "libraryPassingCfg": 4572,
+  "notIndexed": {
+   "other source": 34,
+   "tests": 61
+  },
+  "notIndexedFiles": 12,
+  "notIndexedTop": [
+   {
+    "path": "tests/testsuite/includes/all_includes/src/multiline/linear_search.rs",
+    "links": 45,
+    "class": "tests"
+   },
+   {
+    "path": "guide/src/for_developers/mdbook-wordcount/src/main.rs",
+    "links": 34,
+    "class": "other source"
+   },
+   {
+    "path": "tests/testsuite/test/failing_tests/src/test1.rs",
+    "links": 3,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/test/passing_tests/src/test2.rs",
+    "links": 3,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/includes/all_includes/src/partially-included-test-with-anchors.rs",
+    "links": 2,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/includes/all_includes/src/partially-included-test.rs",
+    "links": 2,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/includes/all_includes/src/hello_world.rs",
+    "links": 1,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/includes/all_includes/src/multiline/another-included-test.rs",
+    "links": 1,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/includes/all_includes/src/multiline/main.rs",
+    "links": 1,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/includes/all_includes/src/multiline/myfn.rs",
+    "links": 1,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/test/passing_tests/src/test1.rs",
+    "links": 1,
+    "class": "tests"
+   },
+   {
+    "path": "tests/testsuite/test/passing_tests/src/test3.rs",
+    "links": 1,
+    "class": "tests"
+   }
+  ]
+ },
+ "c19": {
+  "links": 12557,
+  "level2": 6705,
+  "gainCheckout": 1009,
+  "gainLibrary": 4597,
+  "gatedPercent": 95.25,
+  "gatedLinks": 11960,
+  "percentCheckoutOnly": 61.43,
+  "trait": 323,
+  "underCfg": 29,
+  "generated": 38
+ }
+}

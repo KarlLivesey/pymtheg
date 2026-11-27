@@ -2390,12 +2390,48 @@ configuration, the project never written, no claim of a security boundary.
 The measured shape is in [C-19](changes/C-19.md): answers are taken only for
 links the source-only route leaves open, under the strict join and the gates
 (no answers under a cfg condition other than `test`; trait methods stay
-candidate sets); an edit re-indexes source-only at once and no stale toolchain
-answer is shown as definite. **Why:** the owner's standing rule is that a
+candidate sets); no stale toolchain answer is shown as definite. In the first
+part of C-43 an edit misses the route's cache and re-runs rust-analyzer in
+full before the index completes; re-indexing source-only first, with a
+`stale` state, is the third part's work (see the note and
+`docs/support.md`). **Why:** the owner's standing rule is that a
 language's own build chain is an allowed dependency; source-only Rust stays
 near 43% because most open links need type inference. **Rules out:** running
 the route on a project that has not opted in; reporting the opted-in figure
 without also giving the source-only one.
+
+### D17 and D21 clarified: toolchain links are per configuration
+
+**Decided (manager, 24 November 2026, as the manager's reading of D17):** a
+toolchain answer is definite for the build configuration it records, and
+only for it. D17 already keys every toolchain-backed link by its
+configuration; D16's rule that a wrong definite link blocks is met by a link
+that is right for the configuration it is keyed by. So the Rust route
+decides every answer that passes the gates that do not depend on the
+configuration: trust, a complete index for the crate, the strict join
+(generated or opaque sites it cannot place), import namespaces, a graph
+symbol for the answer, agreement with a source-only definite answer, and the
+library key rules. It may answer an open link and narrow a candidate set. D21's
+gate "no answers under a cfg condition other than `test`" is replaced by this
+contract. Every route-decided link records the configuration string and its
+complete route-off data, so the configuration-free view can always be read
+back. A route-decided link counts at Level 2. C-43's design B, the trace of
+build-condition selections, is kept as a label only: `selection: "seen"`
+with a reason from a closed set, or `"none-seen"`, which means the label's
+checks found nothing and is no claim about any other configuration. Every
+report of the route gives three figures: source-only, with the route, and
+with the route counting only `"none-seen"` upgrades (the route’s state counts
+upgrades by label; the CLI line, the sweep’s public record and the coverage
+scoreboard carry them; the scoreboard counts from the stored labels). **What still blocks:** an answer wrong for its own
+configuration (an import of a name bound in two namespaces, a join that
+places an answer on the wrong site, an answer kept after an edit or a change
+of configuration). A changed target, feature set or Cargo configuration is
+in the key, so it re-answers and never reuses. **Why:** every review round
+found another way a cfg-chosen binding reaches a site; no finite trace is
+sound for every configuration, while each answer is exact for the
+configuration it states. **Rules out:** presenting a route answer as holding
+in a configuration other than the one it records; dropping the route-off
+data of a decided link. See [C-43](changes/C-43.md).
 
 ### D22: init asks once whether the repository is trusted
 

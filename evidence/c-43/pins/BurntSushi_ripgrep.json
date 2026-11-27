@@ -1,0 +1,175 @@
+{
+ "pin": "BurntSushi_ripgrep",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 100
+ },
+ "sourceOnly": {
+  "links": 39819,
+  "level2": 26307,
+  "level2NoneSeen": 26307,
+  "assumed": 1,
+  "proven": 26306,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 66.07,
+  "withModuleLinksPercent": 66.07
+ },
+ "route": {
+  "links": 39819,
+  "level2": 30556,
+  "level2NoneSeen": 27808,
+  "assumed": 1,
+  "proven": 26306,
+  "toolchainDecided": 4249,
+  "toolchainSeen": 2748,
+  "libraryModuleLinks": 0,
+  "level2Percent": 76.74,
+  "level2NoneSeenPercent": 69.84,
+  "withModuleLinksPercent": 76.74,
+  "toolchainDecidedPercent": 10.67
+ },
+ "decided": {
+  "definite:definite": 9947,
+  "definite:unresolved": 4244,
+  "label:seen": 2748,
+  "label:none-seen": 1501,
+  "kept:source-only-differs": 2,
+  "withheld:import-namespaces": 3,
+  "definite:candidates": 5
+ },
+ "join": {
+  "none:kind-not-joined": 4371,
+  "answer": 14066,
+  "unapplied:library": 14105,
+  "none:local": 4619,
+  "filter:import-names-module": 42,
+  "none:trait-declaration": 625,
+  "unapplied:generated": 130,
+  "none:no-occurrence-at-site": 190,
+  "none:no-name-site": 86,
+  "filter:extern-crate": 5,
+  "none:file-not-indexed": 131,
+  "filter:collision": 41,
+  "answer:trait-associated": 135
+ },
+ "agreement": {
+  "confirmed": 9947,
+  "differs": 2,
+  "percent": 99.98
+ },
+ "disagreements": [
+  {
+   "file": "crates/core/flags/doc/version.rs",
+   "range": [
+    3686,
+    3694
+   ],
+   "kind": "values",
+   "name": "features",
+   "sourceOnly": "symbol:19f081a03ee0407bb2461fceb1127fd674b6b48d9aef39bdab9e0df58c2789d2",
+   "toolchain": "symbol:319d55fcda906d50b6cecc939192ba8e70349affa2acd472bb4af77fb5255b22"
+  },
+  {
+   "file": "crates/core/flags/doc/version.rs",
+   "range": [
+    5018,
+    5026
+   ],
+   "kind": "values",
+   "name": "features",
+   "sourceOnly": "symbol:190476b161747f13e6a020efb7060a0e26bf8880e230aa09ab61a37e3a4caccb",
+   "toolchain": "symbol:319d55fcda906d50b6cecc939192ba8e70349affa2acd472bb4af77fb5255b22"
+  }
+ ],
+ "check": {
+  "linksBefore": 39819,
+  "linksAfter": 39819,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 5,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 4249,
+  "path": {
+   "decided": 712,
+   "kept": 154
+  },
+  "receiver": {
+   "decided": 3537,
+   "keptNames": 1667,
+   "keptTraceable": 1298
+  }
+ },
+ "analyzerRun": {
+  "wallS": 28.6,
+  "cpuS": 53.9,
+  "peakMiB": 1204
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 30.8,
+   "cpuS": 42.3
+  },
+  "route": {
+   "wallS": 83.8,
+   "cpuS": 47.7
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 12255,
+  "buckets": {
+   "no identity: library item": 6027,
+   "no identity: local binding": 949,
+   "credited": 4249,
+   "gate: trait-method declaration": 625,
+   "no identity: generated item": 125,
+   "gate: kind/namespace": 9,
+   "no answer: no-occurrence-at-site": 138,
+   "no answer: no-name-site": 60,
+   "gate: known error classes": 8,
+   "gate: an import of a name bound in several namespaces": 3,
+   "no answer: file-not-indexed": 62
+  },
+  "libraryPassingCfg": 5786,
+  "notIndexed": {
+   "other source": 61,
+   "fuzz": 1
+  },
+  "notIndexedFiles": 2,
+  "notIndexedTop": [
+   {
+    "path": "crates/globset/src/serde_impl.rs",
+    "links": 61,
+    "class": "other source"
+   },
+   {
+    "path": "fuzz/fuzz_targets/fuzz_glob.rs",
+    "links": 1,
+    "class": "fuzz"
+   }
+  ]
+ },
+ "c19": {
+  "links": 39819,
+  "level2": 26104,
+  "gainCheckout": 5432,
+  "gainLibrary": 6620,
+  "gatedPercent": 93.36,
+  "gatedLinks": 37177,
+  "percentCheckoutOnly": 79.2,
+  "trait": 625,
+  "underCfg": 371,
+  "generated": 125
+ }
+}

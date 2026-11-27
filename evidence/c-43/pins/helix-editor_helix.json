@@ -1,0 +1,261 @@
+{
+ "pin": "helix-editor_helix",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 230
+ },
+ "sourceOnly": {
+  "links": 90583,
+  "level2": 40673,
+  "level2NoneSeen": 40673,
+  "assumed": 2491,
+  "proven": 38182,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 44.9,
+  "withModuleLinksPercent": 44.9
+ },
+ "route": {
+  "links": 90583,
+  "level2": 52175,
+  "level2NoneSeen": 42667,
+  "assumed": 2491,
+  "proven": 38182,
+  "toolchainDecided": 11502,
+  "toolchainSeen": 9508,
+  "libraryModuleLinks": 0,
+  "level2Percent": 57.6,
+  "level2NoneSeenPercent": 47.1,
+  "withModuleLinksPercent": 57.6,
+  "toolchainDecidedPercent": 12.7
+ },
+ "decided": {
+  "definite:definite": 14425,
+  "definite:unresolved": 11479,
+  "label:seen": 9508,
+  "label:none-seen": 1994,
+  "withheld:import-namespaces": 24,
+  "kept:source-only-differs": 5,
+  "definite:candidates": 23
+ },
+ "join": {
+  "filter:import-names-module": 152,
+  "answer": 25885,
+  "unapplied:library": 33027,
+  "none:kind-not-joined": 8315,
+  "none:local": 14427,
+  "unapplied:generated": 1119,
+  "none:trait-declaration": 1558,
+  "none:no-name-site": 274,
+  "none:no-graph-symbol": 473,
+  "none:no-occurrence-at-site": 1020,
+  "filter:collision": 52,
+  "filter:extern-crate": 37,
+  "answer:trait-associated": 71,
+  "none:file-not-indexed": 3899,
+  "filter:kind-incompatible": 2
+ },
+ "agreement": {
+  "confirmed": 14425,
+  "differs": 5,
+  "percent": 99.97
+ },
+ "disagreements": [
+  {
+   "file": "helix-core/src/line_ending.rs",
+   "range": [
+    10534,
+    10556
+   ],
+   "kind": "calls",
+   "name": "get_line_ending_of_str",
+   "sourceOnly": "symbol:db45fa901bf91a8ff549bff4a28c19dca955f52b7930b9aef1c976ab87e8e4e6",
+   "toolchain": "symbol:6f3de9ac687bfed92c7eaa2caca0e3bcf7a13bd036b9a8f02264577557ae678d"
+  },
+  {
+   "file": "helix-event/src/runtime.rs",
+   "range": [
+    1827,
+    1839
+   ],
+   "kind": "types",
+   "name": "RuntimeLocal",
+   "sourceOnly": "symbol:a88991e2c88a9c89f96cf5e53c73cb798cbc13fb0887a929093be40f5b4fa170",
+   "toolchain": "symbol:62cdd6761111db172f01095022f479710a12c0f70c2b63b32d220de76c0c44de"
+  },
+  {
+   "file": "helix-event/src/runtime.rs",
+   "range": [
+    2241,
+    2253
+   ],
+   "kind": "types",
+   "name": "RuntimeLocal",
+   "sourceOnly": "symbol:a88991e2c88a9c89f96cf5e53c73cb798cbc13fb0887a929093be40f5b4fa170",
+   "toolchain": "symbol:62cdd6761111db172f01095022f479710a12c0f70c2b63b32d220de76c0c44de"
+  },
+  {
+   "file": "helix-term/src/application.rs",
+   "range": [
+    55181,
+    55194
+   ],
+   "kind": "types",
+   "name": "TerminalEvent",
+   "sourceOnly": "symbol:e12063fec41ac13e21340fcfa63d7a43a11c68d3059c51bf476399b855a6365e",
+   "toolchain": "symbol:1931fcddefa3d23d4914419c57c2938b529824b947cf9c49cd387a08fa0a52ec"
+  },
+  {
+   "file": "helix-view/src/clipboard.rs",
+   "range": [
+    1351,
+    1368
+   ],
+   "kind": "types",
+   "name": "ClipboardProvider",
+   "sourceOnly": "symbol:8b240decc97b386bf4ac63f0c6637d963b45f68d7d5bbf9495f4141d12f80a52",
+   "toolchain": "symbol:9d688d96ba044dc1468270555d0f404dad6c7766498cc724e475959a56f59aa2"
+  }
+ ],
+ "check": {
+  "linksBefore": 90583,
+  "linksAfter": 90583,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 29,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 11502,
+  "path": {
+   "decided": 6634,
+   "kept": 3177
+  },
+  "receiver": {
+   "decided": 4868,
+   "keptNames": 4443,
+   "keptTraceable": 3085
+  }
+ },
+ "analyzerRun": {
+  "wallS": 119.4,
+  "cpuS": 1095,
+  "peakMiB": 2461
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 82.7,
+   "cpuS": 108.8
+  },
+  "route": {
+   "wallS": 313.9,
+   "cpuS": 127.6
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 49651,
+  "buckets": {
+   "credited": 11502,
+   "no identity: library item": 23187,
+   "gate: trait-method declaration": 1558,
+   "no answer: no-name-site": 220,
+   "gate: kind/namespace": 51,
+   "no identity: local binding": 7954,
+   "no identity: generated item": 505,
+   "no identity: declaration without a graph symbol": 473,
+   "gate: known error classes": 40,
+   "gate: an import of a name bound in several namespaces": 24,
+   "no answer: no-occurrence-at-site": 843,
+   "no answer: file-not-indexed": 3294
+  },
+  "libraryPassingCfg": 22556,
+  "notIndexed": {
+   "other source": 508,
+   "tests": 2786
+  },
+  "notIndexedFiles": 21,
+  "notIndexedTop": [
+   {
+    "path": "helix-term/tests/test/commands/write.rs",
+    "links": 864,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/auto_pairs.rs",
+    "links": 553,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/commands.rs",
+    "links": 365,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/movement.rs",
+    "links": 278,
+    "class": "tests"
+   },
+   {
+    "path": "helix-tui/src/backend/crossterm.rs",
+    "links": 232,
+    "class": "other source"
+   },
+   {
+    "path": "helix-tui/src/widgets/list.rs",
+    "links": 193,
+    "class": "other source"
+   },
+   {
+    "path": "helix-term/tests/test/commands/insert.rs",
+    "links": 176,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/helpers.rs",
+    "links": 135,
+    "class": "tests"
+   },
+   {
+    "path": "tests/indent/rust.rs",
+    "links": 127,
+    "class": "tests"
+   },
+   {
+    "path": "helix-lsp-types/src/inline_completion.rs",
+    "links": 83,
+    "class": "other source"
+   },
+   {
+    "path": "helix-term/tests/test/commands/movement.rs",
+    "links": 81,
+    "class": "tests"
+   },
+   {
+    "path": "helix-term/tests/test/splits.rs",
+    "links": 71,
+    "class": "tests"
+   }
+  ]
+ },
+ "c19": {
+  "links": 90583,
+  "level2": 40237,
+  "gainCheckout": 19518,
+  "gainLibrary": 25034,
+  "gatedPercent": 90.96,
+  "gatedLinks": 82390,
+  "percentCheckoutOnly": 65.97,
+  "trait": 1558,
+  "underCfg": 846,
+  "generated": 505
+ }
+}

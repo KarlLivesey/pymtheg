@@ -235,7 +235,7 @@ for (const [name, edit] of [
 // C-37: the same edits with write batches of a few rows, so each run has
 // several batch boundaries (a batch commits once it reaches the budget, and
 // the rest at the end of its scope). Every boundary is a kill point.
-for (const [language, files, edit] of [
+for (const [language, files, edit, scoped] of [
   [
     "TypeScript",
     {
@@ -263,12 +263,49 @@ for (const [language, files, edit] of [
     },
     { "b/shadow.go": "package b\n\ntype error = int\n" },
   ],
+  // C-36 under C-37: a scoped Rust re-index (one file re-decided alone) in
+  // write batches, killed at every boundary.
+  [
+    "Rust (scoped, leading comment)",
+    {
+      "Cargo.toml":
+        '[package]\nname = "fixture"\nversion = "0.1.0"\nedition = "2021"\n',
+      "src/lib.rs": "pub mod a;\npub mod b;\npub mod c;\n",
+      "src/a.rs": "pub fn hello() -> u32 {\n    1\n}\n",
+      "src/b.rs":
+        "use crate::a::hello;\n\npub fn b() -> u32 {\n    hello()\n}\n",
+      "src/c.rs":
+        "use crate::a::hello;\n\npub fn c() -> u32 {\n    hello() + 1\n}\n",
+    },
+    { "src/a.rs": "// moved\npub fn hello() -> u32 {\n    1\n}\n" },
+    1,
+  ],
+  [
+    "Rust (scoped, trailing comment)",
+    {
+      "Cargo.toml":
+        '[package]\nname = "fixture"\nversion = "0.1.0"\nedition = "2021"\n',
+      "src/lib.rs": "pub mod a;\npub mod b;\npub mod c;\n",
+      "src/a.rs": "pub fn hello() -> u32 {\n    1\n}\n",
+      "src/b.rs":
+        "use crate::a::hello;\n\npub fn b() -> u32 {\n    hello()\n}\n",
+      "src/c.rs":
+        "use crate::a::hello;\n\npub fn c() -> u32 {\n    hello() + 1\n}\n",
+    },
+    { "src/a.rs": "pub fn hello() -> u32 {\n    1\n}\n// trailing\n" },
+    1,
+  ],
 ]) {
   // 5 rows: most writes commit alone. 40 rows: a batch holds several writes,
   // so some kill points fall inside an open batch, before its commit.
   for (const rows of [5, 40])
     test(`${language}: a re-index in write batches of ${rows} rows killed at any boundary is repaired by the next one`, async (t) => {
-      const tried = await everyKillPoint(files, edit, rows);
+      const tried = await everyKillPoint(
+        files,
+        edit,
+        rows,
+        scoped === undefined ? {} : { scoped },
+      );
       assert.ok(tried >= 6, `write boundaries tried: ${tried}`);
       t.diagnostic(`write boundaries: ${tried}`);
     });

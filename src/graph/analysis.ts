@@ -9,6 +9,7 @@ import type {
   GraphFile,
   GraphLink,
   GraphSymbol,
+  Json,
   LinkResolution,
   ResolutionResult,
   SymbolReference,
@@ -47,7 +48,7 @@ export class LinkDecider {
       resolution: "unresolved",
     };
     delete next.libraries;
-    if (!decision) return this.explainOpenLink(next);
+    if (!decision) return this.explainOpenLink(this.withdrawToolchain(next));
     if (decision.library !== undefined) {
       if (
         decision.targetId !== undefined ||
@@ -87,7 +88,39 @@ export class LinkDecider {
       next.targetStatus = symbol.status;
       next.resolution = "resolved";
     }
-    return this.explainOpenLink(next);
+    return this.explainOpenLink(this.withdrawToolchain(next));
+  }
+  /**
+   * A toolchain record that names a target (C-43: `data.toolchain.target`)
+   * stands only on a link stored with that target. Where the resolution kept
+   * another answer (a source-only library target, say), the record goes, so
+   * the link is not counted as decided by the route; `toolchainOutcome`
+   * says why.
+   */
+  private withdrawToolchain(link: GraphLink): GraphLink {
+    const d = link.data as Record<string, unknown> | null | undefined;
+    const record = d?.toolchain as Record<string, unknown> | undefined;
+    if (
+      !d ||
+      record?.origin !== "toolchain" ||
+      typeof record.target !== "string"
+    )
+      return link;
+    if (link.targetId === record.target) {
+      // Taken: the open link's data the record lists goes now, and the list
+      // with it (the record keeps its other fields, in order).
+      if (!Array.isArray(record.clears)) return link;
+      const { clears, ...kept } = record;
+      const data: Record<string, unknown> = { ...d, toolchain: kept };
+      for (const key of clears as unknown[])
+        if (typeof key === "string") delete data[key];
+      link.data = data as Json;
+      return link;
+    }
+    const { toolchain: _withdrawn, ...data } = d;
+    void _withdrawn;
+    link.data = { ...data, toolchainOutcome: "kept:source-only" } as Json;
+    return link;
   }
   private explainOpenLink(link: GraphLink): GraphLink {
     const reason = this.missingLinkReason;

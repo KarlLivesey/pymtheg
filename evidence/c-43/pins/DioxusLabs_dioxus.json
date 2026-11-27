@@ -1,0 +1,113 @@
+{
+ "pin": "DioxusLabs_dioxus",
+ "state": "partial",
+ "reason": "build script of atk-sys did not finish",
+ "partialCauses": 17,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 856
+ },
+ "sourceOnly": {
+  "links": 150404,
+  "level2": 73311,
+  "level2NoneSeen": 73311,
+  "assumed": 3668,
+  "proven": 69643,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 48.74,
+  "withModuleLinksPercent": 48.74
+ },
+ "route": {
+  "links": 150404,
+  "level2": 73311,
+  "level2NoneSeen": 73311,
+  "assumed": 3668,
+  "proven": 69643,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 48.74,
+  "level2NoneSeenPercent": 48.74,
+  "withModuleLinksPercent": 48.74,
+  "toolchainDecidedPercent": 0
+ },
+ "decided": {},
+ "join": {
+  "none:no-name-site": 887,
+  "none:kind-not-joined": 16425,
+  "answer": 40230,
+  "unapplied:library": 62123,
+  "none:local": 20739,
+  "none:no-graph-symbol": 44,
+  "filter:collision": 761,
+  "none:trait-declaration": 3204,
+  "unapplied:generated": 2683,
+  "none:no-occurrence-at-site": 1154,
+  "filter:import-names-module": 117,
+  "filter:kind-incompatible": 33,
+  "filter:extern-crate": 95,
+  "answer:trait-associated": 353,
+  "none:file-not-indexed": 1341
+ },
+ "agreement": {
+  "confirmed": 0,
+  "differs": 0,
+  "percent": null
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 150404,
+  "linksAfter": 150404,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 0,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 0,
+  "path": {
+   "decided": 0,
+   "kept": 0
+  },
+  "receiver": {
+   "decided": 0,
+   "keptNames": 0,
+   "keptTraceable": 0
+  }
+ },
+ "analyzerRun": {
+  "wallS": 369.1,
+  "cpuS": 1116.1,
+  "peakMiB": 9730
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 512.5,
+   "cpuS": 591.4
+  },
+  "route": {
+   "wallS": 1254.9,
+   "cpuS": 586.9
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "c19": {
+  "links": 149592,
+  "level2": 68525,
+  "gainCheckout": 30330,
+  "gainLibrary": 46065,
+  "gatedPercent": 92.2,
+  "gatedLinks": 137920,
+  "percentCheckoutOnly": 66.08,
+  "trait": 3170,
+  "underCfg": 3975,
+  "generated": 859
+ }
+}

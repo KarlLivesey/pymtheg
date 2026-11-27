@@ -7,6 +7,9 @@ export const seed = "pymtheg-0.2.0-coverage-2026-11-19";
 export const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
 export const missColumns = ["module", "kind", "outcome", "reasons", "links"];
 export const modeNames = ["bare", "installed", "go-toolchain"];
+/** C-43: modes an archive may hold; sweeps before C-43 have none of them. */
+export const optionalModeNames = ["rust-toolchain"];
+const modeLanguage = { installed: "typescript", "go-toolchain": "go", "rust-toolchain": "rust" };
 
 export function storedReasons(data) {
   const fields = [data.reason, data.open?.reason, ...(data.open?.reasons ?? []),
@@ -21,11 +24,18 @@ export function firstBlocker(reasons, outcome) {
 
 export function score(repos, module, own = false) {
   const total = { links: 0, level2: 0, assumed: 0 };
+  // D17 clarified: route-decided Level 2 links labelled seen, from exports
+  // that count them (`labelled` says whether any did).
+  let seen = 0, labelled = false;
   for (const repo of repos) {
     if (!repo.counts || own && repo.language !== module) continue;
     for (const field of Object.keys(total)) total[field] += repo.counts[module][field];
+    if (repo.counts[module].seen !== undefined) {
+      labelled = true;
+      seen += repo.counts[module].seen;
+    }
   }
-  return total;
+  return labelled ? { ...total, seen } : total;
 }
 
 /** D23: merged environment globals of one language, already in its Level 2. */
@@ -98,13 +108,13 @@ export function draw(repos, limit = sampleSize) {
 
 export function verifyModes(modes, pins) {
   const digests = new Set();
-  for (const mode of modeNames) {
+  for (const mode of [...modeNames, ...optionalModeNames.filter((name) => modes[name])]) {
     const input = modes[mode];
     if (!input || input.mode !== (mode === "bare" ? "source-only (default)" : mode) ||
         JSON.stringify(input.missColumns) !== JSON.stringify(missColumns)) throw Error(`Missing ${mode} export`);
     if (!/^[a-f0-9]{64}$/.test(input.release?.sha256)) throw Error(`Missing build digest for ${mode}`);
     digests.add(input.release.sha256);
-    const expected = pins.filter((pin) => mode === "bare" || pin.language === (mode === "installed" ? "typescript" : "go"));
+    const expected = pins.filter((pin) => mode === "bare" || pin.language === modeLanguage[mode]);
     const byId = new Map(input.repos.map((repo) => [repo.id, repo]));
     if (byId.size !== expected.length || input.repos.length !== expected.length) throw Error(`Expected ${expected.length} unique ${mode} attempts`);
     for (const pin of expected) {

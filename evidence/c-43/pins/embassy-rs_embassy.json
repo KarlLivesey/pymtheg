@@ -1,0 +1,57 @@
+{
+ "pin": "embassy-rs_embassy",
+ "state": "unavailable",
+ "reason": "no Cargo.toml at the project root",
+ "partialCauses": 0,
+ "sourceOnly": {
+  "links": 515233,
+  "level2": 174016,
+  "assumed": 268,
+  "proven": 173748,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 33.77,
+  "withModuleLinksPercent": 33.77
+ },
+ "route": {
+  "links": 515233,
+  "level2": 174016,
+  "assumed": 268,
+  "proven": 173748,
+  "toolchainDecided": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 33.77,
+  "withModuleLinksPercent": 33.77,
+  "toolchainDecidedPercent": 0
+ },
+ "decided": {},
+ "join": {},
+ "agreement": {
+  "confirmed": 0,
+  "differs": 0,
+  "percent": null
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 515233,
+  "linksAfter": 515233,
+  "lost": 0,
+  "changedLevel2": 0
+ },
+ "analyzerRun": null,
+ "index": {
+  "sourceOnly": {
+   "wallS": 1788.5,
+   "cpuS": 1837.1
+  },
+  "route": {
+   "wallS": 1740.3,
+   "cpuS": 1817.5
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "c19": null
+}

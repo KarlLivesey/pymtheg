@@ -382,3 +382,23 @@ expect(routed.summary.toolchain === null);
 ```
 
 `pymtheg trust` lists your answers and `pymtheg trust --revoke` removes one.
+
+## The Rust toolchain route
+
+A checkout trusted on this machine also has its Rust links checked with
+rust-analyzer (C-43): indexing runs `rust-analyzer scip` offline on a copy of
+the project and takes its answers for Rust links the source alone leaves open,
+under strict gates. It runs the project's build scripts and proc macros, as
+building it would, and needs the crates already in the crate cache (build the
+project once, or run `cargo fetch`) and the toolchain's `rust-src` component.
+A committed `"graph": {"toolchain": {"rust": false}}` turns it off; a
+rust-analyzer path is honoured only from your own trust answer file
+(`"toolchain": {"rust": "/path/to/rust-analyzer"}` in the checkout's entry)
+and never when it resolves inside the checkout. `summary.toolchain.rust.state`
+is `used` (with counts of links upgraded, confirmed, kept where source-only
+differs, withheld by a gate, and library answers counted but not applied),
+`partial` (with the cause, such as a build script that did not finish or
+offline dependency resolution that failed; no answer is used then) or
+`unavailable` (with the reason). A link the route decided carries
+`data.toolchain` with `origin: "toolchain"`, the rust-analyzer version and the
+configuration.

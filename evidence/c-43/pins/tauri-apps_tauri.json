@@ -1,0 +1,113 @@
+{
+ "pin": "tauri-apps_tauri",
+ "state": "partial",
+ "reason": "build script of atk-sys did not finish",
+ "partialCauses": 16,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 283
+ },
+ "sourceOnly": {
+  "links": 88113,
+  "level2": 42580,
+  "level2NoneSeen": 42580,
+  "assumed": 3401,
+  "proven": 39179,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 48.32,
+  "withModuleLinksPercent": 48.32
+ },
+ "route": {
+  "links": 88113,
+  "level2": 42580,
+  "level2NoneSeen": 42580,
+  "assumed": 3401,
+  "proven": 39179,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 48.32,
+  "level2NoneSeenPercent": 48.32,
+  "withModuleLinksPercent": 48.32,
+  "toolchainDecidedPercent": 0
+ },
+ "decided": {},
+ "join": {
+  "unapplied:library": 36543,
+  "none:kind-not-joined": 8335,
+  "answer": 17627,
+  "none:local": 10971,
+  "filter:import-names-module": 116,
+  "none:trait-declaration": 1506,
+  "unapplied:generated": 1442,
+  "none:no-occurrence-at-site": 3641,
+  "filter:kind-incompatible": 87,
+  "none:no-name-site": 137,
+  "none:file-not-indexed": 6996,
+  "filter:extern-crate": 38,
+  "answer:trait-associated": 48,
+  "none:no-graph-symbol": 28,
+  "filter:collision": 2
+ },
+ "agreement": {
+  "confirmed": 0,
+  "differs": 0,
+  "percent": null
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 88113,
+  "linksAfter": 88113,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 0,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 0,
+  "path": {
+   "decided": 0,
+   "kept": 0
+  },
+  "receiver": {
+   "decided": 0,
+   "keptNames": 0,
+   "keptTraceable": 0
+  }
+ },
+ "analyzerRun": {
+  "wallS": 109.5,
+  "cpuS": 553.6,
+  "peakMiB": 5202
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 81.8,
+   "cpuS": 111.8
+  },
+  "route": {
+   "wallS": 511.9,
+   "cpuS": 125.2
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "c19": {
+  "links": 88051,
+  "level2": 41918,
+  "gainCheckout": 11066,
+  "gainLibrary": 26531,
+  "gatedPercent": 83.59,
+  "gatedLinks": 73604,
+  "percentCheckoutOnly": 60.17,
+  "trait": 1502,
+  "underCfg": 4585,
+  "generated": 651
+ }
+}

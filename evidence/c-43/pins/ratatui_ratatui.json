@@ -1,0 +1,195 @@
+{
+ "pin": "ratatui_ratatui",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 242
+ },
+ "sourceOnly": {
+  "links": 60424,
+  "level2": 25892,
+  "level2NoneSeen": 25892,
+  "assumed": 1793,
+  "proven": 24099,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 42.85,
+  "withModuleLinksPercent": 42.85
+ },
+ "route": {
+  "links": 60424,
+  "level2": 39913,
+  "level2NoneSeen": 26797,
+  "assumed": 1793,
+  "proven": 24099,
+  "toolchainDecided": 14021,
+  "toolchainSeen": 13116,
+  "libraryModuleLinks": 0,
+  "level2Percent": 66.05,
+  "level2NoneSeenPercent": 44.35,
+  "withModuleLinksPercent": 66.05,
+  "toolchainDecidedPercent": 23.2
+ },
+ "decided": {
+  "definite:unresolved": 14017,
+  "label:seen": 13116,
+  "definite:definite": 10666,
+  "label:none-seen": 905,
+  "kept:source-only-differs": 1,
+  "definite:candidates": 4
+ },
+ "join": {
+  "unapplied:library": 13763,
+  "filter:import-names-module": 145,
+  "answer": 24566,
+  "none:kind-not-joined": 5705,
+  "unapplied:generated": 2030,
+  "none:local": 8237,
+  "none:trait-declaration": 1400,
+  "none:no-graph-symbol": 601,
+  "none:no-name-site": 163,
+  "none:no-occurrence-at-site": 2450,
+  "answer:trait-associated": 122,
+  "none:file-not-indexed": 857,
+  "filter:collision": 90,
+  "filter:extern-crate": 19
+ },
+ "agreement": {
+  "confirmed": 10666,
+  "differs": 1,
+  "percent": 99.99
+ },
+ "disagreements": [
+  {
+   "file": "ratatui-core/src/layout/layout.rs",
+   "range": [
+    2400,
+    2405
+   ],
+   "kind": "types",
+   "name": "Cache",
+   "sourceOnly": "symbol:a6b05ca7c7fab2a0aeacc6bdd60e1affea0c73e61d2fe8c307e0f7249a52483e",
+   "toolchain": "symbol:9ada79be0780574d409f778b40554e2213d80894a98929b10551422106e28348"
+  }
+ ],
+ "check": {
+  "linksBefore": 60424,
+  "linksAfter": 60424,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 1,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 14021,
+  "path": {
+   "decided": 7530,
+   "kept": 538
+  },
+  "receiver": {
+   "decided": 6491,
+   "keptNames": 2229,
+   "keptTraceable": 1761
+  }
+ },
+ "analyzerRun": {
+  "wallS": 68.1,
+  "cpuS": 276.7,
+  "peakMiB": 2845
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 66.1,
+   "cpuS": 87.2
+  },
+  "route": {
+   "wallS": 192.3,
+   "cpuS": 91
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 34256,
+  "buckets": {
+   "no identity: library item": 9794,
+   "gate: kind/namespace": 69,
+   "credited": 14021,
+   "no identity: generated item": 1279,
+   "gate: trait-method declaration": 1400,
+   "no identity: local binding": 4104,
+   "no identity: declaration without a graph symbol": 601,
+   "no answer: no-name-site": 141,
+   "no answer: no-occurrence-at-site": 2292,
+   "no answer: file-not-indexed": 530,
+   "gate: known error classes": 25
+  },
+  "libraryPassingCfg": 9496,
+  "notIndexed": {
+   "examples": 117,
+   "other source": 396,
+   "tests": 17
+  },
+  "notIndexedFiles": 8,
+  "notIndexedTop": [
+   {
+    "path": "ratatui-core/src/style/anstyle.rs",
+    "links": 348,
+    "class": "other source"
+   },
+   {
+    "path": "examples/apps/demo/src/termina.rs",
+    "links": 42,
+    "class": "examples"
+   },
+   {
+    "path": "examples/apps/demo/src/termwiz.rs",
+    "links": 38,
+    "class": "examples"
+   },
+   {
+    "path": "examples/apps/demo/src/termion.rs",
+    "links": 37,
+    "class": "examples"
+   },
+   {
+    "path": "ratatui-core/src/style/palette_conversion.rs",
+    "links": 36,
+    "class": "other source"
+   },
+   {
+    "path": "ratatui-macros/tests/ui/fails.rs",
+    "links": 12,
+    "class": "tests"
+   },
+   {
+    "path": "ratatui-widgets/src/polyfills.rs",
+    "links": 12,
+    "class": "other source"
+   },
+   {
+    "path": "ratatui-macros/tests/ui/span_semicolon.rs",
+    "links": 5,
+    "class": "tests"
+   }
+  ]
+ },
+ "c19": {
+  "links": 60424,
+  "level2": 23853,
+  "gainCheckout": 18261,
+  "gainLibrary": 12691,
+  "gatedPercent": 87.96,
+  "gatedLinks": 53148,
+  "percentCheckoutOnly": 69.7,
+  "trait": 1036,
+  "underCfg": 632,
+  "generated": 1285
+ }
+}

@@ -1,0 +1,204 @@
+{
+ "pin": "serde-rs_serde",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 87
+ },
+ "sourceOnly": {
+  "links": 30714,
+  "level2": 8297,
+  "level2NoneSeen": 8297,
+  "assumed": 0,
+  "proven": 8297,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 27.01,
+  "withModuleLinksPercent": 27.01
+ },
+ "route": {
+  "links": 30714,
+  "level2": 15411,
+  "level2NoneSeen": 8484,
+  "assumed": 0,
+  "proven": 8297,
+  "toolchainDecided": 7114,
+  "toolchainSeen": 6927,
+  "libraryModuleLinks": 0,
+  "level2Percent": 50.18,
+  "level2NoneSeenPercent": 27.62,
+  "withModuleLinksPercent": 50.18,
+  "toolchainDecidedPercent": 23.16
+ },
+ "decided": {
+  "definite:definite": 593,
+  "definite:unresolved": 7114,
+  "label:seen": 6927,
+  "label:none-seen": 187,
+  "withheld:import-namespaces": 1
+ },
+ "join": {
+  "filter:import-names-module": 72,
+  "unapplied:library": 10947,
+  "none:kind-not-joined": 4090,
+  "none:local": 5250,
+  "answer": 6510,
+  "none:no-occurrence-at-site": 77,
+  "none:no-name-site": 66,
+  "unapplied:generated": 669,
+  "answer:trait-associated": 1198,
+  "none:trait-declaration": 908,
+  "none:no-graph-symbol": 12,
+  "filter:kind-incompatible": 3,
+  "filter:collision": 506,
+  "filter:extern-crate": 8,
+  "none:file-not-indexed": 398
+ },
+ "agreement": {
+  "confirmed": 593,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 30714,
+  "linksAfter": 30714,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 1,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 7114,
+  "path": {
+   "decided": 6326,
+   "kept": 265
+  },
+  "receiver": {
+   "decided": 788,
+   "keptNames": 559,
+   "keptTraceable": 393
+  }
+ },
+ "analyzerRun": {
+  "wallS": 31.7,
+  "cpuS": 54,
+  "peakMiB": 1147
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 39.7,
+   "cpuS": 53.3
+  },
+  "route": {
+   "wallS": 118.5,
+   "cpuS": 58.6
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 22417,
+  "buckets": {
+   "gate: kind/namespace": 63,
+   "no identity: library item": 10225,
+   "no answer: no-occurrence-at-site": 53,
+   "no answer: kind-not-joined": 34,
+   "credited": 7114,
+   "no answer: no-name-site": 66,
+   "no identity: generated item": 637,
+   "no identity: local binding": 2845,
+   "gate: trait-method declaration": 908,
+   "gate: an import of a name bound in several namespaces": 1,
+   "no identity: declaration without a graph symbol": 12,
+   "gate: known error classes": 75,
+   "no answer: file-not-indexed": 384
+  },
+  "libraryPassingCfg": 8481,
+  "notIndexed": {
+   "other source": 24,
+   "tests": 360
+  },
+  "notIndexedFiles": 121,
+  "notIndexedTop": [
+   {
+    "path": "test_suite/tests/ui/with/incorrect_type.rs",
+    "links": 19,
+    "class": "tests"
+   },
+   {
+    "path": "test_suite/no_std/src/main.rs",
+    "links": 17,
+    "class": "other source"
+   },
+   {
+    "path": "test_suite/tests/ui/default-attribute/tuple_struct_path.rs",
+    "links": 17,
+    "class": "tests"
+   },
+   {
+    "path": "test_suite/tests/unstable/mod.rs",
+    "links": 14,
+    "class": "tests"
+   },
+   {
+    "path": "test_suite/tests/ui/default-attribute/tuple_struct.rs",
+    "links": 13,
+    "class": "tests"
+   },
+   {
+    "path": "test_suite/tests/ui/unimplemented/required_locally.rs",
+    "links": 11,
+    "class": "tests"
+   },
+   {
+    "path": "test_suite/tests/ui/deprecated/deprecated_ser_with.rs",
+    "links": 8,
+    "class": "tests"
+   },
+   {
+    "path": "serde_core/src/std_error.rs",
+    "links": 7,
+    "class": "other source"
+   },
+   {
+    "path": "test_suite/tests/ui/deprecated/deprecated_de_with.rs",
+    "links": 7,
+    "class": "tests"
+   },
+   {
+    "path": "test_suite/tests/ui/conflict/alias-enum.rs",
+    "links": 6,
+    "class": "tests"
+   },
+   {
+    "path": "test_suite/tests/ui/conflict/flatten-newtype-struct.rs",
+    "links": 6,
+    "class": "tests"
+   },
+   {
+    "path": "test_suite/tests/ui/conflict/flatten-tuple-struct.rs",
+    "links": 6,
+    "class": "tests"
+   }
+  ]
+ },
+ "c19": {
+  "links": 30714,
+  "level2": 8282,
+  "gainCheckout": 10504,
+  "gainLibrary": 10457,
+  "gatedPercent": 75.66,
+  "gatedLinks": 23239,
+  "percentCheckoutOnly": 61.16,
+  "trait": 768,
+  "underCfg": 5606,
+  "generated": 777
+ }
+}

@@ -2446,8 +2446,22 @@ async function createHelper(): Promise<Helper> {
                           pending = [];
                         }
                       }
+                      // C-43 design B: named fields under a cfg, which a
+                      // method or field through this type may meet in
+                      // another configuration.
+                      const gatedFields = named
+                        ? named.namedChildren
+                            .filter(
+                              (c) =>
+                                c.type === "field_declaration" &&
+                                gated(c) &&
+                                field(c, "name"),
+                            )
+                            .map((c) => compact(field(c, "name")!.text))
+                        : [];
                       return {
                         fields,
+                        ...(gatedFields.length ? { gatedFields } : {}),
                         typeGenerics:
                           field(n, "type_parameters")?.namedChildren.map((p) =>
                             compact(

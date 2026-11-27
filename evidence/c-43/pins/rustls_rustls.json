@@ -1,0 +1,182 @@
+{
+ "pin": "rustls_rustls",
+ "state": "used",
+ "partialCauses": 0,
+ "analyzer": {
+  "version": "rust-analyzer 1.98.1 (48a229c 2026-09-01)",
+  "configuration": "x86_64-unknown-linux-gnu (host), default features, all targets, cfg(test) on, build scripts and proc macros on, offline",
+  "documents": 164
+ },
+ "sourceOnly": {
+  "links": 70802,
+  "level2": 23060,
+  "level2NoneSeen": 23060,
+  "assumed": 299,
+  "proven": 22761,
+  "toolchainDecided": 0,
+  "toolchainSeen": 0,
+  "libraryModuleLinks": 0,
+  "level2Percent": 32.57,
+  "withModuleLinksPercent": 32.57
+ },
+ "route": {
+  "links": 70802,
+  "level2": 41284,
+  "level2NoneSeen": 25044,
+  "assumed": 299,
+  "proven": 22761,
+  "toolchainDecided": 18224,
+  "toolchainSeen": 16240,
+  "libraryModuleLinks": 0,
+  "level2Percent": 58.31,
+  "level2NoneSeenPercent": 35.37,
+  "withModuleLinksPercent": 58.31,
+  "toolchainDecidedPercent": 25.74
+ },
+ "decided": {
+  "definite:unresolved": 18224,
+  "label:seen": 16240,
+  "definite:definite": 6864,
+  "label:none-seen": 1984
+ },
+ "join": {
+  "none:file-not-indexed": 159,
+  "none:kind-not-joined": 7244,
+  "filter:import-names-module": 239,
+  "unapplied:library": 23317,
+  "answer": 25051,
+  "none:no-name-site": 117,
+  "none:no-graph-symbol": 2173,
+  "none:local": 8505,
+  "unapplied:generated": 1845,
+  "none:trait-declaration": 1550,
+  "none:no-occurrence-at-site": 415,
+  "answer:trait-associated": 37,
+  "filter:kind-incompatible": 40,
+  "filter:extern-crate": 31,
+  "filter:collision": 44
+ },
+ "agreement": {
+  "confirmed": 6864,
+  "differs": 0,
+  "percent": 100
+ },
+ "disagreements": [],
+ "check": {
+  "linksBefore": 70802,
+  "linksAfter": 70802,
+  "lost": 0,
+  "changedLevel2": 0,
+  "outcomes": 0,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 18224,
+  "path": {
+   "decided": 13576,
+   "kept": 2608
+  },
+  "receiver": {
+   "decided": 4648,
+   "keptNames": 2829,
+   "keptTraceable": 1757
+  }
+ },
+ "analyzerRun": {
+  "wallS": 118.4,
+  "cpuS": 520.3,
+  "peakMiB": 2358
+ },
+ "index": {
+  "sourceOnly": {
+   "wallS": 143.9,
+   "cpuS": 172.5
+  },
+  "route": {
+   "wallS": 294.3,
+   "cpuS": 168.1
+  }
+ },
+ "errors": {
+  "sourceOnly": [],
+  "route": []
+ },
+ "funnel": {
+  "open": 47713,
+  "buckets": {
+   "no answer: file-not-indexed": 134,
+   "no identity: library item": 18482,
+   "credited": 18224,
+   "no answer: no-name-site": 96,
+   "no identity: declaration without a graph symbol": 2173,
+   "no identity: generated item": 1263,
+   "gate: trait-method declaration": 1549,
+   "gate: kind/namespace": 176,
+   "no identity: local binding": 5166,
+   "no answer: no-occurrence-at-site": 359,
+   "gate: known error classes": 47,
+   "no answer: kind-not-joined": 44
+  },
+  "libraryPassingCfg": 13605,
+  "notIndexed": {
+   "other source": 49,
+   "fuzz": 85
+  },
+  "notIndexedFiles": 8,
+  "notIndexedTop": [
+   {
+    "path": "fuzz/fuzzers/server.rs",
+    "links": 66,
+    "class": "fuzz"
+   },
+   {
+    "path": "admin/threads-seq.rs",
+    "links": 49,
+    "class": "other source"
+   },
+   {
+    "path": "fuzz/fuzzers/client.rs",
+    "links": 4,
+    "class": "fuzz"
+   },
+   {
+    "path": "fuzz/fuzzers/deframer.rs",
+    "links": 3,
+    "class": "fuzz"
+   },
+   {
+    "path": "fuzz/fuzzers/fragment.rs",
+    "links": 3,
+    "class": "fuzz"
+   },
+   {
+    "path": "fuzz/fuzzers/message.rs",
+    "links": 3,
+    "class": "fuzz"
+   },
+   {
+    "path": "fuzz/fuzzers/persist.rs",
+    "links": 3,
+    "class": "fuzz"
+   },
+   {
+    "path": "fuzz/fuzzers/server_name.rs",
+    "links": 3,
+    "class": "fuzz"
+   }
+  ]
+ },
+ "c19": {
+  "links": 69929,
+  "level2": 19809,
+  "gainCheckout": 24234,
+  "gainLibrary": 21421,
+  "gatedPercent": 74.17,
+  "gatedLinks": 51863,
+  "percentCheckoutOnly": 62.98,
+  "trait": 1503,
+  "underCfg": 12270,
+  "generated": 1255
+ }
+}
