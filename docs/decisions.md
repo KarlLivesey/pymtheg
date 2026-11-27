@@ -3705,3 +3705,20 @@ surfaces alone (review: it missed a function under another build
 constraint, a function and an alias swapping order, a failed file moving,
 and the resolver mode). **Unchanged:** without a session, and on every key
 miss, the pass runs as before. See [C-56](changes/C-56.md).
+
+### Nothing stored beside a source file holds a program (C-64)
+
+**Decided (C-64):** C-64 removes compiler references from the stored name
+restorer: C-49's per-file restorer is made at module level over a copy of
+the fresh names' strings (`nameRestorer`), not as a closure inside the
+extraction. During analysis, a cached declaration can keep a qualified
+target and its compiler symbol or declaration reachable. During
+differential analysis, the retained base host can keep its program
+reachable through TypeScript's `realpath` wrapper. **Why:** a long-lived
+source file can retain a program and its checker through `keyNames`. Bundled library files stay live through `libCache`. The compiler host's parse cache or a later program can keep reused project files live. Each
+source file has one entry, which a later registration can replace before
+keys are cached. Four of the six live programs in the microsoft/TypeScript
+snapshot were reachable through this path. **Unchanged:** stored rows; module versions. **Known,
+not ours:** TypeScript's checker itself writes onto a shared parse a symbol
+that reaches its types, and V8's allocation-site feedback for
+`createProgram` holds one program. See [C-64](changes/C-64.md).

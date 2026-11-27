@@ -16,7 +16,14 @@ import {
 } from "../dist/graph/index.js";
 import { module as synthetic } from "./fixtures/graph-core/synthetic.mjs";
 import ts from "typescript";
-import typescriptModule from "../dist/graph/languages/typescript/index.js";
+import typescriptModule, {
+  typescriptModule as typescriptModuleFactory,
+} from "../dist/graph/languages/typescript/index.js";
+import {
+  isNameRestorer,
+  nameRestorer,
+} from "../dist/graph/languages/typescript/rename.js";
+import { storedKeyNames } from "../dist/graph/languages/typescript/symbols.js";
 
 /** Marks every decoded stored file record so live ones can be counted. */
 class DecodedFile {}
@@ -398,4 +405,113 @@ test("after a TypeScript analysis no compiler program or checker stays alive", a
     store?.close();
     await rm(scratch, { recursive: true, force: true });
   }
+});
+
+// C-64: each program's extraction stored, beside every one of its source
+// files (lib files included), a closure made inside the extraction, which
+// held the program and its checker. Lib files are shared by every program
+// and outlive them, so programs built and replaced during one analysis
+// stayed alive (six at once on microsoft/TypeScript). Counted, without
+// timing: at the first checker call of each rebuilt program, the checker
+// types alive do not grow with the number of programs built before it.
+test("a program replaced during an analysis does not stay alive through what is stored beside its files", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-index-memory-"));
+  let store;
+  try {
+    const root = join(scratch, "project");
+    await mkdir(join(root, "src"), { recursive: true });
+    await writeFile(
+      join(root, "tsconfig.json"),
+      JSON.stringify({ compilerOptions: { strict: true }, include: ["src"] }),
+    );
+    const REBUILDS = 6;
+    for (let i = 0; i < REBUILDS; i++)
+      await writeFile(
+        join(root, "src", `m${i}.ts`),
+        `import { f${(i + 1) % REBUILDS} } from "./m${(i + 1) % REBUILDS}";\n` +
+          `export function f${i}(): number {\n  return [1, 2].map((x) => x + 1).length;\n}\n` +
+          `export const v${i} = f${(i + 1) % REBUILDS};\n`,
+      );
+    const Type = ts.objectAllocator.getTypeConstructor();
+    // The extraction is deeper than the default ten frames below the hook.
+    const limit = Error.stackTraceLimit;
+    Error.stackTraceLimit = 100;
+    let faults = 0;
+    const faulted = new Set();
+    let measureNext = false;
+    const alive = [];
+    const files = new Set();
+    const module = typescriptModuleFactory({
+      checkerFault(method, node) {
+        const source = node?.getSourceFile();
+        if (source) files.add(source);
+        if (measureNext) {
+          measureNext = false;
+          alive.push(queryObjects(Type, { format: "count" }));
+        }
+        // One stack overflow during each file's extraction (not the
+        // warm-up): the session rebuilds its program and extracts the file
+        // again.
+        if (
+          faults < REBUILDS &&
+          method === "getSymbolAtLocation" &&
+          /\/src\/m\d\.ts$/.test(source?.fileName ?? "") &&
+          !faulted.has(source.fileName) &&
+          new Error().stack.includes("extractFile")
+        ) {
+          faults++;
+          faulted.add(source.fileName);
+          measureNext = true;
+          throw new RangeError("Maximum call stack size exceeded");
+        }
+      },
+    });
+    store = new SqliteGraphStore(join(scratch, "graph.sqlite"), "memory");
+    let report;
+    try {
+      report = await indexProject(root, new LanguageRegistry([module]), store);
+    } finally {
+      Error.stackTraceLimit = limit;
+    }
+    assert.equal(report.analysisErrors.length, 0);
+    assert.equal(faults, REBUILDS);
+    assert.equal(alive.length, REBUILDS);
+    // Programs built and replaced do not accumulate: after the first
+    // rebuilds settle (a caller's frame may still hold the one before), the
+    // types alive stay the same however many programs were built. Before
+    // C-64 every replaced checker stayed alive (+97 types each here).
+    const last = alive.slice(-3);
+    assert.deepEqual(
+      last,
+      last.map(() => last[0]),
+      `checker types alive after each rebuild: ${alive.join(", ")}`,
+    );
+    // What is stored beside a file holds only the fresh names' strings.
+    assert.ok(files.size > 0);
+    for (const file of files)
+      assert.ok(isNameRestorer(storedKeyNames(file)), file.fileName);
+  } finally {
+    store?.close();
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test("the stored name restorer copies the fresh names and accepts only strings", () => {
+  const names = {
+    local: { require: "__pym_r1", module: "__pym_m1", exports: "__pym_e1" },
+    uncertain: { require: "__pym_r2", module: "__pym_m2", exports: "__pym_e2" },
+  };
+  const restore = nameRestorer(names);
+  assert.ok(isNameRestorer(restore));
+  assert.equal(restore("__pym_r1.x"), "require.x");
+  names.local.require = "changed";
+  assert.equal(restore("__pym_r1.x"), "require.x");
+  assert.throws(
+    () =>
+      nameRestorer({
+        local: { ...names.local, require: {} },
+        uncertain: names.uncertain,
+      }),
+    TypeError,
+  );
 });
