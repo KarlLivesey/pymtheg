@@ -179,7 +179,8 @@ test(
     const locked = join(root, "src", "locked.ts");
     await writeFile(locked, "export const locked = 1;\n");
     await chmod(locked, 0);
-    t.after(() => chmod(locked, 0o644));
+    // Readable again for the clean-up, if it is still there.
+    t.after(() => chmod(locked, 0o644).catch(() => {}));
     const run = await interrupted(
       ["graph", "index", "--root", root, "--json"],
       { PYM_TEST_STOP_POINT: "before-post" },
