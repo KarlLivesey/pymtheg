@@ -1,0 +1,1772 @@
+{
+ "totals": {
+  "type literal: property signature | type of a module-level declaration | has a member symbol, refused for a call => unresolved:local": 2620,
+  "type literal: property signature | a type annotation at module level | no member symbol => unresolved:local": 2118,
+  "type literal: property signature | a type annotation inside a function or signature | no member symbol => unresolved:local": 983,
+  "type literal: method signature | type of a module-level declaration | has a member symbol, refused for a call => unresolved:local": 952,
+  "type literal: property signature | type of a module-level declaration | has a member symbol, refused for a call => resolved": 459,
+  "type literal: property signature | a type annotation at module level | no member symbol => resolved": 351,
+  "type literal: property signature | other (PropertySignature) | has a member symbol, refused for a call => resolved": 266,
+  "object literal: property | an argument to a call, inside a function | no member symbol => unresolved:local": 254,
+  "type literal: method signature | a type annotation at module level | no member symbol => unresolved:local": 247,
+  "type literal: method signature | type of a module-level declaration | has a member symbol, refused for a call => resolved": 127,
+  "type literal: property signature | a type annotation inside a function or signature | no member symbol => resolved": 109,
+  "object literal: property | an argument to a call, at module level | no member symbol => unresolved:local": 109,
+  "object literal: property | an assignment inside a function | no member symbol => unresolved:local": 105,
+  "object literal: method or accessor | an argument to a call, inside a function | no member symbol => unresolved:local": 77,
+  "type literal: property signature | other (FunctionDeclaration) | has a member symbol, refused for a call => unresolved:local": 75,
+  "type literal: property signature | other (PropertySignature) | has a member symbol, refused for a call => unresolved:local": 72,
+  "object literal: property | a returned literal | no member symbol => unresolved:local": 65,
+  "object literal: property | initialiser of a variable inside a function | no member symbol => unresolved:local": 63,
+  "type literal: property signature | type declared inside a function | no member symbol => unresolved:local": 36,
+  "type literal: property signature | initialiser of a variable inside a function | no member symbol => unresolved:local": 28,
+  "object literal: method or accessor | a returned literal | no member symbol => unresolved:local": 25,
+  "object literal: property | initialiser of an exported module-level declaration | no member symbol => unresolved:local": 20,
+  "type literal: property signature | an argument to a call, inside a function | no member symbol => unresolved:local": 18,
+  "type literal: method signature | initialiser of an exported module-level declaration | has a member symbol, refused for a call => resolved": 18,
+  "type literal: method signature | a type annotation inside a function or signature | no member symbol => resolved": 17,
+  "type literal: method signature | a type annotation inside a function or signature | no member symbol => unresolved:local": 17,
+  "type literal: method signature | a type annotation at module level | no member symbol => resolved": 16,
+  "type literal: property signature | a type annotation at module level | no member symbol => ambiguous": 16,
+  "type literal: property signature | other (TypeParameter) | no member symbol => unresolved:local": 14,
+  "type literal: property signature | an argument to a call, at module level | no member symbol => unresolved:local": 13,
+  "object literal: method or accessor | initialiser of a variable inside a function | no member symbol => unresolved:local": 12,
+  "object literal: property | initialiser of a variable inside a function | has a member symbol, refused for a call => unresolved:local": 8,
+  "object literal: property | export default | has a member symbol, refused for a call => unresolved:local": 8,
+  "type literal: method signature | other (PropertySignature) | has a member symbol, refused for a call => resolved": 8,
+  "object literal: property | initialiser of a module-level declaration | no member symbol => unresolved:local": 7,
+  "type literal: property signature | initialiser of a variable inside a function | has a member symbol, refused for a call => resolved": 7,
+  "type literal: method signature | other (PropertyAccessExpression) | no member symbol => unresolved:local": 6,
+  "type literal: property signature | other (PropertyAccessExpression) | no member symbol => unresolved:local": 6,
+  "type literal: property signature | other (PropertyDeclaration) | has a member symbol, refused for a call => resolved": 6,
+  "type literal: property signature | initialiser of an exported module-level declaration | has a member symbol, refused for a call => resolved": 6,
+  "type literal: property signature | a type annotation inside a function or signature | has a member symbol, refused for a call => resolved": 5,
+  "type literal: method signature | other (GetAccessor) | has a member symbol, refused for a call => unresolved:local": 5,
+  "type literal: property signature | other (MethodDeclaration) | has a member symbol, refused for a call => unresolved:local": 5,
+  "type literal: method signature | initialiser of an exported module-level declaration | has a member symbol, refused for a call => unresolved:local": 4,
+  "type literal: method signature | an argument to a call, inside a function | no member symbol => unresolved:local": 4,
+  "type literal: method signature | a type annotation at module level | no member symbol => ambiguous": 4,
+  "type literal: property signature | a returned literal | has a member symbol, refused for a call => unresolved:local": 4,
+  "type literal: property signature | initialiser of a module-level declaration | no member symbol => unresolved:local": 3,
+  "type literal: method signature | type declared inside a function | no member symbol => unresolved:local": 3,
+  "type literal: property signature | initialiser of a module-level declaration | has a member symbol, refused for a call => resolved": 3,
+  "object literal: property | initialiser of a module-level declaration, as const | no member symbol => unresolved:local": 2,
+  "type literal: method signature | other (FunctionDeclaration) | has a member symbol, refused for a call => unresolved:local": 2,
+  "type literal: property signature | other (PropertyDeclaration) | has a member symbol, refused for a call => unresolved:local": 1,
+  "type literal: method signature | a type annotation inside a function or signature | has a member symbol, refused for a call => resolved": 1,
+  "type literal: property signature | a type annotation inside a function or signature | no member symbol => ambiguous": 1,
+  "object literal: property | other (PropertyAccessExpression) | no member symbol => unresolved:local": 1,
+  "type literal: method signature | other (MethodSignature) | no member symbol => unresolved:local": 1,
+  "object literal: method or accessor | an argument to a call, at module level | no member symbol => unresolved:local": 1,
+  "type literal: method signature | other (TypeParameter) | no member symbol => unresolved:local": 1,
+  "object literal: property | a returned literal | has a member symbol, refused for a call => unresolved:local": 1,
+  "type literal: property signature | other (IndexSignature) | no member symbol => unresolved:local": 1,
+  "type literal: method signature | initialiser of a variable inside a function | no member symbol => unresolved:local": 1
+ },
+ "sample": {
+  "type literal: property signature | a type annotation at module level | no member symbol": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/optimisticUpdates.test.tsx",
+    "line": 323,
+    "kind": "calls",
+    "targetName": "storeRef.store.dispatch",
+    "code": "returnValue = storeRef.store.dispatch("
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/tests/server/websockets.test.ts",
+    "line": 2253,
+    "kind": "calls",
+    "targetName": "ctx.client.events.subscribe",
+    "code": "const subscription = ctx.client.events.subscribe(undefined, {"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/tests/server/adapters/fetch.test.ts",
+    "line": 211,
+    "kind": "calls",
+    "targetName": "client.deferred.query",
+    "code": "client.deferred.query({ wait: 1 }),"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/optimisticUpserts.test.tsx",
+    "line": 512,
+    "kind": "calls",
+    "targetName": "storeRef.store.dispatch",
+    "code": "storeRef.store.dispatch("
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/optimisticUpdates.test.tsx",
+    "line": 268,
+    "kind": "calls",
+    "targetName": "storeRef.store.dispatch",
+    "code": "returnValue = storeRef.store.dispatch("
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/tests/server/streaming.test.ts",
+    "line": 233,
+    "kind": "calls",
+    "targetName": "ctx.client.manualRelease.query",
+    "code": "ctx.client.manualRelease.query({ id: 1 }).then((v) => {"
+   }
+  ],
+  "type literal: property signature | type of a module-level declaration | has a member symbol, refused for a call": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/polling.test.tsx",
+    "line": 184,
+    "kind": "calls",
+    "targetName": "getPosts.initiate",
+    "code": "getPosts.initiate(4, {"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/react-query/test/trpc-options.test.tsx",
+    "line": 38,
+    "kind": "calls",
+    "targetName": "client.greeting.useQuery",
+    "code": "const greetingQuery = client.greeting.useQuery("
+   },
+   {
+    "repo": "react-hook-form/react-hook-form",
+    "file": "src/__tests__/useForm/reset.test.tsx",
+    "line": 3052,
+    "kind": "calls",
+    "targetName": "result.current.trigger",
+    "code": "old = result.current.trigger('test');"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/buildMiddleware.test.tsx",
+    "line": 171,
+    "kind": "calls",
+    "targetName": "getBanana.initiate",
+    "code": "getBanana.initiate(1, {"
+   },
+   {
+    "repo": "react-hook-form/react-hook-form",
+    "file": "src/__tests__/useForm/reset.test.tsx",
+    "line": 2985,
+    "kind": "calls",
+    "targetName": "result.current.trigger",
+    "code": "stale = result.current.trigger();"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/ownRequestResult.test.ts",
+    "line": 251,
+    "kind": "calls",
+    "targetName": "api.endpoints.getThing.initiate",
+    "code": "restarted = store.dispatch(api.endpoints.getThing.initiate('b'))"
+   }
+  ],
+  "type literal: property signature | other (FunctionDeclaration) | has a member symbol, refused for a call": [
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "test/unit/test/jest-matcher-utils.test.ts",
+    "line": 7,
+    "kind": "calls",
+    "targetName": "this.utils.diff",
+    "code": "message: () => this.utils.diff(expected, received) || '',"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/browser/src/client/tester/expect/toContainElement.ts",
+    "line": 42,
+    "kind": "calls",
+    "targetName": "this.utils.RECEIVED_COLOR",
+    "code": "this.utils.RECEIVED_COLOR(`${this.utils.stringify(containerElement.cloneNode(false))} ${"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/browser/src/client/tester/expect/toBeEnabled.ts",
+    "line": 29,
+    "kind": "calls",
+    "targetName": "this.utils.matcherHint",
+    "code": "this.utils.matcherHint(`${this.isNot ? '.not' : ''}.toBeDisabled`, 'element', ''),"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/browser/src/client/tester/expect/toHaveAccessibleErrorMessage.ts",
+    "line": 61,
+    "kind": "calls",
+    "targetName": "this.utils.RECEIVED_COLOR",
+    "code": "this.isNot ? this.utils.RECEIVED_COLOR(redent(actualAccessibleErrorMessage, 2)) : '',"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/browser/src/client/tester/expect/toHaveFormValues.ts",
+    "line": 68,
+    "kind": "calls",
+    "targetName": "this.utils.matcherHint",
+    "code": "this.utils.matcherHint(matcher, 'element', ''),"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/browser/src/client/tester/expect/toMatchScreenshot.ts",
+    "line": 119,
+    "kind": "calls",
+    "targetName": "this.utils.RECEIVED_COLOR",
+    "code": "? `\\nActual screenshot:\\n  ${this.utils.RECEIVED_COLOR(result.actual.path)}`"
+   }
+  ],
+  "object literal: property | an argument to a call, inside a function | no member symbol": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/tests/createSlice.test.ts",
+    "line": 728,
+    "kind": "calls",
+    "targetName": "injected.selectors.selectObj",
+    "code": "expect(injected.selectors.selectObj({})).toBe("
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/tanstack-react-query/src/unstable-handles/handles.test.tsx",
+    "line": 1237,
+    "kind": "calls",
+    "targetName": "t.hydrateBrowser",
+    "code": "t.hydrateBrowser(t.state);"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/server/src/unstable-core-do-not-import/stream/utils/withPing.test.ts",
+    "line": 50,
+    "kind": "calls",
+    "targetName": "fakeTimers.advanceTimersByTimeAsync",
+    "code": "await fakeTimers.advanceTimersByTimeAsync(pingIntervalMs - offsetMs);"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/ownRequestResult.test.ts",
+    "line": 136,
+    "kind": "calls",
+    "targetName": "api.internalActions.removeQueryResult",
+    "code": "api.internalActions.removeQueryResult({"
+   },
+   {
+    "repo": "react-hook-form/react-hook-form",
+    "file": "src/__tests__/useController.dirtyWithoutDefaultValues.test.tsx",
+    "line": 361,
+    "kind": "calls",
+    "targetName": "form.rerenderWith",
+    "code": "form.rerenderWith('baz');"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/microservices/test/server/server-tcp.spec.ts",
+    "line": 258,
+    "kind": "calls",
+    "targetName": "done.settleMessage",
+    "code": "done.settleMessage();"
+   }
+  ],
+  "type literal: property signature | a type annotation inside a function or signature | no member symbol": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/tests/createAsyncThunk.test.ts",
+    "line": 996,
+    "kind": "calls",
+    "targetName": "store.dispatch",
+    "code": "const promise = store.dispatch(fulfilledThunk('testArg'))"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/listenerMiddleware/tests/effectScenarios.test.ts",
+    "line": 442,
+    "kind": "calls",
+    "targetName": "store.dispatch",
+    "code": "store.dispatch(increment())"
+   },
+   {
+    "repo": "honojs/hono",
+    "file": "src/hono.test.ts",
+    "line": 3409,
+    "kind": "calls",
+    "targetName": "c.var.echo4",
+    "code": "c.var.echo4('hello4') +"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/getRunningQuery.test.ts",
+    "line": 188,
+    "kind": "calls",
+    "targetName": "ctx.store.dispatch",
+    "code": "expect(ctx.store.dispatch(ctx.api.endpoints.thing.getRunningQuery(1))).toBe("
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/ownRequestResult.test.ts",
+    "line": 269,
+    "kind": "calls",
+    "targetName": "store.dispatch",
+    "code": "store.dispatch("
+   },
+   {
+    "repo": "honojs/hono",
+    "file": "src/hono.test.ts",
+    "line": 3354,
+    "kind": "calls",
+    "targetName": "c.var.echo3",
+    "code": "c.var.echo('hello') + c.var.echo2('hello2') + c.var.echo3('hello3') + c.var.echo4('hello4')"
+   }
+  ],
+  "type literal: property signature | other (PropertySignature) | has a member symbol, refused for a call": [
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/rendering-util/layout-algorithms/elk/render.ts",
+    "line": 1317,
+    "kind": "calls",
+    "targetName": "log.debug",
+    "code": "log.debug('APA01 processing edge', index, ':', edge);"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/wysiwyg/textWysiwyg.test.tsx",
+    "line": 3495,
+    "kind": "calls",
+    "targetName": "h.setState",
+    "code": "h.setState({ theme: THEME.DARK });"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/tests/drawShape.test.tsx",
+    "line": 493,
+    "kind": "calls",
+    "targetName": "h.setState",
+    "code": "h.setState({ currentItemBackgroundColor: \"#ffc9c9\" });"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/tests/renderOverrides.test.tsx",
+    "line": 325,
+    "kind": "calls",
+    "targetName": "h.setState",
+    "code": "act(() => h.setState({ editingFrame: frame.id }));"
+   },
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/rendering-util/layout-algorithms/elk/render.ts",
+    "line": 3035,
+    "kind": "calls",
+    "targetName": "log.debug",
+    "code": "log.debug('PPP cutter2: bounds', { startBounds, endBounds });"
+   },
+   {
+    "repo": "yargs/yargs",
+    "file": "lib/utils/set-blocking.ts",
+    "line": 18,
+    "kind": "calls",
+    "targetName": "stream._handle.setBlocking",
+    "code": "stream._handle.setBlocking(blocking);"
+   }
+  ],
+  "type literal: method signature | type of a module-level declaration | has a member symbol, refused for a call": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/matchers.test-d.tsx",
+    "line": 22,
+    "kind": "calls",
+    "targetName": "build.query",
+    "code": "querySuccess2: build.query({ query: () => '/success' }),"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/infiniteQueries.test.ts",
+    "line": 1346,
+    "kind": "calls",
+    "targetName": "build.infiniteQuery",
+    "code": "counters: build.infiniteQuery<HitCounter, string, number>({"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/retry.test.ts",
+    "line": 27,
+    "kind": "calls",
+    "targetName": "build.query",
+    "code": "q1: build.query({"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/upgrade/test/__fixtures__/hooks/withInvalidate.tsx",
+    "line": 5,
+    "kind": "calls",
+    "targetName": "trpc.useUtils",
+    "code": "const utils = trpc.useUtils();"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/raceConditions.test.ts",
+    "line": 29,
+    "kind": "calls",
+    "targetName": "build.mutation",
+    "code": "eatBanana: build.mutation<unknown, void>({"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/fakeBaseQuery.test.tsx",
+    "line": 36,
+    "kind": "calls",
+    "targetName": "build.query",
+    "code": "withInvalidErrorQueryFn: build.query<string, string>({"
+   }
+  ],
+  "object literal: property | an assignment inside a function | no member symbol": [
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "samples/remote-sync/ajax/jquery-2.1.0.js",
+    "line": 4726,
+    "kind": "calls",
+    "targetName": "data_priv.remove",
+    "code": "data_priv.remove( doc, fix );"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "samples/remote-sync/ajax/jquery-2.1.0.js",
+    "line": 6094,
+    "kind": "calls",
+    "targetName": "Tween.propHooks._default.get",
+    "code": "Tween.propHooks._default.get( this );"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/openapi/test/heyapi.test.ts",
+    "line": 98,
+    "kind": "calls",
+    "targetName": "config.bodySerializer",
+    "code": "const result = config.bodySerializer!({ name: 'test' });"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "samples/remote-sync/ajax/jquery-2.1.0.js",
+    "line": 3781,
+    "kind": "calls",
+    "targetName": "data_user.get",
+    "code": "data = data_user.get( elem, camelKey );"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "samples/remote-sync/ajax/jquery-2.1.0.js",
+    "line": 4938,
+    "kind": "calls",
+    "targetName": "data_user.access",
+    "code": "udataOld = data_user.access( src );"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "samples/remote-sync/ajax/jquery-2.1.0.js",
+    "line": 4930,
+    "kind": "calls",
+    "targetName": "jQuery.event.add",
+    "code": "jQuery.event.add( dest, type, events[ type ][ i ] );"
+   }
+  ],
+  "object literal: property | an argument to a call, at module level | no member symbol": [
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/tests/excalidraw.test.tsx",
+    "line": 416,
+    "kind": "calls",
+    "targetName": "MainMenu.ItemCustom",
+    "code": "<MainMenu.ItemCustom>"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/tests/arrowBinding.test.tsx",
+    "line": 120,
+    "kind": "calls",
+    "targetName": "actionToggleArrowBinding.checked",
+    "code": "expect(actionToggleArrowBinding.checked!(h.state)).toBe(false);"
+   },
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/mermaidAPI.spec.ts",
+    "line": 663,
+    "kind": "calls",
+    "targetName": "mermaidAPI.reset",
+    "code": "mermaidAPI.reset();"
+   },
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/mermaidAPI.spec.ts",
+    "line": 617,
+    "kind": "calls",
+    "targetName": "mermaidAPI.getConfig",
+    "code": "const orgConfig: any = mermaidAPI.getConfig();"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "excalidraw-app/components/AppSidebar.tsx",
+    "line": 87,
+    "kind": "calls",
+    "targetName": "Sidebar.Tab",
+    "code": "<Sidebar.Tab tab=\"comments\">"
+   },
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/mermaidAPI.spec.ts",
+    "line": 664,
+    "kind": "calls",
+    "targetName": "mermaidAPI.getConfig",
+    "code": "expect(mermaidAPI.getConfig().logLevel).toBe(0);"
+   }
+  ],
+  "type literal: property signature | other (TypeParameter) | no member symbol": [
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/server/src/unstable-core-do-not-import/initTRPC.test.ts",
+    "line": 54,
+    "kind": "references",
+    "targetName": "t._config.$types.meta",
+    "code": "expectTypeOf<typeof t._config.$types.meta>().toEqualTypeOf<object>();"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/server/src/unstable-core-do-not-import/initTRPC.test.ts",
+    "line": 31,
+    "kind": "references",
+    "targetName": "t._config.$types.transformer",
+    "code": "expectTypeOf<typeof t._config.$types.transformer>().toEqualTypeOf<true>();"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/runtime/vm/code-cache.ts",
+    "line": 69,
+    "kind": "calls",
+    "targetName": "v8.setFlagsFromString",
+    "code": "v8.setFlagsFromString(flags)"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/server/src/unstable-core-do-not-import/initTRPC.test.ts",
+    "line": 19,
+    "kind": "references",
+    "targetName": "t._config.$types.transformer",
+    "code": "expectTypeOf<typeof t._config.$types.transformer>().toEqualTypeOf<false>();"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/server/src/unstable-core-do-not-import/initTRPC.test.ts",
+    "line": 67,
+    "kind": "references",
+    "targetName": "t._config.$types.ctx",
+    "code": "expectTypeOf<typeof t._config.$types.ctx>().toEqualTypeOf<Context>();"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/server/src/unstable-core-do-not-import/initTRPC.test.ts",
+    "line": 53,
+    "kind": "references",
+    "targetName": "t._config.$types.ctx",
+    "code": "expectTypeOf<typeof t._config.$types.ctx>().toEqualTypeOf<object>();"
+   }
+  ],
+  "object literal: property | initialiser of a variable inside a function | no member symbol": [
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "samples/remote-sync/ajax/jquery-2.1.0.js",
+    "line": 8026,
+    "kind": "calls",
+    "targetName": "jqXHR.setRequestHeader",
+    "code": "jqXHR.setRequestHeader( \"If-None-Match\", jQuery.etag[ cacheURL ] );"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "samples/remote-sync/ajax/jquery-2.1.0.js",
+    "line": 8036,
+    "kind": "calls",
+    "targetName": "jqXHR.setRequestHeader",
+    "code": "jqXHR.setRequestHeader("
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/queryFn.test.tsx",
+    "line": 380,
+    "kind": "calls",
+    "targetName": "getResult.exists",
+    "code": "if (!getResult.exists()) {"
+   },
+   {
+    "repo": "react-hook-form/react-hook-form",
+    "file": "src/__tests__/controller.test.tsx",
+    "line": 1225,
+    "kind": "calls",
+    "targetName": "transform.input",
+    "code": "value={transform.input(+field.value)}"
+   },
+   {
+    "repo": "react-hook-form/react-hook-form",
+    "file": "src/__tests__/utils/createSubject.test.ts",
+    "line": 118,
+    "kind": "calls",
+    "targetName": "laterSubscription.unsubscribe",
+    "code": "laterSubscription.unsubscribe();"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "test/unit/test/fixtures/timers.suite.ts",
+    "line": 1207,
+    "kind": "calls",
+    "targetName": "global.setImmediate",
+    "code": "global.setImmediate(() => {"
+   }
+  ],
+  "type literal: method signature | a type annotation at module level | no member symbol": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/tests/createSlice.test.ts",
+    "line": 607,
+    "kind": "calls",
+    "targetName": "injectedSlice.selectSlice",
+    "code": "expect(injectedSlice.selectSlice(injectedState)).toBe("
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/cacheLifecycle.test.ts",
+    "line": 290,
+    "kind": "calls",
+    "targetName": "api.injectEndpoints",
+    "code": "const extended = api.injectEndpoints({"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/buildHooks.test.tsx",
+    "line": 3786,
+    "kind": "calls",
+    "targetName": "lateApi.usePrefetch",
+    "code": "() => lateApi.usePrefetch('notYet'),"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/tests/hovers/hoverFixture.ts",
+    "line": 75,
+    "kind": "calls",
+    "targetName": "injectedApi.enhanceEndpoints",
+    "code": "export const /*?enhancedApi*/ enhancedApi = injectedApi.enhanceEndpoints({"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/cacheCollection.test.ts",
+    "line": 276,
+    "kind": "calls",
+    "targetName": "first.unwrap",
+    "code": "await expect(first.unwrap()).rejects.toMatchObject({ name: 'AbortError' })"
+   },
+   {
+    "repo": "pmndrs/zustand",
+    "file": "tests/devtools.test.tsx",
+    "line": 2535,
+    "kind": "calls",
+    "targetName": "api.setState",
+    "code": "api.setState({ count: 15 }, false, {"
+   }
+  ],
+  "object literal: method or accessor | a returned literal | no member symbol": [
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/components/settings/SettingsPanels.browser.tsx",
+    "line": 622,
+    "kind": "calls",
+    "targetName": "authAccessHarness.setSnapshot",
+    "code": "authAccessHarness.setSnapshot({"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "packages/shared/src/observability.test.ts",
+    "line": 217,
+    "kind": "calls",
+    "targetName": "sink.push",
+    "code": "sink.push(makeRecord(\"beta\"));"
+   },
+   {
+    "repo": "withastro/astro",
+    "file": "packages/astro/src/actions/runtime/server.ts",
+    "line": 483,
+    "kind": "calls",
+    "targetName": "actionResultErrorStack.set",
+    "code": "actionResultErrorStack.set(res.error.stack);"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "packages/shared/src/observability.test.ts",
+    "line": 140,
+    "kind": "calls",
+    "targetName": "sink.push",
+    "code": "sink.push(makeRecord(\"beta\"));"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/components/settings/SettingsPanels.browser.tsx",
+    "line": 941,
+    "kind": "calls",
+    "targetName": "authAccessHarness.emitClientRemoved",
+    "code": "authAccessHarness.emitClientRemoved(\"session-client\");"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "packages/shared/src/observability.test.ts",
+    "line": 168,
+    "kind": "calls",
+    "targetName": "sink.push",
+    "code": "sink.push(makeRecord(\"rotate\", `${index}-${\"x\".repeat(48)}`));"
+   }
+  ],
+  "object literal: method or accessor | an argument to a call, inside a function | no member symbol": [
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/tests/server/websocketsLifecycle.test.ts",
+    "line": 204,
+    "kind": "calls",
+    "targetName": "ctx.send",
+    "code": "await ctx.send(subscribe('pending'));"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/tests/server/websocketsLifecycle.test.ts",
+    "line": 237,
+    "kind": "calls",
+    "targetName": "ctx.send",
+    "code": "await ctx.send(subscribe('pending'));"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/tests/server/websocketsLifecycle.test.ts",
+    "line": 677,
+    "kind": "calls",
+    "targetName": "ctx.send",
+    "code": "await ctx.send(subscribe('old'));"
+   },
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/tests/createSlice.test.ts",
+    "line": 443,
+    "kind": "calls",
+    "targetName": "first.actions.something",
+    "code": "expect(second.reducer(undefined, first.actions.something())).toBe("
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "test/unit/test/mocking/vi-mockObject.test.ts",
+    "line": 244,
+    "kind": "calls",
+    "targetName": "(expression).answer",
+    "code": "expect(array[3].answer()).toBe(42)"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/tests/server/websockets.test.ts",
+    "line": 3404,
+    "kind": "calls",
+    "targetName": "eventsSubscribed.calledTimes",
+    "code": "await eventsSubscribed.calledTimes(1);"
+   }
+  ],
+  "object literal: property | export default | has a member symbol, refused for a call": [
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/components/LibraryMenuItems.tsx",
+    "line": 424,
+    "kind": "calls",
+    "targetName": "Stack.Col",
+    "code": "<Stack.Col"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/components/footer/Footer.tsx",
+    "line": 53,
+    "kind": "calls",
+    "targetName": "Stack.Col",
+    "code": "<Stack.Col gap={2}>"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "line": 336,
+    "kind": "calls",
+    "targetName": "Stack.Col",
+    "code": "<Stack.Col"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/components/LayerUI.tsx",
+    "line": 380,
+    "kind": "calls",
+    "targetName": "Stack.Row",
+    "code": "<Stack.Row"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/components/dropdownMenu/DropdownMenuSubContent.tsx",
+    "line": 56,
+    "kind": "calls",
+    "targetName": "Stack.Col",
+    "code": "<Stack.Col className=\"dropdown-menu-container\">{children}</Stack.Col>"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/components/dropdownMenu/DropdownMenuContent.tsx",
+    "line": 105,
+    "kind": "calls",
+    "targetName": "Stack.Col",
+    "code": "<Stack.Col className=\"dropdown-menu-container\">{children}</Stack.Col>"
+   }
+  ],
+  "object literal: property | a returned literal | no member symbol": [
+   {
+    "repo": "pmndrs/zustand",
+    "file": "tests/middlewareTypes.test.tsx",
+    "line": 580,
+    "kind": "calls",
+    "targetName": "(expression).inc",
+    "code": "expectTypeOf(useBoundStore().inc()).toEqualTypeOf<void>()"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "www/build/snippets.test.ts",
+    "line": 220,
+    "kind": "calls",
+    "targetName": "page.expand",
+    "code": "const template = yield* page.expand("
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "www/build/snippets.test.ts",
+    "line": 226,
+    "kind": "calls",
+    "targetName": "page.expand",
+    "code": "const whole = yield* page.expand(sample('page/src/Post.vue'));"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/server/src/terminal/Layers/Manager.test.ts",
+    "line": 252,
+    "kind": "calls",
+    "targetName": "manager.subscribe",
+    "code": "const unsubscribe = yield* manager.subscribe((event) =>"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/element/src/textWrapping.ts",
+    "line": 366,
+    "kind": "calls",
+    "targetName": "(expression).Build",
+    "code": "const notFollowed = Break.NotBefore(...regexes).Build();"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "www/build/snippets.test.ts",
+    "line": 131,
+    "kind": "calls",
+    "targetName": "page.expand",
+    "code": "const expanded = yield* page.expand("
+   }
+  ],
+  "type literal: property signature | other (IndexSignature) | no member symbol": [
+   {
+    "repo": "withastro/astro",
+    "file": "packages/astro/src/runtime/client/dev-toolbar/apps/audit/ui/audit-list-window.ts",
+    "line": 404,
+    "kind": "calls",
+    "targetName": "(expression).updateCount",
+    "code": "this.badges[category.code].updateCount(auditCount);"
+   }
+  ],
+  "type literal: method signature | a type annotation inside a function or signature | no member symbol": [
+   {
+    "repo": "nestjs/nest",
+    "file": "integration/security/e2e/csrf-protection.spec.ts",
+    "line": 185,
+    "kind": "calls",
+    "targetName": "res.end",
+    "code": "res.end('answered by app.use()'),"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/element/tests/resize.test.tsx",
+    "line": 1289,
+    "kind": "calls",
+    "targetName": "topArrow.get",
+    "code": "const topArrowLabel = await UI.editText(topArrow.get(), \"lorem ipsum\");"
+   },
+   {
+    "repo": "withastro/astro",
+    "file": "packages/vite-plugin-astro/src/internal/vite-plugin-head/index.ts",
+    "line": 103,
+    "kind": "calls",
+    "targetName": "this.getModuleInfo",
+    "code": "const info = this.getModuleInfo(id);"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/tests/move.test.tsx",
+    "line": 119,
+    "kind": "calls",
+    "targetName": "rectB.get",
+    "code": "rectB.get() as NonDeleted<ExcalidrawBindableElement>,"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/tests/flip.test.tsx",
+    "line": 892,
+    "kind": "calls",
+    "targetName": "arrow.get",
+    "code": "arrow.get(),"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/tests/move.test.tsx",
+    "line": 118,
+    "kind": "calls",
+    "targetName": "arrow.get",
+    "code": "arrow.get() as NonDeleted<ExcalidrawArrowElement>,"
+   }
+  ],
+  "type literal: property signature | initialiser of a variable inside a function | no member symbol": [
+   {
+    "repo": "colinhacks/zod",
+    "file": "packages/zod/src/v4/core/tests/compile-global.test.ts",
+    "line": 85,
+    "kind": "calls",
+    "targetName": "bag.validator",
+    "code": "expect(bag.validator!({ name: \"ok\", extra: 1 })).toBe(true);"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/server/src/observable/behaviorSubject.test.ts",
+    "line": 71,
+    "kind": "calls",
+    "targetName": "secondSubRef.current?.unsubscribe",
+    "code": "secondSubRef.current?.unsubscribe();"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/server/src/observable/behaviorSubject.test.ts",
+    "line": 48,
+    "kind": "calls",
+    "targetName": "subRef.current?.unsubscribe",
+    "code": "subRef.current?.unsubscribe();"
+   },
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/rendering-util/layout-algorithms/ddlt/backends.ts",
+    "line": 149,
+    "kind": "calls",
+    "targetName": "prepared.graph.nodes",
+    "code": "const recursive = prepared.graph.nodes().filter((id) => prepared.graph.node(id)?.clusterNode);"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/server/src/provider/providerMaintenanceRunner.test.ts",
+    "line": 536,
+    "kind": "calls",
+    "targetName": "releaseFirstLatch.resolve",
+    "code": "releaseFirstLatch.resolve();"
+   },
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/diagrams/wardley/wardleyRenderer.ts",
+    "line": 78,
+    "kind": "calls",
+    "targetName": "db.getDiagramTitle",
+    "code": "const title = db.getDiagramTitle();"
+   }
+  ],
+  "object literal: property | initialiser of a module-level declaration, as const | no member symbol": [
+   {
+    "repo": "trpc/trpc",
+    "file": "www/src/components/site-header.tsx",
+    "line": 134,
+    "kind": "calls",
+    "targetName": "link.Icon",
+    "code": "<link.Icon />"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "www/src/components/theme-toggle.tsx",
+    "line": 70,
+    "kind": "calls",
+    "targetName": "option.Icon",
+    "code": "<option.Icon aria-hidden className=\"size-3.5\" />"
+   }
+  ],
+  "object literal: property | initialiser of an exported module-level declaration | no member symbol": [
+   {
+    "repo": "changesets/changesets",
+    "file": "scripts/e2e/pack.test.ts",
+    "line": 171,
+    "kind": "calls",
+    "targetName": "pm.gitdir",
+    "code": "const cwd = await pm.gitdir("
+   },
+   {
+    "repo": "changesets/changesets",
+    "file": "scripts/e2e/publish.test.ts",
+    "line": 1593,
+    "kind": "calls",
+    "targetName": "pm.gitdir",
+    "code": "const cwd = await pm.gitdir("
+   },
+   {
+    "repo": "changesets/changesets",
+    "file": "scripts/e2e/publish.test.ts",
+    "line": 1133,
+    "kind": "calls",
+    "targetName": "pm.gitdir",
+    "code": "const cwd = await pm.gitdir(createPmContext(registry, pmBinPath), {"
+   },
+   {
+    "repo": "changesets/changesets",
+    "file": "scripts/e2e/publish.test.ts",
+    "line": 1473,
+    "kind": "calls",
+    "targetName": "pm.gitdir",
+    "code": "const cwd = await pm.gitdir("
+   },
+   {
+    "repo": "changesets/changesets",
+    "file": "scripts/e2e/pack.test.ts",
+    "line": 43,
+    "kind": "calls",
+    "targetName": "pm.gitdir",
+    "code": "const cwd = await pm.gitdir("
+   },
+   {
+    "repo": "changesets/changesets",
+    "file": "scripts/e2e/publish.test.ts",
+    "line": 1893,
+    "kind": "calls",
+    "targetName": "pm.gitdir",
+    "code": "const cwd = await pm.gitdir("
+   }
+  ],
+  "type literal: property signature | type declared inside a function | no member symbol": [
+   {
+    "repo": "pmndrs/zustand",
+    "file": "tests/vanilla/basic.test.ts",
+    "line": 70,
+    "kind": "calls",
+    "targetName": "(expression).getState2",
+    "code": "expect(store.getState().getState2().value).toBe(1)"
+   },
+   {
+    "repo": "pmndrs/zustand",
+    "file": "tests/vanilla/basic.test.ts",
+    "line": 95,
+    "kind": "calls",
+    "targetName": "(expression).setState2",
+    "code": "store.getState().setState2({ value: 3 })"
+   },
+   {
+    "repo": "pmndrs/zustand",
+    "file": "tests/immer.test.tsx",
+    "line": 19,
+    "kind": "calls",
+    "targetName": "(expression).inc",
+    "code": "useBoundStore.getState().inc()"
+   },
+   {
+    "repo": "honojs/hono",
+    "file": "src/adapter/lambda-edge/handler.test.ts",
+    "line": 306,
+    "kind": "calls",
+    "targetName": "c.env.callback",
+    "code": "c.env.callback(null, c.env.request)"
+   },
+   {
+    "repo": "pmndrs/zustand",
+    "file": "tests/basic.test.tsx",
+    "line": 455,
+    "kind": "calls",
+    "targetName": "(expression).setState2",
+    "code": "getState().setState2((s) => ({ value: ++s.value }))"
+   },
+   {
+    "repo": "honojs/hono",
+    "file": "src/adapter/lambda-edge/handler.test.ts",
+    "line": 291,
+    "kind": "calls",
+    "targetName": "c.env.callback",
+    "code": "c.env.callback(null, customResult)"
+   }
+  ],
+  "type literal: method signature | other (TypeParameter) | no member symbol": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/tests/utils/helpers.tsx",
+    "line": 224,
+    "kind": "calls",
+    "targetName": "api.util.resetApiState",
+    "code": "refObj.store.dispatch(api.util.resetApiState())"
+   }
+  ],
+  "object literal: property | initialiser of a variable inside a function | has a member symbol, refused for a call": [
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "addons/Dexie.Syncable/src/connect-fn.js",
+    "line": 66,
+    "kind": "calls",
+    "targetName": "rejectConnectPromise.p",
+    "code": "if (error && rejectConnectPromise.p) rejectConnectPromise.p(error);"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "src/hooks/hooks-middleware.ts",
+    "line": 167,
+    "kind": "calls",
+    "targetName": "ctx.onerror",
+    "code": "(ctx) => ctx.onerror && ctx.onerror(error)"
+   },
+   {
+    "repo": "vercel/turborepo",
+    "file": "scripts/validate-review-ci.test.mjs",
+    "line": 141,
+    "kind": "calls",
+    "targetName": "f.workflowPages",
+    "code": "f.workflowPages?.(page) ??"
+   },
+   {
+    "repo": "vercel/turborepo",
+    "file": "scripts/validate-review-ci.test.mjs",
+    "line": 131,
+    "kind": "calls",
+    "targetName": "f.onRequest",
+    "code": "const override = await f.onRequest?.(call, f);"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "src/hooks/hooks-middleware.ts",
+    "line": 156,
+    "kind": "calls",
+    "targetName": "ctx.onsuccess",
+    "code": "ctx.onsuccess("
+   },
+   {
+    "repo": "vercel/turborepo",
+    "file": "scripts/validate-review-ci.test.mjs",
+    "line": 168,
+    "kind": "calls",
+    "targetName": "f.onWait",
+    "code": "await f.onWait?.(delay, f);"
+   }
+  ],
+  "type literal: property signature | a returned literal | has a member symbol, refused for a call": [
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/runtime/runner/run.ts",
+    "line": 359,
+    "kind": "calls",
+    "targetName": "setupTimeout.isTimedOut",
+    "code": "if (setupTimeout.isTimedOut()) {"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/runtime/runner/run.ts",
+    "line": 432,
+    "kind": "calls",
+    "targetName": "teardownTimeout?.clear",
+    "code": "teardownTimeout?.clear()"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/runtime/runner/run.ts",
+    "line": 420,
+    "kind": "calls",
+    "targetName": "setupTimeout.clear",
+    "code": "setupTimeout.clear()"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/runtime/runner/run.ts",
+    "line": 376,
+    "kind": "calls",
+    "targetName": "setupTimeout.clear",
+    "code": "setupTimeout.clear()"
+   }
+  ],
+  "type literal: method signature | type declared inside a function | no member symbol": [
+   {
+    "repo": "colinhacks/zod",
+    "file": "packages/zod/src/v4/classic/tests/cyclic-data.test.ts",
+    "line": 1141,
+    "kind": "calls",
+    "targetName": "ref.deref",
+    "code": "expect(refs.map((ref) => ref.deref())).toEqual([undefined, undefined]);"
+   },
+   {
+    "repo": "colinhacks/zod",
+    "file": "packages/zod/src/v4/classic/tests/error.test.ts",
+    "line": 1042,
+    "kind": "calls",
+    "targetName": "ref.deref",
+    "code": "const live = () => refs.filter((ref) => ref.deref() !== undefined).length;"
+   },
+   {
+    "repo": "colinhacks/zod",
+    "file": "packages/zod/src/v4/classic/tests/cyclic-data.test.ts",
+    "line": 1135,
+    "kind": "calls",
+    "targetName": "ref.deref",
+    "code": "for (let attempt = 0; attempt < 10 && refs.some((ref) => ref.deref()); attempt++) {"
+   }
+  ],
+  "type literal: method signature | initialiser of an exported module-level declaration | has a member symbol, refused for a call": [
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "libs/dexie-react-hooks/src/useDocument.ts",
+    "line": 55,
+    "kind": "calls",
+    "targetName": "DexieYProvider.for",
+    "code": "let provider = DexieYProvider.for(doc);"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "libs/dexie-react-hooks/src/useDocument.ts",
+    "line": 58,
+    "kind": "calls",
+    "targetName": "DexieYProvider.release",
+    "code": "DexieYProvider.release(doc);"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "libs/dexie-react-hooks/src/useDocument.ts",
+    "line": 20,
+    "kind": "calls",
+    "targetName": "DexieYProvider.release",
+    "code": "if (DexieYProvider) DexieYProvider.release(doc);"
+   },
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "libs/dexie-react-hooks/src/useDocument.ts",
+    "line": 37,
+    "kind": "calls",
+    "targetName": "DexieYProvider.load",
+    "code": "providerRef.current = DexieYProvider.load(doc, { gracePeriod });"
+   }
+  ],
+  "object literal: property | initialiser of a module-level declaration | no member symbol": [
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/runtime/workers/init.ts",
+    "line": 68,
+    "kind": "calls",
+    "targetName": "stream.write",
+    "code": "stream.write('', () => resolve(undefined))"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/components/GitActionsControl.tsx",
+    "line": 674,
+    "kind": "calls",
+    "targetName": "currentPublishProvider.Icon",
+    "code": "<currentPublishProvider.Icon className=\"size-3.5\" />"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "examples/.experimental/next-app-dir/src/app/page.tsx",
+    "line": 151,
+    "kind": "calls",
+    "targetName": "page.icon",
+    "code": "<page.icon />"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/components/GitActionsControl.tsx",
+    "line": 866,
+    "kind": "calls",
+    "targetName": "currentPublishProvider.Icon",
+    "code": "<currentPublishProvider.Icon className=\"size-3.5 shrink-0 text-muted-foreground\" />"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/components/GitActionsControl.tsx",
+    "line": 609,
+    "kind": "calls",
+    "targetName": "option.Icon",
+    "code": "<option.Icon"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/components/GitActionsControl.tsx",
+    "line": 654,
+    "kind": "calls",
+    "targetName": "option.Icon",
+    "code": "<option.Icon className=\"size-5 shrink-0\" aria-hidden />"
+   }
+  ],
+  "type literal: property signature | an argument to a call, inside a function | no member symbol": [
+   {
+    "repo": "vitejs/vite",
+    "file": "packages/vite/src/shared/moduleRunnerTransport.ts",
+    "line": 103,
+    "kind": "calls",
+    "targetName": "promise.resolve",
+    "code": "promise.resolve(result)"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/hooks/useStableCallback.ts",
+    "line": 14,
+    "kind": "calls",
+    "targetName": "stableRef.current.userFn",
+    "code": "stableRef.current.userFn(...args)) as T;"
+   },
+   {
+    "repo": "colinhacks/zod",
+    "file": "packages/zod/src/v4/classic/tests/registries.test.ts",
+    "line": 183,
+    "kind": "calls",
+    "targetName": "(expression).defaulter",
+    "code": "expect(myReg.get(mySchema)!.defaulter(\"hello\", true)).toEqual(5);"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "integration/injector/e2e/request-scoped-factory-provider.spec.ts",
+    "line": 32,
+    "kind": "calls",
+    "targetName": "response.status",
+    "code": "response.status(500);"
+   },
+   {
+    "repo": "pmndrs/zustand",
+    "file": "tests/devtools.test.tsx",
+    "line": 402,
+    "kind": "calls",
+    "targetName": "(expression).setCount",
+    "code": "api.getState().setCount(10)"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/runtime/console.ts",
+    "line": 61,
+    "kind": "calls",
+    "targetName": "timer.cancel",
+    "code": "timer.cancel?.()"
+   }
+  ],
+  "object literal: method or accessor | initialiser of a variable inside a function | no member symbol": [
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "test/unit/test/jest-mock.test.ts",
+    "line": 412,
+    "kind": "calls",
+    "targetName": "obj.method",
+    "code": "expect(obj.method()).toBe('mocked2')"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "test/unit/test/mocking/vi-spyOn.test.ts",
+    "line": 1003,
+    "kind": "calls",
+    "targetName": "module.method",
+    "code": "module.method()"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "test/unit/test/jest-mock.test.ts",
+    "line": 297,
+    "kind": "calls",
+    "targetName": "obj.getter",
+    "code": "expect(obj.getter()).toBe('mocked')"
+   },
+   {
+    "repo": "withastro/astro",
+    "file": "packages/astro/test/units/content-collections/image-references.test.ts",
+    "line": 108,
+    "kind": "calls",
+    "targetName": "result.publishedOn.format",
+    "code": "assert.equal(result.publishedOn.format(), '2026-08-04');"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "test/unit/test/jest-mock.test.ts",
+    "line": 407,
+    "kind": "calls",
+    "targetName": "obj.method",
+    "code": "expect(obj.method()).toBe('mocked')"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "test/unit/test/jest-mock.test.ts",
+    "line": 416,
+    "kind": "calls",
+    "targetName": "obj.method",
+    "code": "expect(obj.method()).toBe('original')"
+   }
+  ],
+  "type literal: property signature | an argument to a call, at module level | no member symbol": [
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/shortcutModifierState.ts",
+    "line": 78,
+    "kind": "calls",
+    "targetName": "(expression).setState",
+    "code": "useShortcutModifierStateStore.getState().setState({"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/ui/client/composables/explorer/state.ts",
+    "line": 68,
+    "kind": "calls",
+    "targetName": "filter.matcher",
+    "code": "matcher: (task: Task) => filter.matcher(task.tags || []),"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/modelPickerOpenState.ts",
+    "line": 16,
+    "kind": "calls",
+    "targetName": "(expression).setOpen",
+    "code": "useModelPickerOpenStore.getState().setOpen(open);"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/shortcutModifierState.ts",
+    "line": 71,
+    "kind": "calls",
+    "targetName": "(expression).setState",
+    "code": "useShortcutModifierStateStore.getState().setState({"
+   },
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/shortcutModifierState.ts",
+    "line": 91,
+    "kind": "calls",
+    "targetName": "(expression).clear",
+    "code": "useShortcutModifierStateStore.getState().clear();"
+   },
+   {
+    "repo": "excalidraw/excalidraw",
+    "file": "packages/excalidraw/components/dropdownMenu/common.ts",
+    "line": 25,
+    "kind": "calls",
+    "targetName": "DropdownMenuContentProps.onSelect",
+    "code": "DropdownMenuContentProps.onSelect?.(event);"
+   }
+  ],
+  "type literal: method signature | other (PropertyAccessExpression) | no member symbol": [
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/core/router/router-response-controller.ts",
+    "line": 643,
+    "kind": "calls",
+    "targetName": "(expression).destroy",
+    "code": "(response as { destroy?(): void }).destroy?.();"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "integration/injector/e2e/injector.spec.ts",
+    "line": 195,
+    "kind": "calls",
+    "targetName": "container.getModules",
+    "code": "for (const [, moduleRef] of container.getModules()) {"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/core/nest-application.ts",
+    "line": 431,
+    "kind": "calls",
+    "targetName": "(expression).disable",
+    "code": "(this.httpAdapter as { disable?(setting: string): unknown }).disable?.("
+   },
+   {
+    "repo": "honojs/hono",
+    "file": "src/jsx/base.ts",
+    "line": 275,
+    "kind": "calls",
+    "targetName": "(expression).toString",
+    "code": "const stringified = (value as { toString(): unknown }).toString()"
+   },
+   {
+    "repo": "puppeteer/puppeteer",
+    "file": "test/src/page.test.ts",
+    "line": 1022,
+    "kind": "calls",
+    "targetName": "(expression).woof",
+    "code": ").woof();"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/common/services/console-logger.service.ts",
+    "line": 811,
+    "kind": "calls",
+    "targetName": "(expression).toJSON",
+    "code": ": (item as { toJSON(key: string): unknown }).toJSON(key),"
+   }
+  ],
+  "type literal: method signature | other (GetAccessor) | has a member symbol, refused for a call": [
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/platform-node/test/adapters/configured-request.spec.ts",
+    "line": 179,
+    "kind": "calls",
+    "targetName": "req.app.get",
+    "code": "req.app.get('env'),"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/platform-node/test/adapters/configured-request.spec.ts",
+    "line": 177,
+    "kind": "calls",
+    "targetName": "req.app.get",
+    "code": "req.app.get('trust proxy'),"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/platform-node/test/adapters/node-request.spec.ts",
+    "line": 433,
+    "kind": "calls",
+    "targetName": "req.app.get",
+    "code": "req.app.get('trust proxy'),"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/platform-node/test/adapters/configured-request.spec.ts",
+    "line": 178,
+    "kind": "calls",
+    "targetName": "req.app.get",
+    "code": "req.app.get('trust proxy fn'),"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/platform-node/test/adapters/node-request.spec.ts",
+    "line": 434,
+    "kind": "calls",
+    "targetName": "req.app.get",
+    "code": "req.app.get('env'),"
+   }
+  ],
+  "type literal: method signature | other (FunctionDeclaration) | has a member symbol, refused for a call": [
+   {
+    "repo": "vitejs/vite",
+    "file": "packages/vite/src/node/plugins/css.ts",
+    "line": 965,
+    "kind": "calls",
+    "targetName": "codeSplitEmitQueue.run",
+    "code": "chunkCSS = await codeSplitEmitQueue.run(async () => {"
+   },
+   {
+    "repo": "vitejs/vite",
+    "file": "packages/vite/src/node/plugins/css.ts",
+    "line": 870,
+    "kind": "calls",
+    "targetName": "urlEmitQueue.run",
+    "code": "await urlEmitQueue.run(async () =>"
+   }
+  ],
+  "type literal: method signature | initialiser of a variable inside a function | no member symbol": [
+   {
+    "repo": "withastro/astro",
+    "file": "packages/integrations/vercel/test/server-islands.test.ts",
+    "line": 63,
+    "kind": "calls",
+    "targetName": "renderFunction.default.fetch",
+    "code": "const response = await renderFunction.default.fetch("
+   }
+  ],
+  "type literal: property signature | other (PropertyAccessExpression) | no member symbol": [
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/rendering-util/layout-algorithms/swimlanes/__tests__/sourceOrder.spec.ts",
+    "line": 15,
+    "kind": "calls",
+    "targetName": "(expression).getDirection",
+    "code": ").getDirection?.();"
+   },
+   {
+    "repo": "pmndrs/zustand",
+    "file": "src/middleware/devtools.ts",
+    "line": 386,
+    "kind": "calls",
+    "targetName": "(expression).subscribe",
+    "code": ").subscribe((message) => {"
+   },
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/openapi/src/schemaExtraction.ts",
+    "line": 154,
+    "kind": "calls",
+    "targetName": "(expression).getter",
+    "code": "const inner = (def as { getter: () => unknown }).getter();"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "packages/platform-fastify/adapters/fastify-adapter.ts",
+    "line": 944,
+    "kind": "calls",
+    "targetName": "(expression).code",
+    "code": "return (response as { code: Function }).code(statusCode);"
+   },
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/rendering-util/layout-algorithms/swimlanes/__tests__/sourceOrder.spec.ts",
+    "line": 12,
+    "kind": "calls",
+    "targetName": "(expression).getData",
+    "code": "const layout = (diagram.db as { getData: () => LayoutData }).getData();"
+   },
+   {
+    "repo": "mermaid-js/mermaid",
+    "file": "packages/mermaid/src/rendering-util/rendering-elements/lineJump.integration.spec.ts",
+    "line": 64,
+    "kind": "calls",
+    "targetName": "(expression).getData",
+    "code": "const layoutData = (diagram.db as { getData: () => LayoutData }).getData();"
+   }
+  ],
+  "type literal: property signature | other (MethodDeclaration) | has a member symbol, refused for a call": [
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/node/snapshot-review.ts",
+    "line": 161,
+    "kind": "calls",
+    "targetName": "tracker.stop",
+    "code": "tracker.stop()"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/node/snapshot-review.ts",
+    "line": 273,
+    "kind": "calls",
+    "targetName": "controls.waitForAction",
+    "code": "const action = await controls.waitForAction()"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/node/snapshot-review.ts",
+    "line": 301,
+    "kind": "calls",
+    "targetName": "controls.cleanup",
+    "code": "controls.cleanup()"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/node/snapshot-review.ts",
+    "line": 138,
+    "kind": "calls",
+    "targetName": "tracker.track",
+    "code": "tracker.track(file, { type: 'change', timeout: 500 }),"
+   },
+   {
+    "repo": "vitest-dev/vitest",
+    "file": "packages/vitest/src/node/snapshot-review.ts",
+    "line": 291,
+    "kind": "calls",
+    "targetName": "controls.cleanup",
+    "code": "controls.cleanup()"
+   }
+  ],
+  "object literal: property | other (PropertyAccessExpression) | no member symbol": [
+   {
+    "repo": "pingdotgg/t3code",
+    "file": "apps/web/src/components/GitActionsControl.tsx",
+    "line": 741,
+    "kind": "calls",
+    "targetName": "option.Icon",
+    "code": "<option.Icon"
+   }
+  ],
+  "type literal: method signature | an argument to a call, inside a function | no member symbol": [
+   {
+    "repo": "nestjs/nest",
+    "file": "integration/microservices/e2e/graceful-shutdown.spec.ts",
+    "line": 110,
+    "kind": "calls",
+    "targetName": "(expression).publishAsync",
+    "code": ".publishAsync('graceful-shutdown/ready', '', { qos: 1 });"
+   },
+   {
+    "repo": "honojs/hono",
+    "file": "src/adapter/bun/websocket.ts",
+    "line": 72,
+    "kind": "calls",
+    "targetName": "server.upgrade",
+    "code": "const upgradeResult = server.upgrade<BunWebSocketData>(c.req.raw, {"
+   },
+   {
+    "repo": "honojs/hono",
+    "file": "adapters/bun/src/websocket.ts",
+    "line": 81,
+    "kind": "calls",
+    "targetName": "server.upgrade",
+    "code": "const upgradeResult = server.upgrade<BunWebSocketData>(c.req.raw, {"
+   },
+   {
+    "repo": "nestjs/nest",
+    "file": "integration/microservices/e2e/graceful-shutdown.spec.ts",
+    "line": 97,
+    "kind": "calls",
+    "targetName": "(expression).flush",
+    "code": "await app.unwrap<{ flush(): Promise<void> }>().flush();"
+   }
+  ],
+  "object literal: method or accessor | an argument to a call, at module level | no member symbol": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/tests/fetchBaseQuery.test.tsx",
+    "line": 1004,
+    "kind": "calls",
+    "targetName": "authSlice.actions.setToken",
+    "code": "storeRef.store.dispatch(authSlice.actions.setToken(token))"
+   }
+  ],
+  "type literal: property signature | initialiser of a module-level declaration | no member symbol": [
+   {
+    "repo": "colinhacks/zod",
+    "file": "packages/bench/moltar-libs.ts",
+    "line": 202,
+    "kind": "calls",
+    "targetName": "typiaCase.clone",
+    "code": "return typiaCase.clone(d);"
+   },
+   {
+    "repo": "colinhacks/zod",
+    "file": "packages/bench/moltar-libs.ts",
+    "line": 205,
+    "kind": "calls",
+    "targetName": "typiaCase.is",
+    "code": "if (!typiaCase.is(d)) throw new Error(\"Invalid\");"
+   },
+   {
+    "repo": "colinhacks/zod",
+    "file": "packages/bench/moltar-libs.ts",
+    "line": 201,
+    "kind": "calls",
+    "targetName": "typiaCase.is",
+    "code": "if (!typiaCase.is(d)) throw new Error(\"Invalid\");"
+   }
+  ],
+  "type literal: method signature | other (MethodSignature) | no member symbol": [
+   {
+    "repo": "reduxjs/redux-toolkit",
+    "file": "packages/toolkit/src/query/createApi.ts",
+    "line": 508,
+    "kind": "calls",
+    "targetName": "m.injectEndpoint",
+    "code": "m.injectEndpoint(endpointName, definition)"
+   }
+  ],
+  "object literal: property | a returned literal | has a member symbol, refused for a call": [
+   {
+    "repo": "trpc/trpc",
+    "file": "packages/next/src/withTRPC.tsx",
+    "line": 212,
+    "kind": "calls",
+    "targetName": "trpc.Provider",
+    "code": "<trpc.Provider"
+   }
+  ],
+  "type literal: property signature | other (PropertyDeclaration) | has a member symbol, refused for a call": [
+   {
+    "repo": "dexie/Dexie.js",
+    "file": "src/classes/collection/collection-helpers.ts",
+    "line": 89,
+    "kind": "calls",
+    "targetName": "ctx.replayFilter",
+    "code": "? combine(ctx.filter, ctx.replayFilter())"
+   }
+  ]
+ }
+}

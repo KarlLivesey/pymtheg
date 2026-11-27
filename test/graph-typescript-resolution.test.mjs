@@ -1772,6 +1772,8 @@ test("checkout member chains use typed declarations and preserve open receivers"
         ["api.save();", "save"],
         ["api[7]();", "api.[7]"],
         ["ops.write();", "local.[local].ops.[object].write"],
+        // C-41: the receiver's declaration writes the type literal.
+        ["inferred.run();", "inferred.[type].run"],
       ])
         assert.equal(graph.target(callOn(line)), `use.ts#${identity}`, line);
       assert.deepEqual(graph.candidates(callOn("variant.b.run();")), [
@@ -1797,7 +1799,6 @@ test("checkout member chains use typed declarations and preserve open receivers"
         ['dict["literal"]();', "index-signature"],
         ["record.missing();", "index-signature"],
         ["api[key]();", "no-symbol"],
-        ["inferred.run();", "local"],
       ]) {
         const call = callOn(line);
         assert.equal(call.resolution, "unresolved", line);
@@ -1927,8 +1928,11 @@ test("object-member calls account for every explicit producer and withhold opaqu
       }
       for (const [line, reason] of [
         ["lr.run();", "multiple-object-producers"],
-        ["holder.inner.next();", "object-producer-unverified"],
-        ["this.state.update();", "object-producer-unverified"],
+        // C-41 review 2: the walk counts every write to a member
+        // (`alias.inner = …`, `this.state = …` in another method): two
+        // producers, one of them without an anchor.
+        ["holder.inner.next();", "multiple-object-producers"],
+        ["this.state.update();", "multiple-object-producers"],
         ["list[index]!.item();", "object-producer-unverified"],
         ["list[0]!.item();", "object-producer-unverified"],
       ]) {
@@ -1937,17 +1941,42 @@ test("object-member calls account for every explicit producer and withhold opaqu
         assert.equal(call.data.reason, reason, line);
       }
       assert.equal(callOn("direct[index]!.item();").resolution, "unresolved");
-      // Main already targets the initializer's existing symbol for this shape.
-      assert.equal(graph.target(callOn("legacy.old();")), "use.ts#legacy.old");
-      for (const line of [
-        "legacyList[key].inspect();",
-        "legacyChoice.inspect();",
-      ])
-        assert.equal(
-          graph.target(callOn(line)),
-          "use.ts#legacyFirst.inspect",
-          line,
-        );
+      // Members of literals bound to names (anchored): before C-41 the
+      // checker's single declaration stood, a wrong definite link when the
+      // receiver's value chose. Now the receiver's chain is walked to its
+      // producers (C-41): `legacyList[key]` gives both elements' members,
+      // and `legacy` is a script's top-level `let`, which any file can
+      // assign.
+      const outcome = (line) => {
+        const call = callOn(line);
+        return call.resolution === "resolved"
+          ? graph.target(call)
+          : call.resolution === "ambiguous"
+            ? graph.candidates(call)
+            : `${call.resolution}:${call.data.reason}`;
+      };
+      assert.deepEqual(
+        Object.fromEntries(
+          [
+            "legacy.old();",
+            "legacyList[key].inspect();",
+            "legacyChoice.inspect();",
+          ].map((line) => [line, outcome(line)]),
+        ),
+        {
+          "legacy.old();": "unresolved:receiver-unverified",
+          "legacyChoice.inspect();": [
+            "use.ts#legacyFirst.inspect",
+            "use.ts#legacySecond.inspect",
+          ],
+          // An element access the producers cannot follow: the checker's
+          // answer stands (docs/changes/C-41.md, "Found, not built").
+          "legacyList[key].inspect();": [
+            "use.ts#legacyFirst.inspect",
+            "use.ts#legacySecond.inspect",
+          ],
+        },
+      );
     },
   );
 });

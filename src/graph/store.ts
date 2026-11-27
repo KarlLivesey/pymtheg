@@ -1769,10 +1769,16 @@ export class SqliteGraphStore implements GraphStorage {
     this.queryLimit(limit);
     return this.db
       .prepare(
-        // Generated symbols (a language's `data.anonymous`) after named ones.
+        // Generated symbols (a language's `data.anonymous`) after named ones;
+        // a type literal's members (`data.typeMember`) after other scoped
+        // symbols, by position.
         `SELECT body FROM graph_symbols WHERE file=?
          ORDER BY CASE WHEN json_extract(body,'$.data.anonymous') THEN 1 ELSE 0 END,
-           COALESCE(json_extract(body,'$.data.scoped'),0),id LIMIT ?`,
+           COALESCE(json_extract(body,'$.data.scoped'),0),
+           COALESCE(json_extract(body,'$.data.typeMember'),0),
+           CASE WHEN json_extract(body,'$.data.typeMember')
+             THEN json_extract(body,'$.range.start') END,
+           id LIMIT ?`,
       )
       .all(path, limit)
       .map((row) => JSON.parse(row.body as string) as GraphSymbol);

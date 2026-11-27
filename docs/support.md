@@ -820,6 +820,39 @@ and never yields a version pin.
   graph anchor. Opaque producers stay unresolved (`object-producer-unverified`).
   Several visible producers with missing anchors stay unresolved
   (`multiple-object-producers`).
+- **Reduced receivers:** every member call's receiver chain is walked to
+  its producers (conditionals, `??`, `||`, array elements, `for…of`
+  variables, array callbacks' parameters, initialisers, a `let`'s
+  assignments, object-literal properties and fields with every plain
+  assignment to them,
+  inferred returns, a defaulted parameter's call sites). Only listed step
+  kinds can give a definite link; any other step is unresolved. Written steps (annotations,
+  written return types, assertions) are one arm. Several arms give each
+  arm's member as candidates; one arm gives its own member, also where the
+  checker named another (`[csv, tsv][1].format()` → `tsv.format`). A
+  receiver the walk cannot follow (an expando, a `let` written by
+  destructuring, a generic call with a reduced argument) leaves an
+  object- or type-literal member unresolved (`receiver-unverified`); an
+  interface or class member keeps the checker's answer, which is one
+  declaration whatever the producer (`[ia, ib].reduce((x, y) => y).run()`
+  links `IA.run`). So is a defaulted parameter whose function is
+  referenced other than by direct calls. Logical assignments follow their
+  plain forms; an accessor follows its getter. Limits: narrowing to an
+  intersection, `require` of a conditional `module.exports` and written
+  types derived from inference, an array mutated through an alias, and a
+  member written through `any` keep the checker's reduced answer.
+  A walk stops after 100,000 computed expressions or 200 nested steps
+  (unresolved)
+  ([C-41](changes/C-41.md)).
+- **Type-literal members:** members of a written type literal are
+  symbols, including nested union, intersection, array, tuple and
+  type-argument positions, a named parameter's written type, and inside a
+  function body a local variable's written type and a local function's
+  parameters; overloads are one symbol, listed after a file's other
+  symbols. A call links to one when every step of its receiver is a
+  proven kind (above); a written union gives candidates. Local type aliases have no
+  member symbols. Index signatures and mapped types have no member to link
+  ([C-41](changes/C-41.md)).
   Factory fallthrough and bare returns can contribute `undefined`, including
   after `await`. Static object destructuring follows named properties,
   renames, nested patterns, and defaults that can run. Passing a produced
@@ -890,7 +923,7 @@ and never yields a version pin.
     global declaration of a name that two or more units declare: any
     diagnostic, of any code, that lies there or whose related information
     lies in that unit's declaration files (deny by default). A statement
-    whose name only one unit declares is not checked, so a diagnostic
+    none of whose names two or more unit keys declare is not checked, so a diagnostic
     there (for example TS2430, an interface that incorrectly extends
     another) leaves the set marked: a stated limit of C-42. A diagnostic with related
     locations, all in one unit key, is dropped (a location in no unit, a

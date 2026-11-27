@@ -1,0 +1,162 @@
+## 1: escapes by getSymbolAtLocation only (round 2): test FAILS
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      '&&= as a receiver (guard: the right side, as `&&`)': {
+        head: 'src/use.ts#two.run',
+        tsc: [
+          'two.run'
+  ...
+      'default; JavaScript module.exports': {
+  +     head: 'src/use.js#two.run',
+  -     head: 'unresolved',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'default; export default object': {
+  +     head: 'src/use.ts#two.run',
+  -     head: 'unresolved',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'default; export specifier': {
+  +     head: 'src/use.ts#two.run',
+  -     head: 'unresolved',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'default; shorthand in a local object': {
+  +     head: 'src/use.ts#two.run',
+  -     head: 'unresolved',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'generic shorthand return; interface constraint': {
+  
+## 2a: a shorthand member is never instantiated (round 2): test FAILS
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      '&&= as a receiver (guard: the right side, as `&&`)': {
+        head: 'src/use.ts#two.run',
+        tsc: [
+          'two.run'
+  ...
+      'generic shorthand return; interface constraint': {
+  +     head: 'unresolved',
+  -     head: 'src/use.ts#one.run',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'generic shorthand return; type-literal constraint': {
+  +     head: 'unresolved',
+  -     head: 'src/use.ts#one.run',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'object-literal getter and setter': {
+  
+## 2b: no open type parameter backstop: test PASSES
+## 2: both: test FAILS
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      '&&= as a receiver (guard: the right side, as `&&`)': {
+        head: 'src/use.ts#two.run',
+        tsc: [
+          'two.run'
+  ...
+      'generic shorthand return; interface constraint': {
+  +     head: 'src/use.ts#Store.run',
+  -     head: 'src/use.ts#one.run',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'generic shorthand return; type-literal constraint': {
+  +     head: 'unresolved',
+  -     head: 'src/use.ts#one.run',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'object-literal getter and setter': {
+  
+  Type 'unique symbol' is not assignable to type 'Arms'.
+
+
+====
+## 3: accessor pairs as written (round 2): test FAILS
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      '&&= as a receiver (guard: the right side, as `&&`)': {
+        head: 'src/use.ts#two.run',
+        tsc: [
+          'two.run'
+  ...
+      'class getter and setter': {
+  +     head: 'src/use.ts#one.run',
+  -     head: 'set',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'default; JavaScript module.exports': {
+  ...
+      'object-literal getter and setter': {
+  +     head: 'src/use.ts#one.run',
+  -     head: 'set',
+        tsc: [
+          'one.run'
+        ]
+      },
+      '||= as a receiver': {
+  
+
+
+====
+## 4: logical assignment as the checker's type (round 2): test FAILS
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  ... Skipped lines
+  
+    {
+      '&&= as a receiver (guard: the right side, as `&&`)': {
+        head: 'src/use.ts#two.run',
+        tsc: [
+          'two.run'
+  ...
+      '??= as a receiver': {
+  +     head: 'src/use.ts#one.run',
+  -     head: 'set',
+        tsc: [
+          'one.run'
+        ]
+      },
+      'class getter alone': {
+  ...
+      '||= as a receiver': {
+  +     head: 'src/use.ts#one.run',
+  -     head: 'set',
+        tsc: [
+          'one.run'
+        ]
+      }
+    }
+  
+## no mutation: test PASSES

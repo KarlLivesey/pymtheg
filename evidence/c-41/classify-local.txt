@@ -1,0 +1,76 @@
+links 1308803 local 43168
+11427 0.87 pp destructured binding
+10697 0.82 pp local variable
+7226 0.55 pp type literal: property signature
+7015 0.54 pp parameter
+2975 0.23 pp other (TypeAliasDeclaration)
+1434 0.11 pp type literal: method signature
+643 0.05 pp object literal: property
+488 0.04 pp other (InterfaceDeclaration)
+483 0.04 pp other (PropertyAccessExpression)
+214 0.02 pp other (Identifier)
+155 0.01 pp local function
+115 0.01 pp object literal: method or accessor
+86 0.01 pp other (TypeParameter)
+77 0.01 pp other (MethodDeclaration)
+51 0.00 pp member of a class expression or local class
+21 0.00 pp other (PropertySignature)
+18 0.00 pp other (ClassDeclaration)
+15 0.00 pp other (BinaryExpression)
+6 0.00 pp other (ClassExpression)
+6 0.00 pp function expression
+6 0.00 pp other (PropertyDeclaration)
+4 0.00 pp other (EnumMember)
+4 0.00 pp other (JSDocTypedefTag)
+2 0.00 pp other (ElementAccessExpression)
+--
+3079 0.24 pp type literal: property signature | type of a module-level declaration | has a member symbol, refused for a call
+2485 0.19 pp type literal: property signature | a type annotation at module level | no member symbol
+1093 0.08 pp type literal: property signature | a type annotation inside a function or signature | no member symbol
+1079 0.08 pp type literal: method signature | type of a module-level declaration | has a member symbol, refused for a call
+338 0.03 pp type literal: property signature | other (PropertySignature) | has a member symbol, refused for a call
+267 0.02 pp type literal: method signature | a type annotation at module level | no member symbol
+254 0.02 pp object literal: property | an argument to a call, inside a function | no member symbol
+109 0.01 pp object literal: property | an argument to a call, at module level | no member symbol
+105 0.01 pp object literal: property | an assignment inside a function | no member symbol
+77 0.01 pp object literal: method or accessor | an argument to a call, inside a function | no member symbol
+75 0.01 pp type literal: property signature | other (FunctionDeclaration) | has a member symbol, refused for a call
+65 0.00 pp object literal: property | a returned literal | no member symbol
+63 0.00 pp object literal: property | initialiser of a variable inside a function | no member symbol
+36 0.00 pp type literal: property signature | type declared inside a function | no member symbol
+34 0.00 pp type literal: method signature | a type annotation inside a function or signature | no member symbol
+28 0.00 pp type literal: property signature | initialiser of a variable inside a function | no member symbol
+25 0.00 pp object literal: method or accessor | a returned literal | no member symbol
+22 0.00 pp type literal: method signature | initialiser of an exported module-level declaration | has a member symbol, refused for a call
+20 0.00 pp object literal: property | initialiser of an exported module-level declaration | no member symbol
+18 0.00 pp type literal: property signature | an argument to a call, inside a function | no member symbol
+14 0.00 pp type literal: property signature | other (TypeParameter) | no member symbol
+13 0.00 pp type literal: property signature | an argument to a call, at module level | no member symbol
+12 0.00 pp object literal: method or accessor | initialiser of a variable inside a function | no member symbol
+8 0.00 pp object literal: property | initialiser of a variable inside a function | has a member symbol, refused for a call
+8 0.00 pp object literal: property | export default | has a member symbol, refused for a call
+8 0.00 pp type literal: method signature | other (PropertySignature) | has a member symbol, refused for a call
+7 0.00 pp type literal: property signature | other (PropertyDeclaration) | has a member symbol, refused for a call
+7 0.00 pp object literal: property | initialiser of a module-level declaration | no member symbol
+7 0.00 pp type literal: property signature | initialiser of a variable inside a function | has a member symbol, refused for a call
+6 0.00 pp type literal: method signature | other (PropertyAccessExpression) | no member symbol
+6 0.00 pp type literal: property signature | other (PropertyAccessExpression) | no member symbol
+6 0.00 pp type literal: property signature | initialiser of an exported module-level declaration | has a member symbol, refused for a call
+5 0.00 pp type literal: property signature | a type annotation inside a function or signature | has a member symbol, refused for a call
+5 0.00 pp type literal: method signature | other (GetAccessor) | has a member symbol, refused for a call
+5 0.00 pp type literal: property signature | other (MethodDeclaration) | has a member symbol, refused for a call
+4 0.00 pp type literal: method signature | an argument to a call, inside a function | no member symbol
+4 0.00 pp type literal: property signature | a returned literal | has a member symbol, refused for a call
+3 0.00 pp type literal: property signature | initialiser of a module-level declaration | no member symbol
+3 0.00 pp type literal: method signature | type declared inside a function | no member symbol
+3 0.00 pp type literal: property signature | initialiser of a module-level declaration | has a member symbol, refused for a call
+2 0.00 pp object literal: property | initialiser of a module-level declaration, as const | no member symbol
+2 0.00 pp type literal: method signature | other (FunctionDeclaration) | has a member symbol, refused for a call
+1 0.00 pp type literal: method signature | a type annotation inside a function or signature | has a member symbol, refused for a call
+1 0.00 pp object literal: property | other (PropertyAccessExpression) | no member symbol
+1 0.00 pp type literal: method signature | other (MethodSignature) | no member symbol
+1 0.00 pp object literal: method or accessor | an argument to a call, at module level | no member symbol
+1 0.00 pp type literal: method signature | other (TypeParameter) | no member symbol
+1 0.00 pp object literal: property | a returned literal | has a member symbol, refused for a call
+1 0.00 pp type literal: property signature | other (IndexSignature) | no member symbol
+1 0.00 pp type literal: method signature | initialiser of a variable inside a function | no member symbol

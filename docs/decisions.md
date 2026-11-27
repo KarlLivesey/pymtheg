@@ -3596,6 +3596,54 @@ and a worker above 512 MiB is ended when the job finishes. **Rules out:** a wall
 result; the 30 s grace only bounds how long an unanswering worker is
 given. See [C-48](changes/C-48.md).
 
+### C-41 TypeScript type-literal members as call targets
+
+**Decided (C-41).** Members of a type literal written in a type position
+are graph symbols: the type of a module-level declaration or of a class or
+interface member, nested union, intersection, array, tuple and
+type-argument positions (each place in the identity, an index that shifts
+when a part is inserted before it), and a named parameter's written type
+when the function is a symbol. Inside a function body the same holds for a
+local variable's written type and a local function's parameters, under the
+body's `[local]` name path; these links are kept. A type literal's
+overloads are one symbol, and a file's listing shows type-literal members
+after its other symbols. Every member call (interface, type-literal, class
+and object-literal members alike) links definitely only when every step
+of its receiver is a kind proven to have one producer (default-deny; the
+kinds are listed in the note): the chain is walked to its producers (conditionals, `??`, `||`, array elements,
+`for…of` variables, array callbacks' parameters, `const` initialisers, a
+`let`'s assignments in its file, object-literal properties, inferred
+returns). A written step (a type annotation, a call with a written return
+type, an assertion) is one arm; a generic call's arguments and a
+contextually typed parameter's call must be one arm each. If the arms'
+members are the checker's, its answer stands; otherwise they replace it, a
+candidate set for several arms or the right single member. A receiver the
+walk cannot follow is unresolved (`receiver-unverified`) for an object- or
+type-literal member, as is an arm member without a symbol (`reduced-receiver`). Destructured bindings,
+untyped locals and parameters, local type aliases and interfaces, and
+object literals in call arguments get no symbols. **Trade:** a receiver the walk cannot follow leaves an object- or
+type-literal member unresolved (an interface or class member keeps the
+checker's answer); on the 19 pins 14 of main's definite links change (13
+to candidate sets, of which 12 were right on main and are wider now; 1
+lost; none retargeted) against 5,538 gained, a walked choice is not
+narrowed beyond what assignability shows, and a member read that is not
+called keeps the checker's answer. Three shapes keep the checker's
+reduced answer (limits in the note): narrowing to an intersection,
+`require` of a conditional `module.exports`, and written types derived
+from inference (`typeof x`, `(typeof list)[number]`). Without
+`strictNullChecks`, `??` and `||` take both sides; logical assignments
+are followed as their plain forms, and any other operator only to a
+primitive. A defaulted parameter is followed only when every reference to
+its function is a direct call, and an open type parameter of a generic body
+never supplies a member. **Rules out:** a
+definite link to one member of a union the checker reduced where the walk
+enumerates the producers: interfaces (`pick ? ia : ib`) and object
+literals (`[csv, tsv][1]`). Where the walk cannot follow the receiver, an
+object- or type-literal member is unresolved, while an interface or class
+member keeps the checker's answer (`[ia, ib].reduce((x, y) => y).run()`
+→ `IA.run`). A walk stops after computing 100,000 expressions or at 200
+nested steps (a cached result counted at the depth it reached), both
+unresolved, so the outcome never depends on the stack. See [C-41](changes/C-41.md).
 ### C-38A The early claim covers modules reusing their analysis; the report names the analysis path
 
 **Decided (C-38A):** the early store claim (C-53) is made whenever any

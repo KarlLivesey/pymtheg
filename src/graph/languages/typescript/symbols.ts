@@ -679,8 +679,55 @@ export function enclosingAnchor(node: ts.Node): ts.Node {
   return node.getSourceFile();
 }
 
+/**
+ * The segment a type node adds to a nested type literal's identity (C-41):
+ * empty for a wrapper, the position in a union, intersection, tuple or type
+ * argument list, `[]` for an array element; undefined when `holder` is not
+ * a type that holds `value`.
+ */
+function typeSegment(holder: ts.Node, value: ts.Node): string | undefined {
+  if (
+    ts.isParenthesizedTypeNode(holder) ||
+    (ts.isTypeOperatorNode(holder) &&
+      holder.operator === ts.SyntaxKind.ReadonlyKeyword)
+  )
+    return "";
+  if (ts.isArrayTypeNode(holder)) return "[]";
+  if (ts.isUnionTypeNode(holder))
+    return `[|${holder.types.indexOf(value as ts.TypeNode)}]`;
+  if (ts.isIntersectionTypeNode(holder))
+    return `[&${holder.types.indexOf(value as ts.TypeNode)}]`;
+  if (ts.isTupleTypeNode(holder))
+    return `[#${holder.elements.indexOf(value as ts.TypeNode)}]`;
+  if (
+    ts.isTypeReferenceNode(holder) &&
+    holder.typeArguments?.includes(value as ts.TypeNode)
+  )
+    return `[<${holder.typeArguments.indexOf(value as ts.TypeNode)}>]`;
+  return undefined;
+}
+
 /** A static object member in a named binding or a declaration's return value. */
+/**
+ * The first of a type literal's same-named method signatures (an overload
+ * set), or the node itself. Like an interface's overloads, the set is one
+ * symbol, at its first signature (C-41 review).
+ */
+export function overloadHead(node: ts.Node): ts.Node {
+  if (!ts.isMethodSignature(node) || !ts.isTypeLiteralNode(node.parent))
+    return node;
+  const name = memberName(node.name);
+  return (
+    node.parent.members.find(
+      (member) =>
+        ts.isMethodSignature(member) && memberName(member.name) === name,
+    ) ?? node
+  );
+}
+
 export function objectMember(node: ts.Node): SymbolDraft | undefined {
+  const head = overloadHead(node);
+  if (head !== node) return objectMember(head);
   const draft = memberDraft(node);
   return draft && { key: keyOf(node), ...draft };
 }
@@ -715,6 +762,14 @@ function memberDraft(node: ts.Node): Omit<SymbolDraft, "key"> | undefined {
     names.unshift(memberName(name));
     let value = literal ? outerExpression(object) : object;
     holder = value.parent;
+    // A type literal inside a composite type (C-41): its place in it.
+    while (!literal) {
+      const segment = typeSegment(holder, value);
+      if (segment === undefined) break;
+      if (segment) names.unshift(segment);
+      value = holder;
+      holder = holder.parent;
+    }
     while (literal) {
       const branch =
         ts.isConditionalExpression(holder) && value !== holder.condition
@@ -762,6 +817,15 @@ function memberDraft(node: ts.Node): Omit<SymbolDraft, "key"> | undefined {
   } else if (literal && ts.isArrowFunction(holder)) {
     if (!owner) return undefined;
     slot = "[return].";
+  } else if (
+    !literal &&
+    !owner &&
+    ts.isParameter(holder) &&
+    ts.isIdentifier(holder.name)
+  ) {
+    // The written type of a named parameter of an anchored function (C-41).
+    owner = anchorOf(holder.parent);
+    slot = `[param:${holder.name.text}].`;
   }
   if (!owner || ts.isSourceFile(owner)) return undefined;
   const kind = ts.isShorthandPropertyAssignment(node)
@@ -773,7 +837,9 @@ function memberDraft(node: ts.Node): Omit<SymbolDraft, "key"> | undefined {
     name: names.at(-1)!,
     identity: `${identityOf(owner)}.${slot}[${literal ? "object" : "type"}].${names.join(".")}`,
     range,
-    data: { scoped: true },
+    // A type literal's members are listed after a file's other symbols
+    // (C-41), by position: they do not displace symbols listed before.
+    data: literal ? { scoped: true } : { scoped: true, typeMember: true },
   };
 }
 

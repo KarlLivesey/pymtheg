@@ -570,7 +570,7 @@ test("for scope texts with the bound names beside escapes, quotes and unicode, a
 
 // C-60 review: the module version moves with the keys, so a store written
 // by an earlier version is rebuilt, never reused with its old keys. The
-// store here is made to look so: its TypeScript rows carry version 49, and
+// store here is made to look so: its TypeScript rows carry the previous version, and
 // one symbol row differs as main's keys did.
 test("a store written by the previous TypeScript module version is rebuilt and equals a cold index", async () => {
   await withTree(renamedTree({ "lib.cjs": MULTILINE }), async (tree) => {

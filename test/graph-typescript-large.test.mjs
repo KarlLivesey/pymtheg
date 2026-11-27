@@ -720,7 +720,10 @@ test(
     const options = judged.links.find(
       (l) => l.file === "src/args.ts" && l.text === "defaults.options",
     );
-    assert.equal(options.reason, "local");
+    // Judged clean: C-41 links it to the member of the parameter's written
+    // type literal (before C-41 it was `local`, a declaration with no symbol).
+    assert.equal(options.reason ?? null, null);
+    assert.equal(options.cause ?? null, null);
     // With a budget of one step the same judgement stops at the bound and
     // fails the link with the bound as the reason.
     const stopped = await indexFiles(files, {

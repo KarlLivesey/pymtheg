@@ -1,0 +1,201 @@
+{
+  "kinds": {
+    "ambiguous": 14,
+    "unresolved:receiver-unverified": 1
+  },
+  "total": 15,
+  "sample": [
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 254,
+      "code": "`Successfully got URL from ${provider.getName()}: ${url}`,",
+      "targetName": "provider.getName",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:152 method getName",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getName\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 268,
+      "code": "providerName: provider.getName(),",
+      "targetName": "provider.getName",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:152 method getName",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getName\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 233,
+      "code": "`⚠️  Using custom downloader: ${provider.getName()}`,",
+      "targetName": "provider.getName",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:152 method getName",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getName\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]"
+      ]
+    },
+    {
+      "repo": "dexie/Dexie.js",
+      "file": "src/classes/dexie/transaction-helpers.ts",
+      "line": 124,
+      "code": ".then((x) => {",
+      "targetName": "(expression).then",
+      "kind": "ambiguous",
+      "before": "src/public/types/promise-extended.d.ts:192 method then",
+      "after": [
+        "[\"typescript\",\"src/helpers/promise.d.ts\",\"method\",\"DexiePromise.then\",0]",
+        "[\"typescript\",\"src/public/types/promise-extended.d.ts\",\"method\",\"PromiseExtended.then\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 674,
+      "code": "const url = await provider.getDownloadUrl(downloadOptions);",
+      "targetName": "provider.getDownloadUrl",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:107 method getDownloadUrl",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getDownloadUrl\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getDownloadUrl\",0]"
+      ]
+    },
+    {
+      "repo": "vitest-dev/vitest",
+      "file": "packages/expect/src/jest-expect.ts",
+      "line": 215,
+      "code": "actual.contains(item),",
+      "targetName": "actual.contains",
+      "kind": "ambiguous",
+      "before": "packages/expect/src/jest-expect.ts:28 method contains",
+      "after": [
+        "[\"typescript\",\"packages/expect/src/jest-expect.ts\",\"method\",\"DOMTokenList.contains\",0]",
+        "[\"typescript\",\"packages/expect/src/jest-expect.ts\",\"method\",\"Node.contains\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 223,
+      "code": "if (!(await provider.supports(downloadOptions))) {",
+      "targetName": "provider.supports",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:71 method supports",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.supports\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.supports\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 241,
+      "code": "`Trying provider: ${provider.getName()} for ${options.browser} ${options.buildId}`,",
+      "targetName": "provider.getName",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:152 method getName",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getName\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 245,
+      "code": "const url = await provider.getDownloadUrl(downloadOptions);",
+      "targetName": "provider.getDownloadUrl",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:107 method getDownloadUrl",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getDownloadUrl\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getDownloadUrl\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 671,
+      "code": "if (!(await provider.supports(downloadOptions))) {",
+      "targetName": "provider.supports",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:71 method supports",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.supports\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.supports\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 265,
+      "code": "`Provider ${provider.getName()} failed: ${(err as Error).message}`,",
+      "targetName": "provider.getName",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:152 method getName",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getName\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]"
+      ]
+    },
+    {
+      "repo": "withastro/astro",
+      "file": "packages/astro/src/content/vite-plugin-content-imports.ts",
+      "line": 311,
+      "code": "const { rawData = '', data: unvalidatedData } = await entryConfig.getEntryInfo({",
+      "targetName": "entryConfig.getEntryInfo",
+      "kind": "ambiguous",
+      "before": "packages/astro/src/types/public/content.ts:150 method getEntryInfo",
+      "after": [
+        "[\"typescript\",\"packages/astro/src/types/public/content.ts\",\"method\",\"ContentEntryType.getEntryInfo\",0]",
+        "[\"typescript\",\"packages/astro/src/types/public/content.ts\",\"method\",\"DataEntryType.getEntryInfo\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 248,
+      "code": "`Provider ${provider.getName()} returned no URL for ${options.browser} ${options.buildId}`,",
+      "targetName": "provider.getName",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:152 method getName",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getName\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]"
+      ]
+    },
+    {
+      "repo": "puppeteer/puppeteer",
+      "file": "packages/browsers/src/install.ts",
+      "line": 225,
+      "code": "`Provider ${provider.getName()} does not support ${options.browser} on ${options.platform}`,",
+      "targetName": "provider.getName",
+      "kind": "ambiguous",
+      "before": "packages/browsers/src/provider.ts:152 method getName",
+      "after": [
+        "[\"typescript\",\"packages/browsers/src/DefaultProvider.ts\",\"method\",\"DefaultProvider.getName\",0]",
+        "[\"typescript\",\"packages/browsers/src/provider.ts\",\"method\",\"BrowserProvider.getName\",0]"
+      ]
+    },
+    {
+      "repo": "vercel/turborepo",
+      "file": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/each2.cjs",
+      "line": 45,
+      "code": "describe.only.each([['o-a.json']])('%s', (file) => { try { fs.readFileSync(fx(file)); } catch {} });",
+      "targetName": "describe.only.each",
+      "kind": "unresolved:receiver-unverified",
+      "before": "crates/turborepo-trace-lang-js/tests/flow_oracle/cases/each2.cjs:12 function each",
+      "after": null
+    }
+  ]
+}

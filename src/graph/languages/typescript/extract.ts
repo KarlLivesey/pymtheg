@@ -33,6 +33,7 @@ import {
   toVirtual,
 } from "./project.js";
 import type { entryProvenance, UnbuiltEntry } from "./workspace-entries.js";
+import { receiverArms } from "./receiver-arms.js";
 import {
   bundledLibraryUnit,
   importedTarget,
@@ -117,6 +118,10 @@ const producerReaders = new WeakMap<
   ts.Program,
   ReturnType<typeof objectProducers>
 >();
+const receiverReaders = new WeakMap<
+  ts.Program,
+  ReturnType<typeof receiverArms>
+>();
 import {
   anchorOf,
   rootDeclaration,
@@ -135,6 +140,7 @@ import {
   kindOf,
   nameOf,
   objectMember,
+  overloadHead,
   rangeOf,
   unwrap,
 } from "./symbols.js";
@@ -1213,8 +1219,12 @@ export function extractFile(
         (shorthandMember || !ts.isShorthandPropertyAssignment(declaration)) &&
         (meaning !== "call" ||
           (found.memberCall &&
-            ts.isObjectLiteralExpression(declaration.parent) &&
-            !declaration.getSourceFile().isDeclarationFile &&
+            ((ts.isObjectLiteralExpression(declaration.parent) &&
+              !declaration.getSourceFile().isDeclarationFile) ||
+              // A call on a type-literal member (C-41). The receiver's
+              // chain was walked before: a member the checker took from a
+              // reduced union is not this one.
+              ts.isTypeLiteralNode(declaration.parent)) &&
             !!found.at &&
             checker.getSignaturesOfType(
               checker.getNonNullableType(checker.getTypeAtLocation(found.at)),
@@ -1490,7 +1500,52 @@ export function extractFile(
         if (!record(declaration, current)) local++;
       }
     };
-    visit(found.symbol, 0);
+    // C-41: a member call's receiver chain is walked to its producers. The
+    // checker can have reduced a union of identical types to one arm and
+    // named that arm's member only; the arms' members replace it then, and
+    // a receiver the walk cannot follow leaves the call unresolved.
+    if (
+      meaning === "call" &&
+      found.memberCall &&
+      receiver &&
+      found.name !== undefined
+    ) {
+      let arms = receiverReaders.get(program);
+      if (!arms) {
+        arms = receiverArms(checker, syntax.getAssignmentTargetKind, program);
+        receiverReaders.set(program, arms);
+      }
+      const verdict = arms(receiver, found.name, found.symbol);
+      // A receiver the walk cannot follow: a member declared on an
+      // interface or class (or in a library) is one declaration whatever
+      // producer supplied the value, so the checker's answer stands. Only a
+      // member of an object or type literal, where each producer has its own
+      // declaration, is unresolved (C-41 review 2).
+      if (verdict === "unverified") {
+        const declarations = found.symbol.declarations ?? [];
+        const ownDeclaration = (declaration: ts.Declaration) =>
+          ts.isObjectLiteralExpression(declaration.parent) ||
+          ts.isTypeLiteralNode(declaration.parent);
+        if (!declarations.length || declarations.some(ownDeclaration))
+          return { targets: [], reason: "receiver-unverified", receiver };
+        visit(found.symbol, 0);
+      } else if (verdict) {
+        for (const member of verdict) visit(member, 0);
+        if (local)
+          return {
+            targets: [],
+            // Several producers, one of whose members has no target.
+            reason: verdict.some((member) =>
+              member.declarations?.some((declaration) =>
+                ts.isObjectLiteralExpression(declaration.parent),
+              ),
+            )
+              ? "multiple-object-producers"
+              : "reduced-receiver",
+            receiver,
+          };
+      } else visit(found.symbol, 0);
+    } else visit(found.symbol, 0);
     if (
       !external &&
       !local &&
@@ -3353,7 +3408,8 @@ export function extractFile(
   function handle(node: ts.Node, owner: string): string | null {
     const anchor = anchorOf(node);
     if (!anchor) {
-      const member = objectMember(node);
+      // An overload's later signatures share the first one's symbol.
+      const member = overloadHead(node) === node && objectMember(node);
       if (member) symbols.push(member);
     }
     if (anchor === node) {
