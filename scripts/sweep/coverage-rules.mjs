@@ -464,6 +464,21 @@ export function libraryModuleLinks(repos, module, own = false) {
   return links;
 }
 
+/**
+ * D23 (C-42): a merged environment global counts at Level 2 as proven.
+ * The TypeScript module marks a candidate set `mergedGlobal` when its
+ * library candidates are the declarations, in several library units, of one
+ * global compiler symbol (for example `console.log`, declared by the DOM
+ * library and by `@types/node`). Such a link names the symbol and every
+ * declaring unit, and counts at Level 2 when it has no checkout candidate and
+ * at least two library candidates from different units, each naming a symbol.
+ */
+export function mergedGlobalLevel2(data, libraryCandidates, checkoutCandidates) {
+  return data?.mergedGlobal === true && checkoutCandidates === 0 && libraryCandidates.length >= 2 &&
+    libraryCandidates.every(({ unit, symbol }) => !!unit && !!symbol) &&
+    new Set(libraryCandidates.map(({ ecosystem, unit }) => `${ecosystem}\0${unit}`)).size >= 2;
+}
+
 /** Identity already expressible using the released link and its stored facts. */
 export function externalIdentity(link, evidence, project, disposition) {
   if (link.resolution === "library") return storedLibraryIdentity(link);

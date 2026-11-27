@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { libraryModuleLinks, modules } from "./coverage-rules.mjs";
-import { auditRange, baselineScore, compare, firstBlocker, itemRange, missGroups, pairedRepos, sampleSize, schema, score, seed, verifyModes, verifyReview } from "./coverage-refresh-data.mjs";
+import { auditRange, baselineScore, compare, firstBlocker, itemRange, mergedGlobalCount, missGroups, pairedRepos, sampleSize, schema, score, seed, verifyModes, verifyReview } from "./coverage-refresh-data.mjs";
 
 const languageNames = { go: "Go", rust: "Rust", typescript: "TypeScript / JavaScript" };
 const number = (n) => n.toLocaleString("en-US");
@@ -37,14 +37,19 @@ export function scoreTable(modes, base, own = false) {
     const unit = { ...now, level2: libraryModuleLinks(repos, module, own) };
     const withModules = { ...now, level2: now.level2 + unit.level2 };
     const split = now.assumed ? `<br>${number(proven.level2)} proven (${rate(proven)})<br>${number(assumed.level2)} assumption-marked (${rate(assumed)})` : "";
+    // D23: merged environment globals are in Level 2; shown with the figure without them.
+    const merged = { ...now, level2: mergedGlobalCount(repos, module, own) };
+    const withoutMerged = { ...now, level2: now.level2 - merged.level2 };
+    const mergedCell = merged.level2 ? `<br>${number(merged.level2)} merged environment globals (${rate(merged)})<br>${number(withoutMerged.level2)} (${rate(withoutMerged)}) without merged environment globals` : "";
     const moduleCell = unit.level2 ? `<br>${number(unit.level2)} library module links (${rate(unit)})<br>**${number(withModules.level2)} (${rate(withModules)}) with library module links**` : "";
-    const gapCell = unit.level2 ? `${gap(now)}<br>${gap(withModules)} with library module links` : gap(now);
+    const gapCell = (unit.level2 ? `${gap(now)}<br>${gap(withModules)} with library module links` : gap(now)) +
+      (merged.level2 ? `<br>${gap(withoutMerged)} without merged environment globals` : "");
     // D17 clarified: with a toolchain route, Level 2 counting only the
     // route-decided links labelled none-seen (exports that count the label).
     const noneSeen = { ...now, level2: now.level2 - (now.seen ?? 0) };
     const labelCell = now.seen !== undefined && mode !== "Source only" && mode !== "Bare"
       ? `<br>${number(noneSeen.level2)} (${rate(noneSeen)}) counting only none-seen route answers` : "";
-    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split}${labelCell}${moduleCell} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gapCell} |`;
+    return `| ${languageNames[module]} | ${mode} | ${number(now.links)} | ${number(now.level2)} (${rate(now)})${split}${labelCell}${mergedCell}${moduleCell} | ${number(then.level2)} / ${number(then.links)} (${rate(then)}) | ${gapCell} |`;
   };
   return [
     "| Language | Mode | Links now | Level 2 now | Level 2 at 0.1.0 | Links to 90% |",

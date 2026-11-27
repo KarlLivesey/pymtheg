@@ -1,0 +1,280 @@
+// SPDX-License-Identifier: MIT
+/**
+ * C-55: a module's decoded inputs kept between the runs of an index session
+ * (see docs/changes/C-55.md). The indexer keeps, per stored path, what the
+ * store's reads returned: the analysis records (`filesAt`), the resolver
+ * projection (`resolutionFiles`) and the symbols. A later run re-reads only
+ * the paths written since (the store's record of `replaceFile` calls;
+ * removals need none, as inputs are assembled only for paths stored now)
+ * and assembles each input in the store's own order.
+ *
+ * A module must not change its inputs in place (`keepsInput`). Under the
+ * test suite (PYMTHEG_TEST) everything kept is deep-frozen before any module
+ * sees it, so a module that changes its input throws there instead of
+ * changing kept state. Production does not freeze: freezing a record costs
+ * about two thirds of decoding it (C-55), more than keeping it saves on an
+ * edit that rewrites many files.
+ */
+import { compare } from "./identity.js";
+import type { GraphFile, GraphSymbol, ResolutionFile } from "./types.js";
+import { count } from "./work.js";
+import { storedSize } from "./store.js";
+
+/** What is kept stops being kept above this many UTF-8 bytes of stored JSON. */
+export const keptInputBytes = 128 * 1024 * 1024;
+/** The name and key a module's kept inputs are stored under. */
+export const KEPT_INPUT = "core:input";
+export const keptInputKey = (id: string, version: string) =>
+  JSON.stringify(["C-55", id, version]);
+
+export interface KeptInput {
+  /** Decoded analysis records by path, read before the analysis write. */
+  readonly records: ReadonlyMap<string, GraphFile> | undefined;
+  /** Paths written after the records were read (in that run). */
+  readonly recordsStale: ReadonlySet<string>;
+  /** Resolver projection rows by path, for the module's link kinds. */
+  readonly projection: ReadonlyMap<string, ResolutionFile> | undefined;
+  readonly projectionKinds: string;
+  /** Every path's symbols. */
+  readonly symbols: ReadonlyMap<string, readonly GraphSymbol[]> | undefined;
+  /** Paths written after the resolver input was read (in that run). */
+  readonly resolverStale: ReadonlySet<string>;
+  /** Bytes of stored JSON the kept values were decoded from (estimated). */
+  readonly bytes: number;
+}
+
+/**
+ * Deep-frozen under the test suite only (see above). The indexer also uses
+ * it on a `keepsInput` module's inputs outside a session, so every test of
+ * such a module runs it on frozen inputs.
+ */
+export const guard = <T>(value: T): T =>
+  process.env.PYMTHEG_TEST === "1" ? deepFreeze(value) : value;
+export function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const item of Object.values(value)) deepFreeze(item);
+  }
+  return value;
+}
+// The stored JSON's UTF-8 bytes when the store recorded them (C-55), else
+// the value encoded again (stores that do not record them).
+const size = (value: object) =>
+  storedSize(value) ?? Buffer.byteLength(JSON.stringify(value));
+/**
+ * SQLite's `ORDER BY path` order: UTF-8 bytes, which is code-point order.
+ * It differs from JavaScript's UTF-16 order (`compare`) only between a path
+ * character above U+FFFF (a surrogate pair) and one in U+E000..U+FFFF.
+ */
+export function storeOrder(a: string, b: string): number {
+  const unit = (code: number) =>
+    code >= 0xe000 ? code - 0x800 : code >= 0xd800 ? code + 0x2000 : code;
+  const length = Math.min(a.length, b.length);
+  for (let index = 0; index < length; index++) {
+    const x = a.charCodeAt(index);
+    const y = b.charCodeAt(index);
+    if (x !== y) return unit(x) - unit(y);
+  }
+  return a.length - b.length;
+}
+
+/**
+ * Builds a module's inputs from what was kept plus fresh reads of the
+ * paths it cannot trust, and records what to keep at the end of the run.
+ */
+export class KeptInputs {
+  records?: Map<string, GraphFile>;
+  recordsMark?: number;
+  projection?: Map<string, ResolutionFile>;
+  projectionKinds = "";
+  symbols?: Map<string, readonly GraphSymbol[]>;
+  resolverMark?: number;
+  private bytes = new Map<string, number>();
+  constructor(
+    private readonly previous: KeptInput | undefined,
+    /** Paths written in this run before a read (from the run's start). */
+    private readonly writtenThisRun: () => Set<string>,
+    /** Above this many bytes of stored JSON nothing is kept. */
+    private readonly limitBytes = keptInputBytes,
+  ) {}
+
+  /** The analysis records of `paths` that are stored, in path order. */
+  async analysisInput(
+    paths: readonly string[],
+    read: (paths: readonly string[]) => Promise<GraphFile[]>,
+    mark: number,
+  ): Promise<GraphFile[]> {
+    const old = this.previous?.records;
+    const stale = new Set([
+      ...(this.previous?.recordsStale ?? []),
+      ...this.writtenThisRun(),
+    ]);
+    const wanted = new Set(paths);
+    // Read what is stale and what was never kept (review: a wanted path
+    // missing from the kept value was left out where a fresh read has it).
+    const reread = [...wanted].filter(
+      (path) => !old?.has(path) || stale.has(path),
+    );
+    const fresh = await read(reread);
+    const records = new Map<string, GraphFile>();
+    if (old)
+      for (const [path, file] of old)
+        if (wanted.has(path) && !stale.has(path)) {
+          records.set(path, file);
+          this.bytes.set(`r:${path}`, this.previousBytes(`r:${path}`, file));
+        }
+    for (const file of fresh) {
+      records.set(file.path, guard(file));
+      this.bytes.set(`r:${file.path}`, size(file));
+    }
+    count("kept.input.recordsReused", records.size - fresh.length);
+    count("kept.input.recordsRead", fresh.length);
+    this.records = records;
+    this.recordsMark = mark;
+    return [...records.values()].sort((a, b) => compare(a.path, b.path));
+  }
+
+  /** The resolver projection (by path) and every symbol (by id). */
+  async resolverInput(
+    kinds: readonly string[] | undefined,
+    reads: {
+      allPaths: () => Promise<string[]>;
+      projection?: (paths: readonly string[]) => Promise<ResolutionFile[]>;
+      symbols: (
+        paths: readonly string[],
+      ) => Promise<Map<string, GraphSymbol[]>>;
+    },
+    mark: number,
+  ): Promise<{ projection?: ResolutionFile[]; symbols: GraphSymbol[] }> {
+    const previous = this.previous;
+    const kindsKey = JSON.stringify(kinds ?? null);
+    const stale = new Set([
+      ...(previous?.resolverStale ?? []),
+      ...this.writtenThisRun(),
+    ]);
+    const paths = await reads.allPaths();
+    const keep = (path: string) => !stale.has(path);
+    // Symbols: every stored path's.
+    const oldSymbols = previous?.symbols;
+    const symbolReads = paths.filter(
+      (path) => !oldSymbols?.has(path) || !keep(path),
+    );
+    const freshSymbols = await reads.symbols(symbolReads);
+    const symbols = new Map<string, readonly GraphSymbol[]>();
+    let reusedSymbols = 0;
+    for (const path of paths) {
+      const fresh = freshSymbols.get(path);
+      if (fresh) {
+        symbols.set(path, guard(fresh));
+        this.bytes.set(`s:${path}`, size(fresh));
+      } else {
+        const kept = oldSymbols!.get(path)!;
+        symbols.set(path, kept);
+        reusedSymbols += kept.length;
+        this.bytes.set(`s:${path}`, this.previousBytes(`s:${path}`, kept));
+      }
+    }
+    count("kept.input.symbolsReused", reusedSymbols);
+    this.symbols = symbols;
+    let projection: ResolutionFile[] | undefined;
+    if (kinds && reads.projection) {
+      const oldProjection =
+        previous?.projectionKinds === kindsKey
+          ? previous.projection
+          : undefined;
+      const projectionReads = paths.filter(
+        (path) => !oldProjection?.has(path) || !keep(path),
+      );
+      const fresh = new Map(
+        (await reads.projection(projectionReads)).map((row) => [row.path, row]),
+      );
+      const rows = new Map<string, ResolutionFile>();
+      for (const path of paths) {
+        const row = fresh.get(path);
+        if (row) {
+          rows.set(path, guard(row));
+          this.bytes.set(`p:${path}`, size(row));
+        } else if (oldProjection?.has(path)) {
+          rows.set(path, oldProjection.get(path)!);
+          this.bytes.set(
+            `p:${path}`,
+            this.previousBytes(`p:${path}`, oldProjection.get(path)!),
+          );
+        }
+      }
+      count("kept.input.projectionReused", rows.size - fresh.size);
+      this.projection = rows;
+      this.projectionKinds = kindsKey;
+      // In the order the store's projection query gives (SQL `ORDER BY
+      // path`), not `allPaths`' order, so a module sees what it would see
+      // without a session.
+      projection = [...rows.values()].sort((a, b) =>
+        storeOrder(a.path, b.path),
+      );
+    }
+    this.resolverMark = mark;
+    return {
+      ...(projection ? { projection } : {}),
+      symbols: [...symbols.values()].flat().sort((a, b) => compare(a.id, b.id)),
+    };
+  }
+
+  /**
+   * Every stored file's record, for a resolver given no scope: this run's
+   * analysis records where nothing has written them since they were read,
+   * fresh reads for the rest (other modules' files, and files written
+   * since), in the order `files()` returns them.
+   */
+  async allRecords(
+    paths: readonly string[],
+    read: (paths: readonly string[]) => Promise<GraphFile[]>,
+    writtenSince: (mark: number) => Set<string>,
+  ): Promise<GraphFile[]> {
+    const records = this.records;
+    const stale =
+      this.recordsMark === undefined
+        ? new Set<string>()
+        : writtenSince(this.recordsMark);
+    const usable = (path: string) =>
+      records?.has(path) === true && !stale.has(path);
+    const fresh = await read(paths.filter((path) => !usable(path)));
+    count("kept.input.resolverRecordsReused", paths.filter(usable).length);
+    return [
+      ...paths.filter(usable).map((path) => records!.get(path)!),
+      ...fresh.map((file) => guard(file)),
+    ].sort((a, b) => compare(a.path, b.path));
+  }
+
+  private previousBytes(key: string, value: object): number {
+    return previousSizes.get(this.previous!)?.get(key) ?? size(value);
+  }
+
+  /** What to keep after the run, given the paths written since each read. */
+  result(writtenSince: (mark: number) => Set<string>): KeptInput | undefined {
+    const total = [...this.bytes.values()].reduce((sum, n) => sum + n, 0);
+    count("kept.input.bytes", total);
+    if (total > this.limitBytes) {
+      count("kept.input.overLimit");
+      return undefined;
+    }
+    const kept: KeptInput = {
+      records: this.records,
+      recordsStale:
+        this.recordsMark === undefined
+          ? new Set()
+          : writtenSince(this.recordsMark),
+      projection: this.projection,
+      projectionKinds: this.projectionKinds,
+      symbols: this.symbols,
+      resolverStale:
+        this.resolverMark === undefined
+          ? new Set()
+          : writtenSince(this.resolverMark),
+      bytes: total,
+    };
+    previousSizes.set(kept, new Map(this.bytes));
+    return kept;
+  }
+}
+/** Each kept value's per-entry sizes, so they are not measured again. */
+const previousSizes = new WeakMap<KeptInput, Map<string, number>>();

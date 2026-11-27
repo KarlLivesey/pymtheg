@@ -258,7 +258,10 @@ test("locals shadow imports and package functions", async () => {
     [
       ["lib.Println", "lib/lib.go:function:Println"],
       ["lib.Println", "p/p.go:method:(local).Println"],
-      ["helper", null],
+      // A local holding one func literal: the enclosing function's own
+      // (C-63), never the package's helper.
+      ["helper", "p/p.go:function:C"],
+      // A parameter: unresolved (reason `local`).
       ["helper", null],
     ],
   );

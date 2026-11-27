@@ -1,0 +1,17 @@
+build pin step cpuMs recordsDecoded analyzeGoInputMs resolveGoInputMs liveHeapMiB
+main restic_restic body 3406 560 322 385 83
+main restic_restic body-revert 3462 560 315 385 81
+main restic_restic export 12536 714 301 1203 80
+main restic_restic export-revert 14910 714 324 1270 80
+main cli_cli body 13019 1192 2118 1747 94
+main cli_cli body-revert 13442 1192 2149 1711 93
+main cli_cli export 34723 1524 1783 4558 94
+main cli_cli export-revert 32805 1524 1703 4339 94
+head restic_restic body 3862 560 340 403 118
+head restic_restic body-revert 4637 2 3 89 118
+head restic_restic export 11963 156 3 1107 119
+head restic_restic export-revert 10842 156 6 1110 119
+head cli_cli body 11893 1192 1904 1704 247
+head cli_cli body-revert 9336 66 4 389 247
+head cli_cli export 28039 398 3 3337 247
+head cli_cli export-revert 27073 398 4 3211 247

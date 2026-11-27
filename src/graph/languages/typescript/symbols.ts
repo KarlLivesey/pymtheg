@@ -471,8 +471,27 @@ function callbackSite(node: ts.FunctionLikeDeclaration): unknown[] {
   return [ts.SyntaxKind[parent.kind]];
 }
 
-const scopeKey = (parts: unknown[]) =>
-  createHash("sha256").update(JSON.stringify(parts)).digest("hex").slice(0, 16);
+/**
+ * A hashed part of a scope or member key, from the text at `at`. C-60: the
+ * hash is of the restored text (`keyNames`), so a locally bound `require`,
+ * `module` or `exports`, which reaches the compiler under a fresh name that
+ * depends on every captured file's text, does not change the key.
+ */
+const scopeKey = (at: ts.Node, parts: unknown[]) => {
+  const restore = keyNames.get(at.getSourceFile()) ?? ((text: string) => text);
+  // Each text part is restored before it is serialised: serialised, a name
+  // can follow an escape (`\n`, `\"`) that the restore does not match.
+  const restored = (part: unknown): unknown =>
+    typeof part === "string"
+      ? restore(part)
+      : Array.isArray(part)
+        ? part.map(restored)
+        : part;
+  return createHash("sha256")
+    .update(JSON.stringify(parts.map(restored)))
+    .digest("hex")
+    .slice(0, 16);
+};
 
 function blockSite(block: ts.Block): unknown[] {
   const parent = block.parent;
@@ -516,15 +535,15 @@ function scopeOf(anchor: ts.Node, owner: ts.Node | undefined): string {
     if (ts.isFunctionLike(node) && anchorOf(node) === owner) break;
     if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
       parts.push(
-        `[callback:${scopeKey([node.name?.text, node.parameters.map((p) => p.getText()), ...callbackSite(node)])}]`,
+        `[callback:${scopeKey(node, [node.name?.text, node.parameters.map((p) => p.getText()), ...callbackSite(node)])}]`,
       );
     } else if (ts.isBlock(node) && !ts.isFunctionLike(node.parent)) {
       // Keep the branch or loop header in the identity. Bare blocks can
       // share a key, so requirement links verify multiplicity separately.
-      parts.push(`[block:${scopeKey(blockSite(node))}]`);
+      parts.push(`[block:${scopeKey(node, blockSite(node))}]`);
     } else if (ts.isCaseClause(node) || ts.isDefaultClause(node)) {
       parts.push(
-        `[case:${scopeKey([ts.isCaseClause(node) ? node.expression.getText() : null])}]`,
+        `[case:${scopeKey(node, [ts.isCaseClause(node) ? node.expression.getText() : null])}]`,
       );
     }
   }
@@ -699,14 +718,17 @@ function memberDraft(node: ts.Node): Omit<SymbolDraft, "key"> | undefined {
     while (literal) {
       const branch =
         ts.isConditionalExpression(holder) && value !== holder.condition
-          ? scopeKey([holder.condition.getText(), value === holder.whenTrue])
+          ? scopeKey(holder, [
+              holder.condition.getText(),
+              value === holder.whenTrue,
+            ])
           : ts.isBinaryExpression(holder) &&
               (holder.operatorToken.kind ===
                 ts.SyntaxKind.QuestionQuestionToken ||
                 holder.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
                 holder.operatorToken.kind ===
                   ts.SyntaxKind.AmpersandAmpersandToken)
-            ? scopeKey([
+            ? scopeKey(holder, [
                 holder.operatorToken.kind,
                 value === holder.left,
                 (value === holder.left ? holder.right : holder.left).kind,

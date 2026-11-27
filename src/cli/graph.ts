@@ -42,6 +42,11 @@ export function formatGraph(response: GraphResponse): string {
           ? "Trust: source only (Pymtheg starts no program on its behalf; it only reads the repository's files and writes its own .pymtheg/ files)"
           : `Trust: unanswered. ${response.trustAnswer ?? ""}`,
     );
+  // Which analysis path each module took (C-38A).
+  for (const path of response.sync.report?.analysisPaths ?? [])
+    lines.push(
+      `Analysis ${path.module}: ${path.path}${path.note ? ` (${path.note})` : ""}`,
+    );
   // The opt-in toolchain route (absent when off).
   const toolchain = response.toolchain?.go;
   if (toolchain)
