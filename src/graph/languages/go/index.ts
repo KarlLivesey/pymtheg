@@ -17,7 +17,7 @@ import { GoExtractor } from "./extract.js";
 import { syntaxFailure } from "./failure.js";
 import { directoryOf, importPathOf, readLayout } from "./gomod.js";
 import { affectedFiles, surface } from "./incremental.js";
-import type { FileFact } from "./model.js";
+import { GO_MODULE_VERSION, type FileFact } from "./model.js";
 import { linkNotes, resolveGo } from "./resolve.js";
 import { installation, runHelper } from "./toolchain.js";
 import {
@@ -470,7 +470,7 @@ async function analyze(
 
 const go: LanguageModule = {
   id: ID,
-  version: "33",
+  version: GO_MODULE_VERSION,
   extensions: [".go"],
   contextFiles: ["go.mod", "go.work", "**/vendor/modules.txt"],
   incrementalAnalysis: true,

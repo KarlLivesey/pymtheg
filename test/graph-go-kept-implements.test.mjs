@@ -73,6 +73,26 @@ const files = {
   "rd/a.go":
     "package rd\n\ntype Reader interface{ Read() int }\n\ntype X struct{}\n\nfunc (X) Read() int { return 1 }\n\ntype T struct{ X }\n",
   "rd/b.go": "package rd\n\nfunc helper() {}\n",
+  // Sol's review cases. (a) X under one build constraint, the other
+  // configuration's file empty: a function X added there.
+  "bc/base.go":
+    "//go:build !alternate\n\npackage bc\n\ntype X struct{}\n\nfunc (X) M() {}\n\ntype T struct{ X }\n\ntype I interface{ M() }\n",
+  "bc/alt.go": "//go:build alternate\n\npackage bc\n",
+  // (b) A type alias and a function of one name: their order matters.
+  "ord/o.go":
+    'package ord\n\nimport "strings"\n\ntype X = strings.Builder\n\nfunc X() {}\n\ntype S struct{ X }\n\ntype I interface{ String() string }\n',
+  // An import's path changes under the same alias: no declaration changes,
+  // but the embedded type does (file facts).
+  "imp/i.go":
+    'package imp\n\nimport ext "strings"\n\ntype S struct{ ext.Builder }\n\ntype I interface{ String() string }\n',
+  // An interface embedding another: the embedded interface changes.
+  "iemb/i.go":
+    "package iemb\n\ntype P interface{ M() }\n\ntype Q interface{ N() }\n\ntype R interface{ P }\n\ntype T struct{}\n\nfunc (T) M() {}\n",
+  // An embedded type changes (embeds).
+  "emb2/e.go":
+    "package emb2\n\ntype I interface{ M() }\n\ntype A struct{}\n\nfunc (A) M() {}\n\ntype B struct{}\n\ntype W struct{ A }\n",
+  // (c) A failed file (no surface), moved into the implementers' package.
+  "zz/broken.go": "package box\n\nfunc Broken( {\n",
   // Two init functions share an identity: an anonymous struct in the first
   // renumbers the second's (C-56a).
   "dot/init.go":
@@ -117,6 +137,86 @@ test("a session reuses Go's implements decisions across body edits, proven equal
       false,
     ],
     ["rename it back", () => write("rd/b.go", files["rd/b.go"]), false],
+    [
+      "(a) a function X added under the other build constraint",
+      () => write("bc/alt.go", files["bc/alt.go"] + "\nfunc X() {}\n"),
+      false,
+    ],
+    ["(a) removed again", () => write("bc/alt.go", files["bc/alt.go"]), false],
+    [
+      "(b) the alias and the function of one name swap order",
+      () =>
+        write(
+          "ord/o.go",
+          files["ord/o.go"].replace(
+            "type X = strings.Builder\n\nfunc X() {}\n",
+            "func X() {}\n\ntype X = strings.Builder\n",
+          ),
+        ),
+      false,
+    ],
+    ["(b) swapped back", () => write("ord/o.go", files["ord/o.go"]), false],
+    [
+      "an import's path changes under the same alias",
+      () =>
+        write("imp/i.go", files["imp/i.go"].replace('"strings"', '"bytes"')),
+      false,
+    ],
+    [
+      "the import changed back",
+      () => write("imp/i.go", files["imp/i.go"]),
+      false,
+    ],
+    [
+      "an embedded type changes",
+      () =>
+        write(
+          "emb2/e.go",
+          files["emb2/e.go"].replace(
+            "type W struct{ A }",
+            "type W struct{ B }",
+          ),
+        ),
+      false,
+    ],
+    [
+      "the embed changed back",
+      () => write("emb2/e.go", files["emb2/e.go"]),
+      false,
+    ],
+    [
+      "an interface's embedded interface changes",
+      () =>
+        write(
+          "iemb/i.go",
+          files["iemb/i.go"].replace(
+            "type R interface{ P }",
+            "type R interface{ Q }",
+          ),
+        ),
+      false,
+    ],
+    [
+      "the interface embed changed back",
+      () => write("iemb/i.go", files["iemb/i.go"]),
+      false,
+    ],
+    [
+      "(c) a failed file moves into the implementers' package",
+      () => {
+        rmSync(join(root, "zz/broken.go"));
+        write("box/broken.go", files["zz/broken.go"]);
+      },
+      false,
+    ],
+    [
+      "(c) moved back",
+      () => {
+        rmSync(join(root, "box/broken.go"));
+        write("zz/broken.go", files["zz/broken.go"]);
+      },
+      false,
+    ],
     [
       "a body edit of the file holding the implementers (a scoped run)",
       () => write("rd/a.go", files["rd/a.go"].replace("return 1", "return 2")),
@@ -172,12 +272,20 @@ test("a session reuses Go's implements decisions across body edits, proven equal
       assert.equal((await index(root, session)).sync.complete, true, name);
       const counts = graphWork.counts;
       if (reused) {
-        // Both builds (analysis notes and resolution) reuse, and each reuse
-        // was made again and found identical.
-        assert.equal(counts["go.implementsReused"], 2, name);
-        assert.equal(counts["go.implementsChecked"], 2, name);
+        // Both builds (analysis notes and resolution) reuse the kept value,
+        // and each reuse was made again and found identical.
+        // (Two normal builds, and the lossless resolver where it is built.)
+        assert.equal(counts["go.implementsMade"] ?? 0, 0, name);
+        assert.ok(counts["go.implementsReused"] >= 2, name);
+        assert.equal(
+          counts["go.implementsChecked"],
+          counts["go.implementsReused"],
+          name,
+        );
       } else
-        assert.equal(counts["go.implementsReused"] ?? 0, 0, `${name}: a miss`);
+        // A miss: the notes build makes them again (the resolution build
+        // may then reuse that run's own value).
+        assert.ok((counts["go.implementsMade"] ?? 0) >= 1, `${name}: a miss`);
       assert.deepEqual(
         await differencesFromCold(base, root, registry),
         [],
@@ -217,7 +325,7 @@ test("a stopped run keeps no implements decisions; the next run makes them again
     write("box/box.go", files["box/box.go"].replace("{1, 2}", "{9, 9}"));
     resetGraphWork();
     assert.equal((await index(root, session)).sync.complete, true);
-    assert.equal(graphWork.counts["go.implementsReused"] ?? 0, 0);
+    assert.ok((graphWork.counts["go.implementsMade"] ?? 0) >= 1);
     assert.deepEqual(await differencesFromCold(base, root, production), []);
   } finally {
     rmSync(base, { recursive: true, force: true });
@@ -268,8 +376,10 @@ test("the key covers each file's toolchain status: a change misses it", async ()
   const kept = keptState();
   resetGraphWork();
   await go.resolve({ ...inputs, kept });
+  resetGraphWork();
   await go.resolve({ ...inputs, kept });
-  assert.equal(graphWork.counts["go.implementsReused"], 1, "same inputs");
+  assert.equal(graphWork.counts["go.implementsMade"] ?? 0, 0, "same inputs");
+  assert.ok(graphWork.counts["go.implementsReused"] >= 1, "same inputs");
   const withToolchain = inputs.files.map((file) => ({
     ...file,
     result: {
@@ -282,6 +392,7 @@ test("the key covers each file's toolchain status: a change misses it", async ()
   }));
   resetGraphWork();
   await go.resolve({ ...inputs, files: withToolchain, kept });
+  assert.ok((graphWork.counts["go.implementsMade"] ?? 0) >= 1);
   assert.equal(graphWork.counts["go.implementsReused"] ?? 0, 0);
 });
 
@@ -289,12 +400,14 @@ test("a wrong value under the right key fails the run; a value under another key
   const inputs = await resolveInputs();
   const kept = keptState();
   await go.resolve({ ...inputs, kept });
-  const [name, entry] = [...kept.values][0];
+  const name = "go:implements";
+  const entry = kept.values.get(name);
+  assert.ok(entry);
   // A key miss: the value is never read, the decisions are made again.
   kept.values.set(name, { key: "another key", value: entry.value });
   resetGraphWork();
   const fresh = await go.resolve({ ...inputs, kept });
-  assert.equal(graphWork.counts["go.implementsReused"] ?? 0, 0);
+  assert.ok((graphWork.counts["go.implementsMade"] ?? 0) >= 1);
   assert.ok(fresh.links.some((link) => link.kind === "implements"));
   // A stale value under the current key: the check finds it.
   kept.values.set(name, {
@@ -318,7 +431,7 @@ const shadowFiles = {
     'package use\n\nimport "example.com/m/api"\n\nfunc U(r api.R) int { return r.Read() }\n',
 };
 
-test("each build keeps its own decisions: the shadow resolver keeps none and reads none", async () => {
+test("the resolver that ignores lossy packages keeps its own value; the normal builds share one", async () => {
   const { base, root, write } = tree(shadowFiles);
   try {
     const registry = await discoverLanguages();
@@ -335,27 +448,37 @@ test("each build keeps its own decisions: the shadow resolver keeps none and rea
     );
     resetGraphWork();
     assert.equal((await index(root, session)).sync.complete, true);
-    // Shadows were built in this run; only the two main builds reused.
+    // Shadows were built in this run. Every build reused its mode's value,
+    // each reuse made again and found identical.
     assert.ok((graphWork.counts["go.shadowResolvers"] ?? 0) >= 1);
-    assert.equal(graphWork.counts["go.implementsReused"], 2);
-    assert.equal(graphWork.counts["go.implementsChecked"], 2);
+    assert.equal(graphWork.counts["go.implementsMade"] ?? 0, 0);
+    assert.ok(graphWork.counts["go.implementsReused"] >= 2);
+    assert.equal(
+      graphWork.counts["go.implementsChecked"],
+      graphWork.counts["go.implementsReused"],
+    );
     assert.deepEqual(await differencesFromCold(base, root, registry), []);
-    // The two builds' values are kept under their own names.
+    // One value per resolver mode: the normal builds share one, the
+    // resolver that ignores lossy packages keeps its own.
     const kept = session.kept.get(`go\u0000${go.version}`);
-    assert.ok(kept?.has("go:implements") && kept.has("notes:go:implements"));
+    assert.ok(kept?.has("go:implements") && kept.has("go:implements:lossless"));
+    assert.notEqual(
+      kept.get("go:implements").key,
+      kept.get("go:implements:lossless").key,
+    );
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
 });
 
-test("the notes build keeps decisions named by the store's ids (analyze passes the store's project id)", async () => {
+test("the kept decisions are named by the store's ids (both builds name declarations alike)", async () => {
   const { base, root } = tree(files);
   try {
     const registry = await discoverLanguages();
     const session = new IndexSession({ registry });
     assert.equal((await index(root, session)).sync.complete, true);
     const kept = session.kept.get(`go\u0000${go.version}`);
-    const notes = kept?.get("notes:go:implements")?.value;
+    const notes = kept?.get("go:implements")?.value;
     assert.ok(notes && notes.complete.length > 0);
     const db = new SqliteGraphStore(graphAt(root));
     const ids = new Set(db.findSymbols().map((symbol) => symbol.id));
