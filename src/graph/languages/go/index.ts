@@ -363,6 +363,7 @@ async function analyze(
   const notes = await stage("analyze.go.notes", () =>
     synchronousStretch(() =>
       linkNotes(
+        context.projectId,
         ID,
         files.map((file) =>
           next.has(file.path)
