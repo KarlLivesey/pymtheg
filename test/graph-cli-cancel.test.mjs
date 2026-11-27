@@ -212,15 +212,22 @@ test("a run that is not aborted answers through the worker", async () => {
   }
 });
 
-// C-50, after C-56b changed Go's link-notes call: Go's analysis still marks
-// its project-wide synchronous work after an await (its link notes) as a
-// stretch, so a cancel there is taken inside the module call. The worker's
-// section reads `true` again after the call's promise was returned.
-test("Go's link notes after its analysis has awaited run in a marked stretch", async () => {
+// C-50, checked again after C-56b: Go's parse, after its parser loads (an
+// await), runs in a marked stretch, so a cancel there is taken inside the
+// module call. (Its link notes are marked too, for when they follow the
+// toolchain's await; in a source-only index they run before any await,
+// inside the call already, so this index cannot show that marker.)
+test("Go's parse after its parser loads runs in a marked stretch", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "pymtheg-cli-go-stretch-"));
   try {
-    await writeFile(join(scratch, "go.mod"), "module example.com/m\n\ngo 1.22\n");
-    await writeFile(join(scratch, "a.go"), "package m\n\nfunc A() int { return B() }\n\nfunc B() int { return 1 }\n");
+    await writeFile(
+      join(scratch, "go.mod"),
+      "module example.com/m\n\ngo 1.22\n",
+    );
+    await writeFile(
+      join(scratch, "a.go"),
+      "package m\n\nfunc A() int { return B() }\n\nfunc B() int { return 1 }\n",
+    );
     const { discoverLanguages } = await import("../dist/graph/index.js");
     const all = await discoverLanguages();
     const go = all.modules.filter((module) => module.id === "go");
@@ -234,12 +241,11 @@ test("Go's link notes after its analysis has awaited run in a marked stretch", a
     );
     assert.equal(response.status, "ok");
     // A marked stretch: code inside the module call (true) after the call
-    // had returned its promise ("awaiting"). With one file, two: its parse
-    // after the parser loads, and the project's link notes.
+    // had returned its promise ("awaiting"). With one file, one: its parse.
     const stretches = states.filter(
       (state, i) => state === true && states[i - 1] === "awaiting",
     ).length;
-    assert.equal(stretches, 2, JSON.stringify(states));
+    assert.equal(stretches, 1, JSON.stringify(states));
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
