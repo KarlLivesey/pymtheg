@@ -238,6 +238,22 @@ export interface ProjectAnalysisContext {
   changedContextFiles: readonly string[];
   /** C-45: kept state, as for ResolutionContext.kept. */
   kept?: import("./session.js").KeptState;
+  /**
+   * Reports which analysis path ran (C-38A). Given only when the module has
+   * files in this index.
+   */
+  notePath?: (note: AnalysisPath) => void;
+  /** C-38A: no run finished completely before this one (the store's record). */
+  firstIndex?: boolean;
+}
+/**
+ * The analysis path a module took for one index (C-38A), shown in the index
+ * report: `reused` built no program, `full` analysed every file.
+ */
+export interface AnalysisPath {
+  path: "reused" | "full";
+  /** Why the path needs no reason, such as "no previous index". */
+  note?: string;
 }
 export interface AnalyzedFile {
   path: string;
@@ -265,6 +281,21 @@ export interface LanguageModule {
   dependencyInputs?: true;
   /** Accepts previousFiles and can prove that some files' decisions still hold. */
   incrementalAnalysis?: true;
+  /**
+   * Reports its analysis path through `notePath` (C-38A). Only a module that
+   * analyses in this process: a context cloned into a worker cannot carry
+   * the function.
+   */
+  reportsAnalysisPath?: true;
+  /**
+   * C-55: in an index session, the indexer keeps this module's decoded
+   * inputs (analysis records, resolver projection and symbols) between
+   * runs and re-reads only the files written since. The module must not
+   * change its inputs in place: they may be handed to the next run. The
+   * test suite freezes them, so a module that does fails there. Each input
+   * comes in the order the same read gives without a session.
+   */
+  keepsInput?: true;
   /** For scoped resolution only, the file-level parsed link kinds read across files. */
   scopedFileLinkKinds?: readonly string[];
   /** This resolver uses symbol and link facts without reading file records. */
@@ -332,7 +363,21 @@ export interface GraphStorage {
   /** Compact resolution input, with only the requested parsed link kinds. */
   resolutionFiles?(
     linkKinds: readonly string[],
+    /** C-55: only these paths (all when absent). */
+    paths?: readonly string[],
   ): StorageResult<ResolutionFile[]>;
+  /**
+   * C-55: a point in this connection's `replaceFile` calls, and the paths
+   * written after one. Every file-level fact (record, symbols, resolver
+   * projection) is written only by `replaceFile` and `removeFile`; removals
+   * are not recorded, as readers assemble inputs only for paths stored now.
+   */
+  writeMark?(): number;
+  pathsWrittenSince?(mark: number): Set<string>;
+  /** C-55: each path's symbols, as `findSymbols({ file })` returns them. */
+  symbolsOfFiles?(
+    paths: readonly string[],
+  ): StorageResult<Map<string, GraphSymbol[]>>;
   /**
    * Optional light listing (path, module, status) that decodes no records.
    * The indexer otherwise derives it from files().
@@ -400,6 +445,12 @@ export interface GraphStorage {
    * any later run from that point on. Proves ownership like any write.
    */
   claimIndexRun?(): StorageResult<void>;
+  /**
+   * C-38A: whether a run finished completely before this one began (kept
+   * across later runs, including a run taken over). Read in the run's
+   * opening snapshot.
+   */
+  indexedBefore?(): StorageResult<boolean>;
   /** Module versions whose completed decisions this run found in its opening snapshot. */
   completedAnalysis?(): StorageResult<ReadonlyMap<string, string>>;
   /** An incomplete run retains its mark. A successful owned run records reusable module decisions. */

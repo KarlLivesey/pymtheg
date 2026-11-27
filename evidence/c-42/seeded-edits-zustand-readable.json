@@ -1,0 +1,488 @@
+{
+ "id": "pmndrs/zustand",
+ "seed": 911,
+ "expectedSteps": 30,
+ "steps": [
+  {
+   "step": 0,
+   "file": "src/middleware/devtools.ts",
+   "kind": "comment",
+   "line": 669,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7099,
+    "library": 3313,
+    "merged": 15
+   },
+   "wallMs": 8345,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 1,
+   "file": "src/shallow.ts",
+   "kind": "delete",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7097,
+    "library": 3313,
+    "merged": 15
+   },
+   "wallMs": 7843,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 2,
+   "file": "examples/starter/src/index.tsx",
+   "kind": "delete",
+   "line": 20,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3313,
+    "merged": 15
+   },
+   "wallMs": 8739,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 3,
+   "file": "tests/middlewareTypes.test.tsx",
+   "kind": "delete",
+   "line": 176,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3313,
+    "merged": 15
+   },
+   "wallMs": 8573,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 4,
+   "file": "vitest.config.mts",
+   "kind": "comment",
+   "line": 28,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3313,
+    "merged": 15
+   },
+   "wallMs": 7333,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 5,
+   "file": "tests/persistPromiseLike.test.ts",
+   "kind": "delete",
+   "line": 113,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 7657,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 6,
+   "file": "tests/setup.ts",
+   "kind": "comment",
+   "line": 2,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 8524,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 7,
+   "file": "src/middleware/ssrSafe.ts",
+   "kind": "blank",
+   "line": 7,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 10783,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 8,
+   "file": "src/types.d.ts",
+   "kind": "duplicate",
+   "line": 6,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 9661,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 9,
+   "file": "tests/subscribe.test.tsx",
+   "kind": "statement",
+   "line": 44,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 10663,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 10,
+   "file": "tests/vanilla/subscribe.test.tsx",
+   "kind": "statement",
+   "line": 68,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 10122,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 11,
+   "file": "tests/devtools.test.tsx",
+   "kind": "comment",
+   "line": 1800,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 8606,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 12,
+   "file": "examples/starter/src/index.tsx",
+   "kind": "blank",
+   "line": 53,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 8367,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 13,
+   "file": "tests/basic.test.tsx",
+   "kind": "comment",
+   "line": 449,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 8751,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 14,
+   "file": "tests/vanilla/subscribe.test.tsx",
+   "kind": "comment",
+   "line": 33,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 7937,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 15,
+   "file": "src/middleware.ts",
+   "kind": "blank",
+   "line": 11,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 8308,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 16,
+   "file": "src/middleware/persist.ts",
+   "kind": "delete",
+   "line": 20,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3311,
+    "merged": 15
+   },
+   "wallMs": 9986,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 17,
+   "file": "src/middleware/redux.ts",
+   "kind": "duplicate",
+   "line": 41,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3312,
+    "merged": 15
+   },
+   "wallMs": 8937,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 18,
+   "file": "tests/ssr.test.tsx",
+   "kind": "comment",
+   "line": 3,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3312,
+    "merged": 15
+   },
+   "wallMs": 9389,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 19,
+   "file": "tests/persistPromiseLike.test.ts",
+   "kind": "comment",
+   "line": 71,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3312,
+    "merged": 15
+   },
+   "wallMs": 7986,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 20,
+   "file": "src/middleware/immer.ts",
+   "kind": "duplicate",
+   "line": 50,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3312,
+    "merged": 15
+   },
+   "wallMs": 7526,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 21,
+   "file": "vitest.config.mts",
+   "kind": "blank",
+   "line": 29,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3312,
+    "merged": 15
+   },
+   "wallMs": 7183,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 22,
+   "file": "tests/shallow.test.tsx",
+   "kind": "comment",
+   "line": 116,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7096,
+    "library": 3312,
+    "merged": 15
+   },
+   "wallMs": 7264,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 23,
+   "file": "src/middleware/redux.ts",
+   "kind": "delete",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7093,
+    "library": 3312,
+    "merged": 15
+   },
+   "wallMs": 7680,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 24,
+   "file": "src/middleware/combine.ts",
+   "kind": "blank",
+   "line": 5,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7093,
+    "library": 3312,
+    "merged": 15
+   },
+   "wallMs": 8314,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 25,
+   "file": "tests/setup.ts",
+   "kind": "duplicate",
+   "line": 1,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3313,
+    "merged": 15
+   },
+   "wallMs": 8320,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 26,
+   "file": "src/middleware/persist.ts",
+   "kind": "duplicate",
+   "line": 117,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3313,
+    "merged": 15
+   },
+   "wallMs": 7449,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 27,
+   "file": "src/vanilla.ts",
+   "kind": "delete",
+   "line": 13,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7091,
+    "library": 3313,
+    "merged": 15
+   },
+   "wallMs": 8041,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 28,
+   "file": "tests/middlewareTypes.test.tsx",
+   "kind": "duplicate",
+   "line": 558,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3315,
+    "merged": 15
+   },
+   "wallMs": 7969,
+   "failed": 0,
+   "resolvedFiles": 0
+  },
+  {
+   "step": 29,
+   "file": "tests/middlewareTypes.test.tsx",
+   "kind": "comment",
+   "line": 486,
+   "equal": true,
+   "differences": [],
+   "held": {
+    "links": 7094,
+    "library": 3315,
+    "merged": 15
+   },
+   "wallMs": 7544,
+   "failed": 0,
+   "resolvedFiles": 0
+  }
+ ],
+ "equal": true
+}

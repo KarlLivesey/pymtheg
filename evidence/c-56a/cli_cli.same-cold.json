@@ -1,0 +1,15 @@
+{
+ "root": "cli/cli 42d52b4c",
+ "rows": {
+  "graph_files": 1191,
+  "graph_contexts": 23,
+  "graph_parse_failures": 0,
+  "graph_symbols": 28670,
+  "graph_links": 218270,
+  "graph_candidates": 8545,
+  "graph_library_targets": 65892,
+  "project": 1
+ },
+ "equal": true,
+ "differences": []
+}

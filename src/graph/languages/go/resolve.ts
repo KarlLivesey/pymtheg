@@ -13,6 +13,7 @@ import type {
   ResolutionResult,
 } from "../../types.js";
 import { count, stageSync } from "../../work.js";
+import { fileFacts } from "../../identity.js";
 import {
   directoryOf,
   directoryOfImport,
@@ -387,6 +388,8 @@ export interface LinkNote {
    * member's declaring owner is not provable from the checkout (C-14).
    */
   library?: "library-member-unproven";
+  /** Unresolved: a call through a parameter, result or receiver (`local`). */
+  local?: true;
   /** Decided by the toolchain route (see Decision.toolchain). */
   toolchain?: {
     upgrade: "definite" | "verified" | "external" | "library";
@@ -396,9 +399,26 @@ export interface LinkNote {
 }
 
 /**
- * Runs the same resolution over provisional IDs (`draft:<file>\0<key>`) to find
- * links whose candidate sets exceed their cap. Used by `analyze`, the only phase
- * that may write link data, so the reason is recorded on the link itself.
+ * The project id the notes pass computes its symbols' ids under. It changes
+ * no output: the ids stay inside the pass, and the notes it returns are
+ * keyed by file and link index, never by a symbol id.
+ */
+const NOTES_PROJECT = "go-overflow";
+/**
+ * C-56a: a file's symbols as the notes pass names them: the ids the core
+ * gives stored symbols (kind, identity, and the ordinal among symbols that
+ * share both, by source order), under the notes pass's own project id.
+ */
+export function notesSymbols(
+  file: Pick<GraphFile, "path" | "module" | "result">,
+): GraphSymbol[] {
+  return fileFacts(NOTES_PROJECT, file).symbols;
+}
+/**
+ * Runs the same resolution over the symbols' notes ids (`notesSymbols`, C-56a)
+ * to find links whose candidate sets exceed their cap. Used by `analyze`, the
+ * only phase that may write link data, so the reason is recorded on the link
+ * itself.
  */
 export function linkNotes(
   moduleId: string,
@@ -408,18 +428,22 @@ export function linkNotes(
 ): Map<string, Map<number, LinkNote>> {
   const symbols: GraphSymbol[] = [];
   const links: GraphLink[] = [];
-  const id = (path: string, key: string) => `draft:${path}\u0000${key}`;
+  // C-56a: the symbols are named as the store names them (kind, identity
+  // and ordinal; never a source offset), so moving code leaves ids as they
+  // were. A body edit keeps every id outside the edited declaration, with
+  // one exception: function-local types and anonymous structs are numbered
+  // within the enclosing declaration's identity, so a new one in the first
+  // of two `init` renumbers the second's. Inside the edited declaration, an
+  // anonymous struct inserted above another renumbers the later one. Link
+  // sources are keys of the same file's symbols.
+  const ids = new Map<string, string>();
+  const id = (path: string, key: string) => ids.get(`${path}\u0000${key}`)!;
   for (const file of files) {
     if (file.module !== moduleId || file.result.status === "failed") continue;
-    for (const symbol of file.result.symbols)
-      symbols.push({
-        ...symbol,
-        id: id(file.path, symbol.key),
-        ordinal: 0,
-        file: file.path,
-        module: moduleId,
-        status: file.result.status,
-      });
+    for (const symbol of notesSymbols(file)) {
+      ids.set(`${file.path}\u0000${symbol.key}`, symbol.id);
+      symbols.push(symbol);
+    }
     if (resolutionFiles && !resolutionFiles.has(file.path)) continue;
     file.result.links.forEach((link, index) =>
       links.push({
@@ -439,7 +463,7 @@ export function linkNotes(
     );
   }
   const resolver = new GoResolver(moduleId, {
-    projectId: "go-overflow",
+    projectId: NOTES_PROJECT,
     files,
     contextFiles,
     symbols,
@@ -465,6 +489,7 @@ export function linkNotes(
   for (const [linkId, files] of resolver.invalid) note(linkId).invalid = files;
   for (const linkId of resolver.libraryMembers)
     note(linkId).library = "library-member-unproven";
+  for (const linkId of resolver.locals) note(linkId).local = true;
   for (const [linkId, decided] of resolver.toolchain)
     note(linkId).toolchain = decided;
   return output;
@@ -497,6 +522,8 @@ class GoResolver {
   readonly invalid = new Map<string, string[]>();
   /** Members selected on a library-typed value whose owner is unproven (C-14). */
   readonly libraryMembers = new Set<string>();
+  /** Calls through a parameter, result or receiver left without a target. */
+  readonly locals = new Set<string>();
   /** Links the toolchain route decided (W3-L), for the link notes. */
   readonly toolchain = new Map<string, NonNullable<LinkNote["toolchain"]>>();
   /** Failed files by directory (a file that cannot be read is not valid code). */
@@ -728,6 +755,11 @@ class GoResolver {
         this.open.set(link.id, ["import-destination-uncertain"]);
       else if (!distinct.length && this.libraryMember(link))
         this.libraryMembers.add(link.id);
+      else if (
+        !distinct.length &&
+        (link.data as { localParameter?: unknown } | undefined)?.localParameter
+      )
+        this.locals.add(link.id);
     }
     return { resolutions, links: added };
   }
@@ -3800,6 +3832,18 @@ class GoResolver {
       case "embeds":
       case "references":
       case "calls": {
+        // A call through a local binding that holds exactly one func literal
+        // (parse fact, `localBinding`): the enclosing function's own.
+        if (
+          (link.data as { localBinding?: unknown } | undefined)?.localBinding
+        ) {
+          const owner = link.sourceId
+            ? this.symbolsById.get(link.sourceId)
+            : undefined;
+          return owner && (owner.kind === "function" || owner.kind === "method")
+            ? this.definite([owner])
+            : UNRESOLVED;
+        }
         if (data.t) {
           const types = this.declaredTypes(data.t, link.file);
           if (!types.length) {

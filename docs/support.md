@@ -415,6 +415,17 @@ file (its ID can change when files are added or removed).
   selection names it: a field or concrete method gets `Owner.Name` with its
   declaring named type and package, evidence `declaring-owner`;
   third-party interface methods stay dispatch.
+- **Local func values (C-63):** a call through a local binding that provably
+  holds exactly one func literal (declared with it and never written, or
+  declared without a value and written once with one; no write the source
+  hides, such as an address taken; not of a named func type, whose methods
+  can write it) targets the enclosing function or method,
+  with the binding's name and declaration span in `data.localBinding` (the
+  Rust and TypeScript form). A call through a parameter, a named result or a
+  receiver is unresolved with the reason `local`: its value comes from the
+  caller. A local assigned several func values, or one the source cannot
+  follow, is as below; one assigned a named function resolves to it, as
+  before.
 - **Unresolved:** members of third-party and non-local `replace` types,
   and standard-library members the table does not settle (above); imports Go forbids (`internal`,
   `package main`, a `replace` of a module that is not required, a local
@@ -875,6 +886,31 @@ and never yields a version pin.
   selected Node types can leave both DOM and Node targets possible for a shared
   global, type name or typed member. Two test frameworks supplying the same
   global can also produce a candidate set.
+  When the library candidates are the declarations, in several library
+  units, of one global compiler symbol (for example `console.log` or `URL`,
+  declared by the DOM library and by `@types/node`), the set is marked
+  `mergedGlobal`: it names the symbol in every unit that declares it
+  ([C-42](changes/C-42.md)). These are not marked:
+  - a set of different symbols, such as the arms of a union receiver;
+  - a set that includes a test package (two test frameworks' `describe`,
+    two assertion libraries' `expect`);
+  - a set any of whose units the compiler reports a diagnostic in, on a
+    global declaration of a name that two or more units declare: any
+    diagnostic, of any code, that lies there or whose related information
+    lies in that unit's declaration files (deny by default). A statement
+    whose name only one unit declares is not checked, so a diagnostic
+    there (for example TS2430, an interface that incorrectly extends
+    another) leaves the set marked: a stated limit of C-42. A diagnostic with related
+    locations, all in one unit key, is dropped (a location in no unit, a
+    checkout file, is not counted); one with no related
+    location always counts against its unit. Units are typings packages, so this covers
+    `@cloudflare/workers-types` against the DOM and `bun-types` against
+    `@types/node`, and also a diagnostic with no related location reported
+    in one package. A set whose units are all `node:*` units (one unit key,
+    `@types/node`) has no other unit to conflict with, and stays marked
+    even when `@types/node` has a diagnostic;
+  - a set merged by a module augmentation (`declare module "fastify"`), which
+    is one symbol but not a global.
 - **Unbuilt checkout packages:** The configured compiler emit can identify
   a unique source of a missing declaration entry. A plain `tsc` build can
   prove that mapping, including through `tsc -b` for a referenced child.
@@ -905,8 +941,10 @@ and never yields a version pin.
   (`workspace-entry-unavailable` or `workspace-build-output-missing` when
   TypeScript probed a missing path under a configured output directory).
 - **`partial` files** have complete but qualified facts, never syntax errors: an
-  `extends` base that was not captured (`incomplete-config`; a package preset
-  such as `@tsconfig/node20` leaves most cross-file links unresolved), compiler
+  `extends` base that was not captured, or a base the compiler drops
+  because it is unreadable, has syntax errors or a root that is not an object
+  (`incomplete-config`; a package preset such as `@tsconfig/node20` leaves
+  most cross-file links unresolved; [C-60](changes/C-60.md)), compiler
   stack limits on some lookups, or `require`/`module`/`exports` uses that cannot
   be decided statically.
 - **Files the compiler or memory cannot take (C-13):** a file the TypeScript
