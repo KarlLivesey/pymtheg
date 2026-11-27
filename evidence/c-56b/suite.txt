@@ -1,0 +1,15 @@
+On the first base (b06e44de, this chunk on 54cd0e6f):
+
+Full suite on the dev server (build, tsc, format:check, npm test, npm run test:backend), commit b06e44de:
+
+tsc ok
+All matched files use Prettier code style!
+npm test: tests 3410, pass 3410, fail 0, cancelled 0
+npm run test:backend: tests 97, pass 97, fail 0, cancelled 0, skipped 0
+
+On the pushed tree after the reviews and merging main 3317335b (d62ed287):
+
+tsc ok
+All matched files use Prettier code style!
+npm test: tests 3474, pass 3474, fail 0, cancelled 0
+npm run test:backend: tests 97, pass 97, fail 0

@@ -4,7 +4,6 @@
 // leaves every other symbol's id as it was; Go's overloaded-looking shapes
 // get distinct ids; the stored graph equals a cold index.
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -16,6 +15,8 @@ import {
 } from "../dist/graph/index.js";
 import go from "../dist/graph/languages/go/index.js";
 import { notesSymbols } from "../dist/graph/languages/go/resolve.js";
+import { graphWork, resetGraphWork } from "../dist/graph/work.js";
+import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
 
 const registry = new LanguageRegistry([go]);
 // Every shape the review named: methods of one name on different
@@ -72,44 +73,29 @@ test("Go's overloaded-looking shapes get distinct notes ids, the ones the store 
     await indexProject(root, registry, store);
     for (const file of store.files()) {
       if (file.module !== "go" || file.result.status === "failed") continue;
-      const named = notesSymbols(file);
+      const named = notesSymbols(store.projectId, file);
       const ids = named.map((symbol) => symbol.id);
       assert.equal(new Set(ids).size, ids.length, `distinct in ${file.path}`);
       for (const id of ids) assert.doesNotMatch(id, /^draft:/);
-      // Each symbol gets the store's own ordinal, matched by key, and the id
-      // the core builds from it (under the notes pass's project id).
+      // C-56b: each symbol gets the id and ordinal the store gives the
+      // symbol with the same key (not only the same set of ids).
       const stored = new Map(
         store
           .findSymbols({ file: file.path })
           .map((symbol) => [symbol.key, symbol]),
       );
+      assert.equal(stored.size, named.length, file.path);
       for (const symbol of named) {
         const own = stored.get(symbol.key);
         assert.ok(own, `${symbol.key} in ${file.path}`);
         assert.equal(symbol.ordinal, own.ordinal, `${symbol.key}`);
-        assert.equal(
-          symbol.id,
-          `symbol:${createHash("sha256")
-            .update(
-              JSON.stringify([
-                "v2",
-                "go-overflow",
-                file.module,
-                file.path,
-                own.kind,
-                own.identity,
-                own.ordinal,
-              ]),
-            )
-            .digest("hex")}`,
-          `${symbol.key}`,
-        );
+        assert.equal(symbol.id, own.id, `${symbol.key}`);
       }
     }
     // Each shape as Go's extractor names it. Several init functions share
     // kind and identity: the tie is broken by the ordinal, in source order.
     const named = (path) =>
-      notesSymbols(store.getFile(path)).map(
+      notesSymbols(store.projectId, store.getFile(path)).map(
         (symbol) => `${symbol.kind} ${symbol.identity} ${symbol.ordinal}`,
       );
     const a = named("p/a.go");
@@ -139,7 +125,7 @@ test("Go's overloaded-looking shapes get distinct notes ids, the ones the store 
     // init across files and build-tag twins: one identity, distinct ids,
     // because the file is part of the id.
     const ids = (path, identity) =>
-      notesSymbols(store.getFile(path))
+      notesSymbols(store.projectId, store.getFile(path))
         .filter((symbol) => symbol.identity === identity)
         .map((symbol) => symbol.id);
     const inits = [...ids("p/a.go", "init"), ...ids("p/b.go", "init")];
@@ -161,11 +147,9 @@ test("a body edit above every declaration leaves every notes id as it was", asyn
   const store = new SqliteGraphStore(join(base, "graph.sqlite"));
   try {
     await indexProject(root, registry, store);
-    const before = notesSymbols(store.getFile("p/a.go")).map((symbol) => [
-      symbol.kind,
-      symbol.identity,
-      symbol.id,
-    ]);
+    const before = notesSymbols(store.projectId, store.getFile("p/a.go")).map(
+      (symbol) => [symbol.kind, symbol.identity, symbol.id],
+    );
     // Moves every offset in the file; changes no declaration.
     writeFileSync(
       join(root, "p/a.go"),
@@ -175,11 +159,9 @@ test("a body edit above every declaration leaves every notes id as it was", asyn
       ),
     );
     await indexProject(root, registry, store);
-    const after = notesSymbols(store.getFile("p/a.go")).map((symbol) => [
-      symbol.kind,
-      symbol.identity,
-      symbol.id,
-    ]);
+    const after = notesSymbols(store.projectId, store.getFile("p/a.go")).map(
+      (symbol) => [symbol.kind, symbol.identity, symbol.id],
+    );
     assert.deepEqual(after, before);
   } finally {
     store.close();
@@ -213,13 +195,15 @@ test("the ordinal follows source order, not key order", async () => {
         .filter((symbol) => symbol.name === "init")
         .map((symbol) => [symbol.range.start, symbol.ordinal])
         .sort((a, b) => a[0] - b[0]);
-    const keys = notesSymbols(store.getFile("p/o.go"))
+    const keys = notesSymbols(store.projectId, store.getFile("p/o.go"))
       .filter((symbol) => symbol.name === "init")
       .map((symbol) => symbol.key)
       .sort();
     assert.ok(keys[0].includes(`:${second}:`), "key order differs");
     assert.deepEqual(
-      inits(notesSymbols(store.getFile("p/o.go"))).map(([, n]) => n),
+      inits(notesSymbols(store.projectId, store.getFile("p/o.go"))).map(
+        ([, n]) => n,
+      ),
       [0, 1],
     );
     assert.deepEqual(
@@ -228,6 +212,77 @@ test("the ordinal follows source order, not key order", async () => {
     );
   } finally {
     store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("the live notes pass, called by analyze, names every symbol by its stored id", async () => {
+  const { notesProbe } = await import("../dist/graph/languages/go/resolve.js");
+  const { base, root } = tree();
+  const store = new SqliteGraphStore(join(base, "graph.sqlite"));
+  const seen = [];
+  notesProbe.symbols = (symbols) => seen.push(...symbols);
+  try {
+    await indexProject(root, registry, store);
+    notesProbe.symbols = undefined;
+    assert.ok(seen.length > 0);
+    const stored = new Map(
+      store
+        .findSymbols()
+        .map((symbol) => [`${symbol.file}\0${symbol.key}`, symbol.id]),
+    );
+    const wrong = seen.filter(
+      (symbol) => stored.get(`${symbol.file}\0${symbol.key}`) !== symbol.id,
+    );
+    assert.deepEqual(
+      wrong.map((symbol) => symbol.key),
+      [],
+    );
+  } finally {
+    notesProbe.symbols = undefined;
+    store.close();
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("a scoped run writes its file's implements links again and keeps every other file's", async () => {
+  const base = mkdtempSync(join(tmpdir(), "c56b-scoped-"));
+  const root = join(base, "tree");
+  const files = {
+    "go.mod": "module example.com/m\n\ngo 1.22\n",
+    "i/i.go": "package i\n\ntype I interface{ M() int }\n",
+    "a/a.go": "package a\n\ntype A struct{}\n\nfunc (A) M() int { return 1 }\n",
+    "b/b.go": "package b\n\ntype B struct{}\n\nfunc (B) M() int { return 1 }\n",
+  };
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, path)), { recursive: true });
+    writeFileSync(join(root, path), text);
+  }
+  const path = join(base, "graph.sqlite");
+  try {
+    const first = new SqliteGraphStore(path);
+    await indexProject(root, registry, first);
+    const projectId = first.projectId;
+    first.close();
+    // Only a receiver method's body changes: the run is scoped to a/a.go.
+    writeFileSync(join(root, "a/a.go"), files["a/a.go"].replace("1", "2"));
+    const again = new SqliteGraphStore(path);
+    resetGraphWork();
+    await indexProject(root, registry, again);
+    const implementers = again
+      .links()
+      .filter((link) => link.kind === "implements")
+      .map((link) => link.file)
+      .sort();
+    again.close();
+    assert.equal(graphWork.counts["resolve.go.decisionFiles"], 1, "scoped");
+    assert.deepEqual(implementers, ["a/a.go", "b/b.go"]);
+    const cold = join(base, "cold.sqlite");
+    const fresh = new SqliteGraphStore(cold, projectId);
+    await indexProject(root, registry, fresh);
+    fresh.close();
+    assert.deepEqual(compareRows(storeRows(path), storeRows(cold)), []);
+  } finally {
     rmSync(base, { recursive: true, force: true });
   }
 });

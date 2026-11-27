@@ -3669,6 +3669,7 @@ below it, so nothing the pass builds could be kept across an edit (C-56).
 pass finds, and Go's module version (unchanged, 33): the draft ids were never stored,
 and a Go body edit already rewrites no other file's stored link data.
 See [C-56a](changes/C-56a.md).
+
 ### Nothing stored beside a source file holds a program (C-64)
 
 **Decided (C-64):** C-64 removes compiler references from the stored name
@@ -3685,3 +3686,18 @@ snapshot were reachable through this path. **Unchanged:** stored rows; module ve
 not ours:** TypeScript's checker itself writes onto a shared parse a symbol
 that reaches its types, and V8's allocation-site feedback for
 `createProgram` holds one program. See [C-64](changes/C-64.md).
+
+### Go's implements pass is a plain value; both index builds use stored ids (C-56b)
+
+**Decided (C-56b):** Go's implements pass returns its decisions as a value
+of symbol ids and flags (interfaces with a known, nonempty source-only
+method set; type/interface pairs that remain possible; and pairs that pass
+the source-only structural check, each with a pointer-receiver flag and a
+signature-identity annotation of `identical`, `different` or `unknown`;
+structural matches, not verified implementations; in the order made), and a separate step turns them into the run's dispatch sets
+and `implements` links. The notes pass computes its symbols' ids under the
+store's project id, so both builds of Go's global index name each
+declaration by its stored id. Under the test suite the decisions cross
+JSON before use. **Why:** C-56 can keep a value, not caches that close over
+a resolver. **Unchanged:** every decision, link, note and stored row.
+See [C-56b](changes/C-56b.md).
