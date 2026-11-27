@@ -7,6 +7,11 @@
 //                   after the walk; after it here)
 //   after-parse     the parse write's first store call, before the run's
 //                   first commit (its claim)
+//   after-claim     just after the run's claim has committed, before the
+//                   transaction of its capture check (no lock held)
+//   before-capture  inside that transaction, before the capture check
+//   after-capture   just after the capture check passed, inside that
+//                   transaction (the run's first rows not yet committed)
 //   before-finish   the run's finishIndexRun, its mark still held
 //   before-publish  the command's completion record, after its rows
 //   none            no stop
@@ -64,7 +69,18 @@ if (gate === "after-walk") {
   for (const name of ["beginIndexRun", "completedAnalysis"])
     before(name, () => walked);
 } else if (gate === "after-parse") before("replaceContexts");
-else if (gate === "before-finish") before("finishIndexRun");
+else if (gate === "after-claim") before("claimCommitted");
+else if (gate === "before-capture" || gate === "after-capture") {
+  const original = proto.verifyIndexCapture;
+  proto.verifyIndexCapture = function (verify) {
+    return original.call(this, () => {
+      if (gate === "before-capture") hold();
+      const current = verify();
+      if (current && gate === "after-capture") hold();
+      return current;
+    });
+  };
+} else if (gate === "before-finish") before("finishIndexRun");
 else if (gate === "before-publish") before("completeGraphCommandState");
 else if (gate !== "none") throw Error("unknown gate " + gate);
 

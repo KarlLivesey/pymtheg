@@ -6,7 +6,8 @@
 // waits on an event. Every case must end equal to a cold index of the tree,
 // with its completion intact, with no further index.
 import assert from "node:assert/strict";
-import { fork, spawnSync } from "node:child_process";
+import { fork, spawn, spawnSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import {
   existsSync,
   mkdirSync,
@@ -24,6 +25,28 @@ import {
   SqliteGraphStore,
 } from "../dist/graph/index.js";
 import { compareRows, storeRows } from "../scripts/reindex/dump.mjs";
+
+/** `promise`, or after a safety bound `onExpiry` runs and the wait fails; the bound decides nothing when a test passes. */
+async function bounded(promise, what, onExpiry) {
+  let timer;
+  let expired = false;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          expired = true;
+          reject(Error(`Safety budget exhausted waiting for ${what}`));
+        }, 180_000);
+      }),
+    ]);
+  } catch (error) {
+    if (expired) onExpiry();
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const child = new URL("graph-index-ownership-child.mjs", import.meta.url)
   .pathname;
@@ -85,7 +108,8 @@ const cli = (root, command = "index", ...args) => {
       root,
       "--json",
     ],
-    { encoding: "utf8" },
+    // A bound: a run that waits on a stopped child fails instead of hanging.
+    { encoding: "utf8", timeout: 180_000, killSignal: "SIGKILL" },
   );
   assert.ok(result.status <= 2, result.stderr);
   return JSON.parse(result.stdout);
@@ -129,7 +153,11 @@ async function stopped(root, how, gate, prepare) {
       done({ code, signal });
     }),
   );
-  const message = await at;
+  // Bounded, so a run that never reaches its gate (or never exits) fails
+  // the test instead of hanging it, and is killed.
+  const bound = (promise, what) =>
+    bounded(promise, what, () => run.kill("SIGKILL"));
+  const message = await bound(at, `the run to reach ${gate}`);
   assert.ok(message, `the run reached ${gate}`);
   // Stopped for certain, not only about to be.
   while (!/^State:\s+T/m.test(readFileSync(`/proc/${run.pid}/status`, "utf8")))
@@ -137,13 +165,13 @@ async function stopped(root, how, gate, prepare) {
   return {
     async resume() {
       run.kill("SIGCONT");
-      const result = await exited;
+      const result = await bound(exited, "the resumed run to exit");
       assert.equal(result.code, 0);
       return reply;
     },
     async kill() {
       run.kill("SIGKILL");
-      await exited;
+      await bound(exited, "the killed run to exit");
     },
   };
 }
@@ -245,6 +273,256 @@ for (const language of Object.keys(LANGUAGES)) {
   );
 }
 
+// Sol review (C-62): the claim commits on its own, before the capture
+// check. Helpers: the meta rows as stored, a no-op commit by another
+// connection, and B, an index in another process, run concurrently.
+const metaRows = (root) => {
+  const db = new DatabaseSync(graphAt(root), { readOnly: true });
+  try {
+    return db
+      .prepare("SELECT key, value FROM graph_meta ORDER BY key")
+      .all()
+      .map((row) => [row.key, row.value]);
+  } finally {
+    db.close();
+  }
+};
+const graphTables = (before, after) =>
+  compareRows(before, after).filter((diff) => diff.table !== "graph_meta");
+const noOpCommit = (root) => {
+  const db = new DatabaseSync(graphAt(root));
+  try {
+    db.exec(
+      "BEGIN IMMEDIATE; INSERT INTO graph_meta VALUES ('c62-test','x'); DELETE FROM graph_meta WHERE key='c62-test'; COMMIT;",
+    );
+  } finally {
+    db.close();
+  }
+};
+/** B: `graph index` in another process, started now; resolves to its answer. */
+function concurrentIndex(root) {
+  const child = spawn(
+    process.execPath,
+    [resolve("dist/cli/main.js"), "graph", "index", "--root", root, "--json"],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  let stdout = "";
+  let stderr = "";
+  child.stdout.setEncoding("utf8").on("data", (text) => (stdout += text));
+  child.stderr.setEncoding("utf8").on("data", (text) => (stderr += text));
+  const bound = setTimeout(() => child.kill("SIGKILL"), 180_000);
+  return new Promise((done) =>
+    child.on("close", (code) => {
+      clearTimeout(bound);
+      let answer;
+      try {
+        answer = JSON.parse(stdout);
+      } catch {
+        answer = undefined;
+      }
+      done({ code, answer, stderr });
+    }),
+  );
+}
+
+// A's capture no longer matches when it is checked, after its claim: A
+// undoes the claim exactly. While A is held, a reader sees the old rows and
+// no completion; afterwards the store is as before A started, row for row
+// (its meta rows included), complete, and a no-edit index still verifies.
+// B, an index run concurrently, either verifies or is taken over by the
+// undo; it never leaves the store otherwise.
+const undoCase = (language, how) =>
+  test(
+    `${language}${how === "session" ? " in a session" : ""}: a run whose capture no longer matches after its claim undoes the claim exactly; a concurrent index sees no torn state`,
+    { skip: !proc && "needs /proc to see the child stopped" },
+    async () => {
+      const L = LANGUAGES[language];
+      const { base, root, write, read } = project(language);
+      try {
+        let original = read(L.exported);
+        // The store as it is before A starts (in a session, after the
+        // session's first run, which kept Go's inputs).
+        let before;
+        const snapshot = () => ({
+          rows: storeRows(graphAt(root)),
+          meta: metaRows(root),
+        });
+        if (how === "session") write(L.exported, L.edit(original));
+        else {
+          before = snapshot();
+          write(L.exported, L.removeExport(original));
+        }
+        const A = await stopped(
+          root,
+          how,
+          "before-capture",
+          how === "session"
+            ? (warm) => {
+                keptGo(warm);
+                before = snapshot();
+                original = read(L.exported);
+                write(L.exported, L.removeExport(original));
+              }
+            : undefined,
+        );
+        // A is held after its claim: no completion, the old rows.
+        assert.equal(
+          metaRows(root).some(([key]) => key === "command-complete"),
+          false,
+          "no completion while the claim is held",
+        );
+        assert.deepEqual(
+          graphTables(before.rows, storeRows(graphAt(root))),
+          [],
+          "the old rows while the claim is held",
+        );
+        write(L.exported, original);
+        const B = concurrentIndex(root);
+        overtaken(await A.resume(), "A");
+        const b = await B;
+        assert.ok(
+          b.answer?.sync?.complete === true || b.code !== 0,
+          `B: ${b.code} ${b.stderr}`,
+        );
+        // As before A started: rows and meta rows.
+        assert.deepEqual(metaRows(root), before.meta, "the meta rows");
+        assert.deepEqual(
+          graphTables(before.rows, storeRows(graphAt(root))),
+          [],
+          "the rows",
+        );
+        assert.equal(cli(root, "status").sync.complete, true);
+        // A no-edit index verifies: it writes nothing.
+        assert.equal(cli(root).sync.complete, true);
+        assert.deepEqual(metaRows(root), before.meta, "verified, unchanged");
+        await settled(base, root, "after A");
+      } finally {
+        rmSync(base, { recursive: true, force: true });
+      }
+    },
+  );
+for (const language of Object.keys(LANGUAGES)) undoCase(language, "command");
+undoCase("go", "session");
+
+// Something else commits after A's claim: no undo. A no-op commit by
+// another connection leaves the store reporting incomplete, which one more
+// index repairs; a newer run that claims leaves its own store untouched.
+test(
+  "go: a run whose claim another connection committed after is not undone; the store reports incomplete until the next index",
+  { skip: !proc && "needs /proc to see the child stopped" },
+  async () => {
+    const L = LANGUAGES.go;
+    const { base, root, write, read } = project("go");
+    try {
+      const original = read(L.exported);
+      write(L.exported, L.removeExport(original));
+      const A = await stopped(root, "command", "after-claim");
+      write(L.exported, original);
+      noOpCommit(root);
+      overtaken(await A.resume(), "A");
+      assert.equal(cli(root, "status").sync.complete, false);
+      assert.equal(cli(root).sync.complete, true);
+      await settled(base, root, "after one more index");
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  },
+);
+test(
+  "go: a newer run that claims after A's claim keeps its store; A writes nothing",
+  { skip: !proc && "needs /proc to see the child stopped" },
+  async () => {
+    const L = LANGUAGES.go;
+    const { base, root, write, read } = project("go");
+    try {
+      const original = read(L.exported);
+      write(L.exported, L.removeExport(original));
+      const A = await stopped(root, "command", "after-claim");
+      write(L.exported, original);
+      assert.equal(cli(root).sync.complete, true);
+      const B = storeRows(graphAt(root));
+      const meta = metaRows(root);
+      overtaken(await A.resume(), "A");
+      assert.deepEqual(compareRows(B, storeRows(graphAt(root))), [], "B");
+      assert.deepEqual(metaRows(root), meta, "B's meta rows");
+      await settled(base, root, "after A");
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  },
+);
+
+// Opus review: a run that writes nothing (B, with no edit) begins after A
+// has finished its run and before A publishes its completion; A publishes
+// after B's baseline. B recognises A's completion: it publishes nothing and
+// does not mark the store interleaved, so no later index redoes everything.
+test(
+  "go: a run that writes nothing leaves the completion another run published after its baseline",
+  { skip: !proc && "needs /proc to see the child stopped" },
+  async () => {
+    const L = LANGUAGES.go;
+    const { base, root, write, read } = project("go");
+    try {
+      write(L.exported, L.edit(read(L.exported)));
+      const A = await stopped(root, "command", "before-publish");
+      // A has finished its run: B finds nothing to write.
+      const B = await stopped(root, "command", "before-publish");
+      const a = await A.resume();
+      assert.equal(a.complete, true, JSON.stringify(a));
+      const b = await B.resume();
+      assert.equal(b.complete, true, JSON.stringify(b));
+      assert.equal(
+        metaRows(root).some(([key]) => key === "index-run"),
+        false,
+        "no interleaved mark",
+      );
+      await settled(base, root, "after B");
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  },
+);
+
+// The Sol reviewer's window: A has passed its capture check (after its
+// claim) and is held before its first rows commit; the file is restored
+// and B indexes concurrently. B can no longer verify the old completion
+// (the claim removed it). Whatever the order, B never answers complete
+// over a store that differs from a cold index, and at most one more index
+// settles it.
+for (const language of Object.keys(LANGUAGES))
+  test(
+    `${language}: a run held after its capture check: a concurrent index never answers complete over a stale store`,
+    { skip: !proc && "needs /proc to see the child stopped" },
+    async () => {
+      const L = LANGUAGES[language];
+      const { base, root, write, read } = project(language);
+      try {
+        const original = read(L.exported);
+        write(L.exported, L.removeExport(original));
+        const A = await stopped(root, "command", "after-capture");
+        write(L.exported, original);
+        // B runs to its end while A is held: it cannot verify the old
+        // completion (the claim removed it), and it cannot write while A
+        // holds the lock, so it ends without answering complete.
+        const b = await concurrentIndex(root);
+        assert.notEqual(
+          b.answer?.sync?.complete,
+          true,
+          `B answered complete over A's held claim: ${b.stderr}`,
+        );
+        await A.resume();
+        if (b.answer?.sync?.complete === true)
+          await settled(base, root, "B answered complete");
+        else {
+          assert.equal(cli(root).sync.complete, true);
+          await settled(base, root, "after one more index");
+        }
+      } finally {
+        rmSync(base, { recursive: true, force: true });
+      }
+    },
+  );
+
 // The reviewer's two windows again, with A in an IndexSession whose first
 // run kept Go's inputs (C-55; Go is the module that keeps them). A must
 // still be rejected and leave B's store untouched.
@@ -340,6 +618,8 @@ for (const order of ["A, B", "B, A"])
 for (const gate of [
   "after-walk",
   "after-parse",
+  "after-claim",
+  "before-capture",
   "before-finish",
   "before-publish",
 ])
@@ -358,6 +638,9 @@ for (const gate of [
           gate,
         );
         await A.kill();
+        // Killed after its claim committed: the store reports incomplete.
+        if (gate === "after-claim" || gate === "before-capture")
+          assert.equal(cli(root, "status").sync.complete, false, gate);
         if (gate === "after-walk" || gate === "after-parse")
           assert.deepEqual(
             compareRows(before, storeRows(graphAt(root))),

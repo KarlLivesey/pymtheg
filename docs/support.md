@@ -1017,21 +1017,31 @@ and has files in the index, the path its analysis took:
 line in the CLI's text (`Analysis typescript: full (no previous index)`).
 TypeScript reports `full` or `reused`; Go and Rust report none yet. The
 note `no previous index` means no run finished completely before this one
-(the store's `index-completed` record). A TypeScript store written before
-that record existed reports `no previous index` once, on its next index,
-which writes the record (tested whether its last run finished or not).
+(the store's `index-completed` record). A store written before that record
+existed reports `no previous index` once, on its next index, which writes
+the record, if it holds no Go or Rust files or its last run did not finish
+(tested for a TypeScript-only store, finished or not); one whose last run
+finished with Go or Rust files reports no note, since their completed
+analysis counts as a finished run (tested with Go).
 [C-38A](changes/C-38A.md)
 
 **Concurrent index runs (C-62).** When two index runs overlap, the one
 another run has overtaken writes nothing and never disturbs the newer run's
 mark. Its baseline is read before it walks the tree, so a commit by any
-other run after that stops it at its first write. That first write also
-refuses a capture the disk no longer matches (the walk, or a file the run
-would write), since another run may have found the newer tree current
-without writing. Only the newest run that claimed the store publishes its
-completion. The overtaken run answers taken over, stale or incomplete; the
-newer run's result stands, and the store equals a cold index of the tree
-with no further index. In an index session (the MCP server's worker), an
+other run after that stops it at its first write. Its claim (its mark, and
+the completion records removed) commits on its own; only then does the
+transaction of its first rows check that the disk still matches what it
+captured (the walk, or a file the run would write), since another run may
+have found the newer tree current without writing. A run whose check fails
+undoes its claim, putting back exactly what the claim replaced, if nothing
+else has committed since; otherwise the store reports incomplete until the
+next index. A run publishes its completion only while no newer run has
+claimed the store, and a run that wrote nothing leaves a completion another
+run published after its baseline. The overtaken run answers taken over,
+stale or incomplete; the newer run's result stands, and the store equals a
+cold index of the tree with no further index. An index that read its
+baseline while another run's claim was held answers taken over if that
+claim is then undone; the store is as it was. In an index session (the MCP server's worker), an
 overtaken run keeps nothing, and the session drops what it had kept
 (C-55's kept inputs included). No lease or timeout is involved.
 [C-62](changes/C-62.md)

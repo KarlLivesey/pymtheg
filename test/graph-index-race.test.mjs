@@ -121,11 +121,12 @@ test(
       write("src/c.ts", "export const c = 42;\n");
       assert.equal(cli(root).sync.complete, true);
       const reply = await A.resume();
-      // The other run committed after A's baseline. A stops as overtaken
-      // at its first write, or (C-62: its baseline is read before its walk,
-      // so it walks the tree the other run left) finds nothing to write.
-      // Either way it writes nothing it saw before the other run; a
-      // completion it reports is the store's, which equals a cold index.
+      // A read its baseline before the other run committed, and walks the
+      // tree after it (C-62 reads the baseline before the walk). If it has
+      // anything to write, its first write finds that commit and stops it
+      // as taken over; if the tree it walked is the one the other run
+      // indexed, it writes nothing and answers the store's completion.
+      // Either way it writes nothing it saw before the other run.
       if (reply.error)
         assert.match(reply.error, /took it over/, JSON.stringify(reply));
       assert.deepEqual(await equalsCold(base, root), []);
