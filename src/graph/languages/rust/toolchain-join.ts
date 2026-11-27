@@ -21,11 +21,10 @@
  * the analysis (index.ts). SCIP positions are UTF-8 bytes within lines;
  * Pymtheg ranges are UTF-16 offsets, converted per file.
  *
- * Only checkout answers are returned as targets. An answer naming another
- * crate is counted, never applied: Pymtheg names a library target by the
- * path the code writes (D20), the toolchain by the declaring path, and
- * telling that both name one declaration needs an identity rule this change
- * does not invent.
+ * Checkout answers are returned as targets. An answer naming another crate
+ * is returned as a library key (D24): the unit (a dependency's package, or
+ * a standard-library crate) and the normalised declaring path
+ * (`libraryPath`). Fields, blanket impls and crate roots are not keyed.
  */
 import type { ParseResult } from "../../types.js";
 import { parseSymbol, type ParsedSymbol, type ScipDocument } from "./scip.js";
@@ -145,6 +144,8 @@ export interface LinkTrace {
 export interface JoinOutcome {
   /** Per file, per parsed link index: the checkout symbol the toolchain names. */
   answers: Map<string, Map<number, string>>;
+  /** Per file, per parsed link index: the library key the toolchain names (D24). */
+  libraryAnswers: Map<string, Map<number, LibraryKey>>;
   /**
    * Per file, per answered link index: the bindings its site passes through
    * (design B). A path's trace is every occurrence inside the written path;
@@ -199,6 +200,45 @@ const GRAPH_KINDS: Record<string, ReadonlySet<string>> = {
   macro: new Set(["macro", "function"]),
   "attr-macro": new Set(["macro", "function"]),
 };
+
+/** A library answer's key (D24), before the analysis gates and the version. */
+export interface LibraryKey {
+  ecosystem: "cargo" | "rust-std";
+  unit: string;
+  symbol: string;
+  /** The version SCIP names (the resolved one for a dependency; a URL for std). */
+  scipVersion: string;
+}
+
+const STD = new Set(["std", "core", "alloc", "proc_macro", "test"]);
+const bare = (name: string) => name.replace(/<.*$/s, "").trim();
+
+/**
+ * D24: the normalised declaring path of a SCIP symbol in its crate. Module
+ * segments are joined with `::`. An inherent impl's item is
+ * `module::Type::item`, a trait impl's `<module::Type as Trait>::item`, with
+ * generic arguments dropped. Returns undefined for a blanket impl (its self
+ * type is a type parameter: no nameable owner) or a crate root.
+ */
+export function libraryPath(p: ParsedSymbol): string | undefined {
+  const modules: string[] = [];
+  let i = 0;
+  while (i < p.path.length && p.kinds[i] === "namespace")
+    modules.push(p.path[i++]!);
+  if (i >= p.path.length) return undefined;
+  const prefix = (name: string) => [...modules, name].join("::");
+  if (p.path[i] === "impl" && p.kinds[i] === "type") {
+    const self = p.kinds[i + 1] === "typeparam" ? bare(p.path[i + 1]!) : "";
+    if (!self || /^[A-Z]$/.test(self)) return undefined;
+    const trait =
+      p.kinds[i + 2] === "typeparam" ? bare(p.path[i + 2]!) : undefined;
+    const rest = p.path.slice(i + (trait ? 3 : 2));
+    if (!rest.length) return undefined;
+    const owner = trait ? `<${prefix(self)} as ${trait}>` : prefix(self);
+    return [owner, ...rest].join("::");
+  }
+  return [...modules, ...p.path.slice(i)].join("::");
+}
 
 /** What each link kind may name (C-19). Other kinds take no answer. */
 const KINDS: Record<string, ReadonlySet<string>> = {
@@ -409,8 +449,42 @@ export function joinScip(
     functionTraces.set(fn.id, found);
     return found;
   };
+  /** Design B: the trace of one answered site (checkout or library). */
+  const recordTrace = (
+    f: JoinFile,
+    link: JoinFile["result"]["links"][number],
+    index: number,
+    siteStart: number,
+    e: number,
+  ) => {
+    const t = texts.get(f.path)!;
+    const start = t.byte(link.range.start);
+    const receiver = /\./.test(
+      f.text.slice(link.range.start, siteStart).replace(/\.\.|"[^"]*"/g, ""),
+    );
+    let enclosing: { id: string; start: number; end: number } | undefined;
+    if (receiver)
+      for (const sym of symbolsByFile.get(f.path) ?? [])
+        if (
+          (sym.kind === "function" || sym.kind === "method") &&
+          sym.start <= start &&
+          e <= sym.end &&
+          (!enclosing || sym.start > enclosing.start)
+        )
+          enclosing = sym;
+    let traceGroup = traces.get(f.path);
+    if (!traceGroup) traces.set(f.path, (traceGroup = new Map()));
+    if (enclosing) {
+      const fn = functionTrace(f.path, enclosing);
+      let upTo = 0;
+      while (upTo < fn.at.length && fn.at[upTo]! < e) upTo++;
+      traceGroup.set(index, { receiver, enclosing: enclosing.id, upTo });
+    } else
+      traceGroup.set(index, { receiver, entries: traceOf(f.path, start, e) });
+  };
   // ---- every parsed link
   const answers = new Map<string, Map<number, string>>();
+  const libraryAnswers = new Map<string, Map<number, LibraryKey>>();
   const reasons = explain ? new Map<string, string[]>() : undefined;
   for (const f of files) {
     const t = texts.get(f.path)!;
@@ -469,10 +543,33 @@ export function joinScip(
           p.path[n - 2] !== "impl"
         )
           return "none:trait-declaration";
-        if (!def)
-          return checkoutCrates.has(`${p.crate} ${p.version}`)
-            ? "unapplied:generated"
-            : "unapplied:library";
+        if (!def) {
+          if (checkoutCrates.has(`${p.crate} ${p.version}`))
+            return "unapplied:generated";
+          // D24: a library answer, keyed by its unit and declaring path.
+          // A member written after "." whose descriptor is a term of a type
+          // is a field (no symbol names it); a variant is written after "::".
+          if (
+            p.kinds[n - 1] === "term" &&
+            p.kinds[n - 2] === "type" &&
+            p.path[n - 2] !== "impl" &&
+            /\.\s*(r#)?[A-Za-z_][A-Za-z0-9_]*\s*$/.test(link.targetName)
+          )
+            return "none:library-field";
+          const symbol = libraryPath(p);
+          if (!symbol) return "unapplied:library-blanket";
+          let group = libraryAnswers.get(f.path);
+          if (!group) libraryAnswers.set(f.path, (group = new Map()));
+          group.set(index, {
+            ecosystem: STD.has(p.crate) ? "rust-std" : "cargo",
+            unit: p.crate,
+            symbol,
+            scipVersion: p.version,
+          });
+          // Design B governs library answers too.
+          recordTrace(f, link, index, site.s, e);
+          return "library";
+        }
         const name = texts
           .get(def.path)!
           .slice(def.s, def.e)
@@ -482,33 +579,7 @@ export function joinScip(
         let group = answers.get(f.path);
         if (!group) answers.set(f.path, (group = new Map()));
         group.set(index, found.id);
-        // Design B: the trace of this site.
-        const start = t.byte(link.range.start);
-        const receiver = /\./.test(
-          f.text.slice(link.range.start, site.s).replace(/\.\.|"[^"]*"/g, ""),
-        );
-        let enclosing: { id: string; start: number; end: number } | undefined;
-        if (receiver)
-          for (const sym of symbolsByFile.get(f.path) ?? [])
-            if (
-              (sym.kind === "function" || sym.kind === "method") &&
-              sym.start <= start &&
-              e <= sym.end &&
-              (!enclosing || sym.start > enclosing.start)
-            )
-              enclosing = sym;
-        let traceGroup = traces.get(f.path);
-        if (!traceGroup) traces.set(f.path, (traceGroup = new Map()));
-        if (enclosing) {
-          const fn = functionTrace(f.path, enclosing);
-          let upTo = 0;
-          while (upTo < fn.at.length && fn.at[upTo]! < e) upTo++;
-          traceGroup.set(index, { receiver, enclosing: enclosing.id, upTo });
-        } else
-          traceGroup.set(index, {
-            receiver,
-            entries: traceOf(f.path, start, e),
-          });
+        recordTrace(f, link, index, site.s, e);
         // C-43 review: an associated type or const named through a trait
         // (`S::Error`, `Self::SIDES` in generic code) is answered with the
         // trait's declaration, which is what the code names; counted apart.
@@ -530,6 +601,7 @@ export function joinScip(
   }
   return {
     answers,
+    libraryAnswers,
     traces,
     functionTraces,
     counts,

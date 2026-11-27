@@ -2503,6 +2503,38 @@ location always counts against its unit. The mark is for environment globals: th
 library, DOM, workers, Node and compatible runtimes, and packages that
 augment them.
 
+### D24: a Rust library answer is keyed by its unit and declaring path
+
+**Decided (manager, 23 November 2026):** when the opt-in Rust toolchain route
+(C-43) names an item outside the checkout, the link takes a library target
+keyed by the source-only unit (`cargo` and the dependency's package, or
+`rust-std` and `std`, `core` or `alloc`) and the item's normalised
+declaring path in that unit (modules joined with `::`; an inherent impl's
+item `module::Type::item`, a trait impl's `<module::Type as Trait>::item`,
+generic arguments dropped), with evidence `toolchain-declaring-path`,
+`decidedBy: "toolchain"` and the run's configuration. A dependency's version
+is recorded only when the root `Cargo.lock` states that package at exactly
+the version rust-analyzer resolved; a standard-library target has none. The
+path the code writes is recorded beside it (`toolchainLibrary.written`). An
+offer the stored link does not take leaves the link, which keeps its
+route-off data and records why in `toolchainOutcome` (ruling on PR 70).
+**Why:** rust-analyzer proves the declaration; its declaring path is the one
+name it gives, and a public-path table (C-19's `rustpath.mjs`) would be a
+second resolver. **Rules out:** changing a source-only library target (it
+stays: an identical key counts as agreement, any other as unverified, and the
+item is counted as having two keys); narrowing a candidate set except to a
+library target it already holds; fields, locals, blanket impls (no nameable
+owner) and crate roots; trait-method declarations (dispatch); answers from a
+partial index. (The rule against answers on a link under a cfg condition
+other than `test` was replaced on 24 November 2026: library answers are per
+configuration and labelled, as in "D17 and D21 clarified".)
+**A cfg twin inside the dependency** is the dependency's own business: the
+SCIP data names the external item by its path and carries no cfg
+information about the dependency's source, so the twin cannot be seen. The
+one configuration's answer is taken as that crate's item path, which names
+the item in every configuration where the path exists. The twin rules of
+C-43 apply to items in the checkout only.
+
 ### D19: coverage is judged with dependencies installed
 
 **Decided (Karl, 21 November 2026):** "we will assume in 99% of cases

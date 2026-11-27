@@ -158,6 +158,7 @@ export const libraryEvidence: Readonly<
   "reference-directive": { symbol: false, definite: true },
   "glob-import": { symbol: true, definite: false },
   "declaring-owner": { symbol: "required", definite: true },
+  "toolchain-declaring-path": { symbol: "required", definite: true },
 };
 /**
  * The manifests and lockfiles that can state a library version, by file name,

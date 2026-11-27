@@ -46,7 +46,7 @@ function rustLinks(path) {
   const db = new DatabaseSync(path, { readOnly: true });
   try {
     const links = new Map();
-    const rows = db.prepare(`SELECT l.id, l.file, l.kind, l.resolution, l.target, l.body, t.unit, t.symbol, t.evidence
+    const rows = db.prepare(`SELECT l.id, l.file, l.kind, l.resolution, l.target, l.body, t.ecosystem, t.unit, t.symbol, t.evidence
       FROM graph_links l LEFT JOIN graph_library_targets t ON l.resolution='library' AND t.link=l.id AND t.role='target'
       WHERE l.module='rust'`).iterate();
     for (const row of rows) {
@@ -57,6 +57,10 @@ function rustLinks(path) {
       const moduleLink = row.kind === "imports" && row.resolution === "library" && !level2 && storedReasons(data).length === 0;
       links.set(row.id, { kind: row.kind, resolution: row.resolution, target: row.target, level2, moduleLink,
         assumed: level2 && Array.isArray(data.assumes) && data.assumes.length > 0, toolchain: data.toolchain,
+        // D24: a library target the route applied, and the answer it offered.
+        toolchainLibrary: row.evidence === "toolchain-declaring-path",
+        libraryRecord: row.evidence === "toolchain-declaring-path" ? data.toolchainLibrary ?? null : null,
+        stored: row.resolution === "library" ? { ecosystem: row.ecosystem, unit: row.unit, symbol: row.symbol ?? null, evidence: row.evidence } : null,
         // The stored data without the route's outcome field, for the check that
         // a link the route did not decide stores its route-off data exactly.
         outcome: data.toolchainOutcome ?? null,
@@ -66,7 +70,8 @@ function rustLinks(path) {
         // route's own fields).
         routeOff: JSON.stringify(
           data.toolchain?.routeOff ??
-            Object.fromEntries(Object.entries(data).filter(([key]) => key !== "toolchainOutcome" && key !== "toolchain")),
+            data.toolchainLibrary?.routeOff ??
+            Object.fromEntries(Object.entries(data).filter(([key]) => key !== "toolchainOutcome" && key !== "toolchain" && key !== "toolchainLibrary")),
         ) });
     }
     return links;
@@ -75,20 +80,52 @@ function rustLinks(path) {
   }
 }
 
+/**
+ * D24: where the route offered a library answer and source-only kept its own
+ * library target: an identical key is agreement, any other is unverified,
+ * and the declarations with a different source-only key are the items with
+ * two keys.
+ */
+function libraryAgreement(links) {
+  // D24 (PR 70 ruling): an offer not applied leaves the link, and its
+  // outcome says why; the counts come from those outcomes.
+  const counts = { offered: 0, applied: 0, agree: 0, unverified: 0, sourceOnlyCheckout: 0, candidates: 0, notApplied: 0 };
+  const field = { "library:agrees": "agree", "library:kept-other-key": "unverified", "library:kept-checkout": "sourceOnlyCheckout",
+    "library:kept-candidates": "candidates", "library:not-applied": "notApplied" };
+  for (const link of links.values()) {
+    if (link.toolchainLibrary) counts.applied++;
+    else if (field[link.outcome]) counts[field[link.outcome]]++;
+    else continue;
+    counts.offered++;
+  }
+  return counts;
+}
+
 function score(links) {
-  // level2NoneSeen: Level 2 counting a route-decided link only when the
-  // route saw no build-condition selection on its trace (the third figure).
-  const s = { links: 0, level2: 0, level2NoneSeen: 0, assumed: 0, proven: 0, toolchainDecided: 0, toolchainSeen: 0, libraryModuleLinks: 0 };
+  // D24: Level 2 in four parts: proven source-only, assumption-marked,
+  // toolchain checkout and toolchain library (toolchainDecided is the sum of
+  // the last two). level2NoneSeen: Level 2 counting a route-decided link
+  // (checkout or library) only when the route saw no build-condition
+  // selection on its trace (the third figure).
+  const s = { links: 0, level2: 0, level2NoneSeen: 0, assumed: 0, proven: 0, toolchainDecided: 0, toolchainSeen: 0, toolchainCheckout: 0, toolchainLibrary: 0, libraryModuleLinks: 0 };
   for (const link of links.values()) {
     s.links++;
     if (link.moduleLink) s.libraryModuleLinks++;
     if (!link.level2) continue;
     s.level2++;
-    const seen = link.toolchain && link.toolchain.from !== "definite" && link.toolchain.selection === "seen";
+    const seen =
+      (link.toolchain && link.toolchain.from !== "definite" && link.toolchain.selection === "seen") ||
+      link.libraryRecord?.selection === "seen";
     if (seen) s.toolchainSeen++;
     else s.level2NoneSeen++;
     if (link.assumed) s.assumed++;
-    else if (link.toolchain && link.toolchain.from !== "definite") s.toolchainDecided++;
+    else if (link.toolchainLibrary) {
+      s.toolchainDecided++;
+      s.toolchainLibrary++;
+    } else if (link.toolchain && link.toolchain.from !== "definite") {
+      s.toolchainDecided++;
+      s.toolchainCheckout++;
+    }
     else s.proven++;
   }
   return s;
@@ -144,6 +181,9 @@ const result = {
   join: available?.join ?? {},
   agreement: { confirmed, differs, percent: pct(confirmed, confirmed + differs) },
   disagreements: (merged?.disagreements ?? []).slice(0, 10),
+  // D24: offered library answers against the stored source-only library
+  // targets (computed from the stored links).
+  library: libraryAgreement(after),
   check: { linksBefore: before.size, linksAfter: after.size, lost, changedLevel2: changed, outcomes, outcomeDataDiffers, routeOffDiffers },
   // Sixth review B: what a deny-by-default cfg rule would keep (an estimate).
   design: (() => {

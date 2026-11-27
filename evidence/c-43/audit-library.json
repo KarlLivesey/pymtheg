@@ -1,0 +1,612 @@
+{
+ "seed": "c43b-d24-audit",
+ "applied": 19239,
+ "pins": [
+  "BurntSushi_ripgrep",
+  "fjall-rs_fjall",
+  "clap-rs_clap",
+  "rust-embedded_cortex-m"
+ ],
+ "sample": [
+  {
+   "pin": "fjall-rs_fjall",
+   "file": "src/journal/batch_reader.rs",
+   "line": 181,
+   "offset": 6182,
+   "kind": "calls",
+   "written": "self.items.push",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "alloc",
+    "symbol": "vec::Vec::push",
+    "version": null
+   },
+   "source": "self.items.push(ReadBatchItem {"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/derive/subcommands.rs",
+   "line": 153,
+   "offset": 3584,
+   "kind": "calls",
+   "written": "Opt4::try_parse_from([\"test\", \"add\", \"f\"]).unwrap",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "result::Result::unwrap",
+    "version": null
+   },
+   "source": "Opt4::try_parse_from([\"test\", \"add\", \"f\"]).unwrap()"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_builder/src/builder/value_parser.rs",
+   "line": 571,
+   "offset": 17001,
+   "kind": "calls",
+   "written": "f.debug_struct(\"ValueParser::os_string\").finish",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "fmt::builders::DebugStruct::finish",
+    "version": null
+   },
+   "source": "ValueParserInner::OsString => f.debug_struct(\"ValueParser::os_string\").finish(),"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/printer/src/jsont.rs",
+   "line": 207,
+   "offset": 6798,
+   "kind": "types",
+   "written": "S::Ok",
+   "library": {
+    "ecosystem": "cargo",
+    "unit": "serde_core",
+    "symbol": "ser::Serializer::Ok",
+    "version": "1.0.229"
+   },
+   "source": ") -> Result<S::Ok, S::Error> {"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/globset/src/glob.rs",
+   "line": 889,
+   "offset": 31740,
+   "kind": "types",
+   "written": "Result",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "result::Result",
+    "version": null
+   },
+   "source": "fn have_tokens(&self) -> Result<bool, Error> {"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/builder/multiple_values.rs",
+   "line": 356,
+   "offset": 9302,
+   "kind": "macros",
+   "written": "assert_eq",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "macros::assert_eq",
+    "version": null
+   },
+   "source": "assert_eq!("
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/derive/options.rs",
+   "line": 84,
+   "offset": 2361,
+   "kind": "calls",
+   "written": "Opt::try_parse_from([\"test\", \"-a\", \"24\", \"-a\", \"42\"]).unwrap",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "result::Result::unwrap",
+    "version": null
+   },
+   "source": "Opt::try_parse_from([\"test\", \"-a\", \"24\", \"-a\", \"42\"]).unwrap()"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/ignore/src/walk.rs",
+   "line": 2299,
+   "offset": 79406,
+   "kind": "calls",
+   "written": "td.path().join",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "std",
+    "symbol": "path::Path::join",
+    "version": null
+   },
+   "source": "mkdirp(td.path().join(\"a/b/c\"));"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/derive/value_enum.rs",
+   "line": 373,
+   "offset": 8452,
+   "kind": "macros",
+   "written": "assert_eq",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "macros::assert_eq",
+    "version": null
+   },
+   "source": "assert_eq!("
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_complete/src/aot/shells/bash.rs",
+   "line": 198,
+   "offset": 6009,
+   "kind": "calls",
+   "written": "\"if [ -n \"${oldifs+x}\" ]; then\"#.to_owned",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "alloc",
+    "symbol": "<str::str as ToOwned>::to_owned",
+    "version": null
+   },
+   "source": "r#\"if [ -n \"${oldifs+x}\" ]; then\"#.to_owned(),"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/printer/src/standard.rs",
+   "line": 1773,
+   "offset": 64543,
+   "kind": "calls",
+   "written": "printer.get_mut().get_ref",
+   "library": {
+    "ecosystem": "cargo",
+    "unit": "termcolor",
+    "symbol": "NoColor::get_ref",
+    "version": "1.4.1"
+   },
+   "source": "String::from_utf8(printer.get_mut().get_ref().to_owned()).unwrap()"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/globset/src/lib.rs",
+   "line": 919,
+   "offset": 29826,
+   "kind": "calls",
+   "written": "candidate.ext.is_empty",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "slice::[T]::is_empty",
+    "version": null
+   },
+   "source": "if candidate.ext.is_empty() {"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/regex/src/non_matching.rs",
+   "line": 36,
+   "offset": 1326,
+   "kind": "patterns",
+   "written": "HirKind::Look",
+   "library": {
+    "ecosystem": "cargo",
+    "unit": "regex-syntax",
+    "symbol": "hir::HirKind::Look",
+    "version": "0.8.11"
+   },
+   "source": "HirKind::Look(Look::StartLF | Look::EndLF) => {"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/core/flags/defs.rs",
+   "line": 4959,
+   "offset": 151144,
+   "kind": "calls",
+   "written": "parse_low_raw([\"--no-pcre2-unicode\", \"--unicode\"]).unwrap",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "result::Result::unwrap",
+    "version": null
+   },
+   "source": "let args = parse_low_raw([\"--no-pcre2-unicode\", \"--unicode\"]).unwrap();"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/derive/groups.rs",
+   "line": 221,
+   "offset": 5149,
+   "kind": "types",
+   "written": "Option",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "option::Option",
+    "version": null
+   },
+   "source": "git: Option<String>,"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/builder/app_settings.rs",
+   "line": 744,
+   "offset": 21120,
+   "kind": "macros",
+   "written": "assert_eq",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "macros::assert_eq",
+    "version": null
+   },
+   "source": "assert_eq!("
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "file": "src/journal/writer.rs",
+   "line": 91,
+   "offset": 2678,
+   "kind": "calls",
+   "written": "self\n            .path\n            .file_name()\n            .expect(\"should be valid file name\")\n            .to_str()\n            .expect(\"should be valid utf-8\")\n            .strip_suffix",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "str::str::strip_suffix",
+    "version": null
+   },
+   "source": "let Some(basename) = self"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_mangen/src/lib.rs",
+   "line": 277,
+   "offset": 8266,
+   "kind": "calls",
+   "written": "roff.control",
+   "library": {
+    "ecosystem": "cargo",
+    "unit": "roff",
+    "symbol": "Roff::control",
+    "version": "1.1.1"
+   },
+   "source": "roff.control(\"SH\", [heading.to_uppercase().as_str()]);"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/builder/flag_subcommands.rs",
+   "line": 232,
+   "offset": 7491,
+   "kind": "calls",
+   "written": "app2.try_get_matches_from(vec![\"test\", \"--flag\"]).unwrap",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "result::Result::unwrap",
+    "version": null
+   },
+   "source": "let matches2 = app2.try_get_matches_from(vec![\"test\", \"--flag\"]).unwrap();"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_complete/src/aot/generator/utils.rs",
+   "line": 76,
+   "offset": 2261,
+   "kind": "calls",
+   "written": "a.get_visible_short_aliases().is_some",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "option::Option::is_some",
+    "version": null
+   },
+   "source": "if a.get_visible_short_aliases().is_some() && a.get_short().is_some() {"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/searcher/src/testutil.rs",
+   "line": 582,
+   "offset": 19826,
+   "kind": "calls",
+   "written": "self.expected_with_line_number.as_ref",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "option::Option::as_ref",
+    "version": null
+   },
+   "source": "self.expected_with_line_number.as_ref().unwrap().to_string();"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/derive/subcommands.rs",
+   "line": 264,
+   "offset": 6012,
+   "kind": "macros",
+   "written": "Debug",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "fmt::macros::Debug",
+    "version": null
+   },
+   "source": "#[derive(Debug, PartialEq, Eq, Parser)]"
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "file": "tests/prefix_complex.rs",
+   "line": 14,
+   "offset": 370,
+   "kind": "calls",
+   "written": "\"a\".repeat",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "alloc",
+    "symbol": "str::str::repeat",
+    "version": null
+   },
+   "source": "tree.insert(\"a#1\", \"a\".repeat(4_096))?;"
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/ignore/src/incremental.rs",
+   "line": 680,
+   "offset": 25386,
+   "kind": "calls",
+   "written": "td.path().join",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "std",
+    "symbol": "path::Path::join",
+    "version": null
+   },
+   "source": "wfile(td.path().join(\"project/.gitignore\"), \"!keep.tmp\\nnested.log\\n\");"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/builder/default_vals.rs",
+   "line": 885,
+   "offset": 27247,
+   "kind": "macros",
+   "written": "assert",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "macros::builtin::assert",
+    "version": null
+   },
+   "source": "assert!(m.contains_id(\"arg\"));"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_builder/src/builder/debug_asserts.rs",
+   "line": 94,
+   "offset": 3151,
+   "kind": "calls",
+   "written": "long_flags.push",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "alloc",
+    "symbol": "vec::Vec::push",
+    "version": null
+   },
+   "source": "long_flags.push(Flag::Arg(format!(\"--{long_alias}\"), arg.get_id().as_str()));"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_builder/src/builder/arg.rs",
+   "line": 4635,
+   "offset": 156697,
+   "kind": "calls",
+   "written": "self.val_names\n                    .iter",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "slice::[T]::iter",
+    "version": null
+   },
+   "source": "self.val_names"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/builder/flag_subcommands.rs",
+   "line": 366,
+   "offset": 11761,
+   "kind": "calls",
+   "written": "matches.subcommand_matches(\"some\").unwrap",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "option::Option::unwrap",
+    "version": null
+   },
+   "source": "let sub_matches = matches.subcommand_matches(\"some\").unwrap();"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/builder/require.rs",
+   "line": 575,
+   "offset": 18756,
+   "kind": "macros",
+   "written": "vec",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "alloc",
+    "symbol": "macros::vec",
+    "version": null
+   },
+   "source": ".try_get_matches_from(vec![\"unlessone\", \"--config=some.cfg\"]);"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "examples/tutorial_derive/02_crate.rs",
+   "line": 15,
+   "offset": 238,
+   "kind": "macros",
+   "written": "println",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "std",
+    "symbol": "macros::println",
+    "version": null
+   },
+   "source": "println!(\"two: {:?}\", cli.two);"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_builder/src/builder/command.rs",
+   "line": 5059,
+   "offset": 173072,
+   "kind": "calls",
+   "written": "self\n                .groups\n                .iter()\n                .find(|grp| grp.id == *g)\n                .expect",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "option::Option::expect",
+    "version": null
+   },
+   "source": "for n in self"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_builder/src/mkeymap.rs",
+   "line": 160,
+   "offset": 4098,
+   "kind": "calls",
+   "written": "self.get(key).expect",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "option::Option::expect",
+    "version": null
+   },
+   "source": "self.get(key).expect(INTERNAL_ERROR_MSG)"
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "file": "src/db.rs",
+   "line": 726,
+   "offset": 22684,
+   "kind": "calls",
+   "written": "persisted_seqnos\n                            .entry(item.keyspace_id)\n                            .or_insert_with",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "std",
+    "symbol": "collections::hash::map::Entry::or_insert_with",
+    "version": null
+   },
+   "source": "let persisted_seqno = *persisted_seqnos"
+  },
+  {
+   "pin": "fjall-rs_fjall",
+   "file": "src/db.rs",
+   "line": 608,
+   "offset": 17928,
+   "kind": "calls",
+   "written": "config.path.join",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "std",
+    "symbol": "path::Path::join",
+    "version": null
+   },
+   "source": "config.path.join(KEYSPACES_FOLDER).join(\"0\"),"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/builder/multiple_values.rs",
+   "line": 26,
+   "offset": 675,
+   "kind": "macros",
+   "written": "assert_eq",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "macros::assert_eq",
+    "version": null
+   },
+   "source": "assert_eq!("
+  },
+  {
+   "pin": "BurntSushi_ripgrep",
+   "file": "crates/ignore/benches/workloads.rs",
+   "line": 483,
+   "offset": 15307,
+   "kind": "calls",
+   "written": "b.iter",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "test",
+    "symbol": "bench::Bencher::iter",
+    "version": null
+   },
+   "source": "b.iter(|| assert_eq!(walk(black_box(&builder), 12), ws.python_files));"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_builder/src/util/flat_map.rs",
+   "line": 234,
+   "offset": 5971,
+   "kind": "calls",
+   "written": "self.keys.next",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "<slice::iter::IterMut as Iterator>::next",
+    "version": null
+   },
+   "source": "match self.keys.next() {"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "tests/derive/naming.rs",
+   "line": 69,
+   "offset": 1471,
+   "kind": "macros",
+   "written": "assert_eq",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "core",
+    "symbol": "macros::assert_eq",
+    "version": null
+   },
+   "source": "assert_eq!("
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "examples/typed-derive/implicit.rs",
+   "line": 12,
+   "offset": 337,
+   "kind": "types",
+   "written": "std::path::PathBuf",
+   "library": {
+    "ecosystem": "rust-std",
+    "unit": "std",
+    "symbol": "path::PathBuf",
+    "version": null
+   },
+   "source": "include: Option<std::path::PathBuf>,"
+  },
+  {
+   "pin": "clap-rs_clap",
+   "file": "clap_derive/src/derives/subcommand.rs",
+   "line": 623,
+   "offset": 24493,
+   "kind": "calls",
+   "written": "fields.unnamed.len",
+   "library": {
+    "ecosystem": "cargo",
+    "unit": "syn",
+    "symbol": "punctuated::Punctuated::len",
+    "version": "3.0.10"
+   },
+   "source": "if fields.unnamed.len() == 1 {"
+  }
+ ]
+}

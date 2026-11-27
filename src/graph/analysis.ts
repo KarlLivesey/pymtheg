@@ -48,7 +48,10 @@ export class LinkDecider {
       resolution: "unresolved",
     };
     delete next.libraries;
-    if (!decision) return this.explainOpenLink(this.withdrawToolchain(next));
+    if (!decision)
+      return this.explainOpenLink(
+        this.settleLibraryOffer(this.withdrawToolchain(next)),
+      );
     if (decision.library !== undefined) {
       if (
         decision.targetId !== undefined ||
@@ -88,7 +91,9 @@ export class LinkDecider {
       next.targetStatus = symbol.status;
       next.resolution = "resolved";
     }
-    return this.explainOpenLink(this.withdrawToolchain(next));
+    return this.explainOpenLink(
+      this.settleLibraryOffer(this.withdrawToolchain(next)),
+    );
   }
   /**
    * A toolchain record that names a target (C-43: `data.toolchain.target`)
@@ -120,6 +125,51 @@ export class LinkDecider {
     const { toolchain: _withdrawn, ...data } = d;
     void _withdrawn;
     link.data = { ...data, toolchainOutcome: "kept:source-only" } as Json;
+    return link;
+  }
+  /**
+   * D24: a library answer the route offered (`data.toolchainLibrary`) stays
+   * on the link only when the stored target is that answer (its evidence is
+   * `toolchain-declaring-path`). Otherwise the offer goes and
+   * `toolchainOutcome` says why, so a link the route did not decide stores
+   * its route-off data exactly apart from that one field:
+   * - `library:agrees`: the stored library target has the identical key;
+   * - `library:kept-other-key`: a source-only library target under another key;
+   * - `library:kept-checkout`: a source-only checkout target;
+   * - `library:kept-candidates`: a candidate set without the identical target;
+   * - `library:not-applied`: anything else (no stored answer).
+   */
+  private settleLibraryOffer(link: GraphLink): GraphLink {
+    const d = link.data as Record<string, unknown> | null | undefined;
+    const offer = (d?.toolchainLibrary as { library?: unknown } | undefined)
+      ?.library as
+      | { ecosystem?: string; unit?: string; symbol?: string }
+      | undefined;
+    if (!d || !offer) return link;
+    const stored = link.libraries?.[0];
+    if (
+      link.resolution === "library" &&
+      stored?.evidence === "toolchain-declaring-path"
+    )
+      return link;
+    const same =
+      link.resolution === "library" &&
+      stored !== undefined &&
+      stored.ecosystem === offer.ecosystem &&
+      stored.unit === offer.unit &&
+      (stored.symbol ?? "") === (offer.symbol ?? "");
+    const outcome = same
+      ? "library:agrees"
+      : link.resolution === "library"
+        ? "library:kept-other-key"
+        : link.resolution === "resolved"
+          ? "library:kept-checkout"
+          : link.resolution === "ambiguous"
+            ? "library:kept-candidates"
+            : "library:not-applied";
+    const { toolchainLibrary: _offer, ...data } = d;
+    void _offer;
+    link.data = { ...data, toolchainOutcome: outcome } as Json;
     return link;
   }
   private explainOpenLink(link: GraphLink): GraphLink {

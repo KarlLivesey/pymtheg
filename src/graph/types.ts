@@ -91,7 +91,13 @@ export type LibraryEvidence =
    * after alias, deref, trait or embedding selection, or by the type checker.
    * Never the receiver's type alone. Symbol required.
    */
-  | "declaring-owner";
+  | "declaring-owner"
+  /**
+   * D24: the toolchain (rust-analyzer) names the declaration, and the symbol
+   * is its normalised declaring path in the unit, not the path the code
+   * writes. Symbol required; definite only on a full, gated toolchain run.
+   */
+  | "toolchain-declaring-path";
 /**
  * A target outside the checkout: a library unit (level 1) or a symbol in it
  * (level 2). Never read from dependency sources, the network or a resolver.

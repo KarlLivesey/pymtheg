@@ -31,9 +31,12 @@ import {
   SqliteGraphStore,
   indexProject,
 } from "../dist/graph/index.js";
-import rust from "../dist/graph/languages/rust/index.js";
+import rust, { analysisInput } from "../dist/graph/languages/rust/index.js";
 import { readScip, parseSymbol } from "../dist/graph/languages/rust/scip.js";
-import { nameSite } from "../dist/graph/languages/rust/toolchain-join.js";
+import {
+  libraryPath,
+  nameSite,
+} from "../dist/graph/languages/rust/toolchain-join.js";
 import { setRunControls } from "../dist/graph/languages/rust/toolchain-route.js";
 import {
   buildTarget,
@@ -626,6 +629,114 @@ test("a toolchain record stands only on a link stored with its target; a kept so
   );
 });
 
+test("the analysis input drops a previous run's record, outcome and library offer, and keeps the rest", () => {
+  const input = analysisInput(
+    {
+      path: "src/lib.rs",
+      result: {
+        status: "clean",
+        diagnostics: [],
+        symbols: [],
+        links: [
+          {
+            sourceKey: null,
+            kind: "calls",
+            targetName: "f",
+            range: { start: 0, end: 1 },
+            data: {
+              scope: "g",
+              conditions: [],
+              toolchain: {
+                origin: "toolchain",
+                from: "unresolved",
+                target: "x",
+              },
+              toolchainOutcome: "withheld:cfg-variant",
+              toolchainLibrary: {
+                library: { ecosystem: "cargo", unit: "dep", symbol: "f" },
+              },
+            },
+          },
+        ],
+      },
+    },
+    new Map(),
+  );
+  assert.deepEqual(input.result.links[0].data, { scope: "g", conditions: [] });
+});
+
+test("D24 (PR 70 ruling): an offer the stored link does not take leaves it, and the outcome says why; the rest of the data is the route-off data exactly", () => {
+  const symbol = {
+    id: "s1",
+    projectId: "p",
+    module: "rust",
+    file: "src/lib.rs",
+    key: "k1",
+    kind: "function",
+    name: "f",
+    identity: "f",
+    range: { start: 0, end: 1 },
+    status: "clean",
+  };
+  const offData = {
+    scope: "f",
+    uncertainty: "multiple-checkout-candidates",
+    conditions: [],
+  };
+  const offer = {
+    library: { ecosystem: "rust-std", unit: "core", symbol: "fmt::Debug::fmt" },
+    written: "fmt",
+    rustAnalyzer: "rust-analyzer (fake)",
+    configuration: "host",
+  };
+  const link = {
+    id: "l1",
+    projectId: "p",
+    module: "rust",
+    file: "src/lib.rs",
+    origin: "parse",
+    sourceId: null,
+    kind: "calls",
+    targetName: "fmt",
+    range: { start: 2, end: 3 },
+    targetId: null,
+    targetStatus: null,
+    candidates: [],
+    resolution: "unresolved",
+    data: { ...offData, toolchainLibrary: offer },
+  };
+  const library = (symbolPath, evidence) => ({
+    linkId: "l1",
+    library: {
+      ecosystem: "rust-std",
+      unit: "core",
+      symbol: symbolPath,
+      evidence,
+    },
+  });
+  const decided = (decision) =>
+    decideLink(structuredClone(link), decision, [symbol]);
+  // Applied: the stored target is the offer; the record stays.
+  const applied = decided(
+    library("fmt::Debug::fmt", "toolchain-declaring-path"),
+  );
+  assert.equal(applied.data.toolchainLibrary.written, "fmt");
+  assert.equal(applied.data.toolchainOutcome, undefined);
+  for (const [decision, outcome] of [
+    [library("fmt::Debug::fmt", "qualified-path"), "library:agrees"],
+    [library("fmt::Display::fmt", "qualified-path"), "library:kept-other-key"],
+    [{ linkId: "l1", targetId: "s1" }, "library:kept-checkout"],
+    [undefined, "library:not-applied"],
+  ]) {
+    const kept = decided(decision);
+    assert.equal(
+      JSON.stringify(kept.data),
+      JSON.stringify({ ...offData, toolchainOutcome: outcome }),
+      outcome,
+    );
+  }
+});
+
 test("seventh review 5: with .cargo/config and .cargo/config.toml in one folder, cargo's precedence holds: the plain file is read", async () => {
   await scratch(async (root) => {
     const project = join(root, "project");
@@ -828,11 +939,12 @@ for (const [name, answer, overrides, behaviour, why] of [
     "filter:proc-macro-crate-item",
   ],
   [
-    "a library item (counted, never applied)",
-    ["rust-analyzer cargo std 1.98.1 vec/impl#[Vec]go()."],
+    // D24 applies library answers; a blanket impl has no nameable owner.
+    "a library item of a blanket impl (no nameable owner)",
+    ["rust-analyzer cargo alloc 1.98.1 string/impl#[T][ToString]go()."],
     {},
     {},
-    "unapplied:library",
+    "unapplied:library-blanket",
   ],
 ]) {
   test(`gates: ${name} takes no answer`, async () => {
@@ -1202,6 +1314,111 @@ test("a library root rust-analyzer did not index makes the index partial", async
     assert.equal(again.state.state, "used", JSON.stringify(again.state));
     assert.equal(note(again.report, "available").cached, false);
     assert.equal(runs(tools), 2);
+  });
+});
+
+// ---------------------------------------------------------------- D24: library answers
+
+test("D24: the declaring path of a library symbol is its module path; impl items are Type::item or <Type as Trait>::item; blanket impls and crate roots have none", () => {
+  const path = (symbol) => libraryPath(parseSymbol(symbol));
+  const core =
+    "rust-analyzer cargo core https://github.com/rust-lang/rust/library/core";
+  assert.equal(path(`${core} ops/range/Range#`), "ops::range::Range");
+  assert.equal(
+    path(`${core} option/impl#[\`Option<T>\`]unwrap().`),
+    "option::Option::unwrap",
+  );
+  assert.equal(
+    path(`${core} result/impl#[\`Result<T, E>\`][Try]branch().`),
+    "<result::Result as Try>::branch",
+  );
+  assert.equal(
+    path(`${core} num/impl#[u64]to_be_bytes().`),
+    "num::u64::to_be_bytes",
+  );
+  assert.equal(
+    path("rust-analyzer cargo tempfile 3.27.0 dir/tempdir()."),
+    "dir::tempdir",
+  );
+  assert.equal(path(`${core} option/Option#None.`), "option::Option::None");
+  // A blanket impl (its self type is a type parameter) has no nameable owner.
+  assert.equal(
+    path("rust-analyzer cargo alloc 1 string/impl#[T][ToString]to_string()."),
+    undefined,
+  );
+  assert.equal(path("rust-analyzer cargo tempfile 3.27.0 crate/"), undefined);
+});
+
+/** The gate project with `t.go` answered by `answer` and `dep` locked at 1.2.3. */
+async function libraryCase(root, answer) {
+  const project = join(root, "project");
+  writeProject(project, {
+    ...GATES,
+    "Cargo.lock":
+      'version = 4\n\n[[package]]\nname = "gates"\nversion = "0.1.0"\n\n[[package]]\nname = "dep"\nversion = "1.2.3"\n',
+  });
+  const scip = join(root, "answer.scip");
+  writeFileSync(scip, gateScip([answer]));
+  const tools = fakeToolchain(join(root, "tools"), {
+    scip,
+    metadata: metadata(),
+  });
+  const dump = await index(project, root, { environment: environment(tools) });
+  assert.equal(dump.state.state, "used", JSON.stringify(dump.state));
+  const [caller, gated] = goLinks(dump).sort(
+    (x, y) => x.range.start - y.range.start,
+  );
+  return { dump, caller, gated };
+}
+
+test("D24: an unresolved link answered with a standard-library item becomes a library target keyed by the unit and declaring path, with the written path", async () => {
+  await scratch(async (root) => {
+    const { dump, caller, gated } = await libraryCase(
+      root,
+      "rust-analyzer cargo core 1.98.1 mem/swap().",
+    );
+    assert.equal(caller.resolution, "library");
+    assert.deepEqual(
+      caller.libraries.map(({ id: _id, ...t }) => t),
+      [
+        {
+          ecosystem: "rust-std",
+          unit: "core",
+          symbol: "mem::swap",
+          evidence: "toolchain-declaring-path",
+        },
+      ],
+    );
+    // Offered by the analysis with the written path; applied in the resolve
+    // phase (the stored target's evidence records it).
+    assert.equal(caller.data.toolchainLibrary.written, "t.go");
+    assert.equal(caller.data.toolchain, undefined);
+    assert.ok(dump.state.libraryOffered >= 1, JSON.stringify(dump.state));
+    // D17 clarified: the label and the complete route-off data.
+    assert.equal(caller.data.toolchainLibrary.selection, "none-seen");
+    assert.equal(caller.data.toolchainLibrary.selectionReason, undefined);
+    assert.equal(typeof caller.data.toolchainLibrary.routeOff, "object");
+    // The twin under cfg(feature = "extra") (answered here with the
+    // checkout item) is decided for this configuration, labelled.
+    assert.equal(gated.resolution, "resolved");
+    assert.equal(gated.data.toolchain.selectionReason, "cfg-link");
+  });
+});
+
+test("D24, D17 clarified: an answer in a dependency other than std, core and alloc is decided for this configuration and labelled dependency-on-trace", async () => {
+  await scratch(async (root) => {
+    const { caller } = await libraryCase(
+      root,
+      "rust-analyzer cargo dep 1.2.3 inner/impl#[Thing]go().",
+    );
+    assert.equal(caller.resolution, "library", JSON.stringify(caller.data));
+    assert.equal(caller.libraries[0].ecosystem, "cargo");
+    assert.equal(caller.libraries[0].unit, "dep");
+    assert.equal(caller.data.toolchainLibrary.selection, "seen");
+    assert.equal(
+      caller.data.toolchainLibrary.selectionReason,
+      "dependency-on-trace",
+    );
   });
 });
 
@@ -1794,6 +2011,16 @@ test(
         (l) => l.file === "app/src/lib.rs" && l.targetName === "s.area",
       );
       assert.notEqual(dispatch.resolution, "resolved");
+      // D24: standard-library answers are applied as library targets.
+      const library = dump.links.filter(
+        (l) => l.libraries?.[0]?.evidence === "toolchain-declaring-path",
+      );
+      assert.ok(library.length >= 1, "no library answer was applied");
+      assert.ok(
+        library.every((l) =>
+          ["rust-std", "cargo"].includes(l.libraries?.[0]?.ecosystem),
+        ),
+      );
       // Links whose traces meet a selection are labelled.
       assert.ok(
         dump.links.some((l) => l.data?.toolchain?.selection === "seen"),

@@ -4,6 +4,7 @@ import type {
   ContextFile,
   GraphFile,
   LanguageModule,
+  LibraryTarget,
   LinkResolution,
 } from "../../types.js";
 import { crates } from "./cargo.js";
@@ -119,10 +120,15 @@ export function analysisInput(
           // compare byte for byte).
           toolchain: _toolchain,
           toolchainOutcome: _toolchainOutcome,
+          // D24: a previous run's library offer too; the resolve phase
+          // applies any offer it finds, so a stale one must not survive a
+          // run that is partial, failed or off.
+          toolchainLibrary: _toolchainLibrary,
           ...rest
         } = (l.data ?? {}) as Record<string, Json>;
         void _toolchain;
         void _toolchainOutcome;
+        void _toolchainLibrary;
         return {
           ...l,
           data: {
@@ -277,29 +283,15 @@ function scopedAnalysis(request: ScopedRequest):
 }
 
 /**
- * C-43: decide each link the strict join answered (design B, deny by
- * default). The toolchain sees one configuration. A definite answer is wrong
- * only if the same written site resolves differently in another
- * configuration where it compiles, and a site's resolution depends only on
- * the bindings it passes through. So an answer decides only when no binding
- * on its trace is selected:
- * - a selected binding is anything written under a cfg attribute (`test`
- *   included) that the site's own conditions do not imply, itself or through
- *   an enclosing item, module, impl, trait, block or file; or emitted by a
- *   macro whose expansion source-only does not read;
- * - a path's trace is each segment's binding as rust-analyzer resolved it,
- *   and the `use` hops a segment may pass through;
- * - a receiver-typed link's trace is everything named in the enclosing
- *   function up to the site, and also any method or field of that name, trait
- *   `use`, cfg-gated field or `Deref`/`Index` impl the lookup could meet;
- * - an item of another crate than `std`, `core` or `alloc` on the trace,
- *   or a trace that cannot be completed, leaves the link confirm-only.
- * Also: a link under a cfg other than `test` takes no answer; a name an
- * opaque item may shadow is confirm-only; an import of a name bound in more
- * than one namespace takes no answer. Then a source-only definite target that
- * differs is kept and counted, a source-only library answer is kept, and a
- * candidate set holding the answer, or an unresolved link, becomes definite,
- * recorded on the link (`toolchain`) for the resolve phase to apply.
+ * C-43: decide each link the strict join answered. An answer is definite for
+ * the configuration it records (D17, clarified): it decides every link that
+ * passes the gates that do not depend on the configuration (a graph symbol
+ * for the answer, an import whose name is bound in one namespace where it
+ * comes from, agreement with a source-only definite target, a source-only
+ * library target kept, an answer inside source-only's candidate set). Each
+ * decided link records the selection label (design B, kept as a label) and
+ * its complete route-off data. Library answers (D24) are offered here with
+ * the same label and decided in the resolve phase.
  */
 function decideToolchain(
   updated: readonly { path: string }[],
@@ -317,6 +309,58 @@ function decideToolchain(
   const counts: Record<string, number> = {};
   const disagreements: Json[] = [];
   const bump = (key: string) => (counts[key] = (counts[key] ?? 0) + 1);
+  /**
+   * D24: a library answer is offered here and decided in the resolve phase.
+   * The analysis cannot see source-only library targets: the resolver proves
+   * those in the resolve phase only. Here only the cfg-link gate applies; an
+   * answer that passes it is recorded as `toolchainLibrary` (the key, the
+   * written path, the run), which claims nothing on its own. The resolve
+   * phase applies it where the final source-only answer is still open.
+   */
+  const decideLibrary = (
+    l: AnalyzedFile["result"]["links"][number],
+    data: Record<string, Json>,
+    file: string,
+  ) => {
+    const { tcl, tcTrace, ...rest } = data;
+    // D17 clarified: a library answer is definite for the configuration it
+    // records, like a checkout answer. The selection label says whether the
+    // route saw a build-condition selection on the way to the site (a crate
+    // other than std, core and alloc on the trace, the answer's own crate
+    // included, is `dependency-on-trace`); it gates nothing.
+    const selection = beyondTest(rest.conditions as Json[] | undefined)
+      ? "cfg-link"
+      : uncertaintyReasons(rest.uncertainty).includes(
+            "opaque-item-may-shadow-name",
+          )
+        ? "opaque-shadow"
+        : designB(
+            file,
+            l,
+            rest,
+            tcTrace,
+            undefined,
+            ((rest.targets ?? []) as Json[]).map(String),
+          );
+    bump("library:offered");
+    return {
+      ...l,
+      data: {
+        ...rest,
+        toolchainLibrary: {
+          library: tcl,
+          // The path the code writes, beside the declaring path the key uses.
+          written: l.targetName,
+          rustAnalyzer: toolchain.rustAnalyzer,
+          configuration: toolchain.configuration,
+          selection: selection ? "seen" : "none-seen",
+          ...(selection ? { selectionReason: selection } : {}),
+          // The complete route-off data (D17 clarified).
+          routeOff: { ...rest },
+        },
+      } as Record<string, Json>,
+    };
+  };
   // ---- Design B: the facts the rule reads.
   const identityOf = new Map<string, string>();
   const placeOf = new Map<string, string>();
@@ -708,6 +752,7 @@ function decideToolchain(
     if (!a) return;
     a.result.links = a.result.links.map((l, j) => {
       const data = (l.data ?? {}) as Record<string, Json>;
+      if ("tcl" in data) return decideLibrary(l, data, f.path);
       if (!("tc" in data)) return l;
       const { tc, tcTrace, ...rest } = data;
       const target = String(tc);
@@ -1028,30 +1073,62 @@ export const rustPhases = {
       undefined,
       decide,
     );
-    // C-43: the toolchain's answer, where the source-only one is still open.
-    const upgraded = new Map<string, string>();
+    // C-43: the toolchain's answer, where the source-only one is still open:
+    // a checkout target, or (D24) a library target.
+    const upgraded = new Map<string, LinkResolution>();
     for (const link of ctx.links) {
       const record = (link.data as { toolchain?: Record<string, Json> })
         ?.toolchain;
-      if (
-        record?.origin === "toolchain" &&
-        typeof record.target === "string" &&
-        record.from !== "definite"
-      )
-        upgraded.set(link.id, record.target);
+      if (record?.origin !== "toolchain" || record.from === "definite")
+        continue;
+      if (typeof record.target === "string")
+        upgraded.set(link.id, { linkId: link.id, targetId: record.target });
+    }
+    // D24: library answers the analysis offered, applied where the final
+    // source-only answer is open: unresolved, or a candidate set that already
+    // holds the identical library target. A source-only checkout or library
+    // target stays. The stored target's evidence records the decision.
+    const offered = new Map<string, LibraryTarget>();
+    for (const link of ctx.links) {
+      const offer = (
+        link.data as {
+          toolchainLibrary?: { library?: Omit<LibraryTarget, "evidence"> };
+        }
+      )?.toolchainLibrary?.library;
+      if (offer)
+        offered.set(link.id, {
+          ...offer,
+          evidence: "toolchain-declaring-path",
+        });
+    }
+    if (offered.size) {
+      const keyOf = (t: { ecosystem: string; unit: string; symbol?: string }) =>
+        `${t.ecosystem}\u0000${t.unit}\u0000${t.symbol ?? ""}`;
+      const seen = new Set<string>();
+      resolutions = resolutions.map((r) => {
+        const library = offered.get(r.linkId);
+        if (!library) return r;
+        seen.add(r.linkId);
+        if (r.targetId || r.library) return r;
+        if (r.candidateIds)
+          return (r.libraries ?? []).some((t) => keyOf(t) === keyOf(library))
+            ? { linkId: r.linkId, library }
+            : r;
+        return { linkId: r.linkId, library };
+      });
+      for (const [linkId, library] of offered)
+        if (!seen.has(linkId)) resolutions.push({ linkId, library });
     }
     if (upgraded.size) {
       const seen = new Set<string>();
       resolutions = resolutions.map((r) => {
-        const target = upgraded.get(r.linkId);
-        if (target === undefined) return r;
+        const answer = upgraded.get(r.linkId);
+        if (answer === undefined) return r;
         seen.add(r.linkId);
-        return r.candidateIds || (!r.targetId && !r.library)
-          ? { linkId: r.linkId, targetId: target }
-          : r;
+        return r.candidateIds || (!r.targetId && !r.library) ? answer : r;
       });
-      for (const [linkId, targetId] of upgraded)
-        if (!seen.has(linkId)) resolutions.push({ linkId, targetId });
+      for (const [linkId, answer] of upgraded)
+        if (!seen.has(linkId)) resolutions.push(answer);
     }
     return {
       result: {
@@ -1095,30 +1172,44 @@ const rust: LanguageModule = {
       projectId,
       files: files.map(({ path, module, result }) => {
         const answers = route?.answers.get(path);
+        const libraries = route?.libraryAnswers.get(path);
         const traces = route?.traces.get(path);
+        // Design B: the trace rides along, transient, removed by the decision.
+        const trace = (index: number) =>
+          traces?.has(index)
+            ? { tcTrace: traces.get(index) as unknown as Json }
+            : {};
         return {
           path,
           module,
-          result: answers
-            ? {
-                ...result,
-                links: result.links.map((link, index) =>
-                  answers.has(index)
-                    ? {
-                        ...link,
-                        data: {
-                          ...((link.data ?? {}) as Record<string, Json>),
-                          tc: answers.get(index)!,
-                          // Design B: transient, removed by the decision.
-                          ...(traces?.has(index)
-                            ? { tcTrace: traces.get(index) as unknown as Json }
-                            : {}),
-                        },
-                      }
-                    : link,
-                ),
-              }
-            : result,
+          result:
+            answers || libraries
+              ? {
+                  ...result,
+                  links: result.links.map((link, index) =>
+                    answers?.has(index)
+                      ? {
+                          ...link,
+                          data: {
+                            ...((link.data ?? {}) as Record<string, Json>),
+                            tc: answers.get(index)!,
+                            ...trace(index),
+                          },
+                        }
+                      : libraries?.has(index)
+                        ? {
+                            ...link,
+                            data: {
+                              ...((link.data ?? {}) as Record<string, Json>),
+                              // D24: the toolchain's library answer.
+                              tcl: libraries.get(index)! as unknown as Json,
+                              ...trace(index),
+                            },
+                          }
+                        : link,
+                  ),
+                }
+              : result,
         };
       }),
       contextFiles: cargoInputs(contextFiles),
