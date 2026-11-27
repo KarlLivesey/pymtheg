@@ -3,7 +3,7 @@
 // integer above 1 (never this process's group, every process or init), and
 // its command line must carry a marker only this test's processes have (a
 // path in the test's own scratch directory).
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 const isProcessId = (pid) => Number.isInteger(pid) && pid > 1;
 
@@ -80,4 +80,17 @@ export function closing(child, what) {
   });
   closed.catch(() => {});
   return { wait: () => bounded(closed, what, () => endChild(child)) };
+}
+
+/**
+ * Kills every process whose command line carries `marker`, each with its
+ * process group when it leads one (C-50 review, Sol: a fixture is found by
+ * its own marker, not only by a pid it may never have reported).
+ */
+export function killMarked(marker) {
+  for (const entry of readdirSync("/proc"))
+    if (/^\d+$/.test(entry) && Number(entry) !== process.pid) {
+      const pid = Number(entry);
+      if (!killOwned(pid, marker, { group: true })) killOwned(pid, marker);
+    }
 }

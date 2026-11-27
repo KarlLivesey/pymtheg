@@ -70,6 +70,24 @@ if (isMainThread && process.env.PYM_TEST_SAY_WRITTEN) {
     return result;
   };
 }
+// In the main thread, with PYM_TEST_STDERR_GATE: after its first stderr
+// write, the CLI waits until that file exists (the test closes stderr
+// first), so every later stderr write meets a closed pipe.
+const gate = process.env.PYM_TEST_STDERR_GATE;
+if (isMainThread && gate) {
+  const write = process.stderr.write.bind(process.stderr);
+  let waited = false;
+  const pause = new Int32Array(new SharedArrayBuffer(4));
+  process.stderr.write = (chunk, ...rest) => {
+    const result = write(chunk, ...rest);
+    if (!waited) {
+      waited = true;
+      write("stderr gate\n");
+      while (!existsSync(gate)) Atomics.wait(pause, 0, 0, 5);
+    }
+    return result;
+  };
+}
 const go = process.env.PYM_TEST_INPLACE_GO;
 if (isMainThread && go) {
   const hasFile = proto.hasFile;

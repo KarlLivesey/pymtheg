@@ -1058,18 +1058,18 @@ for every command:
   stop before rendering an error, it uses exit code 130. A link command can
   still stop at a later in-place graph request's checkpoint. Direct
   link-store reads after that checkpoint can finish and return an answer.
-  A `graph` command whose result stands after a stop that came before it
-  printed says so on stderr:
-  that the stop arrived after the index was complete, for an index whose
-  sync is complete, and otherwise that it arrived after the command had
-  finished.
+  If the CLI has handled a stop by the abort check after writing a `graph`
+  result, it prints a late-stop message on stderr. For an index result
+  with `sync.complete: true`, the message says the index was complete.
+  Otherwise it says the command had finished.
 - **What state the index is left in** depends only on the sync, whatever
   the command then does. A sync that wrote its completion leaves the index
   as it wrote it: `graph status` reports it as it would without the stop.
   A sync stopped after it began writing and before its completion leaves
   the index reporting incomplete; one stopped before it began writing
-  leaves the status as it was (a first index leaves an empty store, which
-  reports incomplete rather than missing). The next index repairs an incomplete store
+  leaves the status as it was. A first run stopped before store creation
+  leaves the index missing. A created store without a matching completion
+  reports incomplete. The next index repairs an incomplete store
   to equal a cold index.
 - **Progress lines** already printed may appear before a stop, `graph
   complete: N/N` included: a run prints that line even when it writes no
@@ -1077,10 +1077,14 @@ for every command:
   records an error, or a file changed during the run).
 - **No process the command started is left running**, in every case.
 - **A signal after the command has finished** does not cut its output
-  short: the CLI keeps its signal handlers until stdout and stderr have
-  drained, notes such a signal, and then exits with the command's own
-  code. Only once the output has drained and the handlers are removed can
-  a signal end the CLI by that signal; the output is whole by then.
+  short by one signal: the CLI keeps its signal handlers until stdout and
+  stderr have drained, notes the signal, and exits with the command's own
+  code. A second signal (a stop taken while the command ran counts as the
+  first) ends the CLI at once with exit code 130, and the output may then
+  be cut short. A closed stdout or stderr (EPIPE, or the stream closing)
+  ends the drain for that stream without an error, and the command's exit
+  code stands. Once the output has drained and the handlers are removed, a
+  signal can end the CLI by that signal; the output is whole by then.
 
 Inside a language module's synchronous code, or a synchronous stretch the
 module marks after an await (Go marks its notes pass and its parse, Rust

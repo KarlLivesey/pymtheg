@@ -3246,8 +3246,8 @@ any merged member. [C-42](changes/C-42.md)
 
 ### C-50 The CLI's graph command runs in a worker
 
-A CLI `graph` command, and the graph work of a CLI `link` command, runs in
-a worker thread. The main thread relays progress and handles SIGINT,
+The CLI runs `graph` commands and `link` graph requests that may sync in a
+worker thread. Link graph queries with sync disabled run in place. The main thread relays progress and handles SIGINT,
 SIGTERM, SIGHUP and SIGQUIT. A cancel that finds the worker
 inside a language module's synchronous code terminates it; the store is
 left as a killed run leaves it, and the next index repairs it. Anywhere

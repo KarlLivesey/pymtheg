@@ -248,3 +248,80 @@ test("a signal while a large answer drains to a reader that holds back: the answ
   assert.equal(code, answer.exitCode);
   assert.equal(code, 0);
 });
+
+// Sol review: the user can always get out. Two signals while a large
+// answer drains to a reader that never reads: the CLI exits 130 at once,
+// without the reader (the answer is cut short; the documents say so).
+test("two signals while a large answer drains to a reader that holds back: exit 130 at once", async (t) => {
+  const root = await project(t);
+  const functions = Array.from(
+    { length: 4000 },
+    (_, i) =>
+      `export function function_with_a_long_descriptive_name_${i}(n: number): number { return n + ${i}; }\n`,
+  ).join("");
+  await writeFile(join(root, "src", "big.ts"), functions);
+  await execBounded([cli, "graph", "index", "--root", root]);
+  const child = spawn(
+    process.execPath,
+    [
+      "--import",
+      preload,
+      cli,
+      "graph",
+      "file",
+      "src/big.ts",
+      "--no-sync",
+      "--json",
+      "--root",
+      root,
+    ],
+    {
+      env: { ...process.env, PYM_TEST_SAY_WRITTEN: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  t.after(() => endChild(child));
+  const closed = closing(child, "the CLI to exit on the second signal");
+  // The reader never reads.
+  child.stdout.pause();
+  createInterface({ input: child.stderr }).on("line", (line) => {
+    if (line !== "stdout written") return;
+    child.kill("SIGTERM");
+    child.kill("SIGTERM");
+  });
+  const [code, signal] = await closed.wait();
+  assert.deepEqual([code, signal], [130, null]);
+});
+
+// Sol review: a closed stderr ends nothing but stderr. The index's first
+// progress line is written, the test closes its end of stderr, and every
+// later stderr write meets a closed pipe: the exit code is the one stdout
+// reports.
+test("stderr closed during an index: the exit code is the one stdout reports", async (t) => {
+  const root = await project(t);
+  const gate = join(root, "..", `${root.split("/").pop()}.stderr-gate`);
+  t.after(() => rm(gate, { force: true }));
+  const child = spawn(
+    process.execPath,
+    ["--import", preload, cli, "graph", "index", "--root", root, "--json"],
+    {
+      env: { ...process.env, PYM_TEST_STDERR_GATE: gate },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  t.after(() => endChild(child));
+  const closed = closing(child, "the CLI to exit");
+  let stdout = "";
+  child.stdout.setEncoding("utf8").on("data", (text) => (stdout += text));
+  let gated = false;
+  child.stderr.setEncoding("utf8").on("data", (text) => {
+    if (gated || !text.includes("stderr gate")) return;
+    gated = true;
+    child.stderr.destroy();
+    void writeFile(gate, "");
+  });
+  const [code, signal] = await closed.wait();
+  assert.ok(gated, "the stderr gate was reached");
+  assert.equal(signal, null);
+  assert.equal(code, JSON.parse(stdout).exitCode);
+});

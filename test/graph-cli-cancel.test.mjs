@@ -12,7 +12,7 @@
 // reported is killed too. That bound only turns a hang into a failure.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bounded, killOwned } from "./owned-processes.mjs";
+import { bounded, killMarked, killOwned } from "./owned-processes.mjs";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -62,6 +62,9 @@ async function scenario(name) {
       killOwned(Number(pid), scratch, { group: true });
       killOwned(Number(pid), scratch);
     }
+    // Sol review: and every process that carries the scratch path (each
+    // fixture's socket is in it), reported or not.
+    killMarked(scratch);
     await rm(scratch, { recursive: true, force: true });
   }
   assert.ok(ended, `the ${name} scenario did not finish: ${out}`);
