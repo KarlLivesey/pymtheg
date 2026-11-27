@@ -3678,7 +3678,7 @@ extraction. During analysis, a cached declaration can keep a qualified
 target and its compiler symbol or declaration reachable. During
 differential analysis, the retained base host can keep its program
 reachable through TypeScript's `realpath` wrapper. **Why:** a long-lived
-source file can retain a program and its checker through `keyNames`. This holds for lib files and for project files whose entries were stored first. Each
+source file can retain a program and its checker through `keyNames`. Bundled library files stay live through `libCache`. The compiler host's parse cache or a later program can keep reused project files live. Each
 source file has one entry, which a later registration can replace before
 keys are cached. Four of the six live programs in the microsoft/TypeScript
 snapshot were reachable through this path. **Unchanged:** stored rows; module versions. **Known,
