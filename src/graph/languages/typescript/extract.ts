@@ -63,6 +63,7 @@ import {
 } from "./object-producers.js";
 import {
   NAMES,
+  nameRestorer,
   restoreNames,
   type FreshNames,
   type Renamed,
@@ -366,9 +367,11 @@ export function extractFile(
   // learns the program's fresh names before any key of it is made.
   if (!namedPrograms.has(program)) {
     namedPrograms.add(program);
-    const fresh = context.fresh;
+    // Made outside this function (C-64): a closure made here would hold
+    // this program and checker in every file's entry, lib files included.
+    const restorer = nameRestorer(context.fresh);
     for (const source of program.getSourceFiles())
-      setKeyNames(source, (text) => restoreNames(text, fresh));
+      setKeyNames(source, restorer);
   }
   const uncertainAt = new Set(context.renamed?.uncertain ?? []);
   const uncertainReason = (offset: number) =>
