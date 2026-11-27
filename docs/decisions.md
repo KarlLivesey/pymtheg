@@ -3259,7 +3259,9 @@ after an await (`synchronousStretch`; Go marks its link notes and parse,
 Rust its parse);
 an unmarked stretch is cancelled cooperatively, at the module's next await.
 Child process groups go into C-54's registry and are killed when the worker
-exits. **Rules out:** a CLI graph or link run that only SIGKILL can stop; a
+exits. **Rules out:** a CLI graph or link run that only SIGKILL can stop, also
+while its output drains (a second signal then ends it with 130;
+`test/graph-cli-stop.test.mjs`); a
 wall-clock deadline in place of deterministic bounds.
 [C-50](changes/C-50.md)
 

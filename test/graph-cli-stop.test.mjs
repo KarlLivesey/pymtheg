@@ -195,11 +195,11 @@ test(
   },
 );
 
-// Sol review: a signal once the command has finished must not cut its
-// output short. A large answer is handed to stdout while the reader holds
-// back; SIGTERM then arrives while it drains. The reader gets the whole,
-// parseable answer and the command's own exit code.
-test("a signal while a large answer drains to a reader that holds back: the answer is whole, and the exit code the command's", async (t) => {
+// Sol and Opus reviews: the drain. A large answer, a reader that holds
+// back, and the preload's "drain started" line, said when the CLI begins
+// to drain its output after the command has finished: the test acts on
+// that line, so what it does lands in the drain.
+async function largeAnswer(t) {
   const root = await project(t);
   const functions = Array.from(
     { length: 4000 },
@@ -223,74 +223,59 @@ test("a signal while a large answer drains to a reader that holds back: the answ
       root,
     ],
     {
-      env: { ...process.env, PYM_TEST_SAY_WRITTEN: "1" },
+      env: { ...process.env, PYM_TEST_SAY_DRAIN: "1" },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
   t.after(() => endChild(child));
   const closed = closing(child, "the CLI to exit");
-  // The reader holds back: nothing reads stdout until the signal is sent.
+  // The reader holds back: nothing reads stdout until the test says.
   child.stdout.pause();
   let stderr = "";
-  createInterface({ input: child.stderr }).on("line", (line) => {
-    stderr += line + "\n";
-    if (line !== "stdout written") return;
-    child.kill("SIGTERM");
-    let stdout = "";
-    child.stdout.setEncoding("utf8").on("data", (text) => (stdout += text));
-    child.stdout.once("end", () => (child.received = stdout));
-    child.stdout.resume();
-  });
+  const drain = new Promise((resolve) =>
+    createInterface({ input: child.stderr }).on("line", (line) => {
+      stderr += line + "\n";
+      if (line === "drain started") resolve();
+    }),
+  );
+  return { child, closed, drain, stderr: () => stderr };
+}
+
+test("one signal while a large answer drains to a reader that holds back: the answer is whole, and the exit code the command's", async (t) => {
+  const { child, closed, drain, stderr } = await largeAnswer(t);
+  await drain;
+  child.kill("SIGTERM");
+  let stdout = "";
+  child.stdout.setEncoding("utf8").on("data", (text) => (stdout += text));
+  child.stdout.resume();
   const [code, signal] = await closed.wait();
-  assert.match(stderr, /^stdout written$/m, "the large answer was written");
-  assert.equal(signal, null, `the CLI died by ${signal}: ${stderr}`);
-  const answer = JSON.parse(child.received);
+  assert.equal(signal, null, `the CLI died by ${signal}: ${stderr()}`);
+  const answer = JSON.parse(stdout);
   assert.equal(code, answer.exitCode);
   assert.equal(code, 0);
+  assert.doesNotMatch(stderr(), /the stop arrived/);
 });
 
-// Sol review: the user can always get out. Two signals while a large
-// answer drains to a reader that never reads: the CLI exits 130 at once,
-// without the reader (the answer is cut short; the documents say so).
-test("two signals while a large answer drains to a reader that holds back: exit 130 at once", async (t) => {
-  const root = await project(t);
-  const functions = Array.from(
-    { length: 4000 },
-    (_, i) =>
-      `export function function_with_a_long_descriptive_name_${i}(n: number): number { return n + ${i}; }\n`,
-  ).join("");
-  await writeFile(join(root, "src", "big.ts"), functions);
-  await execBounded([cli, "graph", "index", "--root", root]);
-  const child = spawn(
-    process.execPath,
-    [
-      "--import",
-      preload,
-      cli,
-      "graph",
-      "file",
-      "src/big.ts",
-      "--no-sync",
-      "--json",
-      "--root",
-      root,
-    ],
-    {
-      env: { ...process.env, PYM_TEST_SAY_WRITTEN: "1" },
-      stdio: ["ignore", "pipe", "pipe"],
-    },
-  );
-  t.after(() => endChild(child));
-  const closed = closing(child, "the CLI to exit on the second signal");
-  // The reader never reads.
-  child.stdout.pause();
-  createInterface({ input: child.stderr }).on("line", (line) => {
-    if (line !== "stdout written") return;
-    child.kill("SIGTERM");
-    child.kill("SIGTERM");
-  });
+// decisions.md, C-50: no CLI graph run that only SIGKILL can stop, also
+// while its output drains to a reader that never reads.
+test("the CLI can always be stopped: a second signal while its output drains to a reader that never reads ends it with 130", async (t) => {
+  const { child, closed, drain } = await largeAnswer(t);
+  await drain;
+  child.kill("SIGTERM");
+  child.kill("SIGTERM");
   const [code, signal] = await closed.wait();
   assert.deepEqual([code, signal], [130, null]);
+});
+
+// Opus review: a reader that closes early (`… | head -c 100`): the drain of
+// stdout ends quietly, with no stack trace, and the command's own code.
+test("a reader that closes during the drain: the command's own exit code, no error on stderr", async (t) => {
+  const { child, closed, drain, stderr } = await largeAnswer(t);
+  await drain;
+  child.stdout.destroy();
+  const [code, signal] = await closed.wait();
+  assert.deepEqual([code, signal], [0, null], stderr());
+  assert.doesNotMatch(stderr(), /EPIPE|Error/);
 });
 
 // Sol review: a closed stderr ends nothing but stderr. The index's first

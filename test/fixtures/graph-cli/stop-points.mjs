@@ -55,19 +55,19 @@ if (!isMainThread && point && workerData?.request && workerData?.control) {
     };
   }
 }
-// In the main thread, with PYM_TEST_SAY_WRITTEN: once a large result has
-// been handed to stdout, say so on stderr (the test then signals while the
-// result is still draining to a reader that holds back).
-if (isMainThread && process.env.PYM_TEST_SAY_WRITTEN) {
+// In the main thread, with PYM_TEST_SAY_DRAIN: when the CLI begins to drain
+// its output (the empty write `src/cli/main.ts` makes in its `finally`, once
+// the command has finished), say so on stderr. The test signals, or closes
+// its reader, on that line, so the signal lands in the drain.
+if (isMainThread && process.env.PYM_TEST_SAY_DRAIN) {
   const write = process.stdout.write.bind(process.stdout);
   let said = false;
   process.stdout.write = (chunk, ...rest) => {
-    const result = write(chunk, ...rest);
-    if (!said && String(chunk).length > 1 << 18) {
+    if (!said && chunk === "") {
       said = true;
-      process.stderr.write("stdout written\n");
+      process.stderr.write("drain started\n");
     }
-    return result;
+    return write(chunk, ...rest);
   };
 }
 // In the main thread, with PYM_TEST_STDERR_GATE: after its first stderr
