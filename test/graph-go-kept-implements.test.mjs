@@ -91,6 +91,10 @@ const files = {
   // An embedded type changes (embeds).
   "emb2/e.go":
     "package emb2\n\ntype I interface{ M() }\n\ntype A struct{}\n\nfunc (A) M() {}\n\ntype B struct{}\n\ntype W struct{ A }\n",
+  // A body edit can change the decisions: an anonymous struct embedding X
+  // inside a function body implements I (Sol's review, restic's Hasher).
+  "bod/b.go":
+    "package bod\n\ntype I interface{ M() }\n\ntype X struct{}\n\nfunc (X) M() {}\n\nfunc F() {}\n",
   // (c) A failed file (no surface), moved into the implementers' package.
   "zz/broken.go": "package box\n\nfunc Broken( {\n",
   // Two init functions share an identity: an anonymous struct in the first
@@ -185,6 +189,35 @@ test("a session reuses Go's implements decisions across body edits, proven equal
       false,
     ],
     [
+      "a body edit adds an anonymous struct embedding X (it implements I)",
+      () =>
+        write(
+          "bod/b.go",
+          files["bod/b.go"].replace(
+            "func F() {}",
+            "func F() { _ = struct{ X }{} }",
+          ),
+        ),
+      false,
+    ],
+    ["the body edit undone", () => write("bod/b.go", files["bod/b.go"]), false],
+    [
+      "go.mod cannot be decoded (its read status changes)",
+      () =>
+        writeFileSync(
+          join(root, "go.mod"),
+          Buffer.concat([
+            Buffer.from(files["go.mod"]),
+            Buffer.from([0xff, 0xfe, 0x0a]),
+          ]),
+        ),
+      false,
+      // Go's analysis stops on a context file it cannot read: the run
+      // fails and keeps nothing, so the decisions are never reused.
+      "fails",
+    ],
+    ["go.mod restored", () => write("go.mod", files["go.mod"]), false],
+    [
       "an interface's embedded interface changes",
       () =>
         write(
@@ -266,9 +299,13 @@ test("a session reuses Go's implements decisions across body edits, proven equal
     const registry = await discoverLanguages();
     const session = new IndexSession({ registry });
     assert.equal((await index(root, session)).sync.complete, true);
-    for (const [name, edit, reused] of steps) {
+    for (const [name, edit, reused, fails] of steps) {
       edit();
       resetGraphWork();
+      if (fails === "fails") {
+        assert.equal((await index(root, session)).sync.complete, false, name);
+        continue;
+      }
       assert.equal((await index(root, session)).sync.complete, true, name);
       const counts = graphWork.counts;
       if (reused) {
