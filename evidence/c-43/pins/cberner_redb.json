@@ -10,9 +10,11 @@
  "sourceOnly": {
   "links": 73731,
   "level2": 35223,
+  "level2NoneSeen": 35223,
   "assumed": 110,
   "proven": 35113,
   "toolchainDecided": 0,
+  "toolchainSeen": 0,
   "toolchainCheckout": 0,
   "toolchainLibrary": 0,
   "libraryModuleLinks": 0,
@@ -21,26 +23,29 @@
  },
  "route": {
   "links": 73731,
-  "level2": 58966,
+  "level2": 65157,
+  "level2NoneSeen": 37212,
   "assumed": 110,
   "proven": 35113,
-  "toolchainDecided": 23743,
-  "toolchainCheckout": 8707,
-  "toolchainLibrary": 15036,
+  "toolchainDecided": 29934,
+  "toolchainSeen": 27945,
+  "toolchainCheckout": 11130,
+  "toolchainLibrary": 18804,
   "libraryModuleLinks": 0,
-  "level2Percent": 79.97,
-  "withModuleLinksPercent": 79.97,
-  "toolchainDecidedPercent": 32.2
+  "level2Percent": 88.37,
+  "level2NoneSeenPercent": 50.47,
+  "withModuleLinksPercent": 88.37,
+  "toolchainDecidedPercent": 40.6
  },
  "decided": {
-  "library:offered": 21772,
-  "definite:definite": 9882,
-  "definite:unresolved": 8707,
-  "library:withheld:cfg-link": 5449,
-  "withheld:cfg-variant": 660,
-  "withheld:cfg-link": 3423,
-  "withheld:conditional-candidates": 156,
-  "withheld:cfg-selected": 32
+  "library:offered": 27221,
+  "definite:definite": 11648,
+  "definite:unresolved": 10976,
+  "label:none-seen": 466,
+  "label:seen": 10664,
+  "withheld:import-namespaces": 54,
+  "definite:candidates": 154,
+  "kept:source-only-differs": 28
  },
  "join": {
   "none:kind-not-joined": 5481,
@@ -61,16 +66,127 @@
   "filter:extern-crate": 1
  },
  "agreement": {
-  "confirmed": 9882,
-  "differs": 0,
-  "percent": 100
+  "confirmed": 11648,
+  "differs": 28,
+  "percent": 99.76
  },
- "disagreements": [],
+ "disagreements": [
+  {
+   "file": "src/error.rs",
+   "range": [
+    11429,
+    11462
+   ],
+   "kind": "patterns",
+   "name": "TableError::TypeDefinitionChanged",
+   "sourceOnly": "symbol:fff76867901cc51294f2d5824c694c9af67d46f81c673c36cdf551f5ad9540e9",
+   "toolchain": "symbol:1002834bfa07c8ed6e3db8f32d96d76a8a4f38a56f0b2e1dc3b09293df0c9e23"
+  },
+  {
+   "file": "src/error.rs",
+   "range": [
+    11554,
+    11582
+   ],
+   "kind": "types",
+   "name": "Error::TypeDefinitionChanged",
+   "sourceOnly": "symbol:058d91769d79749cde9a9c868293cc8b77014152a78d0402a4865acb267ad3de",
+   "toolchain": "symbol:c54ef1dc04afb35217f7163ec1f89d2d2098294bd7adceb100753fdf8a3a89fb"
+  },
+  {
+   "file": "src/error.rs",
+   "range": [
+    11888,
+    11917
+   ],
+   "kind": "patterns",
+   "name": "TableError::TableTypeMismatch",
+   "sourceOnly": "symbol:3655f01953147fd50fcd576df345428c0badb0d7173335c3bb16e7920c3b0c0e",
+   "toolchain": "symbol:3474473ed2626a618531cb51b62f4df172997968b51e733729b59db3dfed9629"
+  },
+  {
+   "file": "src/error.rs",
+   "range": [
+    11961,
+    11985
+   ],
+   "kind": "types",
+   "name": "Error::TableTypeMismatch",
+   "sourceOnly": "symbol:ad5fe3f181d0c152c2d1a213508569ba6c50fd53f4b670af3e2ccdcd29b9b5cf",
+   "toolchain": "symbol:434b897785a38f6d62591a95019d2bfded5a875b7c29de5c79bebb47195b5194"
+  },
+  {
+   "file": "src/error.rs",
+   "range": [
+    17680,
+    17713
+   ],
+   "kind": "patterns",
+   "name": "TableError::TypeDefinitionChanged",
+   "sourceOnly": "symbol:fff76867901cc51294f2d5824c694c9af67d46f81c673c36cdf551f5ad9540e9",
+   "toolchain": "symbol:1002834bfa07c8ed6e3db8f32d96d76a8a4f38a56f0b2e1dc3b09293df0c9e23"
+  },
+  {
+   "file": "src/error.rs",
+   "range": [
+    18062,
+    18091
+   ],
+   "kind": "patterns",
+   "name": "TableError::TableTypeMismatch",
+   "sourceOnly": "symbol:3655f01953147fd50fcd576df345428c0badb0d7173335c3bb16e7920c3b0c0e",
+   "toolchain": "symbol:3474473ed2626a618531cb51b62f4df172997968b51e733729b59db3dfed9629"
+  },
+  {
+   "file": "src/error.rs",
+   "range": [
+    38323,
+    38351
+   ],
+   "kind": "patterns",
+   "name": "Error::TypeDefinitionChanged",
+   "sourceOnly": "symbol:058d91769d79749cde9a9c868293cc8b77014152a78d0402a4865acb267ad3de",
+   "toolchain": "symbol:c54ef1dc04afb35217f7163ec1f89d2d2098294bd7adceb100753fdf8a3a89fb"
+  },
+  {
+   "file": "src/error.rs",
+   "range": [
+    38695,
+    38719
+   ],
+   "kind": "patterns",
+   "name": "Error::TableTypeMismatch",
+   "sourceOnly": "symbol:ad5fe3f181d0c152c2d1a213508569ba6c50fd53f4b670af3e2ccdcd29b9b5cf",
+   "toolchain": "symbol:434b897785a38f6d62591a95019d2bfded5a875b7c29de5c79bebb47195b5194"
+  },
+  {
+   "file": "src/sealed.rs",
+   "range": [
+    518,
+    530
+   ],
+   "kind": "implements",
+   "name": "SealedInApi5",
+   "sourceOnly": "symbol:6eaf18181f4b7758303996e3c96ea302a2dd6a5850311dfb0dc12dae7dab8305",
+   "toolchain": "symbol:8ff6de3a2124d5fc951b3b7eb1e648cf6f19f86eca05d521fa9715b6fb0716a4"
+  },
+  {
+   "file": "src/sealed.rs",
+   "range": [
+    518,
+    530
+   ],
+   "kind": "types",
+   "name": "SealedInApi5",
+   "sourceOnly": "symbol:6eaf18181f4b7758303996e3c96ea302a2dd6a5850311dfb0dc12dae7dab8305",
+   "toolchain": "symbol:8ff6de3a2124d5fc951b3b7eb1e648cf6f19f86eca05d521fa9715b6fb0716a4"
+  }
+ ],
  "library": {
-  "offered": 21772,
-  "applied": 15036,
-  "agree": 2776,
-  "unverified": 3960,
+  "offered": 27221,
+  "applied": 18804,
+  "agree": 3106,
+  "unverified": 5311,
   "sourceOnlyCheckout": 0,
   "candidates": 0,
   "notApplied": 0
@@ -80,22 +196,35 @@
   "linksAfter": 73731,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 16456,
-  "outcomeDataDiffers": 0
+  "outcomes": 8499,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 11130,
+  "path": {
+   "decided": 2119,
+   "kept": 336
+  },
+  "receiver": {
+   "decided": 9011,
+   "keptNames": 6083,
+   "keptTraceable": 5102
+  }
  },
  "analyzerRun": {
-  "wallS": 166.3,
-  "cpuS": 1954.4,
-  "peakMiB": 2058
+  "wallS": 161.5,
+  "cpuS": 2049.7,
+  "peakMiB": 2056
  },
  "index": {
   "sourceOnly": {
-   "wallS": 65.2,
-   "cpuS": 80.3
+   "wallS": 63.2,
+   "cpuS": 83.5
   },
   "route": {
-   "wallS": 319.6,
-   "cpuS": 85.4
+   "wallS": 303.9,
+   "cpuS": 101.6
   }
  },
  "errors": {
@@ -105,22 +234,19 @@
  "funnel": {
   "open": 38394,
   "buckets": {
-   "credited: library": 15036,
+   "credited: library": 18804,
    "no answer: no-name-site": 45,
    "gate: kind/namespace": 54,
    "no identity: local binding": 3416,
-   "credited": 8707,
+   "credited": 11130,
    "no answer: no-occurrence-at-site": 805,
-   "gate: cfg condition other than test": 5395,
    "gate: trait-method declaration": 1223,
    "no identity: library item": 363,
-   "gate: cfg-variant guard": 660,
    "gate: known error classes": 106,
    "no identity: generated item": 364,
    "no answer: file-not-indexed": 2022,
-   "gate: conditional candidates": 156,
    "no identity: declaration without a graph symbol": 10,
-   "gate: cfg-selected name (use, alias or function twins)": 32
+   "gate: an import of a name bound in several namespaces": 52
   },
   "libraryPassingCfg": 348,
   "notIndexed": {

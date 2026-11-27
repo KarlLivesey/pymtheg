@@ -10,9 +10,11 @@
  "sourceOnly": {
   "links": 60424,
   "level2": 25892,
+  "level2NoneSeen": 25892,
   "assumed": 1793,
   "proven": 24099,
   "toolchainDecided": 0,
+  "toolchainSeen": 0,
   "toolchainCheckout": 0,
   "toolchainLibrary": 0,
   "libraryModuleLinks": 0,
@@ -21,25 +23,28 @@
  },
  "route": {
   "links": 60424,
-  "level2": 48603,
+  "level2": 49459,
+  "level2NoneSeen": 27826,
   "assumed": 1793,
   "proven": 24099,
-  "toolchainDecided": 22711,
-  "toolchainCheckout": 13459,
-  "toolchainLibrary": 9252,
+  "toolchainDecided": 23567,
+  "toolchainSeen": 21633,
+  "toolchainCheckout": 14021,
+  "toolchainLibrary": 9546,
   "libraryModuleLinks": 0,
-  "level2Percent": 80.44,
-  "withModuleLinksPercent": 80.44,
-  "toolchainDecidedPercent": 37.59
+  "level2Percent": 81.85,
+  "level2NoneSeenPercent": 46.05,
+  "withModuleLinksPercent": 81.85,
+  "toolchainDecidedPercent": 39
  },
  "decided": {
-  "library:offered": 13058,
-  "definite:unresolved": 13459,
-  "definite:definite": 10488,
-  "withheld:conditional-candidates": 314,
-  "withheld:cfg-variant": 9,
-  "withheld:cfg-link": 418,
-  "library:withheld:cfg-link": 457
+  "library:offered": 13515,
+  "definite:unresolved": 14017,
+  "label:seen": 13116,
+  "definite:definite": 10666,
+  "label:none-seen": 905,
+  "kept:source-only-differs": 1,
+  "definite:candidates": 4
  },
  "join": {
   "library": 13515,
@@ -59,16 +64,28 @@
   "filter:extern-crate": 19
  },
  "agreement": {
-  "confirmed": 10488,
-  "differs": 0,
-  "percent": 100
+  "confirmed": 10666,
+  "differs": 1,
+  "percent": 99.99
  },
- "disagreements": [],
+ "disagreements": [
+  {
+   "file": "ratatui-core/src/layout/layout.rs",
+   "range": [
+    2400,
+    2405
+   ],
+   "kind": "types",
+   "name": "Cache",
+   "sourceOnly": "symbol:a6b05ca7c7fab2a0aeacc6bdd60e1affea0c73e61d2fe8c307e0f7249a52483e",
+   "toolchain": "symbol:9ada79be0780574d409f778b40554e2213d80894a98929b10551422106e28348"
+  }
+ ],
  "library": {
-  "offered": 13058,
-  "applied": 9252,
-  "agree": 1098,
-  "unverified": 2708,
+  "offered": 13515,
+  "applied": 9546,
+  "agree": 1122,
+  "unverified": 2847,
   "sourceOnlyCheckout": 0,
   "candidates": 0,
   "notApplied": 0
@@ -78,22 +95,35 @@
   "linksAfter": 60424,
   "lost": 0,
   "changedLevel2": 0,
-  "outcomes": 5004,
-  "outcomeDataDiffers": 0
+  "outcomes": 3970,
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 14021,
+  "path": {
+   "decided": 7530,
+   "kept": 538
+  },
+  "receiver": {
+   "decided": 6491,
+   "keptNames": 2229,
+   "keptTraceable": 1761
+  }
  },
  "analyzerRun": {
-  "wallS": 80,
-  "cpuS": 269.5,
-  "peakMiB": 2855
+  "wallS": 88.2,
+  "cpuS": 330.5,
+  "peakMiB": 2836
  },
  "index": {
   "sourceOnly": {
-   "wallS": 68.4,
-   "cpuS": 85.3
+   "wallS": 87.4,
+   "cpuS": 107.2
   },
   "route": {
-   "wallS": 274.6,
-   "cpuS": 91
+   "wallS": 267.2,
+   "cpuS": 118.7
   }
  },
  "errors": {
@@ -103,21 +133,18 @@
  "funnel": {
   "open": 34256,
   "buckets": {
-   "credited: library": 9252,
+   "credited: library": 9546,
    "gate: kind/namespace": 69,
-   "credited": 13459,
+   "credited": 14021,
    "no identity: generated item": 1279,
-   "gate: conditional candidates": 314,
    "no identity: library item": 248,
    "gate: trait-method declaration": 1400,
    "no identity: local binding": 4104,
    "no identity: declaration without a graph symbol": 601,
    "no answer: no-name-site": 141,
-   "gate: cfg-variant guard": 9,
    "no answer: no-occurrence-at-site": 2292,
    "no answer: file-not-indexed": 530,
-   "gate: known error classes": 25,
-   "gate: cfg condition other than test": 533
+   "gate: known error classes": 25
   },
   "libraryPassingCfg": 244,
   "notIndexed": {

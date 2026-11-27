@@ -11,9 +11,11 @@
  "sourceOnly": {
   "links": 150404,
   "level2": 73311,
+  "level2NoneSeen": 73311,
   "assumed": 3668,
   "proven": 69643,
   "toolchainDecided": 0,
+  "toolchainSeen": 0,
   "toolchainCheckout": 0,
   "toolchainLibrary": 0,
   "libraryModuleLinks": 0,
@@ -23,13 +25,16 @@
  "route": {
   "links": 150404,
   "level2": 73311,
+  "level2NoneSeen": 73311,
   "assumed": 3668,
   "proven": 69643,
   "toolchainDecided": 0,
+  "toolchainSeen": 0,
   "toolchainCheckout": 0,
   "toolchainLibrary": 0,
   "libraryModuleLinks": 0,
   "level2Percent": 48.74,
+  "level2NoneSeenPercent": 48.74,
   "withModuleLinksPercent": 48.74,
   "toolchainDecidedPercent": 0
  },
@@ -73,21 +78,34 @@
   "lost": 0,
   "changedLevel2": 0,
   "outcomes": 0,
-  "outcomeDataDiffers": 0
+  "outcomeDataDiffers": 0,
+  "routeOffDiffers": 0
+ },
+ "design": {
+  "decided": 0,
+  "path": {
+   "decided": 0,
+   "kept": 0
+  },
+  "receiver": {
+   "decided": 0,
+   "keptNames": 0,
+   "keptTraceable": 0
+  }
  },
  "analyzerRun": {
-  "wallS": 400.8,
-  "cpuS": 1133.8,
-  "peakMiB": 9715
+  "wallS": 383.4,
+  "cpuS": 1074,
+  "peakMiB": 9717
  },
  "index": {
   "sourceOnly": {
-   "wallS": 521.6,
-   "cpuS": 574.7
+   "wallS": 495.5,
+   "cpuS": 569.5
   },
   "route": {
-   "wallS": 1585.1,
-   "cpuS": 594.4
+   "wallS": 1327.6,
+   "cpuS": 608.4
   }
  },
  "errors": {
