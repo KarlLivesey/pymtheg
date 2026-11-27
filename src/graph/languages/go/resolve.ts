@@ -521,9 +521,12 @@ class FileMemo<T> {
 
 /**
  * C-56b: the implements pass's decisions, by symbol id, in the order made:
- * interfaces whose implementer list is complete, possible implementers
- * (type, interface), and implementers (type, interface, pointer receiver,
- * identity of the method signatures).
+ * interfaces with a known, nonempty source-only method set (`complete`);
+ * type/interface pairs that remain possible (`possible`); and pairs that
+ * pass the source-only structural check (`implementers`), each with a
+ * pointer-receiver flag and a signature-identity annotation of
+ * `identical`, `different` or `unknown`. Structural matches, not verified
+ * implementations.
  */
 export interface ImplementsDecisions {
   complete: string[];
