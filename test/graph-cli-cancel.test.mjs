@@ -211,3 +211,36 @@ test("a run that is not aborted answers through the worker", async () => {
     await rm(scratch, { recursive: true, force: true });
   }
 });
+
+// C-50, after C-56b changed Go's link-notes call: Go's analysis still marks
+// its project-wide synchronous work after an await (its link notes) as a
+// stretch, so a cancel there is taken inside the module call. The worker's
+// section reads `true` again after the call's promise was returned.
+test("Go's link notes after its analysis has awaited run in a marked stretch", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "pymtheg-cli-go-stretch-"));
+  try {
+    await writeFile(join(scratch, "go.mod"), "module example.com/m\n\ngo 1.22\n");
+    await writeFile(join(scratch, "a.go"), "package m\n\nfunc A() int { return B() }\n\nfunc B() int { return 1 }\n");
+    const { discoverLanguages } = await import("../dist/graph/index.js");
+    const all = await discoverLanguages();
+    const go = all.modules.filter((module) => module.id === "go");
+    const states = [];
+    const response = await executeGraph(
+      { command: "index", root: scratch },
+      {
+        registry: new LanguageRegistry(go),
+        onModuleCall: (inside) => states.push(inside),
+      },
+    );
+    assert.equal(response.status, "ok");
+    // A marked stretch: code inside the module call (true) after the call
+    // had returned its promise ("awaiting"). With one file, two: its parse
+    // after the parser loads, and the project's link notes.
+    const stretches = states.filter(
+      (state, i) => state === true && states[i - 1] === "awaiting",
+    ).length;
+    assert.equal(stretches, 2, JSON.stringify(states));
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
