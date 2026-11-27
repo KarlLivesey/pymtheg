@@ -1,5 +1,6 @@
 Cold index of two installed pins, the sweep runner (scripts/sweep/run.mjs), one
 run each on a shared server; CPU seconds and peak RSS are observations.
+Changesets peaked at 917 → 898 MiB RSS, and Hono at 1,823 → 1,509 MiB.
 
 pin                     build  cpuSeconds  peakRssKiB  status
 changesets/changesets   main   25.06       938876      ok

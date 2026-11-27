@@ -3671,15 +3671,17 @@ and a Go body edit already rewrites no other file's stored link data.
 See [C-56a](changes/C-56a.md).
 ### Nothing stored beside a source file holds a program (C-64)
 
-**Decided (C-64):** a value the TypeScript module stores beside a source
-file, a node, a symbol or a declaration (or in the parse cache) holds no
-program, checker, type or symbol of a checker. The name restorer C-49
-stores per file is made at module level over a copy of the fresh names'
-strings (`nameRestorer`), not as a closure inside the extraction. **Why:**
-lib files are parsed once and shared by every program of an analysis
-(`libCache`), so a closure stored on one kept every program that stored it,
-with its checker, until the analysis ended: six programs at once on
-microsoft/TypeScript. **Unchanged:** stored rows; module versions. **Known,
+**Decided (C-64):** C-64 removes compiler references from the stored name
+restorer: C-49's per-file restorer is made at module level over a copy of
+the fresh names' strings (`nameRestorer`), not as a closure inside the
+extraction. During analysis, a cached declaration can keep a qualified
+target and its compiler symbol or declaration reachable. During
+differential analysis, the retained base host can keep its program
+reachable through TypeScript's `realpath` wrapper. **Why:** a long-lived
+source file can retain a program and its checker through `keyNames`. Each
+source file has one entry, which a later registration can replace before
+keys are cached. Four of the six live programs in the microsoft/TypeScript
+snapshot were reachable through this path. **Unchanged:** stored rows; module versions. **Known,
 not ours:** TypeScript's checker itself writes onto a shared parse a symbol
 that reaches its types, and V8's allocation-site feedback for
 `createProgram` holds one program. See [C-64](changes/C-64.md).
